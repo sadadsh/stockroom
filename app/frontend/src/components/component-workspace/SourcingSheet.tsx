@@ -24,14 +24,6 @@ import { ExternalIcon } from "../icons";
 import { DataTable, EmptyState, Section } from "../primitives";
 import { SourceStateBadge } from "./SheetParts";
 
-/** The lowest quoted unit price, or nothing. Never an interpolated "from" price nobody quoted. */
-export function lowestPrice(offer: DistributorOffer): number | null {
-  const prices = offer.priceBreaks
-    .map((entry) => entry.price)
-    .filter((price): price is number => price != null);
-  return prices.length === 0 ? null : Math.min(...prices);
-}
-
 export function SourcingSheet({
   offers,
   documents,
@@ -50,10 +42,11 @@ export function SourcingSheet({
   const priceTableLabel = useText("component-browser.price-ladder", "Price breaks");
   const statesLabel = useText("component-browser.source-states", "Sources");
   const openListing = useCopyFormatter("component-browser.open-listing", "Open {provider} Listing");
+  const moqLabel = useCopyFormatter("component-browser.offer-moq", "MOQ {count}");
   const openRelated = useCopyFormatter("component-browser.open-related", "Open {mpn}");
   const notValidated = useText(
     "component-browser.related-not-validated",
-    "Not checked for equivalence by Stockroom",
+    "Stockroom has not checked this for equivalence",
   );
 
   return (
@@ -82,7 +75,7 @@ export function SourcingSheet({
                   {offer.stock === null ? stockUnknown : formatCount(offer.stock)}
                 </span>
                 <span className="text-2xs text-t3">
-                  {offer.moq === null ? "" : `MOQ ${formatCount(offer.moq)}`}
+                  {offer.moq === null ? "" : moqLabel({ count: formatCount(offer.moq) })}
                 </span>
                 <span className="text-2xs text-t3">{offer.leadTime}</span>
                 <span className="text-2xs text-t3">
@@ -111,7 +104,7 @@ export function SourcingSheet({
                   label={`${priceTableLabel} ${offer.providerLabel}`}
                   headings={[
                     <Text key="q" id="component-browser.price-col-qty">
-                      Quantity
+                      Count
                     </Text>,
                     <Text key="p" id="component-browser.price-col-price">
                       Unit Price
@@ -143,9 +136,9 @@ export function SourcingSheet({
         count={relatedParts.length}
         note={
           <Text id="component-browser.relationships-unvalidated">
-            These are suggestions published by a distributor. Stockroom has not checked that any of
-            them is electrically or mechanically interchangeable with this component, so treat every
-            row as a lead to verify rather than a proven replacement.
+            These are suggestions from a distributor. Stockroom has not checked whether these parts
+            are interchangeable in circuit or in package with this component, so treat each row as a
+            lead to validate rather than a proven replacement.
           </Text>
         }
       >
@@ -257,7 +250,7 @@ export function SourcingSheet({
       >
         {sources.length === 0 ? (
           <EmptyState id="component-browser.source-states-empty">
-            No source has been consulted for this component yet.
+            No source has been consulted for this component so far.
           </EmptyState>
         ) : (
           <ul aria-label={statesLabel} className="flex flex-col gap-1">

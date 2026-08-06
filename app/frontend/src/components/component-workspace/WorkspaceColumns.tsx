@@ -10,17 +10,26 @@
  * The splitters are a real pointer drag AND a real keyboard control, because a separator that only
  * responds to a mouse is a separator half the people using it cannot move.
  */
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { useText } from "../../lib/copy";
 import {
+  columnMinimums,
+  columnsMinTotal,
   moveSplitter,
   readColumnFractions,
   resolveColumnWidths,
   SPLITTER_KEY_STEP,
   SPLITTER_NEIGHBOURS,
-  WORKSPACE_COLUMN_MIN,
-  WORKSPACE_COLUMNS_MIN_TOTAL,
   writeColumnFractions,
+  type StoredColumnFractions,
   type WorkspaceColumnId,
   type WorkspaceColumnWidths,
   type WorkspaceSplitterId,
@@ -33,18 +42,46 @@ export interface WorkspaceColumnsProps {
   cad: ReactNode;
   specifications: ReactNode;
   sourcing: ReactNode;
+  /**
+   * Nothing has been sourced for this component at all, so the sourcing column can only draw five
+   * lifecycle rows however much room it is given.
+   *
+   * It narrows to what that content needs and the surplus goes to the other two columns. It does not
+   * collapse, does not hide and does not lose its title strip - see `WORKSPACE_SOURCING_SPARSE_MIN`
+   * for the measurement and for why a collapsed strip was the wrong answer. A stored splitter
+   * position overrides this entirely.
+   */
+  sparseSourcing?: boolean;
 }
 
-export function WorkspaceColumns({ cad, specifications, sourcing }: WorkspaceColumnsProps) {
+export function WorkspaceColumns({
+  cad,
+  specifications,
+  sourcing,
+  sparseSourcing = false,
+}: WorkspaceColumnsProps) {
   const bandRef = useRef<HTMLDivElement>(null);
   const [total, setTotal] = useState(ASSUMED_TOTAL);
   const [widths, setWidths] = useState<WorkspaceColumnWidths>(() =>
-    resolveColumnWidths(ASSUMED_TOTAL, readColumnFractions()),
+    resolveColumnWidths(ASSUMED_TOTAL, readColumnFractions(), sparseSourcing),
   );
   // The stored preference is read ONCE. Re-reading it on every resize would let a mid-session drag
   // be undone by the next window change, which is exactly the bug a persisted layout is supposed
-  // to prevent.
-  const fractionsRef = useRef(readColumnFractions());
+  // to prevent. `useRef` has no lazy-initializer form, so passing the call straight to it re-read
+  // the stored preference on EVERY render and threw the answer away.
+  //
+  // The read is a `useMemo` and the ref is seeded from it, rather than the ref being filled in by a
+  // guarded write during render: a render must not mutate a ref, because React can replay or discard
+  // a render and the write would leak out of UI that never committed. Seeding is not mutating - the
+  // initial value is the one thing `useRef` is allowed to be handed - and if React ever discards the
+  // memo the recomputed value is simply unused, because the ref already holds the answer.
+  const storedFractions = useMemo(() => readColumnFractions(), []);
+  const fractionsRef = useRef<StoredColumnFractions | null>(storedFractions);
+
+  // The authoritative widths, mirrored so a drag can derive the next widths WITHOUT computing them
+  // inside a state updater. React may replay an updater, and this one used to persist the result and
+  // write `fractionsRef` from in there - work that must happen exactly once per drag step.
+  const widthsRef = useRef(widths);
 
   // Measure the band and re-derive the pixel widths from the remembered proportions. A layout
   // effect rather than an effect: the first painted frame should already be the right shape.
@@ -62,9 +99,14 @@ export function WorkspaceColumns({ cad, specifications, sourcing }: WorkspaceCol
     return () => observer.disconnect();
   }, []);
 
+  // Re-derived when the sourcing column's content changes too: an offer arriving is the moment the
+  // column has something to be wide for, and it should get the room then rather than on the next
+  // resize.
   useLayoutEffect(() => {
-    setWidths(resolveColumnWidths(total, fractionsRef.current));
-  }, [total]);
+    const next = resolveColumnWidths(total, fractionsRef.current, sparseSourcing);
+    widthsRef.current = next;
+    setWidths(next);
+  }, [total, sparseSourcing]);
 
   const commit = useCallback((next: WorkspaceColumnWidths) => {
     fractionsRef.current = {
@@ -75,15 +117,19 @@ export function WorkspaceColumns({ cad, specifications, sourcing }: WorkspaceCol
     writeColumnFractions(next);
   }, []);
 
+  // One drag step: derive, persist, then set. The derivation reads the mirrored widths rather than a
+  // state updater's `current`, so persistence sits OUTSIDE the updater where it belongs and cannot
+  // be run twice by a replay. It still happens synchronously within the same pointer event, so a
+  // release-and-reload lands on the same layout it did before, and successive steps in one tick still
+  // chain correctly because the mirror is advanced here.
   const drag = useCallback(
     (splitter: WorkspaceSplitterId, delta: number) => {
-      setWidths((current) => {
-        const next = moveSplitter(current, splitter, delta);
-        commit(next);
-        return next;
-      });
+      const next = moveSplitter(widthsRef.current, splitter, delta, sparseSourcing);
+      widthsRef.current = next;
+      commit(next);
+      setWidths(next);
     },
-    [commit],
+    [commit, sparseSourcing],
   );
 
   return (
@@ -98,12 +144,18 @@ export function WorkspaceColumns({ cad, specifications, sourcing }: WorkspaceCol
     >
       <div
         className="flex min-h-0 flex-1"
-        style={{ minWidth: WORKSPACE_COLUMNS_MIN_TOTAL }}
+        style={{ minWidth: columnsMinTotal(sparseSourcing) }}
       >
         <div className="flex min-h-0 flex-none flex-col" style={{ width: widths.cad }}>
           {cad}
         </div>
-        <ColumnSplitter splitter="cad-specifications" widths={widths} total={total} onDrag={drag} />
+        <ColumnSplitter
+          splitter="cad-specifications"
+          widths={widths}
+          total={total}
+          sparseSourcing={sparseSourcing}
+          onDrag={drag}
+        />
         <div
           className="flex min-h-0 flex-none flex-col"
           style={{ width: widths.specifications }}
@@ -114,6 +166,7 @@ export function WorkspaceColumns({ cad, specifications, sourcing }: WorkspaceCol
           splitter="specifications-sourcing"
           widths={widths}
           total={total}
+          sparseSourcing={sparseSourcing}
           onDrag={drag}
         />
         <div className="flex min-h-0 flex-1 flex-col" style={{ minWidth: widths.sourcing }}>
@@ -147,11 +200,13 @@ function ColumnSplitter({
   splitter,
   widths,
   total,
+  sparseSourcing,
   onDrag,
 }: {
   splitter: WorkspaceSplitterId;
   widths: WorkspaceColumnWidths;
   total: number;
+  sparseSourcing: boolean;
   onDrag: (splitter: WorkspaceSplitterId, delta: number) => void;
 }) {
   const copy = SPLITTER_COPY[splitter];
@@ -181,8 +236,9 @@ function ColumnSplitter({
 
   // The travel this handle actually has, so a screen reader hears a position rather than a pixel
   // count that means nothing without knowing the window width.
-  const lowest = WORKSPACE_COLUMN_MIN[left];
-  const highest = Math.max(lowest, widths[left] + widths[right] - WORKSPACE_COLUMN_MIN[right]);
+  const min = columnMinimums(sparseSourcing);
+  const lowest = min[left];
+  const highest = Math.max(lowest, widths[left] + widths[right] - min[right]);
 
   return (
     <div
@@ -241,6 +297,7 @@ export function WorkspaceColumn({
   devId,
   title,
   meta,
+  action,
   toolbar,
   scrollRef,
   children,
@@ -250,6 +307,14 @@ export function WorkspaceColumn({
   title: ReactNode;
   /** The optional right-side count or state. 10px, muted, never badge-styled. */
   meta?: ReactNode;
+  /**
+   * At most ONE compact command button on the title line, between the name and the count.
+   *
+   * A column whose single action is a full toolbar row spends a whole row of vertical space on one
+   * button; the layout has always drawn this as `CAD Assets [Compare Sources]`. It is one button,
+   * not a shelf: a second one belongs in the toolbar or in a menu.
+   */
+  action?: ReactNode;
   /** A compact control row directly under the title strip, inside the column's own chrome. */
   toolbar?: ReactNode;
   scrollRef?: (node: HTMLDivElement | null) => void;
@@ -263,6 +328,7 @@ export function WorkspaceColumn({
     >
       <header className="flex h-[24px] flex-none items-center gap-2 border-b border-line bg-band px-2">
         <span className="ui-panel-title min-w-0 truncate">{title}</span>
+        {action != null ? <span className="flex-none">{action}</span> : null}
         {meta != null ? (
           <span className="ui-component-metadata ml-auto flex-none">{meta}</span>
         ) : null}

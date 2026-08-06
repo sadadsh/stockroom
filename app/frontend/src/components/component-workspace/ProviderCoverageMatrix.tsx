@@ -1,8 +1,10 @@
 /**
  * Compare Sources: every provider's coverage of ONE component, as a dense table.
  *
- * Five columns of facts - `Provider | Symbol | Footprint | 3D Model | Validation` - and one
- * action. Never a card per provider: a person comparing eight providers is scanning a column,
+ * Five columns of facts - `Provider | 3D Model | Footprint | Symbol | Validation` - and one
+ * action. The three asset columns run in the order the CAD modules beside this table are stacked,
+ * which is the frontend's `CAD_ASSET_KINDS`, not the order the payload happens to list them in.
+ * Never a card per provider: a person comparing eight providers is scanning a column,
  * and eight stacked panels turn one comparison into eight readings of the same four fields.
  *
  * The screen answers one question: which provider can supply the whole set for this part, so a
@@ -38,6 +40,7 @@ import { componentProviderDevId } from "../../lib/componentDevIds";
 import { Text, useText } from "../../lib/copy";
 import { Button } from "../primitives";
 import { StatusText, type StatusTone } from "../typography";
+import { CAD_ASSET_KINDS } from "./cadPreference";
 
 /** The only two answers a person can give, plus withdrawing one they already gave. */
 export type UserCoverageStatus = "available" | "not_available" | "";
@@ -124,11 +127,11 @@ export function useProviderMatrixLabels(): ProviderMatrixLabels {
     completeSet: useText("component-browser.provider-complete", "Complete Set"),
     completeHint: useText(
       "component-browser.provider-complete-hint",
-      "This provider can supply the symbol, the footprint and the 3D model for this component.",
+      "This provider can offer the symbol, the footprint and the 3D model for this component.",
     ),
     partialHint: useText(
       "component-browser.provider-partial-hint",
-      "This provider cannot supply the whole set for this component.",
+      "This provider cannot offer the whole set for this component.",
     ),
     signIn: useText("component-browser.provider-sign-in", "Sign In Needed"),
     aggregator: useText("component-browser.provider-aggregator", "Aggregator"),
@@ -156,7 +159,7 @@ export function useProviderMatrixLabels(): ProviderMatrixLabels {
     useForSet: useText("component-browser.provider-use-set", "Use For The Whole Set"),
     useForAsset: useText("component-browser.provider-use-asset", "Prefer This Source"),
     inForce: useText("component-browser.provider-in-force", "Preferred"),
-    nothingValidated: useText("component-browser.provider-none-validated", "Nothing checked yet"),
+    nothingValidated: useText("component-browser.provider-none-validated", "Nothing checked so far"),
     validatedCount: useText("component-browser.provider-validated-count", "checked and passed"),
   };
 }
@@ -203,6 +206,13 @@ export function ProviderCoverageMatrix({
   }
 
   const options = new Map(preference.options.map((option) => [option.provider, option]));
+  // The COLUMN order is the column order of the CAD modules beside this table, not the payload's.
+  // The backend's artifact tuple is a domain ordering (it also decides persisted key order), so the
+  // reading order is applied here: a comparison table whose columns ran Symbol, Footprint, 3D Model
+  // while the three modules stacked 3D Model, Footprint, Symbol would be two answers to one question.
+  const artifacts = [...coverage.artifacts].sort(
+    (a, b) => CAD_ASSET_KINDS.indexOf(a) - CAD_ASSET_KINDS.indexOf(b),
+  );
 
   return (
     // Wide by construction: six columns of real facts. It scrolls sideways INSIDE its own box
@@ -211,7 +221,7 @@ export function ProviderCoverageMatrix({
       <table className="w-full min-w-[720px] border-collapse text-left">
         <caption className="sr-only">
           <Text id="component-browser.provider-matrix-caption">
-            Which provider can supply the whole CAD set for this component
+            Which provider can offer the whole CAD set for this component
           </Text>
         </caption>
         <thead>
@@ -219,7 +229,7 @@ export function ProviderCoverageMatrix({
             <th scope="col" className="ui-table-header py-1 pr-3">
               {labels.provider}
             </th>
-            {coverage.artifacts.map((artifact) => (
+            {artifacts.map((artifact) => (
               <th key={artifact} scope="col" className="ui-table-header py-1 pr-3">
                 {labels.artifacts[artifact]}
               </th>
@@ -239,7 +249,7 @@ export function ProviderCoverageMatrix({
               componentId={componentId}
               row={row}
               option={options.get(row.id) ?? null}
-              artifacts={coverage.artifacts}
+              artifacts={artifacts}
               labels={labels}
               onOpenProvider={onOpenProvider}
               onCorrect={onCorrect}

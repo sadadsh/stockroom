@@ -7,7 +7,7 @@
  * five-slot mix-and-match, and the last case in this file is the gate that keeps it that way.
  */
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { ApiError, api } from "../../api/client";
@@ -52,6 +52,8 @@ vi.mock("../../api/client", async (importActual) => {
       showCaptureProvider: vi.fn(),
       captureWorkflow: vi.fn(),
       workflowEvents: vi.fn(),
+      addPartFiles: vi.fn(),
+      attachSelectedCaptureFiles: vi.fn(),
     },
   };
 });
@@ -325,9 +327,12 @@ describe("provider coverage matrix", () => {
     // person compares is availability, validation and source.
     expect(Array.from(headers).map((cell) => cell.textContent)).toEqual([
       "Provider",
-      "Symbol",
-      "Footprint",
+      // The three asset columns run in the order the CAD modules beside this table are stacked -
+      // 3D Model, Footprint, Symbol - which the matrix applies itself (`CAD_ASSET_KINDS`) rather
+      // than inheriting from the payload, whose tuple is a storage ordering.
       "3D Model",
+      "Footprint",
+      "Symbol",
       "Validation",
       "Action",
     ]);
@@ -526,13 +531,49 @@ describe("the provider trip", () => {
     expect(within(progress).getAllByText("Needed")).toHaveLength(2);
   });
 
-  it("says honestly that no run has reported yet", async () => {
+  it("stops a second import while the host chooser is still up, then allows a retry", async () => {
+    // The chooser is a HOST window: it is up until the person picks or cancels, and while it is up
+    // this control must not be pressable again. The gate for that is the band's own state, which
+    // the sheet around it cannot see - so it is asserted here on the rendered control.
+    let releaseChooser: (paths: string[]) => void = () => {};
+    const host = window as unknown as {
+      __STOCKROOM_HOST__?: { pickFiles: () => Promise<string[]> };
+    };
+    host.__STOCKROOM_HOST__ = {
+      pickFiles: () =>
+        new Promise<string[]>((resolve) => {
+          releaseChooser = resolve;
+        }),
+    };
+    try {
+      const { dialog, user } = await openSheet();
+      const importControl = () =>
+        within(dialog).getByRole("button", { name: "Import Downloaded Files" });
+      expect(importControl()).toBeEnabled();
+
+      await user.click(importControl());
+      expect(importControl()).toBeDisabled();
+
+      // Cancelling the chooser is an empty selection: nothing is sent anywhere, and the control
+      // comes back rather than staying dead until the window is reopened.
+      await act(async () => {
+        releaseChooser([]);
+      });
+      await waitFor(() => expect(importControl()).toBeEnabled());
+      expect(mockApi.addPartFiles).not.toHaveBeenCalled();
+      expect(mockApi.attachSelectedCaptureFiles).not.toHaveBeenCalled();
+    } finally {
+      delete host.__STOCKROOM_HOST__;
+    }
+  });
+
+  it("says honestly that no run has reported so far", async () => {
     const { dialog } = await openSheet();
     const report = dialog.querySelector<HTMLElement>(
       '[data-dev-id="component-browser.provider-report"]',
     )!;
     expect(
-      within(report).getByText("No provider run has reported for this component yet."),
+      within(report).getByText("No provider run has reported for this component so far."),
     ).toBeInTheDocument();
   });
 

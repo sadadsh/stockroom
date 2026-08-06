@@ -3,12 +3,12 @@
  *
  * SIX SECTIONS, IN ONE FIXED ORDER, and the order is the order a person asks the questions in:
  *
- *   1 Lifecycle and Availability   can I still buy this part, and is there any of it
+ *   1 Product Status and Stock     can I still purchase this part, and is there some of it
  *   2 Distributor Offers           who has it, how many, and for how much
  *   3 Pricing and Lead Time        what does it cost at quantity, and how long is the wait
  *   4 Documents                    what has been written about it
  *   5 Related Parts                what else would do the job, and why
- *   6 Data Provenance and History  where every one of those answers came from
+ *   6 Data Provenance and Timeline where each of those answers came from
  *
  * Backend source records are never first. "DigiKey supplied data, Mouser is not connected" is an
  * explanation, and an explanation is only wanted once the thing it explains has been read - so the
@@ -26,16 +26,24 @@
  * unknown - and never on blue, which in a grayscale application would be the only hue on screen
  * that encoded nothing.
  */
-import type { MutableRefObject } from "react";
-import type { ComponentDossier, DistributorOffer, Staleness } from "../../api/dossierTypes";
+import { useState, type MutableRefObject } from "react";
+import type { ComponentDossier, Staleness } from "../../api/dossierTypes";
 import { Text, useCopyFormatter, useText } from "../../lib/copy";
+import { useDevMode } from "../../lib/devMode";
 import { formatCount, formatPrice, formatTimestamp } from "../../lib/formatValue";
 import { Button, StatusText } from "../primitives";
 import { WorkspaceColumn } from "./WorkspaceColumns";
+import { latestCheck } from "./offerFacts";
 import { OffersSection } from "./OffersSection";
 import { ProvenanceHistory } from "./ProvenanceHistory";
 import { DocumentsSection, RelatedPartsSection } from "./ResourcesSection";
 import { PropertyRow, SourcingSection } from "./SourcingParts";
+import {
+  emptySourcingSections,
+  readShowEmptySections,
+  sourcingSectionFill,
+  writeShowEmptySections,
+} from "./sourcingSections";
 import { lifecycleTone } from "./componentIdentity";
 
 /** How much a reading can still be relied on. `unknown` is silence, not freshness. */
@@ -65,6 +73,17 @@ export function SourcingColumn({
   scrollRef: MutableRefObject<HTMLDivElement | null>;
 }) {
   const { supplySummary, distributorOffers, documents, relatedParts, provenance } = dossier;
+  const { enabled: developerMode } = useDevMode();
+  // Read once, on mount. Re-reading per render would let another tab's write change the column
+  // under someone mid-read, and this is a preference, not shared state.
+  const [showEmpty, setShowEmpty] = useState(readShowEmptySections);
+
+  const fill = sourcingSectionFill(dossier, developerMode);
+  const empty = emptySourcingSections(fill);
+  // A section is drawn when it HAS something, or when the reveal is on. The order below is the
+  // fixed order either way: revealing puts each hidden section back where it belongs rather than
+  // appending the empty ones in a block at the end.
+  const shown = (id: keyof typeof fill) => fill[id] || showEmpty;
 
   return (
     <WorkspaceColumn
@@ -78,30 +97,93 @@ export function SourcingColumn({
     >
       <LifecycleSection dossier={dossier} />
 
-      <OffersSection
-        offers={distributorOffers}
-        failures={supplySummary.failures}
-        onRefresh={onRefresh}
-        refreshing={refreshing}
-      />
+      {shown("offers") ? (
+        <OffersSection
+          offers={distributorOffers}
+          failures={supplySummary.failures}
+          onRefresh={onRefresh}
+          refreshing={refreshing}
+        />
+      ) : null}
 
-      <PricingSection dossier={dossier} onViewOffers={onViewOffers} />
+      {shown("pricing") ? (
+        <PricingSection dossier={dossier} onViewOffers={onViewOffers} />
+      ) : null}
 
-      <DocumentsSection
-        documents={documents.items}
-        preferredReason={documents.preferredDatasheetReason}
-        onOpenDocument={onOpenDocument}
-      />
+      {shown("documents") ? (
+        <DocumentsSection
+          documents={documents.items}
+          preferredReason={documents.preferredDatasheetReason}
+          onOpenDocument={onOpenDocument}
+        />
+      ) : null}
 
-      <RelatedPartsSection parts={relatedParts} />
+      {shown("related") ? <RelatedPartsSection parts={relatedParts} /> : null}
 
-      <ProvenanceHistory
-        provenance={provenance}
-        revisions={dossier.revisions}
-        diagnostics={dossier.diagnostics}
-        onViewProvenance={onViewProvenance}
+      {shown("provenance") ? (
+        <ProvenanceHistory
+          provenance={provenance}
+          revisions={dossier.revisions}
+          diagnostics={dossier.diagnostics}
+          onViewProvenance={onViewProvenance}
+        />
+      ) : null}
+
+      {/* LAST, under everything it accounts for, and absent when there is nothing to reveal: a
+          control that would show zero sections is a dead click path. When the reveal is off, the
+          provenance section it hides takes `View Data Provenance` with it - which is why that
+          action also has a permanent home in Manage > View Data Provenance... */}
+      <EmptySectionsToggle
+        hidden={empty.length}
+        showing={showEmpty}
+        onToggle={() => {
+          const next = !showEmpty;
+          setShowEmpty(next);
+          writeShowEmptySections(next);
+        }}
       />
     </WorkspaceColumn>
+  );
+}
+
+/**
+ * The one control that reveals the sections with nothing in them.
+ *
+ * It states the COUNT, so it is an answer as well as an action: `Show 5 Empty Sections` on a part
+ * nobody has sourced says exactly how much of the column is silent, which is the direct form the
+ * quality vocabulary uses everywhere else ("3 Required Values Missing", never "3 / 8"). With
+ * nothing hidden it does not render at all.
+ */
+function EmptySectionsToggle({
+  hidden,
+  showing,
+  onToggle,
+}: {
+  hidden: number;
+  showing: boolean;
+  onToggle: () => void;
+}) {
+  const showLabel = useCopyFormatter(
+    "component-browser.show-empty-sections",
+    "Show {count} Blank Sections",
+  );
+  const hideLabel = useCopyFormatter(
+    "component-browser.hide-empty-sections",
+    "Hide {count} Blank Sections",
+  );
+  if (hidden === 0) return null;
+  const count = formatCount(hidden);
+  return (
+    <div className="px-2 py-1">
+      <Button
+        small
+        data-dev-id="component-browser.empty-sections"
+        aria-expanded={showing}
+        onClick={onToggle}
+      >
+        {showing ? hideLabel({ count }) : showLabel({ count })}
+      </Button>
+    </div>
   );
 }
 
@@ -123,9 +205,9 @@ function LifecycleSection({ dossier }: { dossier: ComponentDossier }) {
   return (
     <SourcingSection
       devId="component-browser.lifecycle"
-      title={<Text id="component-browser.lifecycle-title">Lifecycle and Availability</Text>}
+      title={<Text id="component-browser.lifecycle-title">Product Status and Stock</Text>}
     >
-      <PropertyRow label={<Text id="component-browser.lifecycle-state">Lifecycle</Text>}>
+      <PropertyRow label={<Text id="component-browser.lifecycle-state">Product Status</Text>}>
         {lifecycle ? (
           <StatusText tone={lifecycleTone(lifecycle)}>{lifecycle}</StatusText>
         ) : (
@@ -240,24 +322,18 @@ function PricingSection({
           </span>
         )}
       </PropertyRow>
-      <PropertyRow label={<Text id="component-browser.price-breaks">Quantity Breaks</Text>}>
+      <PropertyRow label={<Text id="component-browser.price-breaks">Price Breaks</Text>}>
         <span className="ui-property-value ui-numeric">
           {breakCount > 0 ? formatCount(breakCount) : <span className="ui-disabled">{unknown}</span>}
         </span>
       </PropertyRow>
-      <PropertyRow label={<Text id="component-browser.factory-lead-time">Factory Lead Time</Text>}>
+      <PropertyRow label={<Text id="component-browser.factory-lead-time">Manufacturer Lead Time</Text>}>
         <span className="ui-property-value">
           {supplySummary.factoryLeadTime || <span className="ui-disabled">{unknown}</span>}
         </span>
       </PropertyRow>
     </SourcingSection>
   );
-}
-
-/** The most recent moment any distributor was read, or "" when none has been. */
-export function latestCheck(offers: readonly DistributorOffer[]): string {
-  const stamps = offers.map((offer) => offer.lastCheckedAt).filter(Boolean).sort();
-  return stamps.length === 0 ? "" : stamps[stamps.length - 1];
 }
 
 function StalenessLabel({ staleness }: { staleness: Staleness }) {

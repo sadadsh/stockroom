@@ -28,16 +28,40 @@ export default {
         popover: "var(--c-popover)",
         // the chrome band: panel title strips + the bottom status bar
         band: "var(--c-band)",
-        // a technical drawing sheet: paper, identical in both themes
+        // --- The technical drawing sheet, and the ink on it ----------------
+        // Theme-aware: a light sheet on a light desktop, a dark one on a dark
+        // desktop, so a 184px preview tile can never be the brightest region of
+        // the workspace and outshout the component's own part number.
         technical: "var(--c-technical)",
+        "technical-wash": "var(--c-technical-wash)",
+        "technical-ink": "var(--c-technical-ink)",
+        "technical-note": "var(--c-technical-note)",
+
+        // The land pattern's layers, as fill-/stroke- utilities. A third
+        // color-is-data family beside the two below: which layer a shape sits on
+        // is the datum, so these carry hue in both themes and are tuned per theme
+        // to stay >=3:1 on their own sheet and apart from one another.
+        "layer-copper": "var(--c-layer-copper)",
+        "layer-mask": "var(--c-layer-mask)",
+        "layer-paste": "var(--c-layer-paste)",
+        "layer-silk": "var(--c-layer-silk)",
+        "layer-fab": "var(--c-layer-fab)",
+        "layer-courtyard": "var(--c-layer-courtyard)",
+        "layer-pin-one": "var(--c-layer-pin-one)",
 
         // --- Controls: a push button is a bevel over a two-stop fill ------
         "control-top": "var(--c-control-top)",
         "control-bottom": "var(--c-control-bottom)",
         "control-hover": "var(--c-control-hover)",
         "control-pressed": "var(--c-control-pressed)",
+        // Selection and active state: a muted amber, the one hue in chrome that is
+        // not a status. `selected-edge` is the bright 2px marker on a selected row or
+        // the current tab; the fill alone is deliberately quiet.
         selected: "var(--c-selected)",
         "selected-hover": "var(--c-selected-hover)",
+        "selected-edge": "var(--c-selected-edge)",
+        // Every other row of a data grid. Structure, not stripes.
+        "row-alt": "var(--c-row-alt)",
 
         // --- Borders: dark groove / hairline / light bevel ----------------
         "line-dark": "var(--c-line-dark)",
@@ -61,9 +85,22 @@ export default {
         helper: "var(--c-text-helper)",
 
         // --- Status: the only hues in chrome, because state IS the datum --
+        //
+        // TWO STRENGTHS PER STATE, and which one to reach for is decided by WCAG, not by taste.
+        // The plain token is the MARK strength: a fill, a border, a tint, a glyph, all of which
+        // are non-text and are held to 3:1. The `-text` token is the same state one step louder,
+        // for a WORD, which is normal text and is held to 4.5:1 - and the plain tokens do not
+        // reach it. Measured against the workspace canvas and the chrome band: --c-ok is 3.78 /
+        // 3.93 light and --c-err is 3.98 / 3.60 dark, all four under the bar, while --c-ok-text
+        // is 4.83 / 5.01 light and 7.54 / 6.84 dark and --c-err-text is 5.06 / 5.26 light and
+        // 7.48 / 6.78 dark. So a status WORD wears `text-ok-text` / `text-err-text` and a status
+        // MARK keeps `bg-ok` / `border-err` / an `ok`-toned glyph.
         ok: "var(--c-ok)",
         warn: "var(--c-warn)",
         err: "var(--c-err)",
+        "ok-text": "var(--c-ok-text)",
+        "warn-text": "var(--c-warn-text)",
+        "err-text": "var(--c-err-text)",
 
         // --- Neutral accent + focus --------------------------------------
         // There is no brand hue and no blue: `acc` is the loud neutral used on a
@@ -94,7 +131,7 @@ export default {
         "stm-classify-partial": "var(--stm-classify-partial)",
       },
       borderRadius: {
-        // Windows engineering chrome is square. 2px is the whole budget.
+        // Windows engineering chrome is SQUARE: 0 for a panel, band or row, 1px for a control.
         card: "var(--r-card)",
         control: "var(--r-control)",
       },
@@ -170,6 +207,19 @@ export default {
         raise: "var(--shadow-raise)",
         pop: "var(--shadow-pop)",
         file: "var(--shadow-file)",
+      },
+      transitionDuration: {
+        // MOTION IS CAPPED AT 160ms, and it is only ever spent on a STATE CHANGE - a hover colour,
+        // a disclosure, a progress width - never on decoration. The scale is redefined rather than
+        // extended so the longer Tailwind defaults (300 / 500 / 700 / 1000ms) are simply not
+        // reachable from a class name: a 300ms fade on a control in a dense engineering panel reads
+        // as lag, and the way that arrives is one call site at a time.
+        0: "0ms",
+        75: "75ms",
+        100: "100ms",
+        150: "150ms",
+        160: "160ms",
+        DEFAULT: "150ms",
       },
       transitionTimingFunction: {
         // Retained under its old name so existing `ease-spring` classes keep resolving,

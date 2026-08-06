@@ -24,13 +24,14 @@ import type { RepresentationLayout } from "../../lib/uiSession";
 import { Text, useText } from "../../lib/copy";
 import { useToast } from "../../lib/toast";
 import { Button } from "../primitives";
-import { CadAssetModule, REPRESENTATION_KINDS } from "./CadAssetModule";
+import { CadAssetModule } from "./CadAssetModule";
+import { REPRESENTATION_KINDS } from "./cadAssetSet";
 import { PreferredSourceControl } from "./PreferredSourceControl";
 import { WorkspaceColumn } from "./WorkspaceColumns";
 import { cadAssetStatus } from "./workspaceStatus";
 
 /** How many of the three assets are actually attached. The column strip's right-hand count. */
-export function attachedCount(dossier: ComponentDossier): number {
+function attachedCount(dossier: ComponentDossier): number {
   const representations = dossier.cadAssets.kinds;
   return REPRESENTATION_KINDS.filter((kind) => {
     const status = cadAssetStatus(representations[kind]);
@@ -45,12 +46,12 @@ export function attachedCount(dossier: ComponentDossier): number {
  * where the category schema has already decided which field means "how many terminals does this
  * part have" - and a comparison against a field nobody normalized is not a comparison.
  */
-export function expectedPinCount(dossier: ComponentDossier): number | null {
+function expectedPinCount(dossier: ComponentDossier): number | null {
   return numericSpecification(dossier, ["pin_count", "number_of_pins", "positions"]);
 }
 
 /** The package pitch the specification states, in millimetres, when it states one. */
-export function expectedPitch(dossier: ComponentDossier): number | null {
+function expectedPitch(dossier: ComponentDossier): number | null {
   return numericSpecification(dossier, ["pitch"]);
 }
 
@@ -124,23 +125,22 @@ export function CadAssetsColumn({
       devId="component-browser.column-cad"
       title={<Text id="component-browser.column-cad">CAD Assets</Text>}
       meta={`${attached}/${REPRESENTATION_KINDS.length}`}
+      // `CAD Assets  [Compare Sources]  2/3` - the column's one action, on the title line, which is
+      // where the layout has always put it. It used to sit on a toolbar row of its own ABOVE the
+      // preferred source, so a ~300px column spent two full rows on chrome before the first
+      // drawing: measured, the two rows plus six rows of layer pills came to 14 bordered controls
+      // over the symbol. On the title line it costs no vertical space at all.
+      action={
+        <Button small data-dev-id="component-browser.compare-sources" onClick={onCompareSources}>
+          <Text id="component-browser.compare-sources">Compare Sources</Text>
+        </Button>
+      }
       toolbar={
-        <div className="flex flex-none flex-wrap items-center gap-2 border-b border-line px-2 py-1">
-          <Button small data-dev-id="component-browser.compare-sources" onClick={onCompareSources}>
-            <Text id="component-browser.compare-sources">Compare Sources</Text>
-          </Button>
-          {/* The way back to the reading state. Offered only when one module is focused, because
-              a control that puts the column into the state it is already in is a dead click. */}
-          {layout === "all" ? null : (
-            <Button
-              small
-              data-dev-id="component-browser.show-all-assets"
-              onClick={() => onLayout("all")}
-            >
-              <Text id="component-browser.show-all-assets">Show All Three</Text>
-            </Button>
-          )}
-          <span className="ml-auto flex min-w-0 items-center">
+        // ONE row, and the set decision owns it: the preferred source is the only fact here whose
+        // VALUE has to be readable, so it gets the elastic width rather than sharing it with a
+        // button that has a permanent home on the line above.
+        <div className="flex min-w-0 flex-none items-center gap-2 border-b border-line px-2 py-1">
+          <span className="flex min-w-0 flex-1 items-center">
             <PreferredSourceControl
               preference={preference}
               busy={write.isPending}
@@ -150,6 +150,18 @@ export function CadAssetsColumn({
               onClear={() => write.mutate({ kind: "clear-set-source" }, { onError: report })}
             />
           </span>
+          {/* The way back to the reading state. Offered only when one module is focused, because
+              a control that puts the column into the state it is already in is a dead click. */}
+          {layout === "all" ? null : (
+            <Button
+              small
+              data-dev-id="component-browser.show-all-assets"
+              onClick={() => onLayout("all")}
+              className="flex-none"
+            >
+              <Text id="component-browser.show-all-assets">Show All Three</Text>
+            </Button>
+          )}
         </div>
       }
     >
@@ -164,6 +176,7 @@ export function CadAssetsColumn({
             expectedPins={pins}
             expectedPitch={pitch}
             expanded={layout === "all" || layout === kind}
+            focused={layout === kind}
             onToggle={() => onLayout(layout === kind ? "all" : kind)}
             onOpenFullPreview={() => onOpenFullPreview(kind)}
             focusRef={setAssetRef[kind]}

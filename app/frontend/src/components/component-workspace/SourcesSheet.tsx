@@ -25,7 +25,6 @@ import type {
   DossierDiagnostics,
   ProvenanceView,
   RecordFieldView,
-  SourceCandidate,
   SourceLedgerEntry,
 } from "../../api/dossierTypes";
 import { Text, useCopyFormatter, useText } from "../../lib/copy";
@@ -46,7 +45,9 @@ import {
 import { DiffModal } from "../DiffModal";
 import { SourceNote, SourceStateBadge } from "./SheetParts";
 import { SpecStateLabel } from "./SpecificationState";
-import { humanizeKey, useCompatibilityNotice } from "./provenanceText";
+import { useCompatibilityNotice } from "./provenanceText";
+import { humanizeKey } from "./provenanceVocabulary";
+import { canApplyAlternate, otherCandidates } from "./sourceCandidates";
 
 export type SourcesSheetTab = "fields" | "records" | "changes" | "diagnostics";
 
@@ -60,39 +61,6 @@ const SOURCES_TABS: readonly TabItem<SourcesSheetTab>[] = [
     copyId: "component-browser.sources-tab-diagnostics",
   },
 ];
-
-/**
- * The fields an alternate can be put in force on.
- *
- * `editField` writes a canonical RECORD attribute, so this is exactly the set of attributes it can
- * reach. A specification key is not one of them - it lives in `specs`, is written through a
- * different seam that carries per-key provenance, and offering an Apply here that the backend
- * would reject with "unknown field" is worse than offering none.
- */
-export const APPLICABLE_FIELDS: ReadonlySet<string> = new Set([
-  "display_name",
-  "mpn",
-  "manufacturer",
-  "description",
-  "value",
-]);
-
-/** Whether this alternate can be applied as-is: a known field, and a plain scalar value. */
-export function canApplyAlternate(fieldId: string, alternate: SourceCandidate): boolean {
-  if (!APPLICABLE_FIELDS.has(fieldId)) return false;
-  const raw = alternate.value;
-  return typeof raw === "string" || typeof raw === "number" || typeof raw === "boolean";
-}
-
-/** Every candidate that is not the one in force. A losing answer is never discarded. */
-export function otherCandidates(field: RecordFieldView): SourceCandidate[] {
-  const preferred = field.preferredSource;
-  return field.sourceCandidates.filter(
-    (candidate) =>
-      candidate.sourceId !== preferred?.sourceId ||
-      candidate.displayValue !== preferred?.displayValue,
-  );
-}
 
 export function SourcesSheet({
   componentId,
@@ -117,7 +85,7 @@ export function SourcesSheet({
   enrich: ReactNode;
 }) {
   const [tab, setTab] = useState<SourcesSheetTab>("fields");
-  const tabsLabel = useText("component-browser.sources-tabs", "Sources and history");
+  const tabsLabel = useText("component-browser.sources-tabs", "Sources and timeline");
 
   return (
     <div data-dev-id="component-browser.sources-sheet" className="flex flex-col gap-3">
@@ -166,7 +134,7 @@ function FieldSourcesPanel({
 }) {
   const emptyValue = useText("component-browser.no-value", "None");
   const tableLabel = useText("component-browser.field-sources-title", "Attributed Fields");
-  const applyLabel = useText("component-browser.field-apply", "Apply");
+  const applyLabel = useText("component-browser.field-apply", "Commit");
 
   if (fields.length === 0) {
     return (
@@ -182,8 +150,8 @@ function FieldSourcesPanel({
       count={fields.length}
       note={
         <Text id="component-browser.field-sources-note">
-          The value in force for each field, the source that supplied it, and every other answer
-          that was offered. Applying an alternate records which source it came from.
+          The value in force for each field, the source that supplied it, and all other answers
+          that were offered. Committing an alternate records which source it came from.
         </Text>
       }
     >
@@ -379,7 +347,7 @@ function ChangesPanel({ componentId, componentName }: { componentId: string; com
   const hasVisual = !!assets && (assets.symbol || assets.footprint);
 
   if (history.isLoading) {
-    return <LoadingState id="component-browser.changes-loading">Loading this component's history...</LoadingState>;
+    return <LoadingState id="component-browser.changes-loading">Loading this component's timeline...</LoadingState>;
   }
   if (history.isError) {
     return (
@@ -387,14 +355,14 @@ function ChangesPanel({ componentId, componentName }: { componentId: string; com
         id="component-browser.changes-failed"
         onRetry={() => history.refetch()}
       >
-        This component's history could not be read.
+        This component's timeline could not be read.
       </ErrorState>
     );
   }
   if (commits.length === 0) {
     return (
       <EmptyState id="component-browser.changes-empty">
-        No history yet. This component has not been committed.
+        No timeline so far. This component has not been committed.
       </EmptyState>
     );
   }
@@ -434,7 +402,7 @@ function ChangesPanel({ componentId, componentName }: { componentId: string; com
                 <div className="border-t border-line px-3 py-2">
                   {diff.isLoading ? (
                     <LoadingState dense id="component-browser.changes-loading">
-                      Loading this component's history...
+                      Loading this component's timeline...
                     </LoadingState>
                   ) : diff.isError || !diff.data ? (
                     <ErrorState
@@ -563,9 +531,9 @@ function DiagnosticsPanel({
       }
       note={
         <Text id="component-browser.diagnostics-note">
-          What this component's storage looks like underneath. It is here because it is sometimes
-          the only thing that answers, and behind developer mode because a schema number is not
-          something anybody can act on.
+          What the storage for this component looks like underneath. It is here because it is
+          sometimes the sole thing that answers, and behind developer mode because a schema number
+          is not something a person can act on.
         </Text>
       }
     >
@@ -582,7 +550,7 @@ function DiagnosticsPanel({
         <p className="text-2xs text-t3">
           <Text id="component-browser.diagnostics-developer-only">
             Turn on developer mode to read the schema version, the derivation identifier, the
-            content hashes and the storage keys this build does not understand.
+            content hashes and the storage fields this build does not understand.
           </Text>
         </p>
       ) : null}
@@ -598,7 +566,7 @@ function DiagnosticsPanel({
               value={diagnostics.derivedBy || none}
             />
             <DiagnosticRow
-              label={<Text id="component-browser.category-schema">Category schema</Text>}
+              label={<Text id="component-browser.category-schema">Class schema</Text>}
               value={diagnostics.categorySchema || none}
             />
             <DiagnosticRow
@@ -615,7 +583,7 @@ function DiagnosticsPanel({
             />
             <DiagnosticRow
               label={
-                <Text id="component-browser.unknown-keys">Keys this build does not read</Text>
+                <Text id="component-browser.unknown-keys">Fields this build does not read</Text>
               }
               value={diagnostics.unknownKeys.join(", ") || none}
             />
@@ -634,7 +602,7 @@ function DiagnosticsPanel({
                 <Text id="component-browser.raw-loading">Loading the canonical record...</Text>
               </p>
             ) : detail.error || !detail.data ? (
-              <p className="text-2xs text-err">
+              <p className="text-2xs text-err-text">
                 <Text id="component-browser.raw-failed">
                   Could not load the canonical record.
                 </Text>

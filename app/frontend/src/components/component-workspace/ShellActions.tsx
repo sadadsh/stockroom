@@ -11,21 +11,32 @@
  * Nothing here is offered speculatively. The host answers which formats this component has files
  * for and which applications are installed, and an item with nothing behind it is not drawn:
  * a menu entry that cannot work is a dead click path, and a disabled one is the same dead path
- * with an explanation nobody asked for.
+ * with an explanation nobody asked for. WHICH of the three the host can perform is decided in
+ * `manageActions.tsx`, beside the rest of the Manage inventory; these are the two dialogs.
+ *
+ * `WorkspaceShellDialogs` at the foot of this file is the wired pair: it holds the one token that
+ * says which row is running and the two mutations that leave the process. That token means nothing
+ * anywhere else in the workspace - it names a format or an application id, and only these two
+ * dialogs can read it - so it lives here with the markup that renders it rather than in the
+ * workspace's own state. WHICH dialog is open stays with the workspace, because the Manage menu
+ * opens it.
  */
-import type { EdaApplication, PartShell } from "../../api/types";
+import { useState } from "react";
+import { useExportPart, useOpenPartIn } from "../../api/queries";
+import type { PartShell } from "../../api/types";
 import { Text, useText } from "../../lib/copy";
+import { useToast } from "../../lib/toast";
 import { Button } from "../primitives";
 import { EmptyState } from "../productState";
 import { UI_PROPERTY_LABEL, UI_ROW_PRIMARY, UI_ROW_METADATA } from "../typography";
 import { WorkspaceModal } from "./WorkspaceModal";
-import type { ManageMenuItem } from "./ManageMenu";
+import { APPLICATION_FORMAT, openableApplications } from "./manageActions";
 
 /** The formats a component can leave the library in, in presentation order. */
 const FORMAT_COPY: Record<string, { copyId: string; label: string; detail: string }> = {
   kicad: {
     copyId: "component-browser.export-format-kicad",
-    label: "KiCad Library Files",
+    label: "KiCad Files",
     detail: "Symbol, footprint and 3D model as separate KiCad files.",
   },
   step: {
@@ -34,57 +45,6 @@ const FORMAT_COPY: Record<string, { copyId: string; label: string; detail: strin
     detail: "The 3D model on its own, in the format it is held in.",
   },
 };
-
-/** The formats an application is offered for. An application it cannot read is not offered. */
-const APPLICATION_FORMAT: Record<string, string> = {
-  kicad: "kicad",
-  "altium-designer": "step",
-};
-
-export function shellManageItems(
-  shell: PartShell | undefined,
-  actions: {
-    onExport: () => void;
-    onOpenIn: () => void;
-    onReveal: () => void;
-  },
-): ManageMenuItem[] {
-  if (!shell?.supported) return [];
-  const items: ManageMenuItem[] = [];
-  if (shell.export_formats.length > 0) {
-    items.push({
-      id: "export",
-      copyId: "component-browser.manage-export",
-      label: "Export Component...",
-      run: actions.onExport,
-    });
-  }
-  if (openableApplications(shell).length > 0) {
-    items.push({
-      id: "open-in",
-      copyId: "component-browser.manage-open-in",
-      label: "Open In...",
-      run: actions.onOpenIn,
-    });
-  }
-  if (shell.component_directory) {
-    items.push({
-      id: "reveal",
-      copyId: "component-browser.manage-reveal",
-      label: "Reveal Component Files...",
-      run: actions.onReveal,
-    });
-  }
-  return items;
-}
-
-/** Installed applications this component actually has a format for. */
-export function openableApplications(shell: PartShell): EdaApplication[] {
-  return shell.eda_applications.filter((application) => {
-    const format = APPLICATION_FORMAT[application.id];
-    return !!format && shell.export_formats.includes(format);
-  });
-}
 
 /**
  * Export Component...: pick the format, and say what each one contains before it is written.
@@ -113,13 +73,13 @@ export function ExportComponentDialog({
       <div className="flex flex-col gap-2">
         <p className={UI_ROW_METADATA}>
           <Text id="component-browser.export-note">
-            Exported files are written to a Stockroom folder outside the library and are replaced
-            each time you export the same format.
+            Exported files are written to a Stockroom folder outside the catalog and are replaced
+            each time the same format is exported.
           </Text>
         </p>
         {formats.length === 0 ? (
           <EmptyState id="component-browser.export-none">
-            This component has no CAD files to export yet.
+            This component has no CAD files to export so far.
           </EmptyState>
         ) : (
           <ul className="flex flex-col">
@@ -187,7 +147,7 @@ export function OpenInDialog({
       <div className="flex flex-col gap-2">
         <p className={UI_ROW_METADATA}>
           <Text id="component-browser.open-in-note">
-            Stockroom exports this component first, then opens the exported files. The library
+            Stockroom exports this component first, then opens the exported files. The catalog
             itself is not modified.
           </Text>
         </p>
@@ -229,5 +189,93 @@ export function OpenInDialog({
         )}
       </div>
     </WorkspaceModal>
+  );
+}
+
+/** Which of the two shell dialogs is raised. `null` is the reading state. */
+export type ShellDialog = "export" | "open-in" | null;
+
+/**
+ * The two dialogs above, wired to the host.
+ *
+ * One pending token serves both because only one of them is ever open, and it is the id of the row
+ * that is running - a format for Export, an application for Open In - so every other row disables
+ * itself while the process is out. It is state that no other part of the workspace can use or
+ * observe, which is why it is held here rather than passed down.
+ *
+ * A failure is reported through the workspace's own `onFailure`, so a shell error reads exactly
+ * like every other write failure in this component: the API's message when there is one, the
+ * supplied fallback when there is not.
+ */
+export function WorkspaceShellDialogs({
+  componentId,
+  shell,
+  open,
+  onClose,
+  onFailure,
+}: {
+  componentId: string;
+  shell: PartShell | undefined;
+  open: ShellDialog;
+  onClose: () => void;
+  onFailure: (error: unknown, fallback: string) => void;
+}) {
+  const exportPart = useExportPart();
+  const openPartIn = useOpenPartIn();
+  const { toast } = useToast();
+  const [pending, setPending] = useState<string | null>(null);
+  const exportedLabel = useText("component-browser.exported", "Component exported");
+  const exportFailed = useText("component-browser.export-failed", "Could not export");
+  const openFailed = useText("component-browser.open-in-failed", "Could not open");
+
+  return (
+    <>
+      <ExportComponentDialog
+        open={open === "export"}
+        shell={shell}
+        pending={pending}
+        onClose={onClose}
+        onExport={(format) => {
+          setPending(format);
+          exportPart.mutate(
+            { partId: componentId, format },
+            {
+              onSuccess: (result) => {
+                setPending(null);
+                onClose();
+                toast(`${exportedLabel} (${result.file_count})`, "ok");
+              },
+              onError: (error) => {
+                setPending(null);
+                onFailure(error, exportFailed);
+              },
+            },
+          );
+        }}
+      />
+
+      <OpenInDialog
+        open={open === "open-in"}
+        shell={shell}
+        pending={pending}
+        onClose={onClose}
+        onOpen={(applicationId, format) => {
+          setPending(applicationId);
+          openPartIn.mutate(
+            { partId: componentId, applicationId, format },
+            {
+              onSuccess: () => {
+                setPending(null);
+                onClose();
+              },
+              onError: (error) => {
+                setPending(null);
+                onFailure(error, openFailed);
+              },
+            },
+          );
+        }}
+      />
+    </>
   );
 }

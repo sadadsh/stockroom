@@ -65,10 +65,6 @@ describe("the Dev Mode registry matches the shipped stylesheet", () => {
       "--fs-lg",
       "--fs-xl",
       "--fs-title",
-      // Status TEXT variants of --c-ok / --c-warn / --c-err, tuned per surface.
-      "--c-ok-text",
-      "--c-warn-text",
-      "--c-err-text",
       // Icon line art: a five-token family with one visual job, adjusted together or not at all.
       "--c-icon-line",
       "--c-icon-fill",
@@ -91,17 +87,61 @@ describe("the Dev Mode registry matches the shipped stylesheet", () => {
   });
 
   it("names no blue default anywhere in the registry", () => {
-    // The three status hues are exempt: green, amber and red encode a STATE, and are the only
-    // hues chrome is allowed. Everything else in the registry is a grey, focus ring included.
-    const STATUS = new Set(["--c-ok", "--c-warn", "--c-err"]);
-    for (const token of DEV_TOKENS.filter((t) => !STATUS.has(t.cssVar))) {
+    // THE RULE: nothing in this registry is a blue. It is stated in two halves because the shipped
+    // palette is a COOL neutral by the owner's choice - the frame is #1F2022 and the label tier
+    // #A9AFB7 - and a bounded cool cast on a grey is not a blue. So a NEAR-NEUTRAL may lean cool by
+    // up to 16 points out of 255, and anything genuinely saturated (the status hues, the amber
+    // selection and accent) must be WARM. A saturated blue satisfies neither half.
+    //
+    // The former single test was `b - r <= 2` on every non-status token, i.e. a test for a literal
+    // grey. It was the right guard for the grey palette it was written against and would now reject
+    // the palette the owner supplied, so it is restated rather than relaxed: measured on the shipped
+    // values, the worst neutral cast is 14 and the least warm saturated token clears r - b by 100.
+    function channels(value: string): [number, number, number] | null {
+      const hex = value.match(/^#([0-9a-f]{6})$/i);
+      if (!hex) return null;
+      const packed = Number.parseInt(hex[1], 16);
+      return [(packed >> 16) & 255, (packed >> 8) & 255, packed & 255];
+    }
+    // COLOUR IS THE DATUM here, so no hue rule applies: the two remaining status hues (one of which
+    // is a green, and a green is not warm), their per-surface text variants, and the seven
+    // land-pattern layers. A grayscale encoding of any of them would carry no information at all.
+    //
+    // `--c-warn` / `--c-warn-text` are NOT on this list any more. The warning tier is a neutral now
+    // - a warning is the exact word plus a triangle, not a colour - so it is held to the same
+    // no-blue bound as the rest of the chrome rather than exempted as a hue.
+    const DATA_HUES = new Set([
+      "--c-ok",
+      "--c-err",
+      "--c-ok-text",
+      "--c-err-text",
+      "--c-layer-copper",
+      "--c-layer-mask",
+      "--c-layer-paste",
+      "--c-layer-silk",
+      "--c-layer-fab",
+      "--c-layer-courtyard",
+      "--c-layer-pin-one",
+    ]);
+    for (const token of DEV_TOKENS.filter((t) => !DATA_HUES.has(t.cssVar))) {
       for (const value of [token.default.dark, token.default.light]) {
-        const hex = value?.match(/^#([0-9a-f]{6})$/i);
-        if (!hex) continue;
-        const packed = Number.parseInt(hex[1], 16);
-        const r = (packed >> 16) & 255;
-        const b = packed & 255;
-        expect(b - r, `${token.cssVar} = ${value} leans blue`).toBeLessThanOrEqual(2);
+        const rgb = value ? channels(value) : null;
+        if (!rgb) continue;
+        const [r, , b] = rgb;
+        const max = Math.max(...rgb) / 255;
+        const min = Math.min(...rgb) / 255;
+        const l = (max + min) / 2;
+        const s = max === min ? 0 : l > 0.5 ? (max - min) / (2 - max - min) : (max - min) / (max + min);
+        if (s <= 0.15) {
+          expect(b - r, `${token.cssVar} = ${value} leans blue`).toBeLessThanOrEqual(16);
+        } else {
+          // Saturated and not a data hue: with the amber accent and selection fill gone, what is
+          // left in this branch is the warm off-white of the drawing sheet's body wash. It is WARM,
+          // and a blue is the one thing that cannot be. Stated as `r > b` rather than as a margin because
+          // saturation is a ratio: a near-white like #f0efe8 reads as 0.21 saturated off an
+          // absolute cast of 8 points, and demanding a wide margin there would reject a paper tint.
+          expect(r - b, `${token.cssVar} = ${value} is a saturated cool hue`).toBeGreaterThan(0);
+        }
       }
     }
   });

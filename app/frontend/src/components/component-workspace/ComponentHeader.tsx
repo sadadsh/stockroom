@@ -243,7 +243,7 @@ function QualitySummary({
 
 const QUALITY_TONE: Record<"warn" | "err" | "neutral" | "ok", string> = {
   warn: "text-warn",
-  err: "text-err",
-  ok: "text-ok",
+  err: "text-err-text",
+  ok: "text-ok-text",
   neutral: "text-t3",
 };

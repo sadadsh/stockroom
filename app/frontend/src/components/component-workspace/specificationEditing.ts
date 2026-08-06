@@ -235,14 +235,3 @@ export function composeSpecificationValue(draft: SpecDraft): string {
   if (value.endsWith(unit)) return value;
   return `${value}${NBSP}${unit}`;
 }
-
-/**
- * What the row will read as once this is written.
- *
- * Stated in the editor rather than discovered afterwards: a person deciding whether to mark a
- * value as checked is deciding what the row will SAY, and the two words are the vocabulary the
- * sheet already uses everywhere else.
- */
-export function verificationAfterWrite(verified: boolean): "verified" | "unverified" {
-  return verified ? "verified" : "unverified";
-}

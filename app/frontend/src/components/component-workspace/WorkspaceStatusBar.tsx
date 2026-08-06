@@ -12,7 +12,7 @@ import { formatCount, formatTimestamp } from "../../lib/formatValue";
 import { StatusText } from "../primitives";
 import { conflictCount, missingCount, DOT } from "./componentIdentity";
 import { totalSpecifications } from "./specificationRows";
-import { latestCheck } from "./SourcingColumn";
+import { latestCheck } from "./offerFacts";
 
 /** What the bar is saying about work in flight. Exactly one of these is true at a time. */
 export type WorkspaceActivity = "idle" | "refreshing" | "saving" | "deleting";
@@ -43,7 +43,7 @@ export function WorkspaceStatusBar({
         ) : activity === "deleting" ? (
           <Text id="component-browser.status-deleting">Deleting component</Text>
         ) : (
-          <Text id="component-browser.status-ready">Ready</Text>
+          <Text id="component-browser.status-ready">Idle</Text>
         )}
       </StatusText>
       {total > 0 ? (
@@ -64,7 +64,7 @@ export function WorkspaceStatusBar({
         </span>
       ) : null}
       {conflicts > 0 ? (
-        <span className="ui-component-metadata flex-none text-err">
+        <span className="ui-component-metadata flex-none text-err-text">
           <Text id="component-browser.status-conflicts" values={{ count: conflicts }}>
             {"{count} conflicting"}
           </Text>

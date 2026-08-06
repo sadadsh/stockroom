@@ -41,7 +41,7 @@ const REVIEWED_SOURCE = "manual:reviewed";
  */
 function useValueTypeLabels(): Record<ValueType, string> {
   return {
-    quantity: useText("component-browser.spec-type-quantity", "Quantity"),
+    quantity: useText("component-browser.spec-type-quantity", "Measurement"),
     range: useText("component-browser.spec-type-range", "Range"),
     integer: useText("component-browser.spec-type-integer", "Whole Number"),
     boolean: useText("component-browser.spec-type-boolean", "Yes Or No"),
@@ -90,10 +90,10 @@ export function SpecificationEditor({
 
   const valueLabel = useCopyFormatter("component-browser.spec-editor-value", "{label} value");
   const unitLabel = useText("component-browser.spec-editor-unit", "Unit");
-  const typeLabel = useText("component-browser.spec-editor-type", "Value Type");
+  const typeLabel = useText("component-browser.spec-editor-type", "Value Kind");
   const sourceLabel = useText("component-browser.spec-editor-source", "Source");
   const reasonLabel = useText("component-browser.spec-editor-reason", "Reason");
-  const reasonHint = useText("component-browser.spec-editor-reason-hint", "Why this value");
+  const reasonHint = useText("component-browser.spec-editor-reason-hint", "What decided this value");
   const verificationLabel = useText(
     "component-browser.spec-editor-verification",
     "Verification Status",
@@ -291,7 +291,7 @@ export function SpecificationEditor({
           className="h-3 w-3 accent-[var(--c-acc)]"
         />
         <Text id="component-browser.spec-editor-prefer">
-          Prefer this value over every source
+          Prefer this value over all sources
         </Text>
       </label>
 
@@ -301,7 +301,7 @@ export function SpecificationEditor({
         <p
           data-dev-id="component-browser.spec-editor-error"
           role="alert"
-          className="ui-component-metadata text-err"
+          className="ui-component-metadata text-err-text"
         >
           {refusal ? <RefusalText refusal={refusal} /> : failure}
         </p>
@@ -378,7 +378,7 @@ function RefusalText({ refusal }: { refusal: SpecEditRefusal }) {
   if (problem === "not-applicable") {
     return (
       <Text id="component-browser.spec-refusal-not-applicable" values={values}>
-        {"{label} does not apply to this kind of component."}
+        {"{label} does not belong to this kind of component."}
       </Text>
     );
   }
@@ -399,7 +399,7 @@ function RefusalText({ refusal }: { refusal: SpecEditRefusal }) {
   if (problem === "not-a-range") {
     return (
       <Text id="component-browser.spec-refusal-range" values={values}>
-        {"Enter two numbers separated by {dash}, such as 1.65–5.5."}
+        {"Enter two numbers with {dash} between them, such as 1.65–5.5."}
       </Text>
     );
   }
@@ -409,7 +409,7 @@ function RefusalText({ refusal }: { refusal: SpecEditRefusal }) {
   if (problem === "not-allowed") {
     return (
       <Text id="component-browser.spec-refusal-allowed" values={values}>
-        {"This field accepts only: {allowed}"}
+        {"This field accepts one of: {allowed}"}
       </Text>
     );
   }

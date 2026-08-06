@@ -29,14 +29,10 @@ import type {
 import { Text, useCopyFormatter, useText } from "../../lib/copy";
 import { useDevMode } from "../../lib/devMode";
 import { formatTimestamp } from "../../lib/formatValue";
-import { Button, EmptyState, StatusText } from "../primitives";
+import { Button, StatusText } from "../primitives";
 import { SourcingSection, SourcingSubSection } from "./SourcingParts";
-import {
-  SourceStateLabel,
-  sourceStateOf,
-  sourceStateTone,
-  useCompatibilityNotice,
-} from "./provenanceText";
+import { SourceStateLabel, useCompatibilityNotice } from "./provenanceText";
+import { sourceStateOf, sourceStateTone } from "./provenanceVocabulary";
 
 export function ProvenanceHistory({
   provenance,
@@ -53,32 +49,59 @@ export function ProvenanceHistory({
   const { enabled: developerMode } = useDevMode();
   const intake = revisions.filter((event) => event.section === "intake");
   const changes = revisions.filter((event) => event.section === "changes");
+  // The five names, resolved through the SAME copy ids the sub-headings carry, so rewording one
+  // rewords both and the summary can never name a section by a word the heading does not use.
+  const sourcesTitle = useText("component-browser.sources-title", "Data Sources");
+  const conflictsTitle = useText("component-browser.conflicts-title", "Field Conflicts");
+  const overridesTitle = useText("component-browser.overrides-title", "Manual Overrides");
+  const intakeTitle = useText(
+    "component-browser.intake-title",
+    "Import and Enrichment Timeline",
+  );
+  const revisionsTitle = useText("component-browser.revisions-title", "Revision Timeline");
+
+  // Five headings and five sentences to say nothing happened is what this block used to render on
+  // any component nobody had sourced. Each sub-section now appears only when it has rows, and the
+  // silent ones are NAMED ONCE on a single metadata line - so "which of the five is empty" is
+  // still answerable, in one line instead of ten.
+  const silent = [
+    provenance.sources.length === 0 ? sourcesTitle : "",
+    provenance.conflicts.length === 0 ? conflictsTitle : "",
+    provenance.manualOverrides.length === 0 ? overridesTitle : "",
+    intake.length === 0 ? intakeTitle : "",
+    changes.length === 0 ? revisionsTitle : "",
+  ].filter(Boolean);
 
   return (
     <SourcingSection
       devId="component-browser.provenance"
       title={
-        <Text id="component-browser.provenance-title">Data Provenance and History</Text>
+        <Text id="component-browser.provenance-title">Data Provenance and Timeline</Text>
       }
     >
       <CompatibilityBanner compatibility={provenance.compatibility} />
-      <DataSources sources={provenance.sources} />
-      <FieldConflicts conflicts={provenance.conflicts} />
-      <ManualOverrides overrides={provenance.manualOverrides} />
-      <History
-        devId="component-browser.provenance-intake"
-        title={<Text id="component-browser.intake-title">Import and Enrichment History</Text>}
-        emptyId="component-browser.intake-empty"
-        empty="Nothing is recorded about how this component's data arrived."
-        events={intake}
-      />
-      <History
-        devId="component-browser.provenance-revisions"
-        title={<Text id="component-browser.revisions-title">Revision History</Text>}
-        emptyId="component-browser.revisions-empty"
-        empty="Nothing has changed since this component was created."
-        events={changes}
-      />
+      {provenance.sources.length > 0 ? <DataSources sources={provenance.sources} /> : null}
+      {provenance.conflicts.length > 0 ? (
+        <FieldConflicts conflicts={provenance.conflicts} />
+      ) : null}
+      {provenance.manualOverrides.length > 0 ? (
+        <ManualOverrides overrides={provenance.manualOverrides} />
+      ) : null}
+      {intake.length > 0 ? (
+        <History
+          devId="component-browser.provenance-intake"
+          title={<Text id="component-browser.intake-title">Import and Enrichment Timeline</Text>}
+          events={intake}
+        />
+      ) : null}
+      {changes.length > 0 ? (
+        <History
+          devId="component-browser.provenance-revisions"
+          title={<Text id="component-browser.revisions-title">Revision Timeline</Text>}
+          events={changes}
+        />
+      ) : null}
+      <NothingRecorded sections={silent} />
       {/* Developer territory only. A storage key is the honest answer to exactly one question, and
           nobody opens a component to ask it. */}
       {developerMode ? <TechnicalDiagnostics diagnostics={diagnostics} /> : null}
@@ -88,6 +111,29 @@ export function ProvenanceHistory({
         </Button>
       </div>
     </SourcingSection>
+  );
+}
+
+/**
+ * The silent sub-sections, as one line.
+ *
+ * Middle dots rather than a sentence each, because this is compact metadata and that is what the
+ * separator vocabulary is for. It is a STATEMENT, not a control: nothing here can be clicked, and
+ * the full ledger is one button below.
+ */
+function NothingRecorded({ sections }: { sections: readonly string[] }) {
+  const line = useCopyFormatter(
+    "component-browser.provenance-nothing",
+    "Nothing recorded: {sections}",
+  );
+  if (sections.length === 0) return null;
+  return (
+    <p
+      data-dev-id="component-browser.provenance-nothing"
+      className="ui-component-metadata border-b border-line/60 px-2 py-1"
+    >
+      {line({ sections: sections.join(" · ") })}
+    </p>
   );
 }
 
@@ -153,15 +199,10 @@ function DataSources({ sources }: { sources: ProvenanceView["sources"] }) {
       title={<Text id="component-browser.sources-title">Data Sources</Text>}
       count={sources.length}
     >
-      {sources.length === 0 ? (
-        <EmptyState dense id="component-browser.provenance-empty">
-          No source has been consulted for this component yet.
-        </EmptyState>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse" aria-label={tableLabel}>
+      <div className="overflow-x-auto">
+        <table className="w-full border-collapse" aria-label={tableLabel}>
             <thead>
-              <tr className="border-b border-line/60">
+              <tr className="border-b border-line-dark [&>th]:border-r [&>th]:border-line/50 [&>th:last-child]:border-r-0">
                 <th scope="col" className="ui-table-header px-2 py-1 text-left">
                   <Text id="component-browser.source-col-source">Source</Text>
                 </th>
@@ -184,7 +225,8 @@ function DataSources({ sources }: { sources: ProvenanceView["sources"] }) {
                   <tr
                     key={source.id}
                     data-dev-id="component-browser.source-state"
-                    className="border-b border-line/60 last:border-b-0"
+                    // Same grid treatment as the offers table: alternating tint, 1px cell rules.
+                    className="border-b border-line/60 last:border-b-0 even:bg-row-alt [&>td]:border-r [&>td]:border-line/50 [&>td:last-child]:border-r-0"
                   >
                     <td className="px-2 py-1 align-baseline">
                       <span className="ui-row-secondary block truncate">{source.label}</span>
@@ -210,10 +252,9 @@ function DataSources({ sources }: { sources: ProvenanceView["sources"] }) {
                   </tr>
                 );
               })}
-            </tbody>
-          </table>
-        </div>
-      )}
+          </tbody>
+        </table>
+      </div>
     </SourcingSubSection>
   );
 }
@@ -227,12 +268,7 @@ function FieldConflicts({ conflicts }: { conflicts: readonly FieldConflictView[]
       title={<Text id="component-browser.conflicts-title">Field Conflicts</Text>}
       count={conflicts.length}
     >
-      {conflicts.length === 0 ? (
-        <EmptyState dense id="component-browser.conflicts-empty">
-          No source disagrees with another about this component.
-        </EmptyState>
-      ) : (
-        conflicts.map((conflict) => (
+      {conflicts.map((conflict) => (
           <div
             key={conflict.field}
             data-dev-id="component-browser.conflict-row"
@@ -261,8 +297,7 @@ function FieldConflicts({ conflicts }: { conflicts: readonly FieldConflictView[]
               ))}
             </ul>
           </div>
-        ))
-      )}
+        ))}
     </SourcingSubSection>
   );
 }
@@ -284,7 +319,7 @@ function ManualOverrides({ overrides }: { overrides: readonly ManualOverrideView
   );
   const reviewedText = useCopyFormatter(
     "component-browser.override-reviewed",
-    "Reviewed by {who}",
+    "Reviewer {who}",
   );
   return (
     <SourcingSubSection
@@ -292,12 +327,7 @@ function ManualOverrides({ overrides }: { overrides: readonly ManualOverrideView
       title={<Text id="component-browser.overrides-title">Manual Overrides</Text>}
       count={overrides.length}
     >
-      {overrides.length === 0 ? (
-        <EmptyState dense id="component-browser.overrides-empty">
-          Nobody has overridden a value on this component.
-        </EmptyState>
-      ) : (
-        overrides.map((override) => {
+      {overrides.map((override) => {
           const stamp = override.reviewedAt ? formatTimestamp(override.reviewedAt) : null;
           return (
             <div
@@ -331,35 +361,30 @@ function ManualOverrides({ overrides }: { overrides: readonly ManualOverrideView
               </span>
             </div>
           );
-        })
-      )}
+        })}
     </SourcingSubSection>
   );
 }
 
-/** One dated history. The projection decided which events belong in it; this renders them. */
+/**
+ * One dated history. The projection decided which events belong in it; this renders them.
+ *
+ * It is only mounted when it HAS events: the "nothing happened" case is one shared line in
+ * `NothingRecorded`, not a heading and a sentence per history.
+ */
 function History({
   devId,
   title,
-  emptyId,
-  empty,
   events,
 }: {
   devId: string;
   title: ReactNode;
-  emptyId: string;
-  empty: string;
   events: readonly RevisionEvent[];
 }) {
   const undated = useText("component-browser.undated", "Undated");
   return (
     <SourcingSubSection devId={devId} title={title} count={events.length}>
-      {events.length === 0 ? (
-        <EmptyState dense id={emptyId}>
-          {empty}
-        </EmptyState>
-      ) : (
-        <ul className="flex flex-col">
+      <ul className="flex flex-col">
           {events.map((event, index) => {
             const stamp = event.at ? formatTimestamp(event.at) : null;
             return (
@@ -381,8 +406,7 @@ function History({
               </li>
             );
           })}
-        </ul>
-      )}
+      </ul>
     </SourcingSubSection>
   );
 }

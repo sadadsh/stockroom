@@ -15,7 +15,6 @@
  * the same provider sentence under all three assets is what pushed the asset off its own header
  * line; the column says where the set came from once, and a module speaks up when it disagrees.
  */
-import type { ReactNode } from "react";
 import type {
   CadPreferenceView,
   RepresentationKind,
@@ -26,62 +25,66 @@ import { componentRepresentationDevId } from "../../lib/componentDevIds";
 import { Text, useText } from "../../lib/copy";
 import { CubeArt, FootprintArt, SymbolArt } from "../icons";
 import { Glb3DView } from "../Glb3DView";
-import { StatusText } from "../primitives";
+import { StatusText, WarnMark } from "../primitives";
+import {
+  AssetControlStrip,
+  AssetOptionsButton,
+  MaximizeButton,
+  MeasureButton,
+  type AssetOption,
+} from "./AssetOptions";
+import { assetFormat } from "./cadAssetSet";
 import { assetOverride } from "./cadPreference";
+import { footprintEvidence, symbolEvidence } from "./cadEvidence";
 import {
   FootprintPreview,
-  footprintEvidence,
   useFootprintLayers,
   type FootprintLayer,
 } from "./FootprintPreview";
 import {
   SymbolPreview,
-  symbolEvidence,
   useSymbolLayers,
   type SymbolLayer,
 } from "./SymbolPreview";
 import { cadAssetStatus, cadStatusTone, type CadAssetStatus, type CadMeasured } from "./workspaceStatus";
 
-export const REPRESENTATION_KINDS: readonly RepresentationKind[] = [
-  "symbol",
-  "footprint",
-  "model",
-];
-
 /** What each asset is CALLED. Asset kinds, not file formats and not applications. */
-export const REPRESENTATION_LABEL: Record<RepresentationKind, string> = {
+const REPRESENTATION_LABEL: Record<RepresentationKind, string> = {
   symbol: "Symbol",
   footprint: "Footprint",
   model: "3D Model",
 };
 
-export const REPRESENTATION_COPY_ID: Record<RepresentationKind, string> = {
+const REPRESENTATION_COPY_ID: Record<RepresentationKind, string> = {
   symbol: "component-browser.asset-symbol",
   footprint: "component-browser.asset-footprint",
   model: "component-browser.asset-model",
 };
 
-export function assetArt(kind: RepresentationKind) {
+function assetArt(kind: RepresentationKind) {
   if (kind === "symbol") return <SymbolArt />;
   if (kind === "footprint") return <FootprintArt />;
   return <CubeArt />;
 }
 
 /**
- * The provider that supplied this asset. A PROVIDER name (Ultra Librarian, SnapMagic, Samacsys)
- * is source information and belongs here; an EDA application's name is not and does not.
+ * The DRAWING SHEET, for all three assets, in either tag.
+ *
+ * The symbol and the land pattern paint it themselves; the 3D canvas is transparent and inherits
+ * it, so the three previews sit on one surface instead of two sheets and a recessed input well.
+ * Theme-aware, which is the whole point: this used to be near-white under the symbol and the
+ * footprint in dark theme, brighter than anything else in the workspace including the part number.
+ *
+ * `w-full` because the compact stage is a <button>, which is inline-block and would otherwise
+ * shrink to its contents where the expanded <div> fills the column.
  */
-export function assetSource(view: RepresentationView): string {
-  const tool = view.tools.find((entry) => entry.tool === view.selectedTool) ?? view.tools[0];
-  return (view.sourceLabel || tool?.sourceLabel || "").trim();
-}
-
-/** The file format the asset is held in, from the reference itself. Never an application name. */
-export function assetFormat(view: RepresentationView): string {
-  const tool = view.tools.find((entry) => entry.tool === view.selectedTool) ?? view.tools[0];
-  const file = tool?.reference.file ?? "";
-  const dot = file.lastIndexOf(".");
-  return dot > 0 ? file.slice(dot + 1).toUpperCase() : "";
+function previewStageClass(expanded: boolean): string {
+  return (
+    "flex w-full flex-none items-center justify-center overflow-hidden border-y border-line " +
+    "bg-technical focus-visible:outline focus-visible:outline-2 " +
+    "focus-visible:-outline-offset-2 focus-visible:outline-focus " +
+    (expanded ? "h-[184px]" : "h-[56px]")
+  );
 }
 
 export function CadAssetModule({
@@ -92,6 +95,7 @@ export function CadAssetModule({
   expectedPins,
   expectedPitch,
   expanded,
+  focused,
   onToggle,
   onOpenFullPreview,
   focusRef,
@@ -105,14 +109,27 @@ export function CadAssetModule({
   expectedPitch: number | null;
   /** Expanded carries the full preview and its controls; collapsed keeps a compact one. */
   expanded: boolean;
+  /**
+   * This module, and only this module, is the one the column is focused on.
+   *
+   * Distinct from `expanded`, which is true for all three in the resting `all` layout. The measured
+   * evidence footer is gated on THIS rather than on `expanded`, because at rest the column was
+   * carrying three lines of counts nobody had asked for - `2 pins · No duplicates`,
+   * `2 pads · 0.96 mm pitch · Courtyard present · 1.80 x 0.84 mm` - under three drawings, in a
+   * ~300px column. A validation FAILURE is not gated: see `AssetIssue`.
+   */
+  focused: boolean;
   onToggle: () => void;
   onOpenFullPreview: () => void;
   focusRef?: (node: HTMLElement | null) => void;
 }) {
   const label = REPRESENTATION_LABEL[kind];
   const override = assetOverride(preference, kind);
-  const collapseLabel = useText("component-browser.asset-collapse", "Collapse");
-  const expandLabel = useText("component-browser.asset-expand", "Expand");
+  // What the header actually DOES, which is not expand or collapse: at rest all three modules are
+  // expanded, and pressing one focuses it - the other two reduce to compact previews and this one
+  // states the evidence it measured. The two words were describing a state the control does not have.
+  const collapseLabel = useText("component-browser.asset-collapse", "Show All Three");
+  const focusLabel = useText("component-browser.asset-expand", "Focus This Asset");
   const fullPreview = useText("component-browser.asset-full-preview", "Open Full Preview");
   const attached = view.tools.some((tool) => tool.present);
 
@@ -137,7 +154,7 @@ export function CadAssetModule({
           type="button"
           data-dev-id="component-browser.asset-header"
           aria-expanded={expanded}
-          title={expanded ? collapseLabel : expandLabel}
+          title={focused ? collapseLabel : focusLabel}
           onClick={onToggle}
           className={
             "ui-section-title flex-none rounded-control focus-visible:outline focus-visible:outline-2 " +
@@ -157,33 +174,48 @@ export function CadAssetModule({
       </h3>
 
       {/* The preview is present in BOTH states, smaller when the module is not in focus, because
-          the three assets are read against each other. Click or double-click it to open the full
-          preview - never a text button, which competes with the asset for the line. */}
-      <div
-        data-dev-id="component-browser.asset-preview"
-        role="button"
-        tabIndex={0}
-        aria-label={fullPreview}
-        onDoubleClick={onOpenFullPreview}
-        onKeyDown={(event) => {
-          if (event.key !== "Enter") return;
-          event.preventDefault();
-          onOpenFullPreview();
-        }}
-        className={
-          "flex flex-none items-center justify-center overflow-hidden border-y border-line " +
-          "bg-field focus-visible:outline focus-visible:outline-2 " +
-          "focus-visible:-outline-offset-2 focus-visible:outline-focus " +
-          (expanded ? "h-[184px]" : "h-[56px]")
-        }
-      >
-        <AssetPreview
-          kind={kind}
-          view={view}
-          preview={preview}
-          interactive={expanded}
-        />
-      </div>
+          the three assets are read against each other. Never a text button, which competes with
+          the asset for the line.
+
+          The STAGE ITSELF is a control only while the module is compact, and that condition is not
+          a style choice. `button` takes presentational children, so a widget role on this container
+          deletes everything under it from the accessibility tree - and while the module is expanded
+          that subtree is the asset's whole control surface: the maximize button, the 3D settings
+          popover, the land pattern's measure target. This container used to carry role="button" in
+          BOTH states, so every one of those controls was invisible to a screen reader, and Enter
+          was the only key that worked because a div gets no keyboard behaviour of its own.
+
+          So the tag follows the content. Compact, the subtree is inert (`interactive={expanded}`
+          switches every child's controls off), nothing is swallowed, and a real <button> gives the
+          stage a name, focus, Enter AND Space for free. Expanded, the stage is a plain surface and
+          the keyboard path is the maximize button that is already inside it. */}
+      {expanded ? (
+        <div data-dev-id="component-browser.asset-preview" className={previewStageClass(true)}>
+          <AssetPreview
+            kind={kind}
+            view={view}
+            preview={preview}
+            interactive
+            onOpenFullPreview={onOpenFullPreview}
+          />
+        </div>
+      ) : (
+        <button
+          type="button"
+          data-dev-id="component-browser.asset-preview"
+          aria-label={fullPreview}
+          onClick={onOpenFullPreview}
+          className={previewStageClass(false)}
+        >
+          <AssetPreview
+            kind={kind}
+            view={view}
+            preview={preview}
+            interactive={false}
+            onOpenFullPreview={onOpenFullPreview}
+          />
+        </button>
+      )}
 
       {expanded ? (
         <AssetControls
@@ -193,7 +225,11 @@ export function CadAssetModule({
         />
       ) : null}
 
-      {expanded ? (
+      {/* A FAILURE is never gated on focus. Everything else about this asset is a count a person
+          can go and ask for; a recorded fault is the one thing the column has to say unprompted. */}
+      <AssetIssue status={view.status} issue={view.issue} />
+
+      {focused ? (
         <AssetEvidence
           kind={kind}
           view={view}
@@ -204,6 +240,40 @@ export function CadAssetModule({
         />
       ) : null}
     </section>
+  );
+}
+
+/**
+ * The recorded FAULT on this asset, if there is one. Visible in every state.
+ *
+ * Split out of the evidence footer when the footer stopped rendering at rest. A silent failure is
+ * worse than a line of text: the module header's status word (`Failed`, `Pin Match Failed`,
+ * `Incomplete`, `Needs Review`) says THAT something is wrong in every state, and this says WHAT.
+ * Neutral text with the warning triangle beside it, because the warning tier is no longer a hue.
+ *
+ * A MISSING asset is not a fault with anything to add. The projection sets its `issue` to "No file is
+ * attached yet.", which is the header's own `Missing` in a longer sentence - so a component with no
+ * CAD at all said the same thing twice per module, six times down a ~300px column. The payload keeps
+ * the string (the completion worklist reads it as a detail line, where it is the only wording there
+ * is); the column does not restate it. `failed` and `review` DO add something - which check, and
+ * whether it failed or could not be measured - so those are stated unconditionally.
+ */
+function AssetIssue({
+  status,
+  issue,
+}: {
+  status: RepresentationView["status"];
+  issue: string | null;
+}) {
+  if (!issue || (status !== "failed" && status !== "review")) return null;
+  return (
+    <p
+      data-dev-id="component-browser.asset-issue"
+      className="ui-component-metadata flex items-baseline gap-1 px-2 py-1 text-warn"
+    >
+      <WarnMark />
+      <span>{issue}</span>
+    </p>
   );
 }
 
@@ -278,20 +348,27 @@ function AssetPreview({
   view,
   preview,
   interactive,
+  onOpenFullPreview,
 }: {
   kind: RepresentationKind;
   view: RepresentationView;
   preview: PreviewData;
   interactive: boolean;
+  /** Handed to the 3D viewer, which owns the only control strip a model module has. */
+  onOpenFullPreview: () => void;
 }) {
-  const absent = useText("component-browser.asset-absent", "No file is attached");
+  const fullPreview = useText("component-browser.asset-full-preview", "Open Full Preview");
   const unreadable = useText(
     "component-browser.asset-unreadable",
     "This file could not be read on this machine",
   );
 
+  // NOTHING ATTACHED: the asset's own line art, and no sentence. `No file is attached` was a second
+  // statement of the header's `Missing` two lines above it, one per absent asset, so a component with
+  // no CAD at all said the same thing four times down a ~300px column. The status word is the
+  // statement; the empty sheet is the illustration of it.
   if (!view.tools.some((tool) => tool.present)) {
-    return <PreviewMessage kind={kind} message={absent} />;
+    return <PreviewMessage kind={kind} message="" />;
   }
   if (kind === "symbol") {
     if (preview.geometry.isError) return <PreviewMessage kind={kind} message={unreadable} />;
@@ -328,7 +405,14 @@ function AssetPreview({
         land={preview.land.data ?? null}
         showViews={interactive}
         showShading={interactive}
-        compact={!interactive}
+        compact
+        // One button, one panel, exactly like the symbol and the land pattern beside it: layers,
+        // motion, camera, appearance and placement all live inside the popover, and the strip is
+        // the settings icon plus the maximize control the module hands down. The previous compact
+        // bar still carried up to four always-visible layer icons and a spin toggle, which is the
+        // same "row of switches above the drawing" the column was being read as.
+        controls={interactive ? "panel" : "none"}
+        trailing={interactive ? <MaximizeButton label={fullPreview} onClick={onOpenFullPreview} /> : null}
       />
     </div>
   );
@@ -348,51 +432,17 @@ function PreviewMessage({ kind, message }: { kind: RepresentationKind; message: 
 /* -------------------------------------------------------------------------- */
 
 /**
- * One toggle. Icon-free by design at this size - a 22px square holding a legible glyph plus a
- * pressed state is wider than the whole column allows - but every one of them carries a tooltip,
- * an accessible label and `aria-pressed`, which is what the pressed state has to be readable as.
- */
-function LayerToggle({
-  devId,
-  label,
-  pressed,
-  onToggle,
-  disabledReason = "",
-}: {
-  devId: string;
-  label: ReactNode;
-  pressed: boolean;
-  onToggle: () => void;
-  /** Stated, never silent: a control that cannot operate has to say why in words. */
-  disabledReason?: string;
-}) {
-  return (
-    <button
-      type="button"
-      data-dev-id={devId}
-      aria-pressed={pressed}
-      disabled={disabledReason !== ""}
-      title={disabledReason || undefined}
-      onClick={onToggle}
-      className={
-        "ui-control-label h-[20px] rounded-control border border-line px-2 " +
-        "hover:bg-control-hover disabled:opacity-50 disabled:hover:bg-transparent " +
-        "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 " +
-        "focus-visible:outline-focus " +
-        (pressed ? "bg-selected text-t1" : "text-t3")
-      }
-    >
-      {label}
-    </button>
-  );
-}
-
-/**
- * The controls that actually operate on the drawing in front of the person.
+ * The controls that operate on the drawing in front of the person: ONE strip, icons only.
  *
- * Deliberately only the ones backed by real data. The 3D body's own controls - fit, orientation,
- * projection, the preset views, the land-pattern overlay - live inside `Glb3DView`, which owns
- * the scene; duplicating them here would be a second set of buttons pointing at one camera.
+ * Every visibility switch is inside the panel `AssetOptionsButton` opens, and nothing else about
+ * what is drawn is visible until it is asked for. Counted on the running application, the previous
+ * arrangement put fourteen outlined pills across six rows above the first piece of evidence in a
+ * ~300px column; this puts two or three 20px icons on one 24px line. Not one switch was removed -
+ * see `AssetOptions.tsx` for where each went and why measure and fit are not switches.
+ *
+ * The 3D body's controls are NOT duplicated here. `Glb3DView` owns the scene, so it owns its own
+ * one-button panel (`controls="panel"`) and this module hands it the maximize control to place at
+ * the end of the same strip - one row for the model too, rather than a bar under a bar.
  */
 function AssetControls({
   kind,
@@ -404,6 +454,16 @@ function AssetControls({
   onOpenFullPreview: () => void;
 }) {
   const openFull = useText("component-browser.asset-full-preview", "Open Full Preview");
+  const symbolOptions = useText(
+    "component-browser.asset-symbol-options",
+    "Show Or Hide Drawn Detail",
+  );
+  const footprintOptions = useText(
+    "component-browser.asset-footprint-options",
+    "Show Or Hide Drawn Detail",
+  );
+  const symbolGroup = useText("component-browser.asset-symbol-group", "Drawn Detail");
+  const measureLabel = useText("component-browser.layer-measure", "Measure");
   const noSymbol = useText(
     "component-browser.asset-controls-no-symbol",
     "The symbol could not be read, so there is nothing to switch on",
@@ -425,48 +485,59 @@ function AssetControls({
     "This footprint draws nothing on that layer",
   );
 
-  if (kind === "model") {
-    return (
-      <div className="flex items-center justify-end gap-1 px-2 py-1">
-        <MaximizeButton label={openFull} onClick={onOpenFullPreview} />
-      </div>
-    );
-  }
+  // The model's strip is Glb3DView's own, so that the settings button and the maximize control sit
+  // on ONE line instead of a module strip stacked under a viewer bar.
+  if (kind === "model") return null;
 
   if (kind === "symbol") {
-    const geometry = preview.geometry.data;
-    const reason = geometry ? "" : noSymbol;
+    const reason = preview.geometry.data ? "" : noSymbol;
     const { layers, toggle } = preview.symbolLayers;
-    const symbolToggle = (layer: SymbolLayer, devId: string, label: ReactNode) => (
-      <LayerToggle
-        devId={devId}
-        label={label}
-        pressed={layers[layer]}
-        onToggle={() => toggle(layer)}
-        disabledReason={reason}
-      />
-    );
+    const symbolOption = (
+      layer: SymbolLayer,
+      devId: string,
+      copyId: string,
+      label: string,
+    ): AssetOption => ({
+      id: layer,
+      devId,
+      copyId,
+      label,
+      on: layers[layer],
+      toggle: () => toggle(layer),
+      disabledReason: reason,
+    });
     return (
-      <div className="flex flex-wrap items-center gap-1 px-2 py-1">
-        {symbolToggle(
-          "pinName",
-          "component-browser.asset-layer-pin-name",
-          <Text id="component-browser.layer-pin-name">Pin Names</Text>,
-        )}
-        {symbolToggle(
-          "pinNumber",
-          "component-browser.asset-layer-pin-number",
-          <Text id="component-browser.layer-pin-number">Pin Numbers</Text>,
-        )}
-        {symbolToggle(
-          "electrical",
-          "component-browser.asset-layer-electrical",
-          <Text id="component-browser.layer-electrical">Electrical Type</Text>,
-        )}
+      <AssetControlStrip>
+        <AssetOptionsButton
+          devId="component-browser.asset-options-symbol"
+          buttonLabel={symbolOptions}
+          groupLabel={symbolGroup}
+          emptyReason={noSymbol}
+          options={[
+            symbolOption(
+              "pinName",
+              "component-browser.asset-layer-pin-name",
+              "component-browser.layer-pin-name",
+              "Pin Names",
+            ),
+            symbolOption(
+              "pinNumber",
+              "component-browser.asset-layer-pin-number",
+              "component-browser.layer-pin-number",
+              "Pin Numbers",
+            ),
+            symbolOption(
+              "electrical",
+              "component-browser.asset-layer-electrical",
+              "component-browser.layer-electrical",
+              "Electrical Type",
+            ),
+          ]}
+        />
         <span className="ml-auto flex items-center gap-1">
           <MaximizeButton label={openFull} onClick={onOpenFullPreview} />
         </span>
-      </div>
+      </AssetControlStrip>
     );
   }
 
@@ -479,80 +550,95 @@ function AssetControls({
   const declares = (suffix: string) =>
     (land?.pads ?? []).some((pad) => pad.layers.some((layer) => layer.endsWith(suffix)));
   const base = land ? "" : noFootprint;
-  const footprintToggle = (
+  const footprintOption = (
     layer: FootprintLayer,
     devId: string,
-    label: ReactNode,
-    reason: string,
-  ) => (
-    <LayerToggle
-      devId={devId}
-      label={label}
-      pressed={layers[layer]}
-      onToggle={() => toggle(layer)}
-      disabledReason={base || reason}
-    />
-  );
+    copyId: string,
+    label: string,
+    reason = "",
+  ): AssetOption => ({
+    id: layer,
+    devId,
+    copyId,
+    label,
+    on: layers[layer],
+    toggle: () => toggle(layer),
+    disabledReason: base || reason,
+  });
 
   return (
-    <div className="flex flex-wrap items-center gap-1 px-2 py-1">
-      {footprintToggle(
-        "copper",
-        "component-browser.asset-layer-copper",
-        <Text id="component-browser.layer-copper">Copper</Text>,
-        land && land.pads.length === 0 ? noLayer : "",
-      )}
-      {footprintToggle(
-        "mask",
-        "component-browser.asset-layer-mask",
-        <Text id="component-browser.layer-mask">Mask</Text>,
-        land && !declares(".Mask") ? noMask : "",
-      )}
-      {footprintToggle(
-        "paste",
-        "component-browser.asset-layer-paste",
-        <Text id="component-browser.layer-paste">Paste</Text>,
-        land && !declares(".Paste") ? noPaste : "",
-      )}
-      {footprintToggle(
-        "silkscreen",
-        "component-browser.asset-layer-silkscreen",
-        <Text id="component-browser.layer-silkscreen">Silkscreen</Text>,
-        land && !drawn(".SilkS") ? noLayer : "",
-      )}
-      {footprintToggle(
-        "fabrication",
-        "component-browser.asset-layer-fabrication",
-        <Text id="component-browser.layer-fabrication">Fabrication</Text>,
-        land && !drawn(".Fab") ? noLayer : "",
-      )}
-      {footprintToggle(
-        "courtyard",
-        "component-browser.asset-layer-courtyard",
-        <Text id="component-browser.layer-courtyard">Courtyard</Text>,
-        land && !drawn(".CrtYd") ? noLayer : "",
-      )}
-      {footprintToggle(
-        "numbers",
-        "component-browser.asset-layer-numbers",
-        <Text id="component-browser.layer-numbers">Pad Numbers</Text>,
-        "",
-      )}
-      {footprintToggle(
-        "origin",
-        "component-browser.asset-layer-origin",
-        <Text id="component-browser.layer-origin">Origin</Text>,
-        "",
-      )}
-      {footprintToggle(
-        "dimensions",
-        "component-browser.asset-layer-dimensions",
-        <Text id="component-browser.layer-dimensions">Dimensions</Text>,
-        land && land.pads.length === 0 ? noLayer : "",
-      )}
-      <LayerToggle
-        devId="component-browser.asset-measure"
-        label={<Text id="component-browser.layer-measure">Measure</Text>}
+    <AssetControlStrip>
+      <AssetOptionsButton
+        devId="component-browser.asset-options-footprint"
+        buttonLabel={footprintOptions}
+        groupLabel={symbolGroup}
+        emptyReason={noFootprint}
+        options={[
+          footprintOption(
+            "copper",
+            "component-browser.asset-layer-copper",
+            "component-browser.layer-copper",
+            "Copper",
+            land && land.pads.length === 0 ? noLayer : "",
+          ),
+          footprintOption(
+            "mask",
+            "component-browser.asset-layer-mask",
+            "component-browser.layer-mask",
+            "Mask",
+            land && !declares(".Mask") ? noMask : "",
+          ),
+          footprintOption(
+            "paste",
+            "component-browser.asset-layer-paste",
+            "component-browser.layer-paste",
+            "Paste",
+            land && !declares(".Paste") ? noPaste : "",
+          ),
+          footprintOption(
+            "silkscreen",
+            "component-browser.asset-layer-silkscreen",
+            "component-browser.layer-silkscreen",
+            "Silkscreen",
+            land && !drawn(".SilkS") ? noLayer : "",
+          ),
+          footprintOption(
+            "fabrication",
+            "component-browser.asset-layer-fabrication",
+            "component-browser.layer-fabrication",
+            "Fabrication",
+            land && !drawn(".Fab") ? noLayer : "",
+          ),
+          footprintOption(
+            "courtyard",
+            "component-browser.asset-layer-courtyard",
+            "component-browser.layer-courtyard",
+            "Courtyard",
+            land && !drawn(".CrtYd") ? noLayer : "",
+          ),
+          footprintOption(
+            "numbers",
+            "component-browser.asset-layer-numbers",
+            "component-browser.layer-numbers",
+            "Pad Numbers",
+          ),
+          footprintOption(
+            "origin",
+            "component-browser.asset-layer-origin",
+            "component-browser.layer-origin",
+            "Origin",
+          ),
+          footprintOption(
+            "dimensions",
+            "component-browser.asset-layer-dimensions",
+            "component-browser.layer-dimensions",
+            "Dimensions",
+            land && land.pads.length === 0 ? noLayer : "",
+          ),
+        ]}
+      />
+      <MeasureButton
+        label={measureLabel}
         pressed={measuring}
         onToggle={toggleMeasuring}
         disabledReason={base}
@@ -560,29 +646,7 @@ function AssetControls({
       <span className="ml-auto flex items-center gap-1">
         <MaximizeButton label={openFull} onClick={onOpenFullPreview} />
       </span>
-    </div>
-  );
-}
-
-/** The one control that opens the full preview: a small maximize glyph, never a text button. */
-function MaximizeButton({ label, onClick }: { label: string; onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      data-dev-id="component-browser.asset-maximize"
-      aria-label={label}
-      title={label}
-      onClick={onClick}
-      className={
-        "flex h-[20px] w-[20px] items-center justify-center rounded-control text-t3 " +
-        "hover:bg-control-hover hover:text-t1 focus-visible:outline focus-visible:outline-2 " +
-        "focus-visible:outline-offset-1 focus-visible:outline-focus"
-      }
-    >
-      <svg viewBox="0 0 16 16" aria-hidden className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.4">
-        <path d="M6 2H2v4M10 14h4v-4M14 6V2h-4M2 10v4h4" />
-      </svg>
-    </button>
+    </AssetControlStrip>
   );
 }
 
@@ -592,6 +656,15 @@ function MaximizeButton({ label, onClick }: { label: string; onClick: () => void
 
 /**
  * What was actually checked, in plain counts, reading `STEP . 5/8 pins matched . No duplicates`.
+ *
+ * ONLY WHEN THIS MODULE IS THE FOCUSED ONE. At rest the column stacks three drawings, and it used to
+ * put a line of counts under each of them - `2 pins · No duplicates`, `2 pads · 0.96 mm pitch ·
+ * Courtyard present · 1.80 x 0.84 mm`, `No file is attached` - which is three lines of measurement
+ * nobody asked for above the specifications a person opened the component to read. Clicking a module
+ * header focuses it (and `Show All Three` comes back), and the focused module states its evidence.
+ * The data is not gone from anywhere: it is measured from the drawing on demand, the recorded checks
+ * are in `Compare Sources` and the evidence surface, and a genuine FAULT is stated in every state by
+ * `AssetIssue` above plus the header's own status word.
  *
  * Built from the drawing and from the recorded checks, never from a claim. An asset nobody has
  * measured says so rather than implying a validation that never ran, and a comparison whose
@@ -624,12 +697,12 @@ function AssetEvidence({
   const duplicateWord = useText("component-browser.evidence-duplicates", "duplicate numbers");
   const unnumberedWord = useText("component-browser.evidence-unnumbered", "unnumbered");
   const hiddenWord = useText("component-browser.evidence-hidden", "hidden");
-  const noBody = useText("component-browser.evidence-no-body", "No body drawn");
+  const noBody = useText("component-browser.evidence-no-body", "No outline drawn");
   const courtyardYes = useText("component-browser.evidence-courtyard", "Courtyard present");
   const courtyardNo = useText("component-browser.evidence-no-courtyard", "No courtyard");
   const pinOneNo = useText("component-browser.evidence-no-pin-one", "No pad numbered 1");
   const pitchWord = useText("component-browser.evidence-pitch", "pitch");
-  const noChecks = useText("component-browser.evidence-none", "Nothing has been checked yet");
+  const noChecks = useText("component-browser.evidence-none", "Nothing has been checked so far");
 
   const parts: string[] = [];
   if (format) parts.push(format);
@@ -683,11 +756,6 @@ function AssetEvidence({
 
   return (
     <div className="flex flex-col gap-0.5 px-2 py-1">
-      {view.issue ? (
-        <p data-dev-id="component-browser.asset-issue" className="ui-component-metadata text-warn">
-          {view.issue}
-        </p>
-      ) : null}
       {parts.length > 0 ? (
         <p data-dev-id="component-browser.asset-evidence" className="ui-component-metadata">
           {parts.join(" · ")}

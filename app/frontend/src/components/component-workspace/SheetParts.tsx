@@ -11,7 +11,8 @@
 import type { SourceCandidate, SourceState } from "../../api/dossierTypes";
 import { useText } from "../../lib/copy";
 import { Badge } from "../primitives";
-import { SourceStateLabel, sourceStateOf, sourceStateTone } from "./provenanceText";
+import { SourceStateLabel } from "./provenanceText";
+import { sourceStateOf, sourceStateTone } from "./provenanceVocabulary";
 
 /**
  * Where one value came from.

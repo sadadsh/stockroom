@@ -7,7 +7,7 @@
  * gap someone has to fill and a field this category never asked for.
  */
 import type { VerificationState } from "../../api/dossierTypes";
-import { Text } from "../../lib/copy";
+import { Text, useText } from "../../lib/copy";
 
 export function SpecStateLabel({ state }: { state: VerificationState }) {
   if (state === "verified") return <Text id="component-browser.spec-verified">Verified</Text>;
@@ -19,4 +19,23 @@ export function SpecStateLabel({ state }: { state: VerificationState }) {
   if (state === "not_applicable")
     return <Text id="component-browser.spec-not-applicable">Not Applicable</Text>;
   return <Text id="component-browser.spec-missing">Missing</Text>;
+}
+
+/**
+ * The same six words as resolved STRINGS, for a tooltip or an accessible name.
+ *
+ * A row that shows a dash where a state word would be still owes the reader the word: the dash is
+ * the quiet form, not the whole answer. One hook rather than six `useText` calls per row, and it
+ * reads the SAME copy ids the visible labels above do, so a rewording cannot leave the accessible
+ * name saying something the disclosure does not.
+ */
+export function useSpecStateText(): Record<VerificationState, string> {
+  return {
+    verified: useText("component-browser.spec-verified", "Verified"),
+    conflicting: useText("component-browser.spec-conflicting", "Conflicting"),
+    unverified: useText("component-browser.spec-unverified", "Unverified"),
+    not_reported: useText("component-browser.spec-not-reported", "Not Reported"),
+    not_applicable: useText("component-browser.spec-not-applicable", "Not Applicable"),
+    missing: useText("component-browser.spec-missing", "Missing"),
+  };
 }

@@ -183,12 +183,8 @@ export function conflictCount(dossier: ComponentDossier): number {
   return dossier.qualitySummary.stateCounts.conflicting ?? 0;
 }
 
-/** How many specifications hold a value nothing authoritative has confirmed. */
-export function unverifiedCount(dossier: ComponentDossier): number {
-  return dossier.qualitySummary.stateCounts.unverified ?? 0;
-}
-
-export const CAD_KINDS: readonly RepresentationKind[] = ["symbol", "footprint", "model"];
+/** The three assets in the order the CAD column stacks them: 3D Model, Footprint, Symbol. */
+export const CAD_KINDS: readonly RepresentationKind[] = ["model", "footprint", "symbol"];
 
 /** The CAD set's own condition, in the closed vocabulary: complete, incomplete, or failed. */
 export function cadCondition(
@@ -222,13 +218,16 @@ export function qualitySegments(dossier: ComponentDossier): QualitySegment[] {
 /**
  * The one representation a CAD quality segment should focus.
  *
- * The first thing actually wrong, or the symbol when nothing is - "focus the asset" has to name an
- * asset even when the set is healthy, or the segment is a dead click.
+ * The first thing actually wrong, or the FIRST MODULE IN THE COLUMN when nothing is - "focus the
+ * asset" has to name an asset even when the set is healthy, or the segment is a dead click. The
+ * healthy fallback is read off `CAD_KINDS` rather than named, so it can never disagree with the
+ * order the column actually stacks the modules in (it did: the fallback was hardcoded `symbol`,
+ * which is now the LAST module).
  */
 export function cadFocusKind(
   kinds: Record<RepresentationKind, RepresentationView>,
 ): RepresentationKind {
-  return cadCondition(kinds).missing[0] ?? "symbol";
+  return cadCondition(kinds).missing[0] ?? CAD_KINDS[0];
 }
 
 /**

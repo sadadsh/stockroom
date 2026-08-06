@@ -20,7 +20,8 @@ import type {
   RepresentationKind,
 } from "../../api/dossierTypes";
 
-export const CAD_ASSET_KINDS: readonly RepresentationKind[] = ["symbol", "footprint", "model"];
+/** Ordered the way the three modules are stacked: 3D Model, Footprint, Symbol. */
+export const CAD_ASSET_KINDS: readonly RepresentationKind[] = ["model", "footprint", "symbol"];
 
 /**
  * The providers worth putting in front of a person for the whole set, in the backend's own order.

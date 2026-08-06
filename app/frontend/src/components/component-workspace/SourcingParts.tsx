@@ -12,7 +12,15 @@
  */
 import type { ReactNode } from "react";
 
-/** A 21px heading band directly above its rows, with at most one action pinned to its right. */
+/**
+ * A 21px heading ROW directly above its rows, with at most one action pinned to its right.
+ *
+ * A RULE, not a filled band. The fill was the same treatment repeated once per section, and with
+ * six sections here plus a group header per specification family it appeared about fifteen times on
+ * one screen - which is most of what the owner was reading as convoluted. A desktop panel header is
+ * a label and a hairline; the weight of the label and the line under it are already two signals,
+ * and a third (a coloured field behind them) only competes with the data below.
+ */
 export function SourcingSection({
   devId,
   title,
@@ -27,7 +35,7 @@ export function SourcingSection({
 }) {
   return (
     <section data-dev-id={devId} className="border-b border-line last:border-b-0">
-      <header className="flex min-h-[21px] items-center gap-2 bg-band px-2 py-0.5">
+      <header className="flex min-h-[21px] items-center gap-2 border-b border-line px-2 py-0.5">
         <h3 className="ui-section-title min-w-0 truncate">{title}</h3>
         {action ? <span className="ml-auto flex-none">{action}</span> : null}
       </header>

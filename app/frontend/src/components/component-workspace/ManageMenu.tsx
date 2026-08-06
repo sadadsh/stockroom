@@ -9,6 +9,9 @@
  *
  * Every item here does something. An item whose surface does not exist yet is not listed, because
  * a menu entry that opens nothing is worse than a menu entry that is absent.
+ *
+ * WHAT is listed, and in what order, is in `manageActions.tsx`. That is a decision about the
+ * product and can be read without rendering a popover; this is the popover.
  */
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { Text, useText } from "../../lib/copy";
@@ -28,80 +31,6 @@ export interface ManageMenuItem {
   separated?: boolean;
   run: () => void;
   disabled?: boolean;
-}
-
-/**
- * The canonical order. Identity first (what the component IS), then the data (what it claims), then
- * the assets, then where the claims came from, then - alone, after a rule - removal.
- *
- * An ellipsis means another surface follows. `Refresh Component Data` has none because it happens
- * where you stand.
- */
-export function manageMenuItems(actions: {
-  onEditIdentity: () => void;
-  onEditClassification: () => void;
-  onReviewMissing: () => void;
-  onRefresh: () => void;
-  refreshing: boolean;
-  onReviewCadSources: () => void;
-  onViewProvenance: () => void;
-  onDelete: () => void;
-  /**
-   * Export Component... / Open In... / Reveal Component Files..., when this host can perform
-   * them. They arrive as a list rather than as three more callbacks because whether each one
-   * EXISTS is decided by the machine (is there a native window, is anything installed, does this
-   * component have files) and that decision belongs with the surface that asked, not here.
-   */
-  shellItems?: ManageMenuItem[];
-}): ManageMenuItem[] {
-  return [
-    {
-      id: "edit-identity",
-      copyId: "component-browser.manage-edit-identity",
-      label: "Edit Identity...",
-      run: actions.onEditIdentity,
-    },
-    {
-      id: "edit-classification",
-      copyId: "component-browser.manage-edit-classification",
-      label: "Edit Category and Classification...",
-      run: actions.onEditClassification,
-    },
-    {
-      id: "review-missing",
-      copyId: "component-browser.manage-review-missing",
-      label: "Review Missing Specifications...",
-      run: actions.onReviewMissing,
-    },
-    {
-      id: "refresh",
-      copyId: "component-browser.manage-refresh",
-      label: "Refresh Component Data",
-      disabled: actions.refreshing,
-      run: actions.onRefresh,
-    },
-    {
-      id: "review-cad-sources",
-      copyId: "component-browser.manage-review-cad",
-      label: "Review CAD Sources...",
-      run: actions.onReviewCadSources,
-    },
-    {
-      id: "view-provenance",
-      copyId: "component-browser.manage-provenance",
-      label: "View Data Provenance...",
-      run: actions.onViewProvenance,
-    },
-    ...(actions.shellItems ?? []),
-    {
-      id: "delete",
-      copyId: "component-browser.manage-delete",
-      label: "Delete Component...",
-      destructive: true,
-      separated: true,
-      run: actions.onDelete,
-    },
-  ];
 }
 
 export function ManageMenu({ items }: { items: ManageMenuItem[] }) {
@@ -215,7 +144,7 @@ export function ManageMenu({ items }: { items: ManageMenuItem[] }) {
                   " hover:bg-control-hover focus-visible:bg-control-hover focus-visible:outline " +
                   "focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus " +
                   "disabled:cursor-not-allowed disabled:text-t5 " +
-                  (item.destructive ? "text-err" : "")
+                  (item.destructive ? "text-err-text" : "")
                 }
               >
                 <Text id={item.copyId}>{item.label}</Text>
