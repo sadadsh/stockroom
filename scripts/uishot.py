@@ -212,6 +212,17 @@ def _appears(locator, timeout_ms: int = _UI_TIMEOUT_MS) -> bool:
         return False
 
 
+# The smallest valid PDF: one empty A4 page. Written as the seeded part's STORED datasheet so the
+# Documents section has a row whose bytes exist and the viewer opens rather than failing.
+_ONE_PAGE_PDF = (
+    b"%PDF-1.4\n"
+    b"1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n"
+    b"2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n"
+    b"3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 595 842]>>endobj\n"
+    b"trailer<</Root 1 0 R>>\n%%EOF\n"
+)
+
+
 def _seed_workspace(base: Path, source: Path | None = None) -> Path:
     """Build a throwaway component library for safe, representative screenshots.
 
@@ -290,6 +301,14 @@ def _seed_workspace(base: Path, source: Path | None = None) -> Path:
     else:
         print(f"  note: installed KiCad render-probe model not found at {installed_model}")
 
+    # A stored datasheet, so the Documents section has a document whose bytes we HOLD rather than
+    # only a URL. `Datasheet.file` means "this name, under datasheets/", which is the convention the
+    # projection reads, so the bytes go there. It is a real (tiny) PDF: a stub with the wrong magic
+    # would make the viewer fail, and a shot of a failed viewer proves nothing about the column.
+    datasheet_dir = profile / "datasheets"
+    datasheet_dir.mkdir(parents=True, exist_ok=True)
+    (datasheet_dir / "tps62130.pdf").write_bytes(_ONE_PAGE_PDF)
+
     # A part carrying the data Batch 3 stopped discarding, so the surfaces that show it can actually
     # be SEEN. Nothing in a real library has any of this yet (no part has been re-enriched since),
     # and a screenshot of a surface with no data proves nothing.
@@ -298,13 +317,68 @@ def _seed_workspace(base: Path, source: Path | None = None) -> Path:
     #   - DigiKey stored FIRST with a full ladder, Mouser second -> proves the Mouser-first reorder
     #     is doing the work rather than the record order happening to be right
     #   - a SIX-tier ladder -> five bulk tiers is ODD, which is the case that used to leave a hole
+    #
+    # AND THE WHOLE SOURCING COLUMN. Everything above exercised the specification and trade surfaces
+    # and left the right-hand column with two of its six sections filled, so "sourcing is dead space"
+    # could not be told apart from "the seeded part has nothing to source". It now carries all six:
+    #   - two distributors' offers with stock, currency and ladders (above)
+    #   - a STORED datasheet plus a package drawing and a PCN -> Documents, four typed rows
+    #   - two catalogue relationships -> Related Parts, each with a derived reason
+    #   - enrichment from three sources -> Data Provenance and History
     (parts / "vendordata.json").write_text(json.dumps({
         "id": "vendordata", "display_name": "AAA Vendor Data Probe",
         "category": "ICs",
         "description": "3A step-down converter, WSON-8",
         "mpn": "TPS62130RGTR", "manufacturer": "Texas Instruments",
-        "datasheet": {"file": "", "source_url": "https://ti.com/lit/ds/symlink/tps62130.pdf",
-                      "fetched_at": ""},
+        "datasheet": {"file": "tps62130.pdf",
+                      "source_url": "https://ti.com/lit/ds/symlink/tps62130.pdf",
+                      "fetched_at": "2026-07-28T09:14:00Z"},
+        # Typed documents beside the datasheet, so the section is the complete record the layout
+        # calls for rather than one row: a held revision, a package drawing, and a change notice.
+        "documents": [
+            {"document_type": "datasheet", "title": "TPS62130 3-A Step-Down Converter",
+             "revision": "SLVSAG9F", "manufacturer": "Texas Instruments",
+             "source_type": "manufacturer", "source": "manufacturer",
+             "local_path": "datasheets/tps62130.pdf",
+             "remote_url": "https://ti.com/lit/ds/symlink/tps62130.pdf",
+             "mime_type": "application/pdf", "is_current": True,
+             "retrieved_at": "2026-07-28T09:14:00Z", "verified_at": "2026-07-28T09:14:00Z"},
+            {"document_type": "datasheet", "title": "TPS62130 3-A Step-Down Converter",
+             "revision": "SLVSAG9E", "manufacturer": "Texas Instruments",
+             "source_type": "manufacturer", "source": "manufacturer",
+             "remote_url": "https://ti.com/lit/ds/symlink/tps62130e.pdf",
+             "mime_type": "application/pdf", "is_current": False,
+             "retrieved_at": "2025-11-02T11:00:00Z"},
+            {"document_type": "package_drawing", "title": "WSON-8 Package Outline",
+             "revision": "MXA08A", "manufacturer": "Texas Instruments",
+             "source_type": "manufacturer", "source": "manufacturer",
+             "remote_url": "https://ti.com/lit/ml/mxa08a/mxa08a.pdf",
+             "mime_type": "application/pdf", "retrieved_at": "2026-07-28T09:14:00Z"},
+            {"document_type": "pcn", "title": "Assembly Site Addition",
+             "revision": "PCN-20260415", "manufacturer": "Texas Instruments",
+             "source_type": "manufacturer", "source": "manufacturer",
+             "remote_url": "https://ti.com/lit/pcn/20260415.pdf",
+             "mime_type": "application/pdf", "retrieved_at": "2026-04-15T00:00:00Z"},
+        ],
+        # Catalogue relationships, so Related Parts has rows whose reason is DERIVED from the
+        # normalized differences rather than copied from a distributor label: a reel of the same part,
+        # and a substitution a distributor offered.
+        "catalog": {
+            "digikey": {
+                "alternate_packaging": [
+                    {"manufacturer_product_number": "TPS62130RGTT",
+                     "manufacturer": "Texas Instruments",
+                     "description": "3A step-down converter, WSON-8, cut tape",
+                     "product_url": "https://www.digikey.com/en/products/detail/tps62130rgtt"},
+                ],
+                "substitutions": [
+                    {"manufacturer_product_number": "TPS62131RGTR",
+                     "manufacturer": "Texas Instruments",
+                     "description": "3A step-down converter, WSON-8, fixed 3.3 V",
+                     "product_url": "https://www.digikey.com/en/products/detail/tps62131rgtr"},
+                ],
+            },
+        },
         "purchase": [
             {"vendor": "DigiKey", "url": "https://www.digikey.com/en/products/detail/x",
              "part_number": "296-35116-1-ND",
