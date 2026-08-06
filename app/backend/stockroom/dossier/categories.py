@@ -69,7 +69,7 @@ class CategorySchema:
     # description, the display name, the MPN, the tags and the values of the identifying spec
     # keys - never against a spec key's NAME, which every category shares.
     signals: tuple[str, ...] = field(default_factory=tuple)
-    # This schema's own groups, inserted after the universal ones. Key Specifications always
+    # This schema's own groups, inserted after the universal ones. Main Specifications always
     # leads and `other` always trails, so a schema never declares either.
     groups: tuple[str, ...] = field(default_factory=tuple)
     # Where this category puts a field that has a different universal home. A resistor's

@@ -57,7 +57,12 @@ _MAX_EVENT_SEQUENCE = (1 << 63) - 1
 # document without limit; the frontend evicts the least-recently-active tab at the same bound.
 _MAX_OPEN_COMPONENTS = 12
 _INFO_TABS = {"overview", "specifications", "sourcing", "sources"}
-_REPRESENTATION_LAYOUTS = {"all", "symbol", "footprint", "model"}
+# Both are MEMBERSHIP vocabularies: the layout is validated against a set and the tool map is
+# addressed by key, so neither sequence reaches a screen. The CAD column stacks 3D Model, Footprint,
+# Symbol, and the layout set is written in that order so reading this file does not suggest otherwise.
+# `_REPRESENTATION_KINDS` keeps the storage order it shares with `model.asset.ASSET_KINDS`, because it
+# builds the key order of the durable `representation_tool` object.
+_REPRESENTATION_LAYOUTS = {"all", "model", "footprint", "symbol"}
 _REPRESENTATION_KINDS = ("symbol", "footprint", "model")
 
 _ROUTES = {"components", "projects", "stm", "settings"}

@@ -44,6 +44,7 @@ from stockroom.dossier.units import NormalizedValue, comparable_key, is_empty, n
 from stockroom.dossier.vocabulary import (
     CATEGORY_GROUPS,
     GROUP_LABELS,
+    GROUP_PARENT,
     OTHER_GROUP,
     UNIVERSAL_GROUPS,
 )
@@ -585,6 +586,28 @@ def build_specifications(record, schema: CategorySchema) -> Specifications:
     by_key = {item["key"]: item for item in records}
     key_specs = tuple(by_key[key] for key in schema.key_specs if key in by_key)
 
+    # A KEY SPECIFICATION IS MOVED INTO THE HEADLINE BLOCK, NOT COPIED INTO IT.
+    #
+    # This was the other way round for one release, on the reasoning that supply voltage is a key
+    # fact ABOUT a logic gate and an electrical parameter OF it, so a reader working down the
+    # Electrical group had to find it there. MEASURED on a 100 nF 0402 capacitor, the cost of that
+    # reasoning was the whole sheet: all seven of the capacitor's key specifications were also its
+    # groups' only rows, so eleven distinct fields rendered as eighteen rows under ten headings, and
+    # `Capacitance` appeared twice on one screen about a capacitor. A reader scrolling the groups was
+    # re-reading the block they had just read.
+    #
+    # So promotion is a MOVE. The headline block answers "what is this part", the groups answer
+    # "what else is on record about it", and no value is stated twice.
+    promoted = {item["key"] for item in key_specs}
+    remaining = [item for item in records if item["key"] not in promoted]
+    rows_by_group: dict[str, list[dict[str, Any]]] = {}
+    for item in remaining:
+        rows_by_group.setdefault(item["group"], []).append(item)
+
+    def content(group_id: str) -> int:
+        """How many rows under this group a reader can actually read. See `_earns_a_heading`."""
+        return sum(1 for item in rows_by_group.get(group_id, ()) if _earns_a_heading(item))
+
     # The headings this sheet actually renders: the schema's own order first, then any group a
     # row landed in that the schema never declared, then `other`. That middle step is what stops
     # a specification DISAPPEARING: a field's registry group (a resistor's `Mounting Type` sits
@@ -595,19 +618,42 @@ def build_specifications(record, schema: CategorySchema) -> Specifications:
     undeclared = [
         group_id
         for group_id, _ in UNIVERSAL_GROUPS + CATEGORY_GROUPS
-        if group_id not in declared
-        and group_id != "key_specifications"
-        and any(_earns_a_heading(item) for item in records if item["group"] == group_id)
+        if group_id not in declared and group_id != "key_specifications" and content(group_id) > 0
     ]
+    ordering = (*declared, *undeclared, OTHER_GROUP[0])
+
+    # A REFINEMENT HOLDING ONE ROW FOLDS INTO THE HEADING ABOVE IT.
+    #
+    # One header line per line of data is not a grouping, it is an index. `Capacitance`,
+    # `Tolerance and Stability`, `Temperature Characteristics`, `Construction and Termination` and
+    # `Mounting` each held exactly one row on the seeded capacitor, and the anchor strip offered all
+    # five as destinations. So a category group with a single readable row is dropped and its rows are
+    # read under the universal heading it refines (`GROUP_PARENT`, which declares one for every
+    # category group and never points at `key_specifications` or `other`).
+    #
+    # DETERMINISTIC BY CONSTRUCTION, because a row must never move between renders: the fold target is
+    # a static declaration, the decision is a pure function of one group's own row count, it is taken
+    # in one pass over the fixed `ordering`, and it is not applied recursively - a parent that ends up
+    # holding one folded row keeps its heading rather than folding onward into a third place.
+    #
+    # A UNIVERSAL group never folds. It has no `GROUP_PARENT` entry because it IS the parent, and one
+    # row under `Environmental and Reliability` is still a heading a reader navigates by.
+    folded_in: dict[str, list[dict[str, Any]]] = {}
+    dissolved: set[str] = set()
+    for group_id in ordering:
+        parent = GROUP_PARENT.get(group_id)
+        if parent is None or content(group_id) != 1:
+            continue
+        # Every row moves, the inapplicable ones included: a group is kept or dropped WHOLE, and a
+        # row that says "this does not apply to this part" is still an answer somebody may look for.
+        folded_in.setdefault(parent, []).extend(rows_by_group.get(group_id, ()))
+        dissolved.add(group_id)
 
     groups: list[dict[str, Any]] = []
-    for group_id in (*declared, *undeclared, OTHER_GROUP[0]):
-        # A key specification is LIFTED into the headline block, not removed from engineering.
-        # Supply voltage is a key fact about a logic gate AND an electrical parameter of it, and
-        # a reader working down the Electrical group to find it must find it there. The
-        # duplication is deliberate: the headline block answers "what is this part", the group
-        # answers "what does this part do electrically", and one number answers both questions.
-        rows = [item for item in records if item["group"] == group_id]
+    for group_id in ordering:
+        if group_id in dissolved:
+            continue
+        rows = [*rows_by_group.get(group_id, ()), *folded_in.get(group_id, ())]
         if not any(_earns_a_heading(item) for item in rows):
             continue
         rows.sort(key=lambda item: (item["order"], item["label"]))

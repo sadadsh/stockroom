@@ -27,12 +27,19 @@ from tests.backend.dossier import records
 
 
 def _contested() -> PartRecord:
-    """A resistor whose tolerance two distributors disagree about."""
+    """A resistor whose tolerance two distributors disagree about.
+
+    Mouser deliberately holds the answer computed precedence picks and DigiKey the one it does
+    not, because the registry's distributor order is Mouser first (2026-08-05). Every pin test
+    below pins DigiKey for that reason: pinning the source that already wins would prove nothing
+    about promotion. The two names were swapped here when the order was, so each test still says
+    exactly what it said before - only which distributor plays the losing role changed.
+    """
     record = records.resistor()
     record.alternates = {
         "Tolerance": [
-            SourcedValue(value="1%", source="digikey"),
-            SourcedValue(value="2%", source="mouser"),
+            SourcedValue(value="1%", source="mouser"),
+            SourcedValue(value="2%", source="digikey"),
         ]
     }
     return record
@@ -94,8 +101,8 @@ def test_an_override_records_the_value_and_source_it_displaced():
     set_override(record, "tolerance", "0.5%", reviewed_by="user", reviewed_at="2026-08-05")
     override = _row(record)["override"]
     assert override["replacedValue"] == "1%"
-    assert override["replacedSource"] == "digikey"
-    assert override["replacedSourceLabel"] == "DigiKey"
+    assert override["replacedSource"] == "mouser"
+    assert override["replacedSourceLabel"] == "Mouser"
     assert override["reviewedBy"] == "user"
     assert override["reviewedAt"] == "2026-08-05"
 
@@ -106,7 +113,7 @@ def test_a_second_override_records_what_the_sources_say_not_the_first_override()
     set_override(record, "tolerance", "0.25%")
     override = _row(record)["override"]
     assert override["replacedValue"] == "1%"
-    assert override["replacedSource"] == "digikey"
+    assert override["replacedSource"] == "mouser"
 
 
 def test_an_override_on_a_field_nothing_answered_displaces_nothing():
@@ -171,7 +178,7 @@ def test_a_preferred_source_must_be_one_of_the_fields_own_candidates():
 def test_a_field_nothing_answered_can_have_no_preferred_source():
     record = records.resistor()
     with pytest.raises(UnpinnableSource):
-        set_preferred_source(record, "eccn", "digikey")
+        set_preferred_source(record, "eccn", "mouser")
 
 
 def test_a_persons_own_earlier_answer_is_not_offered_as_a_source_to_prefer():
@@ -184,17 +191,17 @@ def test_a_persons_own_earlier_answer_is_not_offered_as_a_source_to_prefer():
 
 def test_a_preferred_source_promotes_that_source_without_dropping_the_others():
     record = _contested()
-    assert _row(record)["preferredSource"]["sourceId"] == "digikey"
-    set_preferred_source(record, "tolerance", "mouser", reviewed_by="user")
+    assert _row(record)["preferredSource"]["sourceId"] == "mouser"
+    set_preferred_source(record, "tolerance", "digikey", reviewed_by="user")
     row = _row(record)
-    assert row["preferredSource"]["sourceId"] == "mouser"
+    assert row["preferredSource"]["sourceId"] == "digikey"
     assert row["preferredValue"] == "2%"
-    assert set(_sources(row)) == {"digikey", "mouser"}
+    assert set(_sources(row)) == {"mouser", "digikey"}
 
 
 def test_a_pinned_field_reports_the_disagreement_as_settled_rather_than_open():
     record = _contested()
-    set_preferred_source(record, "tolerance", "mouser")
+    set_preferred_source(record, "tolerance", "digikey")
     row = _row(record)
     assert row["conflictState"] == "resolved"
     assert row["preferredSourcePin"]["inForce"] is True
@@ -202,14 +209,14 @@ def test_a_pinned_field_reports_the_disagreement_as_settled_rather_than_open():
 
 def test_a_pin_follows_its_source_rather_than_copying_what_it_said():
     record = _contested()
-    set_preferred_source(record, "tolerance", "mouser")
-    record.alternates["Tolerance"][1] = SourcedValue(value="5%", source="mouser")
+    set_preferred_source(record, "tolerance", "digikey")
+    record.alternates["Tolerance"][1] = SourcedValue(value="5%", source="digikey")
     assert _row(record)["preferredValue"] == "5%"
 
 
 def test_a_pin_never_becomes_an_empty_manual_answer():
     record = _contested()
-    set_preferred_source(record, "tolerance", "mouser")
+    set_preferred_source(record, "tolerance", "digikey")
     row = _row(record)
     assert "manual" not in _sources(row)
     assert row["override"] is None
@@ -217,16 +224,16 @@ def test_a_pin_never_becomes_an_empty_manual_answer():
 
 def test_a_pin_whose_source_no_longer_answers_is_reported_not_obeyed():
     record = _contested()
-    set_preferred_source(record, "tolerance", "mouser")
-    record.alternates["Tolerance"] = [SourcedValue(value="1%", source="digikey")]
+    set_preferred_source(record, "tolerance", "digikey")
+    record.alternates["Tolerance"] = [SourcedValue(value="1%", source="mouser")]
     row = _row(record)
-    assert row["preferredSource"]["sourceId"] == "digikey"
+    assert row["preferredSource"]["sourceId"] == "mouser"
     assert row["preferredSourcePin"]["inForce"] is False
 
 
 def test_a_reviewed_value_outranks_a_pin_and_the_pin_says_it_is_not_in_force():
     record = _contested()
-    set_preferred_source(record, "tolerance", "mouser")
+    set_preferred_source(record, "tolerance", "digikey")
     set_override(record, "tolerance", "0.5%")
     row = _row(record)
     assert row["preferredValue"] == "0.5%"
@@ -235,7 +242,7 @@ def test_a_reviewed_value_outranks_a_pin_and_the_pin_says_it_is_not_in_force():
 
 def test_clearing_the_override_hands_the_field_back_to_the_pin():
     record = _contested()
-    set_preferred_source(record, "tolerance", "mouser")
+    set_preferred_source(record, "tolerance", "digikey")
     set_override(record, "tolerance", "0.5%")
     clear_override(record, "tolerance")
     row = _row(record)
@@ -245,10 +252,10 @@ def test_clearing_the_override_hands_the_field_back_to_the_pin():
 
 def test_clearing_a_preferred_source_returns_the_field_to_computed_precedence():
     record = _contested()
-    set_preferred_source(record, "tolerance", "mouser")
+    set_preferred_source(record, "tolerance", "digikey")
     assert clear_preferred_source(record, "tolerance")[1] is True
     row = _row(record)
-    assert row["preferredSource"]["sourceId"] == "digikey"
+    assert row["preferredSource"]["sourceId"] == "mouser"
     assert row["conflictState"] == "conflicting"
     assert row["preferredSourcePin"] is None
 
@@ -264,7 +271,7 @@ def test_clearing_a_preferred_source_that_was_never_set_is_not_an_error():
 def test_clearing_a_preferred_source_never_resurrects_a_cleared_override():
     record = _contested()
     set_override(record, "tolerance", "0.5%")
-    set_preferred_source(record, "tolerance", "mouser")
+    set_preferred_source(record, "tolerance", "digikey")
     clear_override(record, "tolerance")
     clear_preferred_source(record, "tolerance")
     assert record.overrides == {}
@@ -277,13 +284,13 @@ def test_clearing_a_preferred_source_never_resurrects_a_cleared_override():
 def test_a_decision_survives_a_record_round_trip():
     record = _contested()
     set_override(record, "tolerance", "0.5%", reviewed_by="user", reviewed_at="2026-08-05")
-    set_preferred_source(record, "tolerance", "mouser", reviewed_by="user")
+    set_preferred_source(record, "tolerance", "digikey", reviewed_by="user")
     restored = PartRecord.loads(record.dumps())
     stored = restored.overrides["tolerance"]
     assert stored.value == "0.5%"
-    assert stored.preferred_source == "mouser"
+    assert stored.preferred_source == "digikey"
     assert stored.replaced_value == "1%"
-    assert stored.replaced_source == "digikey"
+    assert stored.replaced_source == "mouser"
 
 
 def test_an_override_written_before_pins_existed_is_still_a_value_override():
@@ -306,7 +313,7 @@ def test_an_ordinary_override_serializes_exactly_as_it_always_did():
 
 def test_a_pin_only_entry_says_it_holds_no_value():
     record = _contested()
-    set_preferred_source(record, "tolerance", "mouser")
+    set_preferred_source(record, "tolerance", "digikey")
     assert record.overrides["tolerance"].to_dict()["has_value"] is False
 
 
@@ -319,19 +326,19 @@ def test_a_decision_is_the_only_thing_the_record_gains():
 
 def test_pinning_the_source_already_pinned_never_records_it_as_overriding_itself():
     record = _contested()
-    set_preferred_source(record, "tolerance", "mouser")
-    set_preferred_source(record, "tolerance", "mouser")
+    set_preferred_source(record, "tolerance", "digikey")
+    set_preferred_source(record, "tolerance", "digikey")
     pin = _row(record)["preferredSourcePin"]
-    assert pin["replacedSource"] == "digikey"
+    assert pin["replacedSource"] == "mouser"
 
 
 def test_repinning_to_another_source_records_the_one_it_took_over_from():
     record = _contested()
-    set_preferred_source(record, "tolerance", "mouser")
     set_preferred_source(record, "tolerance", "digikey")
+    set_preferred_source(record, "tolerance", "mouser")
     pin = _row(record)["preferredSourcePin"]
-    assert pin["sourceId"] == "digikey"
-    assert pin["replacedSource"] == "mouser"
+    assert pin["sourceId"] == "mouser"
+    assert pin["replacedSource"] == "digikey"
 
 
 # ------------------------------------------- the reason, and whether it was checked
@@ -380,9 +387,9 @@ def test_an_unconfirmed_override_says_so_on_disk_and_reads_back():
 def test_withdrawing_a_value_takes_its_reason_and_its_confidence_with_it():
     record = _contested()
     set_override(record, "tolerance", "0.5%", note="reel label", verified=False)
-    set_preferred_source(record, "tolerance", "mouser")
+    set_preferred_source(record, "tolerance", "digikey")
     clear_override(record, "tolerance")
     entry = record.overrides["tolerance"]
     assert entry.note == ""
     assert entry.verified is True
-    assert entry.preferred_source == "mouser"
+    assert entry.preferred_source == "digikey"

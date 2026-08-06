@@ -12,7 +12,11 @@ from stockroom.dossier.categories import SCHEMAS_BY_KEY, resolve_schema
 from stockroom.dossier.specifications import build_specifications, is_presented
 from stockroom.dossier.vocabulary import (
     APPLICABILITY_STATES,
+    CATEGORY_GROUPS,
+    GROUP_PARENT,
     IMPORTANCE_LEVELS,
+    OTHER_GROUP,
+    UNIVERSAL_GROUPS,
     VERIFICATION_STATES,
 )
 from stockroom.model.part import EnrichmentField, FieldOverride, PartRecord, SourcedValue
@@ -122,6 +126,68 @@ def test_disagreeing_sources_are_conflicting_and_every_answer_is_kept():
     assert {entry["sourceId"] for entry in item["sourceCandidates"]} == {"mouser", "digikey"}
 
 
+def test_one_value_holds_the_slot_and_the_owners_distributor_order_decides_which():
+    """Three distributors, one row, one displayed answer - and the other two still there.
+
+    Mouser first, DigiKey second, LCSC third is the owner's order (2026-08-05), carried by the
+    provider registry's own position rather than by three tiers.
+    """
+    record = records.resistor()
+    record.alternates = {
+        "Resistance": [
+            SourcedValue(value="1.3 kOhms", source="lcsc"),
+            SourcedValue(value="1.2 kOhms", source="digikey"),
+            SourcedValue(value="1.1 kOhms", source="mouser"),
+        ]
+    }
+    item = _by_key(record)["resistance"]
+    assert item["preferredValue"] == "1.1 kOhms"
+    assert item["preferredSource"]["sourceId"] == "mouser"
+    assert [entry["sourceId"] for entry in item["sourceCandidates"]] == [
+        "mouser",
+        "digikey",
+        "lcsc",
+    ]
+    # One answer is SHOWN; nothing is discarded, and the disagreement is still named.
+    assert item["conflictState"] == "conflicting"
+    assert item["verificationState"] == "conflicting"
+
+
+def test_a_field_only_lcsc_reports_is_shown_and_attributed_to_lcsc():
+    record = records.resistor()
+    record.alternates = {"Tolerance": [SourcedValue(value="1%", source="lcsc")]}
+    item = _by_key(record)["tolerance"]
+    assert item["preferredValue"] == "1%"
+    assert item["preferredSource"]["sourceId"] == "lcsc"
+    assert item["preferredSource"]["sourceLabel"] == "LCSC"
+    # A distributor answer, no longer `Parsed Or Inferred`, which is what it read as while the
+    # provider registry did not know LCSC existed.
+    assert item["preferredSource"]["tier"] == "authorized_distributor"
+    assert item["preferredSource"]["tierLabel"] == "Trusted Authorized Distributor"
+    assert item["conflictState"] == "none"
+
+
+def test_the_datasheet_still_holds_the_slot_against_all_three_distributors():
+    record = records.resistor()
+    record.alternates = {
+        "Resistance": [
+            SourcedValue(value="1.1 kOhms", source="mouser"),
+            SourcedValue(value="1.2 kOhms", source="digikey"),
+            SourcedValue(value="1.3 kOhms", source="lcsc"),
+            SourcedValue(value="1.0 kOhms", source="datasheet"),
+        ]
+    }
+    item = _by_key(record)["resistance"]
+    assert item["preferredValue"] == "1.0 kOhms"
+    assert item["preferredSource"]["tier"] == "manufacturer_datasheet"
+    assert item["preferredSource"]["sourceId"] == "datasheet"
+    assert {entry["sourceId"] for entry in item["sourceCandidates"]} >= {
+        "mouser",
+        "digikey",
+        "lcsc",
+    }
+
+
 def test_an_unattributed_value_never_claims_to_be_verified():
     item = _by_key(records.resistor())["resistance"]
     assert item["verificationState"] == "unverified"
@@ -216,10 +282,20 @@ def test_bookkeeping_keys_never_take_a_specification_row():
     assert is_presented("Grid")
 
 
-def test_a_key_specification_also_appears_in_its_own_engineering_group():
-    # Resistance is a key fact ABOUT a resistor and an electrical parameter OF it. A reader
-    # working down the engineering groups to find it has to find it there, so the headline block
-    # LIFTS the row rather than taking it away. The duplication is deliberate.
+def test_a_key_specification_is_moved_into_the_headline_block_and_not_copied():
+    # THIS TEST WAS THE OPPOSITE ASSERTION, deliberately reversed on the owner's decision.
+    #
+    # It used to read `test_a_key_specification_also_appears_in_its_own_engineering_group`, on the
+    # reasoning that resistance is a key fact ABOUT a resistor and an electrical parameter OF it, so
+    # a reader working down the engineering groups had to find it there too. The reasoning is sound
+    # in isolation and was measured to be wrong in aggregate: on the seeded 100 nF capacitor ALL
+    # SEVEN key specifications were also their groups' only rows, so eleven distinct fields rendered
+    # as eighteen rows under ten headings and `Capacitance` appeared twice on one screen about a
+    # capacitor. The reader scrolling the groups was re-reading the block they had just read.
+    #
+    # Promotion is a MOVE now. Nothing is lost: the value is on screen, above the groups, and the
+    # row object is unchanged - `Specifications.records` still carries every field, so completeness,
+    # search, the evidence levels and the raw projection are all untouched.
     dossier = component_dossier(records.resistor())
     key_specs = {item["key"] for item in dossier["keySpecifications"]}
     listed = {
@@ -228,7 +304,14 @@ def test_a_key_specification_also_appears_in_its_own_engineering_group():
         for item in group["specifications"]
     }
     assert key_specs
-    assert key_specs <= listed
+    assert key_specs.isdisjoint(listed)
+    # And every one of them is still reachable, which is the half the reversal must not break.
+    for record in (records.resistor(), records.capacitor(), records.microcontroller()):
+        projected = component_dossier(record)
+        promoted = {item["key"] for item in projected["keySpecifications"]}
+        assert promoted, "a category with key specifications must present them"
+        every_row = {item["key"] for item in _specs(record).records}
+        assert promoted <= every_row
 
 
 def test_no_group_is_ever_emitted_under_the_key_specifications_id():
@@ -244,14 +327,25 @@ def test_a_row_whose_group_the_category_never_declared_still_reaches_the_sheet()
     # Mounting Type belongs to `mounting`, which the resistor schema never declares. A row with
     # nowhere to go used to vanish from the sheet entirely, which is the invisible hole the whole
     # category schema exists to prevent.
+    #
+    # The undeclared group is no longer necessarily the HEADING it is read under: `mounting` holds one
+    # row, so it folds into `Package and Mechanical` (see `GROUP_PARENT`). What this test protects is
+    # that the row REACHES the sheet, so it is asserted about the row rather than about the heading -
+    # a heading is a presentation decision and the missing row was the actual bug.
     dossier = component_dossier(records.resistor())
-    listed = {
+    on_screen = {item["key"] for item in dossier["keySpecifications"]} | {
         item["key"]
         for group in dossier["specificationGroups"]
         for item in group["specifications"]
     }
-    assert "mounting_type" in listed
-    assert {group["id"] for group in dossier["specificationGroups"]} >= {"mounting"}
+    assert "mounting_type" in on_screen
+    # A resistor's case code is in `construction_termination`, which the resistor schema also never
+    # declares, and it is not a key specification - so it is the undeclared-group case with nothing
+    # else carrying it. It is read under the universal heading that group refines.
+    package = next(
+        group for group in dossier["specificationGroups"] if group["id"] == "package_mechanical"
+    )
+    assert "case_code" in {item["key"] for item in package["specifications"]}
 
 
 def test_a_group_with_nothing_but_inapplicable_rows_is_never_a_heading():
@@ -276,20 +370,25 @@ def test_a_group_with_nothing_but_inapplicable_rows_is_never_a_heading():
 
 def test_a_group_whose_only_row_is_an_expected_gap_is_still_a_heading():
     # The opposite case, and the reason the rule is about the STATE rather than about emptiness:
-    # `Tolerance and Stability` holds one row for a capacitor, the tolerance nobody supplied, and
-    # the category expects it. A Missing row is real content and a reader has to be able to reach
-    # it - dropping a heading for having no VALUES would hide exactly the gaps this sheet exists
-    # to show.
+    # `Environmental and Reliability` holds one row for a capacitor, the operating temperature nobody
+    # supplied, and the category expects it. A Missing row is real content and a reader has to be
+    # able to reach it - dropping a heading for having no VALUES would hide exactly the gaps this
+    # sheet exists to show.
+    #
+    # It used to be stated on `Tolerance and Stability`, whose one row was the capacitor's tolerance.
+    # That row is a key specification and is now read in the headline block instead, so the same rule
+    # is stated on the universal group that still demonstrates it. A universal group never folds - see
+    # `GROUP_PARENT` - so one Missing row under it is exactly the case being protected.
     groups = {
         group["id"]: group
         for group in component_dossier(records.capacitor())["specificationGroups"]
     }
-    assert "tolerance_stability" in groups
+    assert "environmental_reliability" in groups
     states = {
         item["key"]: item["verificationState"]
-        for item in groups["tolerance_stability"]["specifications"]
+        for item in groups["environmental_reliability"]["specifications"]
     }
-    assert states == {"tolerance": "missing"}
+    assert states == {"operating_temperature": "missing"}
 
 
 def test_an_inapplicable_row_still_renders_beside_real_ones():
@@ -324,6 +423,84 @@ def test_the_rule_is_about_the_rows_and_never_about_the_group_itself():
     assert "interface_pinout" in groups
     pins = records.by_key(groups["interface_pinout"]["specifications"])["pin_count"]
     assert pins["displayValue"] == "2"
+
+
+def test_a_refinement_holding_one_row_is_read_under_the_heading_it_refines():
+    # MEASURED on the seeded 100 nF 0402 capacitor: seven headings held exactly one row each -
+    # `Package and Mechanical`, `Environmental and Reliability`, `Capacitance`,
+    # `Tolerance and Stability`, `Temperature Characteristics`, `Construction and Termination` and
+    # `Mounting` - so the sheet spent one header line per line of data and the anchor strip offered
+    # seven destinations that were each a single row. One header per row is an index, not a grouping.
+    dossier = component_dossier(records.capacitor())
+    ids = {group["id"] for group in dossier["specificationGroups"]}
+    assert not ids & {
+        "capacitance",
+        "tolerance_stability",
+        "temperature_characteristics",
+        "construction_termination",
+        "mounting",
+    }
+    # And the row is HOMED, not dropped: the capacitor's case code is a package-and-mechanical fact
+    # and is read there rather than under a heading invented for it alone.
+    package = next(
+        group for group in dossier["specificationGroups"] if group["id"] == "package_mechanical"
+    )
+    assert "case_code" in {item["key"] for item in package["specifications"]}
+    assert package["count"] == len(package["specifications"])
+
+
+def test_a_refinement_with_enough_under_it_keeps_its_own_heading():
+    # The fold is about ONE row, not about category groups being unwelcome. The microcontroller's
+    # peripherals group carries three rows, which is a grouping worth separating, so it stands.
+    groups = {
+        group["id"]: group
+        for group in component_dossier(records.microcontroller())["specificationGroups"]
+    }
+    assert "analog_digital_peripherals" in groups
+    assert groups["analog_digital_peripherals"]["count"] >= 2
+
+
+def test_a_universal_group_never_folds_even_holding_one_row():
+    # A universal group IS the parent. `Environmental and Reliability` holds one row on a capacitor
+    # and keeps its heading, because there is no more general place for it to be read and a reader
+    # navigating the anchor strip for the temperature range has to have somewhere to land.
+    groups = {
+        group["id"]: group
+        for group in component_dossier(records.capacitor())["specificationGroups"]
+    }
+    assert groups["environmental_reliability"]["count"] == 1
+
+
+def test_every_category_group_declares_the_universal_heading_it_refines():
+    # The fold target is a static declaration, which is what makes a row's section deterministic. A
+    # new category group therefore cannot ship without saying where its single row belongs, and it can
+    # never point at the headline region or at the `other` bucket - folding into either would hide a
+    # row rather than home it.
+    universal = {key for key, _ in UNIVERSAL_GROUPS}
+    for group_id, _ in CATEGORY_GROUPS:
+        assert group_id in GROUP_PARENT, f"{group_id} declares no parent heading"
+        parent = GROUP_PARENT[group_id]
+        assert parent in universal, f"{group_id} folds into {parent}, which is not universal"
+        assert parent != "key_specifications"
+    # And no universal group declares one: they are the parents, not the children.
+    assert not (universal & set(GROUP_PARENT))
+    assert OTHER_GROUP[0] not in set(GROUP_PARENT.values())
+
+
+def test_the_same_record_always_puts_a_row_in_the_same_section():
+    # A row must not move between renders. The fold is a pure function of one group's own readable
+    # row count, taken in one pass over a fixed ordering, so projecting the same record twice has to
+    # produce the same section for every row - and it is asserted rather than argued.
+    def placement(record):
+        dossier = component_dossier(record)
+        return {
+            item["key"]: group["id"]
+            for group in dossier["specificationGroups"]
+            for item in group["specifications"]
+        }
+
+    for factory in (records.capacitor, records.resistor, records.connector, records.microcontroller):
+        assert placement(factory()) == placement(factory())
 
 
 def test_every_group_count_is_derived_from_its_own_rows():

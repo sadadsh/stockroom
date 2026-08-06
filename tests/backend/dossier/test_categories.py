@@ -107,12 +107,31 @@ def test_the_universal_groups_always_lead_in_the_same_order():
 
 
 def test_a_category_specific_group_is_rendered_for_the_category_that_earns_it():
-    groups = {item["id"] for item in component_dossier(records.connector())["specificationGroups"]}
-    assert "mating_retention" in groups or "electrical_ratings" in groups
-    resistor_groups = {
-        item["id"] for item in component_dossier(records.resistor())["specificationGroups"]
+    # "Earns it" is now two conditions, not one: the category's rows have to LAND in the group AND
+    # there has to be more than one of them, because a heading over a single row is an index entry
+    # rather than a grouping (see `GROUP_PARENT` and the fold in `build_specifications`). The
+    # microcontroller's peripherals group carries three rows and stands on its own; the connector's
+    # `mating_retention` and `electrical_ratings` hold one each and are read under the universal
+    # headings they refine.
+    mcu_groups = {
+        item["id"] for item in component_dossier(records.microcontroller())["specificationGroups"]
     }
-    assert "mating_retention" not in resistor_groups
+    assert "analog_digital_peripherals" in mcu_groups
+    # The category boundary is still enforced: a resistor never grows a connector's heading, and its
+    # rows never land in one either.
+    resistor = component_dossier(records.resistor())
+    assert "mating_retention" not in {item["id"] for item in resistor["specificationGroups"]}
+    assert "analog_digital_peripherals" not in {
+        item["id"] for item in resistor["specificationGroups"]
+    }
+    # And a connector's mating facts still reach the sheet, under the heading they refine.
+    connector = component_dossier(records.connector())
+    placed = {
+        item["key"]: group["id"]
+        for group in connector["specificationGroups"]
+        for item in group["specifications"]
+    }
+    assert placed.get("retention_type") == "package_mechanical"
 
 
 def test_a_schema_moves_a_field_into_its_own_group_rather_than_redefining_it():
