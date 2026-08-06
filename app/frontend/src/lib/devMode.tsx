@@ -26,7 +26,11 @@ import {
   BEHAVIOR_OVERRIDES,
   type BehaviorOverride,
 } from "./behavior.overrides";
-import { useApplyDraftOverrides, useDevModeDraft } from "./devModeDraft";
+import {
+  useApplyDraftOverrides,
+  useDevModeDraft,
+  type TokenOverrides,
+} from "./devModeDraft";
 import { useDevModeHistory, useDevModeHistoryKeys } from "./devModeHistory";
 import { useDevModeSave } from "./devModeSave";
 import { useDevModeSelection } from "./devModeSelection";
@@ -38,6 +42,10 @@ interface DevModeContextValue {
   // The active theme, so the panel can say which theme a colour edit targets.
   theme: Theme;
   // --- tokens ---
+  // The two working override blocks themselves (dark + shared on `root`, light on `light`). The
+  // panel's rows read `tokenValue` and want the active theme; the issues list has to resolve BOTH
+  // palettes out of one draft, which no per-theme reader can answer.
+  tokenOverrides: TokenOverrides;
   // The effective value of a token for the active theme (an override if set, else its shipped
   // default), so the panel shows what is live.
   tokenValue: (cssVar: string) => string;
@@ -137,6 +145,9 @@ const DEFAULT: DevModeContextValue = {
   enabled: false,
   toggle: noop,
   theme: "dark",
+  // No provider: nothing is being edited, so both blocks are empty and a reader of them measures the
+  // shipped defaults - which is exactly what `tokenValue` below answers with on this same context.
+  tokenOverrides: { root: {}, light: {} },
   tokenValue: (cssVar) => {
     const t = DEV_TOKEN_BY_VAR.get(cssVar);
     return t?.default.dark ?? "";

@@ -531,6 +531,22 @@ export const DEV_IDS: DevIdEntry[] = [
   { id: "design.piece-move-up", label: "One position earlier", area: "design" },
   { id: "design.piece-move-down", label: "One position later", area: "design" },
   { id: "design.piece-move-into", label: "Send a placement to another region", area: "design" },
+  // The narrow style scope (plan 1.5). The WIDE scope - a role everywhere it appears - is the Tokens
+  // rows and the Box tab, which are outside the id system with the panel's other chrome; these two
+  // are on the canvas beside the move controls and belong with them.
+  { id: "design.piece-text-role", label: "Which text role this placement overrides", area: "design" },
+  { id: "design.piece-text-role-here", label: "The role that placement takes here alone", area: "design" },
+  // THE ISSUES LIST (plan 1.4). It earns rows on the same ground the Arrange section's do: it is the
+  // surface a screenshot of a bad arrangement has to be able to name, and it is the one place a
+  // committed layout's known cost is readable. The row id is SHARED across every reported issue, the
+  // way the canvas ids are, because a style written for one row is meant for all of them.
+  { id: "design.issues", label: "Issues section", area: "design" },
+  { id: "design.issues-count", label: "The count of warnings and notes here", area: "design" },
+  { id: "design.issue", label: "One reported issue", area: "design" },
+  // The live letter-rule warning on the copy editor (plan 1.5). The Copy editor is otherwise the
+  // panel's own chrome and outside the id system; this line is the exception because it is the one
+  // part of it that states a RULE about the product rather than a control of the editor.
+  { id: "design.letter-rule-warn", label: "Live letter-rule warning on a reworded label", area: "design" },
 ];
 
 // The areas in first-appearance order, for grouping the catalogue.

@@ -157,6 +157,47 @@ describe("DevPanel inspect-first shell", () => {
     expect(label).toHaveTextContent("Reworded Title");
   });
 
+  /**
+   * THE LIVE LETTER RULE (plan 1.5). `copy.letterRule.test.ts` binds what an AGENT authors by reading
+   * source in CI and can say nothing about text the owner is typing into this box; this is the same
+   * judgement, over the same allowlist in `lib/letterRule.ts`, running on the working string.
+   *
+   * IT WARNS AND NEVER BLOCKS (plan decision 3), which is the half worth asserting hardest: Save is
+   * still enabled while the warning is up, and the reworded text is still what the label renders.
+   *
+   * FAILS IF: the warning is wired to the DEFAULT rather than to the working text (it would appear on
+   * selection and never move), the allowlist is not consulted (`DigiKey` and `Symbol` would be
+   * reported), or Save is gated on the warning - which would make the rule a block, in the owner's
+   * own product, over their own words.
+   */
+  it("warns about the blocked letter in reworded text without blocking the Save", () => {
+    render(<Harness />);
+    toggleDevMode();
+    fireEvent.click(screen.getByText("Original Title"));
+    const editor = screen.getByLabelText("Edit copy text");
+    const warning = () => document.querySelector('[data-dev-id="design.letter-rule-warn"]');
+    const save = () => screen.getByRole("button", { name: "Save to source" });
+    expect(warning()).toBeNull();
+
+    fireEvent.change(editor, { target: { value: "Apply Every Category" } });
+    expect(warning()?.textContent).toContain("Apply");
+    expect(warning()?.textContent).toContain("Every");
+    expect(warning()?.textContent).toContain("Category");
+    // Warn, never block: the text is live on the label and Save is offered.
+    expect(document.querySelector('[data-copy-id="detail.title.copy"]')).toHaveTextContent(
+      "Apply Every Category",
+    );
+    expect(save()).not.toBeDisabled();
+
+    // The allowlist is the shared one: a trade name and a standardised term are not offences.
+    fireEvent.change(editor, { target: { value: "DigiKey Symbol Sheet" } });
+    expect(warning()).toBeNull();
+
+    // A placeholder resolves to data at render, so the hole is not judged - only the words around it.
+    fireEvent.change(editor, { target: { value: "Holds {quantity} parts" } });
+    expect(warning()).toBeNull();
+  });
+
   it("a direct <Text> click still selects the copy and surfaces the Copy tab", () => {
     render(<Harness />);
     toggleDevMode();

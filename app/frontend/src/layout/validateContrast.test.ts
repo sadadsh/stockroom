@@ -24,6 +24,7 @@ import {
   contrastRatio,
   CONTRAST_FLOOR,
   devTokenValues,
+  draftThemeTokens,
   parseColor,
   shippedThemeTokens,
   validateContrast,
@@ -193,6 +194,47 @@ describe("the document decides which pairings are live", () => {
       }
     }
     expect(validateContrast(hidden, shipped, { pairings })).toEqual([]);
+  });
+});
+
+describe("the palettes a live edit is measured against", () => {
+  /**
+   * THE FLOOR OF THE WHOLE DRAFT PATH: with nothing edited, the draft palettes ARE the shipped ones.
+   *
+   * FAILS IF: `draftThemeTokens` reads a default the panel does not (the wrong theme's fallback, or
+   * `default.dark` for a themed token in light theme) - the issues list would then report the design
+   * as broken before anybody had touched it, which is the anchor `validateDocument.test.ts` holds.
+   */
+  it("resolve to the shipped defaults when nothing is overridden", () => {
+    expect(draftThemeTokens({ root: {}, light: {} })).toEqual(shippedThemeTokens());
+  });
+
+  /**
+   * FAILS IF: the two blocks are merged, or the active theme's block is applied to both palettes. A
+   * colour is stored per theme, so an edit made in dark theme must leave the light palette at its
+   * default - a validator that reported the same failure twice would be inventing one of them.
+   */
+  it("keep the two blocks apart, and share the unthemed scalars", () => {
+    const edited = draftThemeTokens({ root: { "--c-t1": "#101010" }, light: { "--c-t1": "#f0f0f0" } });
+    const dark = edited.find((entry) => entry.theme === "dark");
+    const light = edited.find((entry) => entry.theme === "light");
+    expect(dark?.values["--c-t1"]).toBe("#101010");
+    expect(light?.values["--c-t1"]).toBe("#f0f0f0");
+
+    // An unthemed token (a radius) is shared: it is written on `root` and means it for both themes.
+    const shared = draftThemeTokens({ root: { "--r-control": "9px" }, light: {} });
+    for (const entry of shared) expect(entry.values["--r-control"]).toBe("9px");
+  });
+
+  /**
+   * FAILS IF: an empty override is treated as a value. `useApplyDraftOverrides` removes the property
+   * when the field is cleared, so the screen shows the stylesheet default - and measuring "" would
+   * report an unmeasurable pairing that is not on the screen.
+   */
+  it("read a cleared field as no override at all", () => {
+    expect(draftThemeTokens({ root: { "--c-t1": "" }, light: {} })[0].values["--c-t1"]).toBe(
+      devTokenValues("dark")["--c-t1"],
+    );
   });
 });
 
