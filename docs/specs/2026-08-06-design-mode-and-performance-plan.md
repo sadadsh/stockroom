@@ -34,8 +34,22 @@ Taken by explicit choice, question by question:
 7. **New elements are made of real data and real actions only.** A field picker over
    everything the backend serves; an action picker over everything the app can do. No
    free text authoring, no computed expressions. A button always does something real; a
-   value is always the truth. (This also means the builder can never author a string,
-   so the interface letter rule is structurally unviolable from inside it.)
+   value is always the truth. (For NEW elements the builder can never author a string.
+   Existing interface text became editable by the owner's same-day amendment below —
+   see 1.5 for how the letter rule survives that.)
+
+**Owner amendment (2026-08-06, later the same day): "by every surface I mean
+everything, text too."** Two clarifications with plan-wide force:
+
+- **Editable scope is the whole application.** Every route — the components
+  workspace, the shell, projects, the STM viewer, ingest, settings, the search
+  overlay, dialogs — eventually becomes regions and pieces. Sequencing is unchanged
+  (workspace first, shell in its own phase); the remaining routes join the layout
+  system in a phase of their own after the shell, one route at a time, each with its
+  own pixel-parity transcription gate. The performance phases renumber after it.
+- **Text is editable in place.** Decision 7 stands for new elements — the composer
+  still cannot author a new standalone string — but existing interface text can be
+  reworded where it is, backed by the copy layer. See 1.5.
 
 **The standing motivation:** the owner dislikes the shipped look, and prose-driven
 visual iteration failed to converge. The builder exists so the owner never has to
@@ -142,6 +156,25 @@ fields, pick actions, arrange them in a small row/stack — producing a piece wh
 manifest is its bindings. It is a *composition*, not code: deleting it orphans
 nothing.
 
+**Text edits in place (owner amendment):** clicking any text in edit mode edits it
+directly, backed by the copy layer — every interface string already routes through
+`<Text>` / `useText` / `useCopyFormatter` with a stable copy id, which is exactly why
+the copy-routing work was done. A reworded string is a copy override keyed on that
+id, carried with the layout draft and committed through the same pipeline. The
+composer still cannot author NEW standalone strings (decision 7 stands: new elements
+are real data and real actions only); this is rewording what exists.
+
+**The letter rule under owner-typed text, resolved:** the letter rule and the term
+map are the owner's own rules, enforced by `copy.letterRule.test.ts` against
+app-authored source. When the OWNER types text through Design Mode, the editor
+validates live and shows violations in the issues list (warn, never block, per
+decision 3). At commit, an owner-authored override carries provenance marking it
+owner-authored, and the lint exempts owner-authored overrides while still binding
+everything agents author. The lint's purpose is to catch authored-for-the-owner
+violations, not to overrule the owner in their own product. None of this is built
+before the edit-mode phase; it is recorded here so the implementing agent does not
+invent something worse.
+
 ## 1.6 Commit pipeline
 
 Draft (localStorage, named) → **Commit**: serialise the layout document to its source
@@ -159,7 +192,8 @@ implementer "fixes" them by weakening.
 - The native window chrome (the WPF tab strip, `WindowTabStrip.cs`) is not React and
   is not editable by this system. The React shell inside the window is.
 - Closed vocabularies stay closed: CAD states, quality states, provider names. The
-  builder places and styles them; it cannot rename them (it has no text authoring).
+  builder places and styles them; it cannot rename them — their strings sit outside
+  in-place text editing, and the vocabulary tests keep binding them.
 - The backend remains the single authority on data semantics. The builder binds to
   what is served; it never derives.
 
@@ -210,7 +244,11 @@ elements; auto-place rules with issues-list provenance.
 
 Phase 6 — **Shell regions.** Rail, picker, status bar, header join the editable tree.
 
-Phases 7–8 — **Feel:** cheap wins (lazy chunks, prefetch, keepPreviousData), then
+Phase 7 — **The remaining routes.** Projects, the STM viewer, ingest, settings, the
+search overlay and the dialogs join the layout system one route at a time, each
+transcribed with its own pixel-parity gate exactly as Phase 1 did the workspace.
+
+Phases 8–9 — **Feel:** cheap wins (lazy chunks, prefetch, keepPreviousData), then
 optimistic writes.
 
 ## Standing constraints binding every phase
