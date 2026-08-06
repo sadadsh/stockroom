@@ -55,6 +55,7 @@ import {
 } from "../../layout/defaultWorkspaceLayout";
 import { findRegion } from "../../layout/document";
 import { WORKSPACE_REGION } from "../../layout/workspacePieces";
+import { useArrangeColumnGeometry } from "../design-mode/ArrangeSurface";
 
 /** The width the band assumes before it has been measured. Replaced on the first layout pass. */
 const ASSUMED_TOTAL = 1366;
@@ -121,6 +122,14 @@ export function WorkspaceColumnBand({
   const storedFractions = useMemo(() => readColumnFractions(), []);
   const fractionsRef = useRef<StoredColumnFractions | null>(storedFractions);
 
+  // ARRANGE MODE EDITS THE DOCUMENT, NOT THIS WORKSTATION (plan 1.5, Phase 3B). `null` outside edit
+  // mode, and then every line below takes exactly the path it always took. Inside it, the band's
+  // proportions come from the arrangement being edited rather than from `localStorage`, and a drag
+  // writes them back through `setRegionSize` - which is the difference between "I want this column
+  // wider on THIS monitor" and "the sourcing column is wider in this design".
+  const arrange = useArrangeColumnGeometry(sparseSourcing);
+  const editedFractions = arrange?.fractions ?? null;
+
   // The authoritative widths, mirrored so a drag can derive the next widths WITHOUT computing them
   // inside a state updater. React may replay an updater, and this one used to persist the result and
   // write `fractionsRef` from in there - work that must happen exactly once per drag step.
@@ -146,19 +155,32 @@ export function WorkspaceColumnBand({
   // column has something to be wide for, and it should get the room then rather than on the next
   // resize.
   useLayoutEffect(() => {
-    const next = resolveColumnWidths(total, fractionsRef.current, sparseSourcing);
+    const next = resolveColumnWidths(
+      total,
+      editedFractions ?? fractionsRef.current,
+      sparseSourcing,
+    );
     widthsRef.current = next;
     setWidths(next);
-  }, [total, sparseSourcing]);
+  }, [total, sparseSourcing, editedFractions]);
 
-  const commit = useCallback((next: WorkspaceColumnWidths) => {
-    fractionsRef.current = {
-      cad: next.cad,
-      specifications: next.specifications,
-      sourcing: next.sourcing,
-    };
-    writeColumnFractions(next);
-  }, []);
+  const commit = useCallback(
+    (next: WorkspaceColumnWidths) => {
+      // In arrange mode the boundary is a property of the DOCUMENT, so nothing is written to this
+      // machine's storage and the remembered preference is left exactly as the owner last set it.
+      if (arrange) {
+        arrange.commit(next, total);
+        return;
+      }
+      fractionsRef.current = {
+        cad: next.cad,
+        specifications: next.specifications,
+        sourcing: next.sourcing,
+      };
+      writeColumnFractions(next);
+    },
+    [arrange, total],
+  );
 
   // One drag step: derive, persist, then set. The derivation reads the mirrored widths rather than a
   // state updater's `current`, so persistence sits OUTSIDE the updater where it belongs and cannot
