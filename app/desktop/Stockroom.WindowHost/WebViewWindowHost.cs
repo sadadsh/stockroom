@@ -122,6 +122,9 @@ internal sealed class WebViewWindowHost : IDisposable
             Content = _root,
         };
         _window.Closing += OnWindowClosing;
+        // Window-level and previewed, so the two history keys work whether the focus is in the
+        // strip or inside the provider page.
+        _window.PreviewKeyDown += OnWindowPreviewKeyDown;
     }
 
     internal IntPtr WindowHandle =>
@@ -867,6 +870,26 @@ internal sealed class WebViewWindowHost : IDisposable
         core.Navigate(typed);
     }
 
+    private void OnWindowPreviewKeyDown(object sender, KeyEventArgs eventArguments)
+    {
+        if (!_tabStrip.IsProviderSelected)
+        {
+            return;
+        }
+
+        var step = ProviderHistoryShortcut.Resolve(
+            eventArguments.Key,
+            eventArguments.SystemKey,
+            Keyboard.Modifiers);
+        if (step == ProviderHistoryStep.None)
+        {
+            return;
+        }
+
+        eventArguments.Handled = true;
+        NavigateProviderHistory(back: step == ProviderHistoryStep.Back);
+    }
+
     private void RefreshActiveProvider()
     {
         var core = ActiveProviderWebView()?.CoreWebView2;
@@ -1040,13 +1063,21 @@ internal sealed class WebViewWindowHost : IDisposable
         object? sender,
         CoreWebView2NewWindowRequestedEventArgs eventArguments)
     {
+        // Consumed before anything is decided: whatever follows, this request does not reach the
+        // Windows shell and therefore cannot become a page in the person's own browser.
         eventArguments.Handled = true;
-        if (!ProviderNavigationPolicy.IsAllowedTopLevel(eventArguments.Uri)
-            || _providerEnvironment is not CoreWebView2Environment environment
-            || !_providerLeases.TryGetActive(out var lease)
-            || lease is null)
+        var hasLease = _providerLeases.TryGetActive(out var lease) && lease is not null;
+        var environment = _providerEnvironment;
+        switch (ProviderNewWindowPolicy.Resolve(
+            eventArguments.Uri,
+            hasLease,
+            canCreatePopup: environment is not null))
         {
-            return;
+            case ProviderNewWindowAction.Refuse:
+                return;
+            case ProviderNewWindowAction.NavigateInPlace:
+                NavigateActiveProviderInPlace(eventArguments.Uri);
+                return;
         }
 
         var deferral = eventArguments.GetDeferral();
@@ -1061,7 +1092,7 @@ internal sealed class WebViewWindowHost : IDisposable
                 AllowDrop = false,
                 CreationProperties = new CoreWebView2CreationProperties(),
             };
-            _providerPopups.Add(popup, lease);
+            _providerPopups.Add(popup, lease!);
             _providerContent.Children.Add(popup);
             await popup.EnsureCoreWebView2Async(environment)
                 .ConfigureAwait(true);
@@ -1076,11 +1107,39 @@ internal sealed class WebViewWindowHost : IDisposable
             {
                 RemoveProviderPopup(popup);
             }
+
+            // The popup could not be built. The person still clicked a link, so honour it in the
+            // page they are already on rather than dropping the click on the floor.
+            if (ProviderNewWindowPolicy.Resolve(
+                    eventArguments.Uri,
+                    hasLease,
+                    canCreatePopup: false)
+                == ProviderNewWindowAction.NavigateInPlace)
+            {
+                NavigateActiveProviderInPlace(eventArguments.Uri);
+            }
         }
         finally
         {
             deferral.Complete();
         }
+    }
+
+    /// <summary>
+    /// Send the open provider view to <paramref name="uri"/> itself: same window, same lease, same
+    /// download journal. Nothing about the lease changes, because looking at another page of the
+    /// same provider is not another piece of work.
+    /// </summary>
+    private void NavigateActiveProviderInPlace(string? uri)
+    {
+        var core = ActiveProviderWebView()?.CoreWebView2;
+        if (core is null || !ProviderNavigationPolicy.IsNavigableInPlace(uri))
+        {
+            return;
+        }
+
+        _providerNavigationError = string.Empty;
+        core.Navigate(uri!);
     }
 
     private void OnProviderPopupCloseRequested(object? sender, object eventArguments)
@@ -1939,6 +1998,104 @@ internal static class ProviderNavigationPolicy
         }
         return uri.Scheme == Uri.UriSchemeHttps
             && !string.IsNullOrWhiteSpace(uri.IdnHost);
+    }
+
+    /// <summary>
+    /// Whether a page is a real destination the open provider view can simply go to.
+    /// </summary>
+    /// <remarks>
+    /// <c>about:blank</c> passes <see cref="IsAllowedTopLevel"/> because a script legitimately
+    /// opens one and writes into it, but navigating the page a person is working on to a blank
+    /// document is not honouring their click - it is losing it.
+    /// </remarks>
+    internal static bool IsNavigableInPlace(string? value) =>
+        Uri.TryCreate(value, UriKind.Absolute, out var uri)
+        && string.IsNullOrEmpty(uri.UserInfo)
+        && uri.Scheme == Uri.UriSchemeHttps
+        && !string.IsNullOrWhiteSpace(uri.IdnHost);
+}
+
+internal enum ProviderNewWindowAction
+{
+    /// <summary>Consumed and dropped. Never passed on to the operating system.</summary>
+    Refuse,
+
+    /// <summary>A real popup over the same page, which is what an OAuth window needs to be.</summary>
+    Popup,
+
+    /// <summary>The open provider view goes there itself, under the same lease.</summary>
+    NavigateInPlace,
+}
+
+/// <summary>
+/// What happens when a provider page asks for a new window.
+///
+/// The one invariant: never the operating system's browser. A link out of a provider page must
+/// stay inside Stockroom, because a page opened in Chrome is a page whose downloads no longer
+/// belong to a lease and no longer reach the journal that proves which component a file is for.
+/// So every outcome here is inside this window, and the last resort is refusal rather than
+/// handing the string to whatever program claims the scheme.
+///
+/// A popup is preferred while one can be built: real opener semantics are what carries a provider
+/// sign-in through. When one cannot be built, the click is still honoured - the open provider view
+/// navigates there itself - instead of being swallowed, which is how a person ends up clicking a
+/// link repeatedly and watching nothing happen.
+/// </summary>
+internal static class ProviderNewWindowPolicy
+{
+    internal static ProviderNewWindowAction Resolve(
+        string? uri,
+        bool hasActiveLease,
+        bool canCreatePopup)
+    {
+        if (!hasActiveLease
+            || !ProviderNavigationPolicy.IsAllowedTopLevel(uri))
+        {
+            return ProviderNewWindowAction.Refuse;
+        }
+        if (canCreatePopup)
+        {
+            return ProviderNewWindowAction.Popup;
+        }
+        return ProviderNavigationPolicy.IsNavigableInPlace(uri)
+            ? ProviderNewWindowAction.NavigateInPlace
+            : ProviderNewWindowAction.Refuse;
+    }
+}
+
+internal enum ProviderHistoryStep
+{
+    None,
+    Back,
+    Forward,
+}
+
+/// <summary>
+/// Alt+Left and Alt+Right, the two keys a person already has in their hands for a browser.
+/// </summary>
+/// <remarks>
+/// WPF reports a modified arrow key as <see cref="Key.System"/> and carries the real key in
+/// <c>SystemKey</c>, so both are read. Alt alone qualifies: Ctrl+Alt+Left and Shift+Alt+Left mean
+/// other things on Windows and must not be claimed here.
+/// </remarks>
+internal static class ProviderHistoryShortcut
+{
+    internal static ProviderHistoryStep Resolve(
+        Key key,
+        Key systemKey,
+        ModifierKeys modifiers)
+    {
+        if (modifiers != ModifierKeys.Alt)
+        {
+            return ProviderHistoryStep.None;
+        }
+        var effective = key == Key.System ? systemKey : key;
+        return effective switch
+        {
+            Key.Left => ProviderHistoryStep.Back,
+            Key.Right => ProviderHistoryStep.Forward,
+            _ => ProviderHistoryStep.None,
+        };
     }
 }
 
