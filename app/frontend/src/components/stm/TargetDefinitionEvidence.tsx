@@ -121,7 +121,7 @@ export function TargetDefinitionEvidence({
             </dd>
             <dt>
               <Text id="stm.target.evidence.compact-hybrid">
-                Compact Hybrid Positions
+                Compact Mixed Positions
               </Text>
             </dt>
             <dd className="font-mono text-t1">
@@ -129,7 +129,7 @@ export function TargetDefinitionEvidence({
             </dd>
             <dt>
               <Text id="stm.target.evidence.fully-exclusive">
-                Fully Exclusive Positions
+                All-Exclusive Positions
               </Text>
             </dt>
             <dd className="font-mono text-t1">
@@ -165,7 +165,7 @@ export function TargetDefinitionEvidence({
             </dt>
             <dd className="text-t1">
               <Text id="stm.target.evidence.owned-by-consumer">
-                Owned By Consumer
+                Consumer-Owned
               </Text>
             </dd>
           </dl>
@@ -196,7 +196,7 @@ export function TargetDefinitionEvidence({
           </dt>
           <dd className="font-mono text-t1">R{definition.compiler_rev}</dd>
           <dt>
-            <Text id="stm.target.evidence.policy">Policy</Text>
+            <Text id="stm.target.evidence.policy">Rules</Text>
           </dt>
           <dd className="truncate font-mono text-t1">
             {formatToken(definition.profile.id)}

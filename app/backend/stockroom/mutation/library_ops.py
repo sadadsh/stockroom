@@ -29,6 +29,7 @@ from stockroom.model.part import (
     Datasheet,
     EdaAssets,
     EnrichmentField,
+    PartDocument,
     PartRecord,
     Provenance,
     Purchase,
@@ -74,6 +75,73 @@ def _kicad(record: PartRecord):
     KiCad-only, which is how Altium assets ended up filed over KiCad references.
     """
     return record.assets_for("kicad")
+
+
+# Where the library keeps datasheet copies, as a record-portable path. `Datasheet.file` has
+# always been the bare filename under this directory; a typed document spells the whole
+# library-relative path so nothing downstream has to know the convention to find the bytes.
+_DATASHEET_DIR = "datasheets"
+
+
+def _catalog_media_for(catalog: dict, url: str) -> dict:
+    """The catalogue entry a stored document came from, when a provider named one.
+
+    Only used to recover a title and a REVISION - facts the file itself cannot state. A URL that
+    no catalogue mentions yields nothing rather than a guessed revision, because an unlabelled
+    datasheet is honestly unlabelled and a fabricated "Rev A" would outlive the mistake.
+    """
+    if not url:
+        return {}
+    for payload in (catalog or {}).values():
+        if not isinstance(payload, dict):
+            continue
+        for item in payload.get("media") or []:
+            if isinstance(item, dict) and str(item.get("url") or "") == url:
+                return item
+    return {}
+
+
+def _stored_datasheet_document(staged, stored: Path, now: str) -> PartDocument:
+    """The datasheet this add just took a copy of, as a typed document.
+
+    Written BESIDE the legacy `datasheet` slot and never instead of it. That slot keeps its exact
+    meaning - every v4 record and every existing library depends on it - and the projection folds
+    the two onto ONE row because they name the same file, with the typed entry keeping the slot
+    because it is the one that can say which revision this is, who supplied it, when the library
+    took its copy, and whether the bytes were ever checked.
+    """
+    from stockroom.dossier.urls import is_pdf
+    from stockroom.enrich.datasheet import looks_like_pdf
+
+    url = str(getattr(staged.datasheet_meta, "source_url", "") or "")
+    # A link is carried only when it plausibly addresses the DOCUMENT. An import package's own
+    # URL is the package's address, not the datasheet's, and repeating it here would attribute
+    # the PDF to a page that never served it.
+    remote = url if is_pdf(url) else ""
+    media = _catalog_media_for(staged.catalog, remote)
+    try:
+        verified = looks_like_pdf(stored.read_bytes()[:5])
+    except OSError:
+        verified = False
+    return PartDocument(
+        document_type="datasheet",
+        title=str(media.get("title") or "") or "Datasheet",
+        revision=str(media.get("revision") or ""),
+        manufacturer=staged.manufacturer,
+        # Declared only for the one case the record can prove on its own: bytes with no link are
+        # something Stockroom imported. With a link, the projection reads the host and decides.
+        source_type="" if remote else "imported",
+        source=str(getattr(staged.provenance, "source", "") or ""),
+        local_path=f"{_DATASHEET_DIR}/{stored.name}",
+        remote_url=remote,
+        mime_type="application/pdf" if verified else "",
+        # When the LIBRARY took this copy. Passed in rather than read here so an add stays
+        # reproducible in a test instead of stamping whatever the clock said during the run.
+        retrieved_at=now,
+        # Stamped only because the bytes were actually read and checked. `verified` is a
+        # statement about bytes, never about a link having looked plausible.
+        verified_at=now if verified else "",
+    )
 
 
 def _altium_log_suffix(log: str) -> str:
@@ -362,7 +430,13 @@ class LibraryOps:
         result = apply_hygiene(self.repo.root, self._hygiene_tools(), repo=self.repo, lfs=True)
         return {**result, **self.lfs_status()}
 
-    def add_part(self, staged: StagedPart, require_complete: bool = True) -> PartRecord:
+    def add_part(
+        self, staged: StagedPart, require_complete: bool = True, *, now: str = ""
+    ) -> PartRecord:
+        # `now` is when the LIBRARY takes its copy of the staged files, used to date the typed
+        # datasheet document. Passed in rather than read here for the same reason every other
+        # clock in this engine is: an add that stamped itself could not be asserted on, and a
+        # caller with no clock gets an honestly undated document rather than a guessed one.
         # Complete-to-add gate (spec section 6): the primary library is complete-only.
         # Fails BEFORE any file write, so a rejected add leaves zero trace. An archive
         # profile is grandfathered (spec section 7), so its adds bypass the gate
@@ -441,6 +515,7 @@ class LibraryOps:
             # datasheet still lands on the record (the link is a first-class field),
             # so a part added from a pulled link keeps that link.
             datasheet = staged.datasheet_meta
+            documents: list[PartDocument] = []
             if staged.datasheet_source is not None:
                 ds_name = f"{part_id}.pdf"
                 ds_dst = self.lib.datasheets_dir / ds_name
@@ -448,6 +523,9 @@ class LibraryOps:
                 txn.track(ds_dst)
                 datasheet = staged.datasheet_meta or Datasheet()
                 datasheet.file = ds_name
+                # The same copy, typed. Nothing above changed: the legacy slot still holds the
+                # bare filename it always held.
+                documents.append(_stored_datasheet_document(staged, ds_dst, now))
 
             # A part added with no human name arrives here with display_name == "" or the
             # bare MPN (the UI seeds "" and candidateFromResult falls back to the MPN), which
@@ -477,6 +555,7 @@ class LibraryOps:
                 mpn=staged.mpn,
                 manufacturer=staged.manufacturer,
                 datasheet=datasheet,
+                documents=documents,
                 assets={
                     "kicad": EdaAssets(
                         symbol=Asset.of(AssetRef(lib=nickname, name=staged.entry_name))
@@ -1251,6 +1330,15 @@ class LibraryOps:
                     if ds_path.exists():
                         txn.track(ds_path)
                         ds_path.unlink()
+                    # A typed document naming the same file goes with it. Leaving it behind
+                    # would keep the record claiming a stored copy that has just been deleted,
+                    # and every reader would offer a document that cannot open.
+                    removed = record.datasheet.file.replace("\\", "/").rsplit("/", 1)[-1]
+                    record.documents = [
+                        doc
+                        for doc in record.documents
+                        if doc.local_path.replace("\\", "/").rsplit("/", 1)[-1] != removed
+                    ]
                 record.datasheet = None
             else:
                 self._detach_eda_asset(record, kind, txn)
@@ -1568,6 +1656,181 @@ class LibraryOps:
                 txn.track(sym_lib_path)
             txn.commit(f"Edit {part_id}: {field}")
         return record
+
+    # -- reviewed decisions about one specification ---------------------------
+    #
+    # Each of these is a read-modify-write, and the read happens INSIDE the transaction. The
+    # write lock spans the whole window (see mutation/transaction.py), so two people deciding
+    # two different fields on one part serialize instead of each writing a record built from a
+    # snapshot taken before the other's change - which is how a concurrent write loses a field
+    # without anything reporting an error.
+
+    def _decide(self, part_id: str, message: str, decide) -> PartRecord:
+        """Apply one reviewed decision to a record and commit it, or commit nothing.
+
+        Change is judged on the SERIALIZED record rather than on what the decision reports, so
+        every no-op is caught by one rule: clearing what was never set, re-pinning the source
+        already pinned, and re-entering the value already in force are all true no-ops with no
+        write and no empty commit. The caller still receives the record, because the end state it
+        asked for is real - mirroring `set_specs`.
+        """
+        json_path = self.lib.parts_dir / f"{part_id}.json"
+        with Transaction(self.repo) as txn:
+            record = self.load_record(part_id)
+            before = record.dumps()
+            decide(record)
+            after = record.dumps()
+            if after == before:
+                return record
+            json_path.write_text(after, encoding="utf-8")
+            txn.track(json_path)
+            txn.commit(message)
+        return record
+
+    def set_specification_override(
+        self,
+        part_id: str,
+        key: str,
+        value: object,
+        *,
+        reviewed_by: str,
+        reviewed_at: str,
+        note: str = "",
+        verified: bool = True,
+    ) -> PartRecord:
+        """Record a reviewed value for one specification, keeping every sourced answer.
+
+        Raises before any write for a key no canonical field claims, so a refused edit costs
+        nothing and cannot leave a half-applied decision behind.
+        """
+        from stockroom.dossier.decisions import canonical_key, set_override
+
+        canonical = canonical_key(key)
+        return self._decide(
+            part_id,
+            f"Override {canonical} on {part_id}",
+            lambda record: set_override(
+                record,
+                canonical,
+                value,
+                reviewed_by=reviewed_by,
+                reviewed_at=reviewed_at,
+                note=note,
+                verified=verified,
+            ),
+        )
+
+    def clear_specification_override(self, part_id: str, key: str) -> PartRecord:
+        """Withdraw the reviewed value for one specification. Idempotent."""
+        from stockroom.dossier.decisions import canonical_key, clear_override
+
+        canonical = canonical_key(key)
+        return self._decide(
+            part_id,
+            f"Clear the override of {canonical} on {part_id}",
+            lambda record: clear_override(record, canonical),
+        )
+
+    def set_specification_preferred_source(
+        self, part_id: str, key: str, source_id: str, *, reviewed_by: str, reviewed_at: str
+    ) -> PartRecord:
+        """Pin one specification to one source's answer, following that source thereafter."""
+        from stockroom.dossier.decisions import canonical_key, set_preferred_source
+
+        canonical = canonical_key(key)
+        return self._decide(
+            part_id,
+            f"Prefer {source_id} for {canonical} on {part_id}",
+            lambda record: set_preferred_source(
+                record, canonical, source_id, reviewed_by=reviewed_by, reviewed_at=reviewed_at
+            ),
+        )
+
+    def clear_specification_preferred_source(self, part_id: str, key: str) -> PartRecord:
+        """Return one specification to computed precedence. Idempotent."""
+        from stockroom.dossier.decisions import canonical_key, clear_preferred_source
+
+        canonical = canonical_key(key)
+        return self._decide(
+            part_id,
+            f"Clear the preferred source for {canonical} on {part_id}",
+            lambda record: clear_preferred_source(record, canonical),
+        )
+
+    # -- the preferred CAD source ---------------------------------------------
+    #
+    # `coverage` arrives as a CALLABLE rather than a document because the answer has to be about
+    # the record inside the transaction: computing it before the load would judge a pin against
+    # a reading of the evidence taken at a different moment. The callable is what opens the
+    # machine-local stores; nothing in `dossier.cad_preference` reaches for a path.
+
+    def set_cad_preferred_source(
+        self, part_id: str, provider: str, *, coverage, reviewed_by: str, reviewed_at: str
+    ) -> PartRecord:
+        """Prefer one provider for this component's whole CAD set.
+
+        Refuses before any write when that provider does not supply all three artifacts, so a
+        rejected choice costs nothing and cannot leave half a preference behind.
+        """
+        from stockroom.dossier.cad_preference import set_preferred_source
+
+        return self._decide(
+            part_id,
+            f"Prefer {provider} for the CAD set on {part_id}",
+            lambda record: set_preferred_source(
+                record,
+                coverage(record),
+                provider,
+                reviewed_by=reviewed_by,
+                reviewed_at=reviewed_at,
+            ),
+        )
+
+    def clear_cad_preferred_source(self, part_id: str) -> PartRecord:
+        """Return the whole CAD set to the providers that actually supplied the files."""
+        from stockroom.dossier.cad_preference import clear_preferred_source
+
+        return self._decide(
+            part_id,
+            f"Clear the preferred CAD source on {part_id}",
+            lambda record: clear_preferred_source(record),
+        )
+
+    def set_cad_asset_preferred_source(
+        self,
+        part_id: str,
+        asset: str,
+        provider: str,
+        *,
+        coverage,
+        reviewed_by: str,
+        reviewed_at: str,
+    ) -> PartRecord:
+        """Prefer one provider for ONE CAD asset, when that leaves the set coherent."""
+        from stockroom.dossier.cad_preference import set_asset_preferred_source
+
+        return self._decide(
+            part_id,
+            f"Prefer {provider} for the {asset} on {part_id}",
+            lambda record: set_asset_preferred_source(
+                record,
+                coverage(record),
+                asset,
+                provider,
+                reviewed_by=reviewed_by,
+                reviewed_at=reviewed_at,
+            ),
+        )
+
+    def clear_cad_asset_preferred_source(self, part_id: str, asset: str) -> PartRecord:
+        """Withdraw one asset's own pin, leaving the whole-set preference standing."""
+        from stockroom.dossier.cad_preference import clear_asset_preferred_source
+
+        return self._decide(
+            part_id,
+            f"Clear the preferred CAD source for the {asset} on {part_id}",
+            lambda record: clear_asset_preferred_source(record, asset),
+        )
 
     def renormalize_descriptions(self, *, dry_run: bool = False) -> list[dict]:
         """Rebuild machine names + placeholder descriptions from each record's specs (a

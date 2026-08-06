@@ -25,6 +25,11 @@ export function BenchPartModal({ part, onClose }: { part: string; onClose: () =>
       style={{ zIndex: modalZ }}
       className="fixed inset-0 flex items-center justify-center bg-black/50 p-6"
       data-testid="bench-part-modal"
+      // role="presentation", matching the shared modal frame in components/modalParts: the scrim
+      // is a surface, not a control. The press-to-dismiss is a POINTER convenience whose keyboard
+      // equivalent is Escape on the top layer, which useModalDismiss already answers, so the scrim
+      // must not enter the accessibility tree as a second way to close the window.
+      role="presentation"
       onClick={onClose}
     >
       <div
@@ -55,7 +60,7 @@ export function BenchPartModal({ part, onClose }: { part: string; onClose: () =>
               <Text id="stm.bench.loading">Loading the pinout...</Text>
             </p>
           ) : pinout.error ? (
-            <p className="py-16 text-center text-sm text-err">
+            <p className="py-16 text-center text-sm text-err-text">
               {pinout.error instanceof ApiError && pinout.error.status === 409
                 ? notBuiltLabel
                 : failedLabel}

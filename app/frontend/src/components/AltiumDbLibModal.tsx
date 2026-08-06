@@ -6,7 +6,7 @@
  * a second local-file or Altium-only activation lane.
  */
 import { useMemo, useState } from "react";
-import { motion } from "motion/react";
+import * as m from "motion/react-m";
 import { useAltiumStatus } from "../api/queries";
 import { useModalDismiss } from "../lib/useModalDismiss";
 import { Badge, Dot, SegmentedControl } from "./primitives";
@@ -17,7 +17,7 @@ type Filter = "all" | "ready" | "needs";
 
 const TH =
   "sticky top-0 z-[1] whitespace-nowrap border-b border-line bg-raise px-3 py-2.5 text-left " +
-  "text-2xs font-bold uppercase tracking-[0.06em] text-t3";
+  "ui-property-label";
 const TD = "whitespace-nowrap px-3 py-2.5 text-sm";
 
 export function AltiumDbLibModal({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -26,7 +26,10 @@ export function AltiumDbLibModal({ open, onClose }: { open: boolean; onClose: ()
   // Escape + Tab focus-trap + focus-restore (the shared modal idiom); attach the ref to the dialog.
   const { ref: dialogRef, zIndex: modalZ } = useModalDismiss(open, onClose);
 
-  const rows = status.data?.rows ?? [];
+  // The empty fallback was a fresh `[]` on every render, so the two memos below re-ran on every
+  // render they existed to skip - and the whole catalog was re-filtered whenever anything else on
+  // this dialog changed. Memoised here, the row list keeps one identity per response.
+  const rows = useMemo(() => status.data?.rows ?? [], [status.data]);
   const readyCount = useMemo(() => rows.filter((r) => r.ready).length, [rows]);
   const shown = useMemo(
     () => rows.filter((r) => (filter === "all" ? true : filter === "ready" ? r.ready : !r.ready)),
@@ -35,9 +38,9 @@ export function AltiumDbLibModal({ open, onClose }: { open: boolean; onClose: ()
   // Copy layer: the filter words carry a live count, so only the word is overridable while the count
   // stays dynamic; the accessible strings resolve here because attributes cannot host <Text>.
   const filterAll = useText("modal.altium.filter-all", "All");
-  const filterReady = useText("modal.altium.filter-ready", "Ready");
+  const filterReady = useText("modal.altium.filter-ready", "Prepared");
   const filterNeeds = useText("modal.altium.filter-needs", "Needs Files");
-  const dialogLabel = useText("modal.altium.title", "Altium Database Library");
+  const dialogLabel = useText("modal.altium.title", "Altium Database Catalog");
   const closeLabel = useText("modal.altium.close", "Close");
   const filterLabel = useText("modal.altium.filter", "Filter parts");
 
@@ -47,11 +50,16 @@ export function AltiumDbLibModal({ open, onClose }: { open: boolean; onClose: ()
     <div
       style={{ zIndex: modalZ }}
       className="fixed inset-0 flex items-start justify-center bg-black/60 p-4 pt-[7vh]"
+      // role="presentation", matching the shared modal frame in components/modalParts: the scrim
+      // is a surface, not a control. The press-to-dismiss below is a POINTER convenience whose
+      // keyboard equivalent is Escape on the top layer, which useModalDismiss already answers, so
+      // the scrim must not enter the accessibility tree as a second way to close the window.
+      role="presentation"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <motion.div
+      <m.div
         ref={dialogRef}
         tabIndex={-1}
         initial={{ opacity: 0, y: 8, scale: 0.99 }}
@@ -66,7 +74,7 @@ export function AltiumDbLibModal({ open, onClose }: { open: boolean; onClose: ()
         <div className="flex h-[38px] flex-none items-center justify-between gap-4 border-b border-line bg-band px-4">
           <div className="flex items-baseline gap-2.5">
             <h2 className="text-sm font-semibold text-t1">
-              <Text id="modal.altium.title">Altium Database Library</Text>
+              <Text id="modal.altium.title">Altium Database Catalog</Text>
             </h2>
             <span className="text-xs text-t3">
               {readyCount} of {rows.length} mapped
@@ -100,24 +108,22 @@ export function AltiumDbLibModal({ open, onClose }: { open: boolean; onClose: ()
         <div className="min-h-0 flex-1 overflow-auto px-5 pb-5">
           {status.isLoading ? (
             <p className="py-6 text-center text-sm text-t3">
-              <Text id="modal.altium.loading">Reading the library...</Text>
+              <Text id="modal.altium.loading">Reading the catalog...</Text>
             </p>
           ) : status.isError ? (
-            <p className="py-6 text-center text-sm text-err">
-              <Text id="modal.altium.error">Could not read the Altium library.</Text>
+            <p className="py-6 text-center text-sm text-err-text">
+              <Text id="modal.altium.error">Could not read the Altium catalog.</Text>
             </p>
           ) : shown.length === 0 ? (
             <div className="flex items-center justify-center gap-2.5 py-10">
               <Dot tone="neutral" />
               <span className="text-sm text-t3">
                 {rows.length === 0 ? (
-                  <Text id="modal.altium.empty-no-parts">This library has no parts yet.</Text>
+                  <Text id="modal.altium.empty-no-parts">This catalog holds no parts so far.</Text>
                 ) : filter === "ready" ? (
-                  <Text id="modal.altium.empty-none-ready">
-                    No parts are ready to place yet. Collect the complete source set from Components.
-                  </Text>
+                  <Text id="modal.altium.empty-none-ready">No parts can be placed so far. Collect the complete source set from Components.</Text>
                 ) : (
-                  <Text id="modal.altium.empty-all-ready">Every part has its Altium assets.</Text>
+                  <Text id="modal.altium.empty-all-ready">Each part has its Altium assets.</Text>
                 )}
               </span>
             </div>
@@ -166,7 +172,7 @@ export function AltiumDbLibModal({ open, onClose }: { open: boolean; onClose: ()
                         <span className="inline-flex items-center gap-1.5">
                           <Dot tone="ok" />
                           <span className="text-t2">
-                            <Text id="modal.altium.status-ready">Ready</Text>
+                            <Text id="modal.altium.status-ready">Prepared</Text>
                           </span>
                         </span>
                       ) : (
@@ -181,7 +187,7 @@ export function AltiumDbLibModal({ open, onClose }: { open: boolean; onClose: ()
             </table>
           )}
         </div>
-      </motion.div>
+      </m.div>
     </div>
   );
 }

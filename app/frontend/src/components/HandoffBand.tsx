@@ -19,43 +19,15 @@
  */
 import type { ReactNode } from "react";
 import type { PartDetail } from "../api/types";
-import { EDA_DATA_FIELDS, edaTool } from "../lib/edaRegistry.generated";
+import { edaTool } from "../lib/edaRegistry.generated";
 import { assetRef, assetsFor } from "../lib/edaTarget";
 import { compactUrl } from "../lib/compactUrl";
-import { Text, useText } from "../lib/copy";
+import { Text, useCopyFormatter, useText } from "../lib/copy";
 import { instanceDevId } from "../lib/componentDevIds";
 import { EditableText } from "./EditableText";
 import { AdaptiveChoice } from "./AdaptiveChoice";
 import { EYEBROW_DENSE } from "./primitives";
-
-/**
- * The order the band reads in, which is a PRESENTATION decision and deliberately not the registry's
- * emit order. It groups by what a person is looking for: who the part is (identity), what CAD it
- * carries (references), then the documents.
- *
- * The registry still decides membership - `handoffFields` below intersects this with the generated
- * curated set, and `HandoffBand.test.tsx` fails if the two ever disagree. So a field added to the
- * registry cannot be silently dropped by being missing from this list; it shows up as a test
- * failure naming it, which is the whole point of ordering here rather than filtering here.
- */
-export const BAND_ORDER = [
-  "mpn",
-  "manufacturer",
-  "category",
-  "symbol",
-  "footprint",
-  "datasheet",
-  "description",
-] as const;
-
-/** The curated fields, in band order. Exported so the test can assert registry coverage. */
-export function handoffFields() {
-  const curated = EDA_DATA_FIELDS.filter((f) => f.origin === "curated");
-  const byKey = new Map(curated.map((f) => [f.key, f]));
-  return BAND_ORDER.map((k) => byKey.get(k)).filter(
-    (f): f is (typeof curated)[number] => !!f,
-  );
-}
+import { handoffFields } from "./handoffFields";
 
 /** The value a field currently holds on the record, and how to present it. */
 interface Resolved {
@@ -155,9 +127,11 @@ export function HandoffBand({
               belongs to placement alone; this band says what it actually counts. */}
           <span
             data-dev-id="detail.handoff-ready"
-            className={ready === total ? "font-medium text-ok" : "font-medium text-warn"}
+            className={ready === total ? "font-medium text-ok-text" : "font-medium text-warn"}
           >
-            {ready} of {total} filled
+            <Text id="detail.handoff.filled-count" values={{ ready, total }}>
+              {"{ready} of {total} filled"}
+            </Text>
           </span>
           {/* hidden in a narrow band: the COUNT is the load-bearing half, and the tool names
               are what push the header into a truncation nobody can read */}
@@ -227,6 +201,11 @@ function HandoffCell({
   busy?: boolean;
 }) {
   const missing = !value.text.trim();
+  // The tool name in the hole is registry data; the sentence around it is ours.
+  const onlyReceives = useCopyFormatter(
+    "detail.handoff-only-tip",
+    "{tool} alone receives this field",
+  );
   return (
     <div
       // One cell per registry field: the cell names the field it IS and the class it belongs to,
@@ -243,10 +222,12 @@ function HandoffCell({
             // As a filled chip it was ~110px wide - wider than the CATEGORY label beside it and
             // louder than the value beneath it, which inverted the cell's hierarchy for the one
             // field that is a footnote rather than a headline.
-            className="ml-auto min-w-0 flex-none truncate text-2xs font-medium uppercase tracking-wide text-t3/70"
-            title={`Only ${only} receives this field`}
+            className="ml-auto min-w-0 flex-none truncate ui-row-metadata"
+            title={onlyReceives({ tool: only })}
           >
-            {only} only
+            <Text id="detail.handoff.only-tool" values={{ tool: only }}>
+              {"{tool} alone"}
+            </Text>
           </span>
         ) : null}
       </div>
@@ -277,6 +258,13 @@ function HandoffValue({
   edit?: Edit;
   busy?: boolean;
 }): ReactNode {
+  // Resolved before the branches below, because a hook cannot sit past an early return. The field
+  // NAME in each hole is registry vocabulary; the sentence it sits in is ours.
+  const noneOnRecord = useCopyFormatter("detail.handoff-missing-tip", "No {field} on record");
+  // The in-field hint and the accessible name of the open affordance. Both hold a field NAME in
+  // their hole, which is registry vocabulary, while the words around it are ours.
+  const addHint = useCopyFormatter("detail.handoff-add-placeholder", "Add {field}");
+  const openName = useCopyFormatter("detail.handoff-open-aria", "Open {field}");
   if (edit?.kind === "select") {
     return (
       <AdaptiveChoice
@@ -297,7 +285,7 @@ function HandoffValue({
         value={value.full ?? value.text}
         onSave={edit.onSave}
         label={label}
-        placeholder={`Add ${label}`}
+        placeholder={addHint({ field: label })}
         multiline={edit.multiline}
         clampLines={edit.multiline ? 2 : undefined}
         // TRUNCATE every single-line value. MEASURED in the owner's REAL window (1423px viewport,
@@ -329,7 +317,7 @@ function HandoffValue({
           rel="noreferrer"
           data-dev-id={instanceDevId("detail.handoff-open", fieldKey)}
           data-dev-role="detail.handoff-open"
-          aria-label={`Open ${label}`}
+          aria-label={openName({ field: label })}
           title={value.full}
           className="flex-none rounded-control p-0.5 text-t3 transition-colors hover:text-t1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc"
         >
@@ -344,7 +332,7 @@ function HandoffValue({
 
   if (missing) {
     return (
-      <span className="truncate text-xs font-medium text-warn" title={`No ${label} on record`}>
+      <span className="truncate text-xs font-medium text-warn" title={noneOnRecord({ field: label })}>
         <Text id="detail.handoff-missing">Not Set</Text>
       </span>
     );
@@ -360,7 +348,7 @@ function HandoffValue({
         // The SAME accessible name the editable branch gives it. The visible text is a shortened
         // URL, which would otherwise make this control's screen-reader name depend on whether the
         // caller happened to allow editing - one control, two names.
-        aria-label={`Open ${label}`}
+        aria-label={openName({ field: label })}
         className="truncate text-xs font-medium text-t1 underline decoration-line underline-offset-2 transition-colors hover:decoration-t1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc"
       >
         {value.text}

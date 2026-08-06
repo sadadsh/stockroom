@@ -13,7 +13,8 @@ import type { SpecConflict } from "../lib/candidateFromResult";
 import { distributorLabel } from "../lib/sourced";
 import { CANDIDATE_ROLE, candidateDevId } from "../lib/componentDevIds";
 import { Badge, Button, Card, Dot } from "./primitives";
-import { PhotoTrigger, productPhotoUrl } from "./ProductPhoto";
+import { PhotoTrigger } from "./ProductPhoto";
+import { productPhotoUrl } from "./partPhotos";
 import { AdaptiveChoice } from "./AdaptiveChoice";
 
 // Where a shown conflict value came from.
@@ -164,15 +165,18 @@ export function CandidateCard({
           className="mb-3 flex flex-col gap-1.5 rounded-control border border-warn/40 bg-warn/[0.08] px-3 py-2.5"
         >
           <span className="text-xs font-medium text-warn">
-            <Text id="ingest.conflicts-title">
-              The sources disagree here. The first value is kept; everything stays editable after adding.
-            </Text>
+            <Text id="ingest.conflicts-title">The sources disagree here. The first value is kept; all of it remains editable after adding.</Text>
           </span>
           {conflicts.map((cf) => (
             <div key={cf.key} className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-xs">
               <span className="text-t3">{cf.key}</span>
+              {/* A conflicting value is identified by WHERE it came from and WHAT it says; the
+                  position it happens to hold in the alternates array is not its identity. */}
               {cf.values.map((v, i) => (
-                <span key={i} className="inline-flex items-baseline gap-1 text-t1">
+                <span
+                  key={`${v.source}:${v.value}`}
+                  className="inline-flex items-baseline gap-1 text-t1"
+                >
                   {i > 0 ? (
                     <span aria-hidden="true" className="text-t3">
                       ·
@@ -195,7 +199,7 @@ export function CandidateCard({
           value={c.manufacturer}
           onChange={(v) => set("manufacturer", v)}
         />
-        <Field label="Category" copyId="ingest.field-category" value={c.category} onChange={(v) => set("category", v)} />
+        <Field label="Class" copyId="ingest.field-category" value={c.category} onChange={(v) => set("category", v)} />
         <Field
           label="Description"
           copyId="ingest.field-description"
@@ -248,7 +252,7 @@ export function CandidateCard({
 
       {missing.length > 0 ? (
         <div className="mt-3">
-          <div className="mb-1.5 text-xs text-err">
+          <div className="mb-1.5 text-xs text-err-text">
             <Text id="ingest.still-needs">This part still needs:</Text>
           </div>
           <div className="flex flex-wrap gap-1.5">

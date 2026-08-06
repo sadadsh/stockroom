@@ -1,4 +1,3 @@
-import type { SourcedAlternate } from "../api/types";
 /**
  * The single, data-driven module that turns a part's free-form spec bag into a
  * presentation. It is the modular guarantee: a future part carrying a spec key we
@@ -24,28 +23,6 @@ export const SPEC_HIDDEN_KEYS = new Set([
   "Image",
 ]);
 
-// A distributor's INTERNAL record id is not a property of the part.
-//
-// LCSC's product payload carries brandId / catalogId / parentCatalogId / wmCatalogId, and the
-// scrape adapter Title-cases any uncurated field into a spec label - so `Brand Id 100` rendered
-// in the Other group beside real parameters. The record deliberately KEEPS every field the
-// source exposed (the owner's explicit "store everything", locked by
-// tests/backend/enrich/test_lcsc_product.py); this is only about what the sheet PRESENTS.
-//
-// A trailing " Id" WORD, anchored, case-sensitive. Exact on purpose:
-//   * "Grid" / "Humidity" keep their rows, because the letters must be their own word;
-//   * "LCSC Product ID" keeps its row, because a CURATED label spells it "ID" while the
-//     humanized fallback that produces the junk spells it "Id". That difference is what
-//     separates an identifier a person orders by from one only LCSC's database uses.
-const VENDOR_RECORD_ID = / Id$/;
-
-/** True for a key the sheet must not present: an asset reference, the pinout, or a
- * distributor's internal record id. One predicate so every consumer filters identically -
- * the two call sites in this file drifted apart once already. */
-export function isVendorBookkeeping(key: string): boolean {
-  return SPEC_HIDDEN_KEYS.has(key) || VENDOR_RECORD_ID.test(key);
-}
-
 // Spec values that mean "the distributor did not fill this" - dropped so an
 // empty-in-disguise spec never takes a row (compared lowercased + trimmed).
 export const EMPTY_SPEC_VALUES = new Set([
@@ -58,36 +35,22 @@ export const EMPTY_SPEC_VALUES = new Set([
 ]);
 
 // The presentation groups, mirroring the north-star spec sheet. "Other" is the fallback
-// bucket every UNKNOWN key routes to, so a never-seen spec always has a sane home. The
-// array order IS the render order of the groups.
+// bucket every UNKNOWN key routes to, so a never-seen spec always has a sane home.
 export type SpecGroupName =
   | "Electrical"
   | "Physical"
+  // WHAT THE PART IS AND DOES: its type, topology, channel count, what it is for. These are
+  // real, first-class characteristics that are neither electrical quantities nor dimensions,
+  // and with no home of their own every one of them fell into "Other".
   | "Device"
   | "Ratings & Compliance"
   | "Trade & Compliance"
   | "Other";
 
-export const SPEC_GROUP_ORDER: readonly SpecGroupName[] = [
-  "Electrical",
-  "Physical",
-  // WHAT THE PART IS AND DOES: its type, topology, channel count, what it is for. These are
-  // real, first-class characteristics that are neither electrical quantities nor dimensions,
-  // and with no home of their own every one of them fell into "Other".
-  "Device",
-  "Ratings & Compliance",
-  "Trade & Compliance",
-  "Other",
-];
-
-// The procurement group, rendered by the SOURCING tab rather than the Specs sheet.
-//
-// These keys are real vendor data the owner asked to stop discarding (origin, the page's own
-// tariff rate, export classification, order quantities) but they are NOT physical parameters, and
-// `derive.isReferenceOnlySpecKey` deliberately keeps them off the spec sheet so it does not read
-// as a distributor page dump. Both rules hold at once by giving them a group of their own: a buyer
-// looks for an import classification next to the prices, not next to the propagation delay.
-export const TRADE_GROUP: SpecGroupName = "Trade & Compliance";
+// The procurement group: origin, the page's own tariff rate, export classification, order
+// quantities. Real vendor data, and not a physical parameter, so the parametric search ranks it
+// last rather than mixing it in with the electrical dimensions.
+const TRADE_GROUP: SpecGroupName = "Trade & Compliance";
 
 // The fallback group + a large default order so unknown keys sort AFTER every known
 // key while keeping their own insertion order among themselves (a stable sort).
@@ -221,7 +184,6 @@ export const SPEC_PATTERNS: SpecPattern[] = [
   { token: "input", group: "Device", order: 25 },
 ];
 
-
 // The ordered, extensible registry. Grouped by concern for readability; `order` (not
 // array position) drives within-group sorting, so inserting a row anywhere is safe.
 export const SPEC_REGISTRY: SpecRegistryEntry[] = [
@@ -337,130 +299,13 @@ export const SPEC_REGISTRY: SpecRegistryEntry[] = [
   { match: "unit weight kg", group: TRADE_GROUP, label: "Unit Weight", unit: "kg", order: 50 },
 ];
 
-// A FAMILY of spec keys that are the same fact stated once per jurisdiction, variant or
-// channel, and therefore belong in ONE row with a member each rather than N rows of their own.
-//
-// This needs a pattern rather than N registry rows because the key space is open: Mouser emits
-// six fixed HTS keys, but LCSC emits `HTS Code (<country name>)` for whatever countries a part
-// has codes for, so a hand-listed set would silently miss the seventh country and go back to
-// shouting a wall of near-identical rows over the specs that matter.
-//
-// A family is NOT a disagreement. Two sources contradicting each other is a different thing
-// entirely and lives in the part's `alternates`; this is one source stating many related facts.
-export interface SpecFamily {
-  // The family's own display label - the collapsed row's name.
-  family: string;
-  // Matched against the NORMALIZED key (see normalizeSpecKey). Capture group 1, when present,
-  // names the member ("us", "eu taric", "vietnam"); a match with no capture is the unqualified
-  // form of the same fact and becomes a member with no name of its own.
-  match: RegExp;
-  group: SpecGroupName;
-  order: number;
-}
-
-export const SPEC_FAMILIES: readonly SpecFamily[] = [
-  {
-    family: "HTS Code",
-    // "HTS Code (US)", "HTS Code (EU TARIC)", LCSC's "HTS Code (Vietnam)", or a bare "HTS Code".
-    match: /^hts code(?:\s+(.+))?$/,
-    group: TRADE_GROUP,
-    // just below ECCN: both are export classification, and ECCN is the single-value one.
-    order: 11,
-  },
-  {
-    family: "HTS Code",
-    // DigiKey's additional Brazil and Korea customs classifications.
-    match: /^(br|kr)hts$/,
-    group: TRADE_GROUP,
-    order: 11,
-  },
-];
-
-// The member's own label, recovered from the raw key so it reads as the source wrote it
-// ("US", "EU TARIC", "Vietnam") rather than as the normalized lowercase form. Falls back to the
-// family name for the unqualified key, which has no member name of its own.
-function memberLabel(rawKey: string, family: SpecFamily, captured: string | undefined): string {
-  if (!captured) return family.family;
-  // find the captured run inside the raw key, case-insensitively, so the source's own casing and
-  // punctuation survive: normalizeSpecKey stripped the parentheses to match, and reading the
-  // label back off the raw key avoids having to reconstruct them.
-  const stripped = rawKey.trim().replace(/[()]/g, " ").replace(/\s+/g, " ").trim();
-  const at = stripped.toLowerCase().lastIndexOf(captured.toLowerCase());
-  return at >= 0 ? stripped.slice(at, at + captured.length).trim() : captured;
-}
-
-/** The family a raw spec key belongs to, with the member's label, or null when it is an
- * ordinary standalone spec. */
-export function resolveFamily(
-  rawKey: string,
-): { family: SpecFamily; member: string } | null {
-  const norm = normalizeSpecKey(rawKey);
-  for (const family of SPEC_FAMILIES) {
-    const m = family.match.exec(norm);
-    if (m) return { family, member: memberLabel(rawKey, family, m[1]) };
-  }
-  return null;
-}
-
 // A resolved spec: raw key + where the registry (or the fallback) places it.
 interface ResolvedSpec {
-  id: string;
   key: string;
   label: string;
   group: SpecGroupName;
   unit?: string;
   order: number;
-}
-
-// One presented spec row: the raw key, the display label, the coerced value, and the
-// unit split off it (for tabular alignment) when there was one.
-export interface SpecRow {
-  /**
-   * Stable presentation-schema identity. Older fixtures may omit it, so every consumer must use
-   * `specRowId()` rather than reading it directly.
-   */
-  id?: string;
-  key: string;
-  label: string;
-  value: string;
-  // The value as STORED, before prettifying / unit-splitting / the ± prefix. A consumer comparing
-  // this row against another source's answer must compare stored-to-stored: "1%" renders as "±1%",
-  // so comparing the presented string made the value already in force look like a different
-  // answer, and the panel offered to "use" what it was already using.
-  raw: string;
-  unit?: string;
-  // Present only on a FAMILY row (see SPEC_FAMILIES): the individual per-jurisdiction values,
-  // sorted by member label. The family row itself carries no value of its own - `value` is the
-  // member count, so the collapsed row still says how much is behind it.
-  members?: SpecRow[];
-}
-
-export interface SpecGroup {
-  title: SpecGroupName;
-  rows: SpecRow[];
-}
-
-// One facet definition for the parametric-search rail. `kind` is "range" for a numeric
-// spec (min/max, plus a shared unit when consistent) or "checkbox" for a categorical
-// one (distinct values + counts). `group`/`order` mirror the same registry so a facet
-// rail groups exactly like the detail spec sheet.
-export interface FacetValue {
-  value: string;
-  count: number;
-}
-
-export interface FacetDef {
-  key: string;
-  label: string;
-  group: SpecGroupName;
-  order: number;
-  kind: "range" | "checkbox";
-  // present on a checkbox facet: distinct values, count desc then value asc
-  values?: FacetValue[];
-  // present on a range facet
-  min?: number;
-  max?: number;
-  unit?: string;
 }
 
 // Fold casing + punctuation to a canonical key so "Voltage Rating", "voltage_rating",
@@ -484,33 +329,6 @@ const _REGISTRY_INDEX: Map<string, SpecRegistryEntry> = (() => {
   return index;
 })();
 
-/**
- * Stable semantic identity for a specification.
- *
- * Raw distributor keys are evidence, not identifiers: `DCR`, `DC Resistance`, and
- * `Voltage - Breakdown` versus `Breakdown Voltage` are spelling variants. Exact registry rows
- * canonicalize through their human label; unregistered rows use the conservative label cleanup.
- * Qualifiers remain part of the id, so Breakdown Voltage and Breakdown Voltage (Min) never merge.
- */
-export function canonicalSpecId(
-  rawKey: string,
-  displayLabel?: string,
-  category = "",
-): string {
-  const norm = normalizeSpecKey(rawKey);
-  const scope = normalizeSpecKey(category);
-  const entry =
-    (scope ? _REGISTRY_INDEX.get(`${scope}::${norm}`) : undefined) ??
-    _REGISTRY_INDEX.get(`*::${norm}`);
-  const label = displayLabel?.trim() || entry?.label || cleanSpecLabel(rawKey);
-  return normalizeSpecKey(entry?.id ?? label);
-}
-
-/** Resolve the identity of a presented row, including legacy/test rows created before ids existed. */
-export function specRowId(row: Pick<SpecRow, "id" | "key" | "label">): string {
-  return row.id || canonicalSpecId(row.key, row.label);
-}
-
 // Resolve where a raw key lands: a category-scoped entry wins, then a global entry, then
 // the fallback (Other, at the fallback order) so an unknown key is placed, never dropped.
 export function resolveSpec(rawKey: string, category: string): ResolvedSpec {
@@ -523,7 +341,6 @@ export function resolveSpec(rawKey: string, category: string): ResolvedSpec {
   if (entry) {
     const label = entry.label ?? rawKey;
     return {
-      id: canonicalSpecId(rawKey, label, category),
       key: rawKey,
       label,
       group: entry.group,
@@ -544,8 +361,7 @@ export function resolveSpec(rawKey: string, category: string): ResolvedSpec {
       if (hit) {
         const label = cleanSpecLabel(rawKey);
         return {
-          id: canonicalSpecId(rawKey, label, category),
-          key: rawKey,
+              key: rawKey,
           label,
           group: p.group,
           order: p.order,
@@ -555,30 +371,11 @@ export function resolveSpec(rawKey: string, category: string): ResolvedSpec {
   }
   const label = cleanSpecLabel(rawKey);
   return {
-    id: canonicalSpecId(rawKey, label, category),
     key: rawKey,
     label,
     group: FALLBACK_GROUP,
     order: FALLBACK_ORDER,
   };
-}
-
-// Leading "number [unit]" matcher: a number (optional sign, thousands, decimal,
-// exponent) then a unit made only of NON-digit characters through end-of-string. The
-// no-digit tail is what keeps a range ("-40°C ~ 85°C") from splitting - a later digit
-// means no match, so the value passes through whole.
-const _NUM_UNIT_RE = /^([+-]?\d[\d,]*(?:\.\d+)?(?:[eE][+-]?\d+)?)\s*([^\d]*)$/;
-
-// Split a value into its numeric lead + unit for tabular alignment. Returns the value
-// unchanged (no unit) when it is not a clean "number [unit]" (a range, prose, or a bare
-// code like "0603" keeps its whole string).
-export function splitValueUnit(raw: string): { value: string; unit?: string } {
-  const text = raw.trim();
-  const m = _NUM_UNIT_RE.exec(text);
-  if (!m) return { value: text };
-  const num = m[1];
-  const unit = (m[2] ?? "").trim();
-  return unit ? { value: num, unit } : { value: num };
 }
 
 // Presentation-only unit prettifying. The stored specs keep the scraped spelling
@@ -601,12 +398,6 @@ export function prettifyValue(text: string): string {
     .replace(/(\d)\s+C\b/g, "$1 °C");
 }
 
-// True when a value already carries its own unit / symbol (so the registry unit must NOT be
-// appended on top of it - the source of the "200 mW (1/5 W) W" double-unit).
-function hasInlineUnit(value: string): boolean {
-  return /[a-zµΩ°%]/i.test(value);
-}
-
 // Spec keys whose value is inherently a ± quantity (a tolerance, a temperature coefficient):
 // the north-star reads "±1%", not "1 %". Keyed normalized so any casing matches.
 const SIGNED_KEYS = new Set(["tolerance", "temperature coefficient"].map(normalizeSpecKey));
@@ -616,215 +407,6 @@ const SIGNED_KEYS = new Set(["tolerance", "temperature coefficient"].map(normali
 export function applySign(rawKey: string, value: string): string {
   if (!SIGNED_KEYS.has(normalizeSpecKey(rawKey))) return value;
   return /^[±+−-]/.test(value.trim()) ? value : `±${value}`;
-}
-
-// Numeric parse for faceting: the numeric lead (commas stripped) as a finite number,
-// plus its unit, or null when the value is not numeric.
-function parseNumericSpec(raw: string): { num: number; unit: string } | null {
-  const m = _NUM_UNIT_RE.exec(raw.trim());
-  if (!m) return null;
-  const num = Number(m[1].replace(/,/g, ""));
-  if (!Number.isFinite(num)) return null;
-  return { num, unit: (m[2] ?? "").trim() };
-}
-
-// True when a spec value is real, presentable data (not null, not an object like the
-// pinout list, not blank, not an empty-in-disguise marker).
-function isPresentableValue(value: unknown): boolean {
-  if (value == null || typeof value === "object") return false;
-  const text = String(value).trim();
-  if (text === "") return false;
-  return !EMPTY_SPEC_VALUES.has(text.toLowerCase());
-}
-
-// Coerce a real spec entry to a display string (callers already gate on
-// isPresentableValue, so this only ever sees scalars).
-function coerceValue(value: unknown): string {
-  return String(value).trim();
-}
-
-/**
- * Turn a part's spec bag into ordered, grouped presentation rows. Hidden keys and
- * empty-in-disguise values are dropped; each survivor is routed by the registry (an
- * unknown key lands in "Other", never dropped), its value split into value + unit,
- * groups ordered by SPEC_GROUP_ORDER, and rows ordered by the registry `order`
- * (unknown keys keep their insertion order, a stable sort). Empty groups are omitted.
- */
-export function groupSpecs(
-  category: string,
-  specs: Record<string, unknown>,
-): SpecGroup[] {
-  // Bucket resolved rows by group, preserving insertion order within each bucket.
-  const buckets = new Map<SpecGroupName, Array<{ row: SpecRow; order: number; seq: number }>>();
-  // One accumulator per family encountered, so N per-jurisdiction keys become one row.
-  const families = new Map<string, { family: SpecFamily; rows: SpecRow[]; seq: number }>();
-  let seq = 0;
-  for (const [key, value] of Object.entries(specs)) {
-    if (isVendorBookkeeping(key)) continue;
-    if (!isPresentableValue(value)) continue;
-    const inFamily = resolveFamily(key);
-    if (inFamily) {
-      const bucket = families.get(inFamily.family.family) ?? {
-        family: inFamily.family, rows: [], seq: seq++,
-      };
-      bucket.rows.push({
-        id: canonicalSpecId(key, inFamily.member, category),
-        key,
-        label: inFamily.member,
-        value: prettifyValue(coerceValue(value)),
-        raw: coerceValue(value),
-      });
-      families.set(inFamily.family.family, bucket);
-      continue;
-    }
-    const resolved = resolveSpec(key, category);
-    const split = splitValueUnit(coerceValue(value));
-    const prettyUnit = split.unit ? prettifyValue(split.unit) : undefined;
-    let dispValue = prettifyValue(split.value);
-    // the value's own inline unit wins; the registry unit is only a fallback for a bare number
-    // that carried none - never appended onto a value that already has a unit.
-    let dispUnit = prettyUnit ?? (hasInlineUnit(split.value) ? undefined : resolved.unit);
-    // a percent reads tight ("±1%", not "1 %"), so fold it into the value with no space
-    if (dispUnit === "%") {
-      dispValue += "%";
-      dispUnit = undefined;
-    }
-    dispValue = applySign(key, dispValue);
-    const row: SpecRow = {
-      id: resolved.id,
-      key: resolved.key,
-      label: resolved.label,
-      value: dispValue,
-      raw: coerceValue(value),
-      unit: dispUnit,
-    };
-    const list = buckets.get(resolved.group) ?? [];
-    list.push({ row, order: resolved.order, seq: seq++ });
-    buckets.set(resolved.group, list);
-  }
-
-  // Fold each family into a single row. Members sort by their own label so the list reads the
-  // same on every part regardless of the order the distributor's payload happened to arrive in.
-  for (const { family, rows, seq: familySeq } of families.values()) {
-    rows.sort((a, b) => a.label.localeCompare(b.label));
-    const list = buckets.get(family.group) ?? [];
-    list.push({
-      row: {
-        id: canonicalSpecId(family.family),
-        key: family.family,
-        label: family.family,
-        raw: "",  // a family row is a count of its members, not a value any source offered
-        // The collapsed row states HOW MANY facts are behind it rather than picking one
-        // jurisdiction to stand for the rest - which region is "the" region depends on who is
-        // reading, and the panel must not decide that for them.
-        value: String(rows.length),
-        members: rows,
-      },
-      order: family.order,
-      seq: familySeq,
-    });
-    buckets.set(family.group, list);
-  }
-
-  const groups: SpecGroup[] = [];
-  for (const title of SPEC_GROUP_ORDER) {
-    const list = buckets.get(title);
-    if (!list || list.length === 0) continue;
-    list.sort((a, b) => a.order - b.order || a.seq - b.seq);
-    groups.push({ title, rows: list.map((e) => e.row) });
-  }
-  return groups;
-}
-
-/**
- * Aggregate a set of parts' spec keys into facet definitions for the parametric-search
- * rail. For each spec key seen (after the same hidden/empty filtering), classify it as
- * a numeric range (every value parses to a finite number AND their units are consistent)
- * or a checkbox list (distinct string values + counts). Facets are grouped and ordered
- * by the same registry, so the rail mirrors the detail spec sheet. This is the FRONTEND
- * shape only; the backend builds its own server aggregation separately.
- */
-export function deriveFacets(
-  parts: Array<{ category: string; specs: Record<string, unknown> }>,
-): FacetDef[] {
-  // Aggregate values per RAW key, remembering the category of the first part that
-  // carried it (for deterministic registry resolution across a mixed set).
-  const acc = new Map<string, { key: string; category: string; values: string[]; seq: number }>();
-  let seq = 0;
-  for (const part of parts) {
-    for (const [key, value] of Object.entries(part.specs)) {
-      if (isVendorBookkeeping(key)) continue;
-      if (!isPresentableValue(value)) continue;
-      // FOLD FAMILIES, exactly as `groupSpecs` does for the detail sheet. Without this the rail
-      // showed SIX separate HTS facets - one per jurisdiction - which is the same fact repeated,
-      // never six things to filter on. The docstring below has always claimed the rail "mirrors the
-      // detail spec sheet"; it did not, and `resolveFamily` is the same routing `groupSpecs` uses,
-      // so folding here keeps ONE definition of what a family is rather than a second copy.
-      const fam = resolveFamily(key);
-      const bucketKey = fam ? fam.family.family : key;
-      const bucket = acc.get(bucketKey);
-      if (bucket) {
-        bucket.values.push(coerceValue(value));
-      } else {
-        acc.set(bucketKey, {
-          key: bucketKey,
-          category: part.category,
-          values: [coerceValue(value)],
-          seq: seq++,
-        });
-      }
-    }
-  }
-
-  const facets: Array<FacetDef & { _seq: number }> = [];
-  for (const { key, category, values, seq: bucketSeq } of acc.values()) {
-    const resolved = resolveSpec(key, category);
-    facets.push({ ...classifyFacet(values), key, label: resolved.label, group: resolved.group, order: resolved.order, _seq: bucketSeq });
-  }
-
-  const groupIndex = (g: SpecGroupName) => SPEC_GROUP_ORDER.indexOf(g);
-  facets.sort(
-    (a, b) =>
-      groupIndex(a.group) - groupIndex(b.group) ||
-      a.order - b.order ||
-      a._seq - b._seq,
-  );
-  return facets.map(({ _seq, ...facet }) => facet);
-}
-
-// Classify one key's aggregated values: a numeric range when every value parses to a
-// finite number with a consistent unit, else a checkbox list.
-function classifyFacet(
-  values: string[],
-): { kind: "range"; min: number; max: number; unit?: string } | { kind: "checkbox"; values: FacetValue[] } {
-  const nums: number[] = [];
-  const units = new Set<string>();
-  let allNumeric = values.length > 0;
-  for (const v of values) {
-    const parsed = parseNumericSpec(v);
-    if (!parsed) {
-      allNumeric = false;
-      break;
-    }
-    nums.push(parsed.num);
-    if (parsed.unit) units.add(parsed.unit);
-  }
-  // A numeric spec whose values disagree on units is not a single honest range; treat
-  // it as categorical instead of inventing a min/max across scales.
-  if (allNumeric && units.size <= 1) {
-    return {
-      kind: "range",
-      min: Math.min(...nums),
-      max: Math.max(...nums),
-      unit: units.size === 1 ? [...units][0] : undefined,
-    };
-  }
-  const counts = new Map<string, number>();
-  for (const v of values) counts.set(v, (counts.get(v) ?? 0) + 1);
-  const distinct: FacetValue[] = [...counts.entries()]
-    .map(([value, count]) => ({ value, count }))
-    .sort((a, b) => b.count - a.count || a.value.localeCompare(b.value));
-  return { kind: "checkbox", values: distinct };
 }
 
 /**
@@ -866,184 +448,3 @@ export function cleanSpecLabel(raw: string): string {
   return [`${qualifier} ${quantity}`, suffix].filter(Boolean).join(" ");
 }
 
-/**
- * Two spec keys name the SAME concept when their normalised word sets match.
- *
- * Distributors word one parameter differently and Stockroom keeps every wording, so the owner's
- * real part carries BOTH `Breakdown Voltage` (LCSC, 6 V) and `Voltage - Breakdown` (DigiKey,
- * 8.5 V). The label prettifier renders both as "Breakdown Voltage", so the sheet showed the same
- * name twice with two different numbers and nothing saying which was in force - which is worse
- * than showing one, because a reader cannot tell it is a disagreement rather than two parameters.
- *
- * A SET, not a sequence: the wordings differ by ORDER ("voltage breakdown" vs "breakdown
- * voltage"), which is exactly what a plain normalised-string compare misses. `rating` / `rated`
- * are distributor grammar rather than a second electrical concept: `Power` and `Power Rating`,
- * or `Voltage Rated` and `Voltage Rating`, must occupy one row. Other qualifiers still separate
- * concepts, because they add a word - `Voltage - Breakdown (Min)` keeps `min` and stays its own
- * row, and `Voltage - Clamping (Max) @ Ipp` keeps `max`/`ipp` and never folds into
- * `Clamping Voltage`. Verified against the owner's real records.
- */
-export function specConcept(key: string): string {
-  const words = key
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, " ")
-    .trim()
-    .split(" ")
-    .filter(Boolean);
-  const quantityWords = new Set([
-    "capacitance",
-    "current",
-    "frequency",
-    "inductance",
-    "power",
-    "resistance",
-    "temperature",
-    "voltage",
-  ]);
-  const isRatedQuantity = words.some((word) => quantityWords.has(word));
-  const semanticWords =
-    words.length > 1 && isRatedQuantity
-      ? words.filter((word) => word !== "rating" && word !== "rated")
-      : words;
-  return [...new Set(semanticWords)].sort().join(" ");
-}
-
-const SI_PREFIX_SCALE: Readonly<Record<string, number>> = {
-  p: 1e-12,
-  n: 1e-9,
-  u: 1e-6,
-  "µ": 1e-6,
-  "μ": 1e-6,
-  m: 1e-3,
-  k: 1e3,
-  K: 1e3,
-  M: 1e6,
-  G: 1e9,
-  T: 1e12,
-};
-
-function comparableBaseUnit(token: string): string | null {
-  if (token === "Ω") return "Ω";
-  if (/^hz$/i.test(token)) return "Hz";
-  if (/^wh$/i.test(token)) return "Wh";
-  if (/^ah$/i.test(token)) return "Ah";
-  if (/^[fhvawsj]$/i.test(token)) return token.toUpperCase();
-  return null;
-}
-
-/**
- * Parse the leading engineering quantity from a source value into its base-unit magnitude.
- *
- * Parenthetical source detail is deliberately allowed after the first quantity:
- * `62.5 mW (1/16 W)` is still a power value. Unsupported/prose units return null, so this can
- * suppress a duplicate only when both the dimension and the magnitude are understood.
- */
-function comparableQuantity(raw: string): { magnitude: number; unit: string } | null {
-  const text = prettifyValue(raw).replace(/^−/, "-").trim();
-  const match =
-    /^([+-]?(?:\d[\d,]*(?:\.\d+)?|\.\d+)(?:[eE][+-]?\d+)?)\s*([^\s(]+)/.exec(text);
-  if (!match) return null;
-  const value = Number(match[1].replace(/,/g, ""));
-  if (!Number.isFinite(value)) return null;
-  const token = match[2];
-
-  const direct = comparableBaseUnit(token);
-  if (direct) return { magnitude: value, unit: direct };
-
-  const prefix = token[0];
-  const base = comparableBaseUnit(token.slice(1));
-  const scale = SI_PREFIX_SCALE[prefix];
-  if (!base || scale === undefined) return null;
-  return { magnitude: value * scale, unit: base };
-}
-
-/**
- * Whether two source strings are the same presentable answer.
- *
- * Distributor values often differ only in engineering notation (`0.5 V` / `500 mV`) or in the
- * rounding used beside an exact fraction (`0.063 W` / `62.5 mW (1/16 W)`). A one-percent relative
- * window covers that measured rounding case while still retaining a materially different source
- * answer as an alternate. Unknown units never compare numerically.
- */
-export function equivalentSpecValue(left: unknown, right: unknown): boolean {
-  if (
-    (typeof left !== "string" && typeof left !== "number") ||
-    (typeof right !== "string" && typeof right !== "number")
-  ) {
-    return left === right;
-  }
-  const leftText = String(left);
-  const rightText = String(right);
-  const normalizedLeft = leftText.trim().replace(/\s+/g, " ").toLowerCase();
-  const normalizedRight = rightText.trim().replace(/\s+/g, " ").toLowerCase();
-  if (normalizedLeft === normalizedRight) return true;
-
-  const a = comparableQuantity(leftText);
-  const b = comparableQuantity(rightText);
-  if (!a || !b || a.unit !== b.unit) return false;
-  const scale = Math.max(Math.abs(a.magnitude), Math.abs(b.magnitude));
-  if (scale === 0) return true;
-  return Math.abs(a.magnitude - b.magnitude) <= scale * 0.01;
-}
-
-/**
- * Fold rows that name one concept into a single row, routing the displaced values into
- * `alternates` so the existing "N Sources" disclosure can show and swap them.
- *
- * The FIRST row wins the slot: groupSpecs already emits in registry/source priority order, so the
- * winner here is the same value that won everywhere else. Pure and non-mutating - the caller's
- * groups and alternates are re-rendered on every keystroke.
- */
-export function mergeSameConcept(
-  groups: readonly SpecGroup[],
-  alternates: Record<string, SourcedAlternate[]>,
-): { groups: SpecGroup[]; alternates: Record<string, SourcedAlternate[]> } {
-  const winnerFor = new Map<string, SpecRow>();
-  const extra: Record<string, SourcedAlternate[]> = {};
-  const out: SpecGroup[] = [];
-
-  for (const group of groups) {
-    const rows: SpecRow[] = [];
-    for (const row of group.rows) {
-      // a family row carries its own members and is already a collapse; never fold one again
-      if (row.members) {
-        rows.push(row);
-        continue;
-      }
-      const concept = specConcept(specRowId(row));
-      const winner = winnerFor.get(concept);
-      if (!winner) {
-        winnerFor.set(concept, row);
-        rows.push(row);
-        continue;
-      }
-      // `raw` and not `value`: the presented string is prettified ("1%" renders "±1%"), and
-      // comparing presented values is what made an alternates row offer the value already in force.
-      const already = [
-        { value: winner.raw ?? winner.value },
-        ...(alternates[winner.key] ?? []),
-        ...(extra[winner.key] ?? []),
-      ];
-      if (already.some((a) => equivalentSpecValue(a.value, row.raw ?? row.value))) continue;
-      (extra[winner.key] ??= []).push({
-        value: row.raw ?? row.value,
-        source: row.key,
-        confidence: "",
-      });
-    }
-    if (rows.length) out.push({ ...group, rows });
-  }
-
-  if (!Object.keys(extra).length) return { groups: out, alternates };
-  const merged: Record<string, SourcedAlternate[]> = { ...alternates };
-  for (const [key, added] of Object.entries(extra)) {
-    const winner = [...winnerFor.values()].find((r) => r.key === key);
-    const head: SourcedAlternate[] = merged[key]?.length
-      ? merged[key]
-      : winner
-        ? [{ value: winner.raw ?? winner.value, source: "", confidence: "" }]
-        : [];
-    merged[key] = [...head, ...added];
-  }
-  return { groups: out, alternates: merged };
-}

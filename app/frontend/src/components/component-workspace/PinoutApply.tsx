@@ -16,7 +16,7 @@ import { useText } from "../../lib/copy";
 import { Button } from "../primitives";
 
 /** The enriched pinout as a sourced field with a non-empty pin list, or null. */
-export function pinoutOf(specs: Record<string, SourcedField | null>): SourcedField | null {
+function pinoutOf(specs: Record<string, SourcedField | null>): SourcedField | null {
   const entry = specs.pinout;
   if (entry && Array.isArray(entry.value) && entry.value.length > 0) return entry;
   return null;
@@ -39,8 +39,8 @@ export function PinoutApply({
   const setSpecs = useSetSpecs();
   const lookUp = useText("component-browser.pinout-lookup", "Look Up Pinout");
   const lookingUp = useText("component-browser.pinout-looking-up", "Looking Up...");
-  const applyLabel = useText("component-browser.pinout-apply", "Apply Pinout");
-  const applying = useText("component-browser.pinout-applying", "Applying...");
+  const applyLabel = useText("component-browser.pinout-apply", "Commit Pinout");
+  const applying = useText("component-browser.pinout-applying", "Committing...");
   const notFound = useText("component-browser.pinout-not-found", "No pinout found.");
   const failed = useText("component-browser.pinout-lookup-failed", "Lookup failed.");
 
@@ -85,7 +85,7 @@ export function PinoutApply({
 
   return (
     <span className="flex items-center gap-2">
-      {enrich.status === "error" ? <span className="text-2xs text-err">{failed}</span> : null}
+      {enrich.status === "error" ? <span className="text-2xs text-err-text">{failed}</span> : null}
       {enrich.status === "done" && !found ? (
         <span className="text-2xs text-t3">{notFound}</span>
       ) : null}

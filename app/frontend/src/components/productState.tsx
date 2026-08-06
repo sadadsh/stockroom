@@ -38,10 +38,16 @@ function cx(...parts: Array<string | false | null | undefined>): string {
 /**
  * The one docked chrome header: the thin band at the top of a route column or a docked panel.
  *
- * 34px is not decoration. The rail toggle, the Components list title and the open-component tab
- * band all sit on ONE horizontal line across the window, and a 4px difference between them reads
+ * 26px is not decoration. The rail wordmark, the Components list title and the Projects title
+ * strip all sit on ONE horizontal line across the window, and a 4px difference between them reads
  * as a mis-registration rather than as variety (measured on the owner's window, 2026-07-26).
- * `devIds.parity.test.ts` gates this file for exactly that reason, so the height stays a literal.
+ * `devIds.parity.test.ts` gates every file in that family for exactly that reason, so the height
+ * stays a literal.
+ *
+ * It was 34px. The desktop density this product is being held to puts a panel title strip at
+ * 24-26px, and the strip is a LABEL: at 34px it spent a third of its height on air while the rows
+ * beneath it were being packed to 24. Changing the picker alone would have mis-registered it
+ * against the rail, so the whole shared line moved together and both gates moved with it.
  *
  * `right` is a trailing COUNT and deliberately sits next to the title rather than flush to the
  * far edge: every call site passes a number, and flushing separated the number from the noun it
@@ -58,7 +64,7 @@ export function RouteHeader({
   return (
     <div
       className={cx(
-        "flex h-[34px] flex-none items-center gap-2 border-b border-line bg-band px-3.5",
+        "flex h-[26px] flex-none items-center gap-2 border-b border-line bg-band px-2.5",
         className,
       )}
       {...rest}
@@ -180,7 +186,7 @@ const STATE_TEXT: Record<ProductState, string> = {
   empty: "text-t3",
   warning: "text-warn",
   unavailable: "text-t3",
-  error: "text-err",
+  error: "text-err-text",
 };
 
 /** The one shell all five states render in, so they differ by TONE and wording, never by shape. */
@@ -324,7 +330,7 @@ export function ErrorState({
 export function RetryAction({
   onRetry,
   id = "state.retry",
-  label = "Try Again",
+  label = "Rerun",
   devId,
   pending = false,
 }: {
@@ -335,7 +341,7 @@ export function RetryAction({
   pending?: boolean;
 }) {
   const resolved = useText(id, label);
-  const pendingLabel = useText("state.retrying", "Retrying");
+  const pendingLabel = useText("state.retrying", "Rerunning");
   return (
     <Button
       small
@@ -349,6 +355,14 @@ export function RetryAction({
     </Button>
   );
 }
+
+// Module scope: the table reads nothing local, so it is allocated once rather than per notice.
+const NOTICE_TONE_TEXT: Record<BadgeTone, string> = {
+  ok: "text-ok-text",
+  warn: "text-warn",
+  err: "text-err-text",
+  neutral: "text-t3",
+};
 
 /**
  * A one-line note inside a section: a qualification, not a state of the whole surface.
@@ -371,18 +385,12 @@ export function InlineNotice({
   action?: ReactNode;
   className?: string;
 }) {
-  const TONE_TEXT: Record<BadgeTone, string> = {
-    ok: "text-ok",
-    warn: "text-warn",
-    err: "text-err",
-    neutral: "text-t3",
-  };
   return (
     <p
       data-dev-id={devId}
       className={cx(
         "flex min-w-0 items-center gap-2 text-2xs leading-relaxed",
-        TONE_TEXT[tone],
+        NOTICE_TONE_TEXT[tone],
         className,
       )}
     >
@@ -462,6 +470,8 @@ export function Region({
 
 // --------------------------------------------------------------------------- compact fact row
 
+const FACT_VALUE_TONE = { t1: "text-t1", t2: "text-t2", warn: "text-warn" } as const;
+
 /**
  * One label-and-value line in a packed region.
  *
@@ -497,7 +507,6 @@ export function FactRow({
   className?: string;
 }) {
   const Element = as;
-  const VALUE_TONE = { t1: "text-t1", t2: "text-t2", warn: "text-warn" } as const;
   return (
     <Element
       data-dev-id={devId}
@@ -519,7 +528,7 @@ export function FactRow({
           className={cx(
             "flex-none text-2xs font-semibold",
             mono && "tnum font-mono",
-            VALUE_TONE[tone],
+            FACT_VALUE_TONE[tone],
           )}
         >
           {value}

@@ -10,6 +10,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useState,
   type ReactNode,
 } from "react";
@@ -56,11 +57,16 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     [],
   );
 
-  return (
-    <ThemeContext.Provider value={{ theme, setTheme, toggle }}>
-      {children}
-    </ThemeContext.Provider>
+  // Held by identity rather than rebuilt inline. Both callbacks are already stable, so the only
+  // thing that can change here is the theme itself - and a fresh object on every provider render
+  // made every consumer of `useTheme` re-render whenever anything above this provider did, which
+  // is most of the chrome. The dependency list is exactly what the value holds.
+  const value = useMemo(
+    () => ({ theme, setTheme, toggle }),
+    [theme, setTheme, toggle],
   );
+
+  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }
 
 export function useTheme(): ThemeContextValue {

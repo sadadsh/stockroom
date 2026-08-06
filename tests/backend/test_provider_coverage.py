@@ -14,6 +14,7 @@ from pathlib import Path
 
 import pytest
 
+from stockroom.dossier import DATA_DESTINATIONS, component_dossier
 from stockroom.evidence import EvidenceArtifact, EvidenceStore
 from stockroom.ingest.candidates import ValidationOutcome
 from stockroom.model.asset import Asset, AssetOrigin, AssetRef
@@ -29,7 +30,6 @@ from stockroom.provider_coverage import (
     set_user_assertion,
 )
 from stockroom.providers import all_providers, search_url
-from stockroom.workspace import DATA_DESTINATIONS, component_workspace
 
 
 @dataclass(frozen=True)
@@ -664,21 +664,23 @@ def test_an_unknown_key_inside_a_stored_assertion_survives_a_rewrite():
 
 
 def test_the_record_field_has_a_declared_product_destination():
-    assert DATA_DESTINATIONS["provider_assertions"] == "providers.rows"
+    assert DATA_DESTINATIONS["provider_assertions"] == "cadSourceCoverage.rows"
 
 
-# ------------------------------------------------------------------ workspace
+# ------------------------------------------------------------------ dossier
 
 
-def test_the_workspace_carries_provider_coverage_without_a_store():
-    view = component_workspace(_record())
-    assert [row["id"] for row in view["providers"]["rows"]] == [p.key for p in all_providers()]
+def test_the_dossier_carries_provider_coverage_without_a_store():
+    view = component_dossier(_record())
+    assert [row["id"] for row in view["cadSourceCoverage"]["rows"]] == [
+        p.key for p in all_providers()
+    ]
 
 
-def test_the_workspace_uses_the_coverage_a_caller_computed_with_a_store(tmp_path: Path):
+def test_the_dossier_uses_the_coverage_a_caller_computed_with_a_store(tmp_path: Path):
     store = EvidenceStore((tmp_path / "Evidence").resolve())
     _record_bundle(store, provider="ultralibrarian", artifacts=_kicad_bytes())
     record = _record()
     coverage = provider_coverage(record, evidence=store, identity=_IDENTITY)
-    view = component_workspace(record, coverage=coverage)
-    assert view["providers"]["completeProviders"] == ["ultralibrarian"]
+    view = component_dossier(record, coverage=coverage)
+    assert view["cadSourceCoverage"]["completeProviders"] == ["ultralibrarian"]

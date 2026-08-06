@@ -46,6 +46,12 @@ _PARENT_PID = 111
 _CHILD_PID = 222
 _BASE_URL = "http://127.0.0.1:43210"
 _STAGING_ROOT = str(Path(tempfile.gettempdir()).resolve() / "Stockroom Staging")
+# The shell bridge's two roots and the exact targets inside them. Built from the platform's own
+# temp root so the absolute-path rule holds on whichever machine runs the suite.
+_LIBRARY_ROOT = str(Path(tempfile.gettempdir()).resolve() / "Stockroom Library")
+_COMPONENT_DIRECTORY = str(Path(_LIBRARY_ROOT) / "sourced" / "part-1")
+_EXPORT_ROOT = str(Path(tempfile.gettempdir()).resolve() / "Component Exports")
+_EXPORTED_FILE = str(Path(_EXPORT_ROOT) / "part-1" / "kicad" / "part-1.kicad_sym")
 
 
 @dataclass
@@ -329,6 +335,25 @@ class _Channel:
                     }
                 ],
             }
+        if request.name == "eda-applications":
+            return "eda-applications", {
+                "applications": [
+                    {"id": "kicad", "name": "KiCad 9.0", "version": "9.0.1"},
+                ]
+            }
+        if request.name == "shell-reveal":
+            assert request.payload == {
+                "root": _LIBRARY_ROOT,
+                "path": _COMPONENT_DIRECTORY,
+            }
+            return "shell-revealed", {"revealed": True}
+        if request.name == "eda-open":
+            assert request.payload == {
+                "application_id": "kicad",
+                "root": _EXPORT_ROOT,
+                "path": _EXPORTED_FILE,
+            }
+            return "eda-opened", {"opened": True}
         if request.name == "provider-lease-release":
             return "provider-lease-released", {
                 "lease_id": request.payload["lease_id"],
@@ -1723,3 +1748,88 @@ def test_real_windows_job_termination_reaps_the_launched_root(
             process.wait(timeout=5.0)
 
     assert process.poll() is not None
+
+
+def test_shell_bridge_carries_a_resolved_root_and_never_a_program_path(
+    tmp_path: Path,
+) -> None:
+    """The three shell commands, and the shape of what they are allowed to send.
+
+    The window host resolves an application id to a binary itself, so nothing this client sends
+    names a program. Every path it sends arrives with the root it must stay inside, which is what
+    lets the far side refuse an escape independently rather than trusting this one.
+    """
+
+    client, _server, _launcher, channel = _launch(tmp_path)
+
+    assert client.detected_eda_applications() == (
+        {"id": "kicad", "name": "KiCad 9.0", "version": "9.0.1"},
+    )
+    client.reveal_directory(_LIBRARY_ROOT, _COMPONENT_DIRECTORY)
+    client.open_file_with_eda_application("kicad", _EXPORT_ROOT, _EXPORTED_FILE)
+
+    assert [message.name for message in channel.sent[-3:]] == [
+        "eda-applications",
+        "shell-reveal",
+        "eda-open",
+    ]
+    shell_messages = [
+        message
+        for message in channel.sent
+        if message.name in {"eda-applications", "shell-reveal", "eda-open"}
+    ]
+    assert shell_messages
+    assert all(".exe" not in str(message.payload).lower() for message in shell_messages)
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "",
+        # Relative: what it means depends on the host's working directory.
+        r"sourced\part-1",
+        # A UNC share is not a local path and can be anything on any machine.
+        r"\\server\share\part-1",
+        # The Win32 device namespace bypasses normalisation entirely.
+        r"\\?\C:\part-1",
+        # A traversal segment, which is the shape the boundary exists for.
+        r"C:\Libraries\..\Windows",
+        # Quotes and wildcards have no business in a resolved path.
+        r'C:\Libraries\"quoted"',
+        r"C:\Libraries\*",
+        # A control character truncates the string for anything below the managed layer.
+        "C:\\Libraries\\a\tb",
+        # Untrimmed: an exact path has no surrounding whitespace.
+        r" C:\Libraries ",
+    ],
+)
+def test_reveal_refuses_a_path_that_is_not_an_exact_absolute_local_path(
+    tmp_path: Path,
+    path: str,
+) -> None:
+    client, _server, _launcher, channel = _launch(tmp_path)
+    before = len(channel.sent)
+
+    with pytest.raises(ValueError):
+        client.reveal_directory(_LIBRARY_ROOT, path)
+
+    # Refused BEFORE anything went down the pipe. A rejected path is never a message the host
+    # has to be trusted to turn down.
+    assert len(channel.sent) == before
+
+
+def test_open_refuses_an_application_id_that_is_not_a_stable_identifier(
+    tmp_path: Path,
+) -> None:
+    client, _server, _launcher, channel = _launch(tmp_path)
+    before = len(channel.sent)
+
+    for application_id in ("", r"C:\Windows\System32\cmd.exe", "KiCad", "kicad;calc"):
+        with pytest.raises(ValueError):
+            client.open_file_with_eda_application(
+                application_id,
+                _EXPORT_ROOT,
+                _EXPORTED_FILE,
+            )
+
+    assert len(channel.sent) == before

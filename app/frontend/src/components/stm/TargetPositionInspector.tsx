@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import type {
   TargetDefinitionDTO,
   TargetDefinitionPosition,
@@ -28,6 +28,9 @@ const INSPECTOR_VIEWS: ReadonlyArray<{
   { id: "evidence", label: "Evidence" },
 ];
 
+// A new position invalidates the open view, which is this component's whole state. The caller keys
+// the inspector on position.position so React remounts it, rather than an effect that costs a
+// render still showing the previous position's view.
 export function TargetPositionInspector({
   definition,
   position,
@@ -36,7 +39,6 @@ export function TargetPositionInspector({
   position: TargetDefinitionPosition;
 }) {
   const [view, setView] = useState<InspectorView>("decision");
-  useEffect(() => setView("decision"), [position.position]);
   const viewLabel = useText(
     "stm.target.position.view.aria",
     "Position Inspector View",
@@ -45,9 +47,11 @@ export function TargetPositionInspector({
   const foundation = definition.functional_foundation.groups.filter((group) =>
     group.positions.includes(position.position),
   );
+  // one Set for the whole requirements scan, instead of re-scanning route_ids per requirement
+  const routeIds = new Set(position.route_ids);
   const requirements = definition.requirements.filter(
     (requirement) =>
-      position.route_ids.includes(requirement.id) ||
+      routeIds.has(requirement.id) ||
       requirement.routes.some((route) => route.position === position.position),
   );
   const services = definition.service_groups.filter((group) =>
@@ -103,7 +107,7 @@ export function TargetPositionInspector({
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <Eyebrow dense>
-              <Text id="stm.target.position.physical">Physical Position</Text>
+              <Text id="stm.target.position.physical">Package Position</Text>
             </Eyebrow>
             <div className="mt-0.5 flex items-baseline gap-2">
               <span className="font-mono text-xl font-semibold text-t1">
@@ -186,6 +190,15 @@ function DecisionView({
   requirements: TargetDefinitionDTO["requirements"];
   strategy: TargetDefinitionDTO["universalization"]["strategies"][number] | undefined;
 }) {
+  // InspectorSection takes a heading STRING, so each heading is resolved here and handed over
+  // already worded.
+  const universalCircuit = useText(
+    "stm.target.position.universal-circuit",
+    "Universal Circuit",
+  );
+  const proofRequired = useText("stm.target.position.proof-required", "Proof Required");
+  const obligations = useText("stm.target.position.obligations", "Obligations");
+
   return (
     <>
       <div
@@ -227,11 +240,15 @@ function DecisionView({
           <Text id="stm.target.position.safe-default">Safe Default</Text>
         </dt>
         <dd className="text-right text-t1">
-          {strategy?.safe_default ? formatToken(strategy.safe_default) : "Not Declared"}
+          {strategy?.safe_default ? (
+            formatToken(strategy.safe_default)
+          ) : (
+            <Text id="stm.target.position.not-declared">Not Declared</Text>
+          )}
         </dd>
       </dl>
 
-      <InspectorSection title="Universal Circuit">
+      <InspectorSection title={universalCircuit}>
         {strategy ? (
           <>
             <div className="flex items-baseline justify-between gap-2">
@@ -255,7 +272,12 @@ function DecisionView({
                         .join(", ")}
                     </span>
                     <span className="flex-none font-mono text-t3">
-                      {branch.matched_targets.length} MCU
+                      <Text
+                        id="stm.target.position.branch-count"
+                        values={{ count: branch.matched_targets.length }}
+                      >
+                        {"{count} MCU"}
+                      </Text>
                     </span>
                   </div>
                   <p className="mt-0.5 text-t3">
@@ -272,11 +294,15 @@ function DecisionView({
       </InspectorSection>
 
       {strategy && strategy.validation.status !== "not-required" ? (
-        <InspectorSection title="Proof Required">
+        <InspectorSection title={proofRequired}>
           <p className="text-2xs leading-relaxed text-t2">
-            {strategy.validation.required_checks.length
-              ? strategy.validation.required_checks.map(formatToken).join(", ")
-              : "Target-specific safety evidence"}
+            {strategy.validation.required_checks.length ? (
+              strategy.validation.required_checks.map(formatToken).join(", ")
+            ) : (
+              <Text id="stm.target.position.proof-evidence">
+                Target-specific safe-state evidence
+              </Text>
+            )}
           </p>
           <p className="mt-1 text-2xs text-t3">
             If proof fails: {formatToken(strategy.validation.failure_action)}.
@@ -284,7 +310,7 @@ function DecisionView({
         </InspectorSection>
       ) : null}
 
-      <InspectorSection title="Obligations">
+      <InspectorSection title={obligations}>
         {foundation.length || requirements.length ? (
           <div className="space-y-2">
             {foundation.map((group) => (
@@ -341,9 +367,7 @@ function TargetsView({
   return (
     <>
       <p className="mb-2 text-2xs leading-relaxed text-t3">
-        <Text id="stm.target.position.targets.grouping">
-          Grouped by canonical pin name and electrical identity across the selected MCU set.
-        </Text>
+        <Text id="stm.target.position.targets.grouping">Grouped per canonical pin name and electrical role across the selected MCU set.</Text>
       </p>
       <div className="divide-y divide-line border-y border-line">
         {groups.map((group) => (
@@ -414,9 +438,19 @@ function EvidenceView({
   routingPaths: TargetDefinitionDTO["routing_requirements"]["paths"];
   stateContract: TargetDefinitionDTO["universalization"]["state_contract"];
 }) {
+  // As in DecisionView: the section heading is a string prop, so it is resolved before the render.
+  const runCritical = useText("stm.target.position.run-critical", "Run Critical");
+  const accessRoutes = useText("stm.target.position.access-routes", "Access Routes");
+  const boardEvidence = useText("stm.target.position.board-evidence", "Board Evidence");
+  const constraints = useText("stm.target.position.constraints", "Constraints");
+  const stateContractTitle = useText(
+    "stm.target.position.state-contract",
+    "Safe State Contract",
+  );
+
   return (
     <>
-      <InspectorSection title="Run Critical" first>
+      <InspectorSection title={runCritical} first>
         {foundation.length ? (
           <div className="space-y-3">
             {foundation.map((group) => (
@@ -443,7 +477,7 @@ function EvidenceView({
         )}
       </InspectorSection>
 
-      <InspectorSection title="Access Routes">
+      <InspectorSection title={accessRoutes}>
         {requirements.length || services.length ? (
           <div className="space-y-3">
             {requirements.map((requirement) => (
@@ -488,7 +522,7 @@ function EvidenceView({
         )}
       </InspectorSection>
 
-      <InspectorSection title="Board Evidence">
+      <InspectorSection title={boardEvidence}>
         <p className="text-xs font-medium text-t1">
           {BOARD_ACTION_LABEL[position.board_action]}
         </p>
@@ -526,7 +560,7 @@ function EvidenceView({
       </InspectorSection>
 
       {strategy?.fallback || strategy?.constraints.length ? (
-        <InspectorSection title="Constraints">
+        <InspectorSection title={constraints}>
           {strategy.fallback ? (
             <>
               <div className="flex justify-between gap-2 text-2xs">
@@ -536,7 +570,12 @@ function EvidenceView({
                   </Text>
                 </span>
                 <span className="font-mono text-t2">
-                  {strategy.fallback.independent_paths} Active Paths
+                  <Text
+                    id="stm.target.position.fallback-paths"
+                    values={{ count: strategy.fallback.independent_paths }}
+                  >
+                    {"{count} Active Paths"}
+                  </Text>
                 </span>
               </div>
               <p className="mt-1 text-2xs leading-relaxed text-t3">
@@ -556,7 +595,7 @@ function EvidenceView({
         </InspectorSection>
       ) : null}
 
-      <InspectorSection title="Safe State Contract">
+      <InspectorSection title={stateContractTitle}>
         <dl className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-1 text-2xs">
           {Object.entries(stateContract).map(([state, behavior]) => (
             <div key={state} className="contents">
@@ -599,7 +638,7 @@ function CompactStatusRow({
   return (
     <div className="flex items-center justify-between gap-2 text-xs">
       <span className="min-w-0 truncate text-t2">{label}</span>
-      <span className={`flex-none font-mono text-2xs ${complete ? "text-ok" : "text-warn"}`}>
+      <span className={`flex-none font-mono text-2xs ${complete ? "text-ok-text" : "text-warn"}`}>
         {status}
       </span>
     </div>

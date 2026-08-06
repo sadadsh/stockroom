@@ -21,11 +21,15 @@ import {
   usePartHistory,
 } from "../../api/queries";
 import type {
-  ComponentSourcesView,
-  FactAlternate,
-  SourceRecordView,
-} from "../../api/workspaceTypes";
-import { Text, useText } from "../../lib/copy";
+  CompatibilityView,
+  DossierDiagnostics,
+  ProvenanceView,
+  RecordFieldView,
+  SourceLedgerEntry,
+} from "../../api/dossierTypes";
+import { Text, useCopyFormatter, useText } from "../../lib/copy";
+import { useDevMode } from "../../lib/devMode";
+import { formatTimestamp } from "../../lib/formatValue";
 import {
   Badge,
   Button,
@@ -39,8 +43,11 @@ import {
   type TabItem,
 } from "../primitives";
 import { DiffModal } from "../DiffModal";
-import { ExternalIcon } from "../icons";
 import { SourceNote, SourceStateBadge } from "./SheetParts";
+import { SpecStateLabel } from "./SpecificationState";
+import { useCompatibilityNotice } from "./provenanceText";
+import { humanizeKey } from "./provenanceVocabulary";
+import { canApplyAlternate, otherCandidates } from "./sourceCandidates";
 
 export type SourcesSheetTab = "fields" | "records" | "changes" | "diagnostics";
 
@@ -50,38 +57,16 @@ const SOURCES_TABS: readonly TabItem<SourcesSheetTab>[] = [
   { id: "changes", label: "Changes", copyId: "component-browser.sources-tab-changes" },
   {
     id: "diagnostics",
-    label: "Diagnostics",
+    label: "Technical Diagnostics",
     copyId: "component-browser.sources-tab-diagnostics",
   },
 ];
 
-/**
- * The fields an alternate can be put in force on.
- *
- * `editField` writes a canonical RECORD attribute, so this is exactly the set of attributes it can
- * reach. A specification key is not one of them - it lives in `specs`, is written through a
- * different seam that carries per-key provenance, and offering an Apply here that the backend
- * would reject with "unknown field" is worse than offering none.
- */
-export const APPLICABLE_FIELDS: ReadonlySet<string> = new Set([
-  "display_name",
-  "mpn",
-  "manufacturer",
-  "description",
-  "value",
-]);
-
-/** Whether this alternate can be applied as-is: a known field, and a plain scalar value. */
-export function canApplyAlternate(fieldId: string, alternate: FactAlternate): boolean {
-  if (!APPLICABLE_FIELDS.has(fieldId)) return false;
-  const raw = alternate.rawValue;
-  return typeof raw === "string" || typeof raw === "number" || typeof raw === "boolean";
-}
-
 export function SourcesSheet({
   componentId,
   componentName,
-  sources,
+  provenance,
+  diagnostics,
   onApplyAlternate,
   applying,
   refresh,
@@ -90,7 +75,8 @@ export function SourcesSheet({
   componentId: string;
   /** The display name the nested visual diff titles itself with. */
   componentName: string;
-  sources: ComponentSourcesView;
+  provenance: ProvenanceView;
+  diagnostics: DossierDiagnostics;
   onApplyAlternate: (fieldId: string, value: unknown) => void;
   applying: boolean;
   /** The sourcing refresh action, owned by the workspace so the job lives above this sheet. */
@@ -99,7 +85,7 @@ export function SourcesSheet({
   enrich: ReactNode;
 }) {
   const [tab, setTab] = useState<SourcesSheetTab>("fields");
-  const tabsLabel = useText("component-browser.sources-tabs", "Sources and history");
+  const tabsLabel = useText("component-browser.sources-tabs", "Sources and timeline");
 
   return (
     <div data-dev-id="component-browser.sources-sheet" className="flex flex-col gap-3">
@@ -115,16 +101,20 @@ export function SourcesSheet({
       <TabPanel idBase="component-sources" tab={tab}>
         {tab === "fields" ? (
           <FieldSourcesPanel
-            sources={sources}
+            fields={provenance.recordFields}
             onApplyAlternate={onApplyAlternate}
             applying={applying}
           />
         ) : tab === "records" ? (
-          <SourceRecordsPanel records={sources.records} refresh={refresh} enrich={enrich} />
+          <SourceRecordsPanel sources={provenance.sources} refresh={refresh} enrich={enrich} />
         ) : tab === "changes" ? (
           <ChangesPanel componentId={componentId} componentName={componentName} />
         ) : (
-          <DiagnosticsPanel componentId={componentId} sources={sources} />
+          <DiagnosticsPanel
+            componentId={componentId}
+            diagnostics={diagnostics}
+            compatibility={provenance.compatibility}
+          />
         )}
       </TabPanel>
     </div>
@@ -134,19 +124,19 @@ export function SourcesSheet({
 // ------------------------------------------------------------------ field sources
 
 function FieldSourcesPanel({
-  sources,
+  fields,
   onApplyAlternate,
   applying,
 }: {
-  sources: ComponentSourcesView;
+  fields: RecordFieldView[];
   onApplyAlternate: (fieldId: string, value: unknown) => void;
   applying: boolean;
 }) {
   const emptyValue = useText("component-browser.no-value", "None");
   const tableLabel = useText("component-browser.field-sources-title", "Attributed Fields");
-  const applyLabel = useText("component-browser.field-apply", "Apply");
+  const applyLabel = useText("component-browser.field-apply", "Commit");
 
-  if (sources.fields.length === 0) {
+  if (fields.length === 0) {
     return (
       <EmptyState id="component-browser.field-sources-empty">
         No field carries an attribution.
@@ -157,11 +147,11 @@ function FieldSourcesPanel({
     <Section
       title="Attributed Fields"
       copyId="component-browser.field-sources-title"
-      count={sources.fields.length}
+      count={fields.length}
       note={
         <Text id="component-browser.field-sources-note">
-          The value in force for each field, the source that supplied it, and every other answer
-          that was offered. Applying an alternate records which source it came from.
+          The value in force for each field, the source that supplied it, and all other answers
+          that were offered. Committing an alternate records which source it came from.
         </Text>
       }
     >
@@ -182,35 +172,33 @@ function FieldSourcesPanel({
           </Text>,
         ]}
       >
-        {sources.fields.map((field) => (
+        {fields.map((field) => (
           <tr
-            key={field.id}
+            key={field.key}
             data-dev-id="component-browser.field-source-row"
             className="border-b border-line/60 align-top last:border-b-0"
           >
             <td className="px-3 py-1.5 text-t2">{field.label}</td>
             <td className="px-3 py-1.5">
-              <span className="tnum font-mono text-t1">
-                {field.formattedValue || emptyValue}
-              </span>
-              {field.alternates.length > 0 ? (
+              <span className="tnum font-mono text-t1">{field.displayValue || emptyValue}</span>
+              {otherCandidates(field).length > 0 ? (
                 <ul className="mt-1 flex flex-col gap-1">
-                  {field.alternates.map((alternate) => (
+                  {otherCandidates(field).map((alternate) => (
                     <li
-                      key={`${alternate.sourceId}:${alternate.formattedValue}`}
+                      key={`${alternate.sourceId}:${alternate.displayValue}`}
                       className="flex items-baseline gap-2 text-2xs text-t3"
                     >
                       <span className="tnum font-mono">
-                        {alternate.formattedValue || emptyValue}
+                        {alternate.displayValue || emptyValue}
                       </span>
                       <span>{alternate.sourceLabel || alternate.sourceId}</span>
-                      {canApplyAlternate(field.id, alternate) ? (
+                      {canApplyAlternate(field.key, alternate) ? (
                         <button
                           type="button"
                           data-dev-id="component-browser.field-source-apply"
                           disabled={applying}
-                          aria-label={`${applyLabel} ${alternate.formattedValue} ${field.label}`}
-                          onClick={() => onApplyAlternate(field.id, alternate.rawValue)}
+                          aria-label={`${applyLabel} ${alternate.displayValue} ${field.label}`}
+                          onClick={() => onApplyAlternate(field.key, alternate.value)}
                           className="rounded-control px-1 font-medium text-acc transition-colors hover:brightness-125 disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc"
                         >
                           {applyLabel}
@@ -222,14 +210,18 @@ function FieldSourcesPanel({
               ) : null}
             </td>
             <td className="px-3 py-1.5">
-              <SourceNote source={field.source} />
-              {field.source?.fetchedAt ? (
-                <span className="mt-0.5 block text-2xs text-t3">{field.source.fetchedAt}</span>
+              <SourceNote source={field.preferredSource} />
+              {field.preferredSource?.retrievedAt ? (
+                <span className="mt-0.5 block text-2xs text-t3">
+                  {formatTimestamp(field.preferredSource.retrievedAt).text}
+                </span>
               ) : null}
             </td>
             <td className="px-3 py-1.5">
-              <Badge size="sm" tone={field.state === "conflict" ? "warn" : "neutral"}>
-                {field.state}
+              {/* The quality vocabulary, not the storage token. `unverified` is a state name in
+                  the record; `Unverified` is the word a person reads everywhere else. */}
+              <Badge size="sm" tone={field.conflictState === "conflicting" ? "warn" : "neutral"}>
+                <SpecStateLabel state={field.verificationState} />
               </Badge>
             </td>
           </tr>
@@ -242,15 +234,16 @@ function FieldSourcesPanel({
 // ------------------------------------------------------------------ source records
 
 function SourceRecordsPanel({
-  records,
+  sources,
   refresh,
   enrich,
 }: {
-  records: SourceRecordView[];
+  sources: SourceLedgerEntry[];
   refresh: { run: () => void; running: boolean };
   enrich: ReactNode;
 }) {
   const undated = useText("component-browser.undated", "Undated");
+  const fieldsAnswered = useCopyFormatter("component-browser.fields-used", "{count} fields");
   const refreshing = useText("component-browser.source-refreshing", "Refreshing...");
   const refreshLabel = useText("component-browser.source-refresh", "Refresh Sourcing");
 
@@ -259,7 +252,7 @@ function SourceRecordsPanel({
       <Section
         title="Source Records"
         copyId="component-browser.sources-title"
-        count={records.length}
+        count={sources.length}
         action={
           <Button
             data-dev-id="component-browser.source-refresh"
@@ -271,41 +264,33 @@ function SourceRecordsPanel({
           </Button>
         }
       >
-        {records.length === 0 ? (
+        {sources.length === 0 ? (
           <EmptyState id="component-browser.sources-empty">
             No captured source records.
           </EmptyState>
         ) : (
           <ul className="flex flex-col gap-1">
-            {records.map((record) => (
+            {sources.map((source) => (
               <li
-                key={record.id}
+                key={source.id}
                 data-dev-id="component-browser.source-record-row"
                 className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-card border border-line bg-raise px-3 py-1.5"
               >
-                <span className="flex-none text-2xs font-semibold text-t1">{record.label}</span>
-                <SourceStateBadge state={record.state} />
-                <span className="flex-none text-2xs text-t3">{record.fetchedAt || undated}</span>
-                {record.file ? (
-                  <span className="min-w-0 flex-1 truncate font-mono text-2xs text-t3" title={record.file}>
-                    {record.file}
-                  </span>
-                ) : null}
-                {record.digest ? (
-                  <span className="flex-none font-mono text-2xs text-t3" title={record.digest}>
-                    {record.digest.slice(0, 12)}
-                  </span>
-                ) : null}
-                {record.url ? (
-                  <a
-                    href={record.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    aria-label={record.label}
-                    className="flex-none rounded-control px-1 text-t2 transition-colors hover:text-t1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc"
+                <span className="flex-none text-2xs font-semibold text-t1">{source.label}</span>
+                <SourceStateBadge state={source.state} />
+                <span className="flex-none text-2xs text-t3">
+                  {source.fetchedAt ? formatTimestamp(source.fetchedAt).text : undated}
+                </span>
+                <span className="flex-none text-2xs text-t3">
+                  {fieldsAnswered({ count: source.fieldCount })}
+                </span>
+                {source.payloadRef ? (
+                  <span
+                    className="min-w-0 flex-1 truncate font-mono text-2xs text-t3"
+                    title={source.payloadRef}
                   >
-                    <ExternalIcon />
-                  </a>
+                    {source.payloadRef}
+                  </span>
                 ) : null}
               </li>
             ))}
@@ -362,7 +347,7 @@ function ChangesPanel({ componentId, componentName }: { componentId: string; com
   const hasVisual = !!assets && (assets.symbol || assets.footprint);
 
   if (history.isLoading) {
-    return <LoadingState id="component-browser.changes-loading">Loading this component's history...</LoadingState>;
+    return <LoadingState id="component-browser.changes-loading">Loading this component's timeline...</LoadingState>;
   }
   if (history.isError) {
     return (
@@ -370,14 +355,14 @@ function ChangesPanel({ componentId, componentName }: { componentId: string; com
         id="component-browser.changes-failed"
         onRetry={() => history.refetch()}
       >
-        This component's history could not be read.
+        This component's timeline could not be read.
       </ErrorState>
     );
   }
   if (commits.length === 0) {
     return (
       <EmptyState id="component-browser.changes-empty">
-        No history yet. This component has not been committed.
+        No timeline so far. This component has not been committed.
       </EmptyState>
     );
   }
@@ -417,7 +402,7 @@ function ChangesPanel({ componentId, componentName }: { componentId: string; com
                 <div className="border-t border-line px-3 py-2">
                   {diff.isLoading ? (
                     <LoadingState dense id="component-browser.changes-loading">
-                      Loading this component's history...
+                      Loading this component's timeline...
                     </LoadingState>
                   ) : diff.isError || !diff.data ? (
                     <ErrorState
@@ -457,9 +442,14 @@ function ChangesPanel({ componentId, componentName }: { componentId: string; com
                                       : "neutral"
                                 }
                               >
-                                {field.status}
+                                <ChangeStatusLabel status={field.status} />
                               </Badge>
-                              <span className="flex-none font-mono text-t3">{field.key}</span>
+                              {/* Named, with the storage key one hover away. A column of
+                                  `manufacturer_part_number_raw` is not a change log anybody can
+                                  read, and the raw key is still the thing to search for. */}
+                              <span className="flex-none text-t3" title={field.key}>
+                                {humanizeKey(field.key)}
+                              </span>
                               <span className="min-w-0 flex-1 break-words text-t2">
                                 {field.status === "added"
                                   ? formatValue(field.after, absent)
@@ -502,75 +492,100 @@ function ChangesPanel({ componentId, componentName }: { componentId: string; com
 
 function DiagnosticsPanel({
   componentId,
-  sources,
+  diagnostics,
+  compatibility,
 }: {
   componentId: string;
-  sources: ComponentSourcesView;
+  diagnostics: DossierDiagnostics;
+  compatibility: CompatibilityView;
 }) {
   const [open, setOpen] = useState(false);
   const [rawOpen, setRawOpen] = useState(false);
+  const { enabled: developerMode } = useDevMode();
   // The canonical record is fetched only when it is actually asked for: the raw shape is the one
   // thing on this sheet the projection deliberately does not carry.
   const detail = usePartDetailQuery(rawOpen ? componentId : null);
-  const { diagnostics } = sources;
-  const unknown = useText("component-browser.unknown", "unknown");
+  const none = useText("component-browser.diagnostics-none", "None");
   const showLabel = useText("component-browser.diagnostics-show", "Show Diagnostics");
   const hideLabel = useText("component-browser.diagnostics-hide", "Hide Diagnostics");
   const showRaw = useText("component-browser.diagnostics-show-raw", "Show Canonical Record");
   const hideRaw = useText("component-browser.diagnostics-hide-raw", "Hide Canonical Record");
+  const notice = useCompatibilityNotice(compatibility);
 
   return (
     <Section
-      title="Diagnostics"
+      title="Technical Diagnostics"
       copyId="component-browser.diagnostics-title"
       count={diagnostics.unknownKeys.length}
       action={
-        <Button
-          data-dev-id="component-browser.diagnostics-toggle"
-          small
-          aria-expanded={open}
-          onClick={() => setOpen((current) => !current)}
-        >
-          {open ? hideLabel : showLabel}
-        </Button>
+        developerMode ? (
+          <Button
+            data-dev-id="component-browser.diagnostics-toggle"
+            small
+            aria-expanded={open}
+            onClick={() => setOpen((current) => !current)}
+          >
+            {open ? hideLabel : showLabel}
+          </Button>
+        ) : undefined
       }
       note={
         <Text id="component-browser.diagnostics-note">
-          Technical truth about how this record was produced. Collapsed because nobody opens a
-          component to read it, and reachable because sometimes it is the only thing that answers.
+          What the storage for this component looks like underneath. It is here because it is
+          sometimes the sole thing that answers, and behind developer mode because a schema number
+          is not something a person can act on.
         </Text>
       }
     >
-      {open ? (
+      {/* The one diagnostic that is ALSO a consequence for the person, said as that consequence:
+          a count, a cause and a limitation, rather than a schema number and a list of keys. */}
+      {/* Already resolved through the copy layer by `useCompatibilityNotice`, which owns its ids
+          and its count. A second copy id here would register a default that moves with the data. */}
+      {notice ? (
+        <p className="text-2xs text-warn">
+          {notice.text}
+        </p>
+      ) : null}
+      {!developerMode ? (
+        <p className="text-2xs text-t3">
+          <Text id="component-browser.diagnostics-developer-only">
+            Turn on developer mode to read the schema version, the derivation identifier, the
+            content hashes and the storage fields this build does not understand.
+          </Text>
+        </p>
+      ) : null}
+      {developerMode && open ? (
         <div className="flex flex-col gap-2">
           <dl className="rounded-card border border-line bg-raise px-3 py-1">
             <DiagnosticRow
-              label={<Text id="component-browser.schema-version">Schema version</Text>}
-              value={String(diagnostics.schemaVersion)}
+              label={<Text id="component-browser.schema-version">Record schema</Text>}
+              value={String(diagnostics.recordSchemaVersion)}
             />
             <DiagnosticRow
-              label={<Text id="component-browser.derived-by">Derived by</Text>}
-              value={diagnostics.derivedBy || unknown}
+              label={<Text id="component-browser.derived-by">Derivation</Text>}
+              value={diagnostics.derivedBy || none}
             />
             <DiagnosticRow
-              label={<Text id="component-browser.derived-at">Derived at</Text>}
-              value={diagnostics.derivedAt || unknown}
+              label={<Text id="component-browser.category-schema">Class schema</Text>}
+              value={diagnostics.categorySchema || none}
             />
             <DiagnosticRow
               label={<Text id="component-browser.hash-symbol">Symbol hash</Text>}
-              value={diagnostics.hashes.symbolContent || unknown}
+              value={diagnostics.hashes.symbolContent || none}
             />
             <DiagnosticRow
               label={<Text id="component-browser.hash-footprint">Footprint hash</Text>}
-              value={diagnostics.hashes.footprintContent || unknown}
+              value={diagnostics.hashes.footprintContent || none}
             />
             <DiagnosticRow
               label={<Text id="component-browser.hash-model">Model hash</Text>}
-              value={diagnostics.hashes.modelFile || unknown}
+              value={diagnostics.hashes.modelFile || none}
             />
             <DiagnosticRow
-              label={<Text id="component-browser.unknown-keys">keys written by a newer build</Text>}
-              value={diagnostics.unknownKeys.join(", ") || unknown}
+              label={
+                <Text id="component-browser.unknown-keys">Fields this build does not read</Text>
+              }
+              value={diagnostics.unknownKeys.join(", ") || none}
             />
           </dl>
           <Button
@@ -587,7 +602,7 @@ function DiagnosticsPanel({
                 <Text id="component-browser.raw-loading">Loading the canonical record...</Text>
               </p>
             ) : detail.error || !detail.data ? (
-              <p className="text-2xs text-err">
+              <p className="text-2xs text-err-text">
                 <Text id="component-browser.raw-failed">
                   Could not load the canonical record.
                 </Text>
@@ -602,6 +617,13 @@ function DiagnosticsPanel({
       ) : null}
     </Section>
   );
+}
+
+/** What one commit did to one field, in words rather than in the diff's own token. */
+function ChangeStatusLabel({ status }: { status: string }) {
+  if (status === "added") return <Text id="component-browser.change-added">Added</Text>;
+  if (status === "removed") return <Text id="component-browser.change-removed">Removed</Text>;
+  return <Text id="component-browser.change-changed">Changed</Text>;
 }
 
 function DiagnosticRow({ label, value }: { label: ReactNode; value: string }) {

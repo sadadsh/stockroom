@@ -7,7 +7,7 @@
  * when a lookup carried none of it, so an empty or blocked fetch shows no hollow panel.
  */
 import type { CatalogProductData, EnrichmentResult } from "../api/types";
-import { Text, useText } from "../lib/copy";
+import { Text, useCopyFormatter, useText } from "../lib/copy";
 import { distributorLabel, sv } from "../lib/sourced";
 import { Badge, Eyebrow } from "./primitives";
 
@@ -148,7 +148,7 @@ function RelatedProducts({
   );
 }
 
-export function CatalogProductDataBlock({ data }: { data: CatalogProductData }) {
+function CatalogProductDataBlock({ data }: { data: CatalogProductData }) {
   return (
     <div className="flex flex-col gap-2 border-t border-line pt-3">
       <div className="flex flex-wrap items-center gap-2">
@@ -219,6 +219,8 @@ export function CatalogProductDataBlock({ data }: { data: CatalogProductData }) 
 
 export function PulledDepth({ result }: { result: EnrichmentResult }) {
   const priceLadderLabel = useText("depth.price-ladder", "Price Ladder");
+  // The distributor name in the hole is a provider trade name; the verb around it is ours.
+  const openOnDistributor = useCopyFormatter("depth.open-on-distributor", "Open on {distributor}");
   const stockNum =
     result.stock != null && Number.isFinite(Number(result.stock.value))
       ? Number(result.stock.value)
@@ -243,7 +245,9 @@ export function PulledDepth({ result }: { result: EnrichmentResult }) {
   const stats: [string, string][] = [];
   if (stockNum != null) stats.push(["Stock", `${stockNum.toLocaleString()} in stock`]);
   if (lead) stats.push(["Lead Time", lead]);
-  if (lifecycle) stats.push(["Lifecycle", lifecycle]);
+  // "Product Status", not "Lifecycle": one concept, one spelling across the app, and this is the
+  // distributors' own name for the field the value is read out of. See `interfaceTerms.ts`.
+  if (lifecycle) stats.push(["Product Status", lifecycle]);
   if (best) stats.push(["Best Price", `${money(best.price, best.currency)}/ea`]);
 
   if (stats.length === 0 && breaks.length === 0 && distKeys.length === 0 && !digikey) return null;
@@ -268,7 +272,7 @@ export function PulledDepth({ result }: { result: EnrichmentResult }) {
                   target="_blank"
                   rel="noreferrer"
                   className="rounded-control outline-none hover:brightness-110 focus-visible:ring-2 focus-visible:ring-acc"
-                  title={`Open on ${label}`}
+                  title={openOnDistributor({ distributor: label })}
                 >
                   <Badge tone="ok">{label}</Badge>
                 </a>

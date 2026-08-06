@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor } from "@testing-library/react";
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import userEvent from "@testing-library/user-event";
 
 import { api } from "../api/client";
@@ -70,16 +70,18 @@ function OpenAddPartOnMount() {
   return null;
 }
 
+/**
+ * Stands in for the Library page, which owns opening a part. The reopen seam is a SUBSCRIPTION, so
+ * the probe registers for it exactly as that page does and records what it was handed - which is
+ * also what proves the request survives the gap in between: the intake flow requests the open from
+ * inside its own commit, and nothing else here reads it.
+ */
 function ContinuationProbe() {
-  const { reopenPartId } = useCapture();
+  const { onReopen } = useCapture();
   const { isOpen } = useAddPart();
-  return (
-    <div
-      data-testid="continuation"
-      data-reopen={reopenPartId ?? ""}
-      data-add-open={String(isOpen)}
-    />
-  );
+  const [opened, setOpened] = useState("");
+  useEffect(() => onReopen(setOpened), [onReopen]);
+  return <div data-testid="continuation" data-reopen={opened} data-add-open={String(isOpen)} />;
 }
 
 function wrapper(ui: ReactNode) {
@@ -197,7 +199,7 @@ describe("IngestPage network-only Add A Part", () => {
   it("exposes one identity-to-coherent-network path and no local-file control", () => {
     wrapper(<IngestPage />);
 
-    expect(screen.getByText("Resolve Identity + Data")).toBeInTheDocument();
+    expect(screen.getByText("Resolve Identification + Data")).toBeInTheDocument();
     expect(screen.getByText("Add Once")).toBeInTheDocument();
     expect(screen.getByText("Collect One KiCad + Altium + STEP Package")).toBeInTheDocument();
     expect(screen.getByText(/available metadata, datasheet, provenance/i)).toBeInTheDocument();
@@ -257,7 +259,7 @@ describe("IngestPage network-only Add A Part", () => {
     expect(screen.getByLabelText("Part Number")).toHaveValue("TPD6E05U06RVZR");
     expect(screen.getByText("Automatic Source Ladder")).toBeInTheDocument();
     expect(
-      screen.getByText(/Identity-only sources may contribute data but never active CAD/i),
+      screen.getByText(/Identification-alone sources can contribute data but never active CAD/i),
     ).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Add to Components" }));

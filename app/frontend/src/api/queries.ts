@@ -22,10 +22,11 @@ import type {
 import { api, type ListPartsArgs, type SearchArgs } from "./client";
 import { invalidatePartCadProjection } from "./partCadProjectionQueries";
 import type {
+  ComponentDossier,
   ComponentProvidersView,
-  ComponentWorkspaceResponse,
   CoverageArtifact,
-} from "./workspaceTypes";
+  RepresentationKind,
+} from "./dossierTypes";
 import { useJob } from "../lib/useJob";
 
 export function useProjects() {
@@ -465,13 +466,116 @@ export function usePartDetailQuery(id: string | null) {
   });
 }
 
-// The opened component's normalized workspace. Invalidated wherever the part detail is,
-// because every write that changes a record changes what this projects.
-export function usePartWorkspaceQuery(id: string | null) {
+// The opened component's dossier. Invalidated wherever the part detail is, because every
+// write that changes a record changes what this projects.
+export function usePartDossierQuery(id: string | null) {
   return useQuery({
     queryKey: ["part-workspace", id],
-    queryFn: () => api.partWorkspace(id as string),
+    queryFn: () => api.partDossier(id as string),
     enabled: !!id,
+  });
+}
+
+/**
+ * The four specification writes, and the one rule they all obey.
+ *
+ * Each endpoint answers with the FULL updated dossier, and the answer REPLACES the cached
+ * document rather than being merged into it. An override does not change one value: it changes
+ * that value, its verification state, the conflict state of the row, its group's count, the
+ * category completeness score, the quality summary and the revision history, all at once. A
+ * partial merge would leave most of those stale while looking like it had saved.
+ *
+ * On failure nothing is written to the cache at all, so the row reverts to exactly what the
+ * server last said and the caller reports what failed. A write that silently appeared to save
+ * is worse than one that visibly did not.
+ */
+export type SpecificationWrite =
+  | { kind: "set-override"; key: string; value: string; note?: string; verified?: boolean }
+  | { kind: "clear-override"; key: string }
+  | { kind: "set-preferred-source"; key: string; sourceId: string }
+  | { kind: "clear-preferred-source"; key: string };
+
+function runSpecificationWrite(id: string, write: SpecificationWrite): Promise<ComponentDossier> {
+  if (write.kind === "set-override") {
+    return api.setSpecificationOverride(id, write.key, write.value, {
+      note: write.note,
+      verified: write.verified,
+    });
+  }
+  if (write.kind === "clear-override") {
+    return api.clearSpecificationOverride(id, write.key);
+  }
+  if (write.kind === "set-preferred-source") {
+    return api.setSpecificationPreferredSource(id, write.key, write.sourceId);
+  }
+  return api.clearSpecificationPreferredSource(id, write.key);
+}
+
+export function useWriteSpecification(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (write: SpecificationWrite) => runSpecificationWrite(id, write),
+    onSuccess: (dossier: ComponentDossier) => {
+      qc.setQueryData(["part-workspace", id], dossier);
+      // Deliberately NOT the general post-write invalidation: that one invalidates the dossier
+      // itself, which would throw away the authoritative document the endpoint just returned and
+      // re-ask for it. The answer IS the new state; re-fetching it is how the value flickers back
+      // to the old one for a frame and how two sources of truth get reintroduced.
+      //
+      // Everything a specification write genuinely changes ELSEWHERE is invalidated: the list and
+      // the facets index normalized values, the duplicate set can turn on an identity field, and
+      // the write commits, so the part's timeline gained an entry.
+      qc.invalidateQueries({ queryKey: ["parts"] });
+      qc.invalidateQueries({ queryKey: ["facets"] });
+      qc.invalidateQueries({ queryKey: ["duplicates"] });
+      qc.invalidateQueries({ queryKey: ["part", id] });
+      qc.invalidateQueries({ queryKey: ["part-history", id] });
+    },
+  });
+}
+
+/**
+ * Choosing which provider supplies a component's CAD.
+ *
+ * Four writes on one hook for the same reason the specification writes share one: they address
+ * one decision from two scopes and answer with the same document, and four hooks would be four
+ * places for the cache handling to drift apart.
+ *
+ * What a change would REPLACE is not asked for here. It travels on the dossier itself
+ * (`cadAssets.preference.options`), planned by the same backend function that refuses the write,
+ * so the confirmation a person approves and the decision the record makes cannot describe
+ * different outcomes - and no round trip stands between deciding and being shown.
+ */
+export type CadPreferenceWrite =
+  | { kind: "set-set-source"; provider: string }
+  | { kind: "clear-set-source" }
+  | { kind: "set-asset-source"; asset: RepresentationKind; provider: string }
+  | { kind: "clear-asset-source"; asset: RepresentationKind };
+
+function runCadPreferenceWrite(
+  id: string,
+  write: CadPreferenceWrite,
+): Promise<ComponentDossier> {
+  if (write.kind === "set-set-source") return api.setCadPreferredSource(id, write.provider);
+  if (write.kind === "clear-set-source") return api.clearCadPreferredSource(id);
+  if (write.kind === "set-asset-source") {
+    return api.setCadAssetPreferredSource(id, write.asset, write.provider);
+  }
+  return api.clearCadAssetPreferredSource(id, write.asset);
+}
+
+export function useWriteCadPreference(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (write: CadPreferenceWrite) => runCadPreferenceWrite(id, write),
+    onSuccess: (dossier: ComponentDossier) => {
+      // The endpoint answers with the whole recomputed dossier, so it is written straight into
+      // the cache rather than invalidated: re-asking would discard the authoritative document
+      // and reintroduce the second source of truth it exists to prevent.
+      qc.setQueryData(["part-workspace", id], dossier);
+      // The decision commits, so the part's timeline gained an entry.
+      qc.invalidateQueries({ queryKey: ["part-history", id] });
+    },
   });
 }
 
@@ -496,8 +600,8 @@ export function useSetProviderCoverage(id: string) {
     onSuccess: (providers: ComponentProvidersView) => {
       qc.setQueryData(
         ["part-workspace", id],
-        (current: ComponentWorkspaceResponse | undefined) =>
-          current ? { ...current, providers } : current,
+        (current: ComponentDossier | undefined) =>
+          current ? { ...current, cadSourceCoverage: providers } : current,
       );
       qc.invalidateQueries({ queryKey: ["part-history", id] });
     },
@@ -539,9 +643,15 @@ export function useCadSourceQuery(id: string | null, enabled: boolean) {
 
 // A mutation rebuilds the derived index server-side, so after any write we
 // invalidate the list, the facets, and the affected detail to read-after-write.
+//
+// Returned through `useCallback` so it has a STABLE identity: `useQueryClient` hands back the same
+// client for the life of a provider, so nothing here can go stale. That stability is what lets the
+// one effect-driven caller (`useRefreshSourcing`) list this in its dependencies honestly instead of
+// omitting it and explaining why - an omission that only stayed correct while the closure kept
+// reading nothing but `qc`.
 function useInvalidateAfterWrite() {
   const qc = useQueryClient();
-  return (id: string) => {
+  return useCallback((id: string) => {
     qc.invalidateQueries({ queryKey: ["parts"] });
     qc.invalidateQueries({ queryKey: ["facets"] });
     qc.invalidateQueries({ queryKey: ["duplicates"] });
@@ -552,7 +662,7 @@ function useInvalidateAfterWrite() {
     qc.invalidateQueries({ queryKey: ["altium-models-pending"] });
     // a write commits, so the part's git timeline (M6k) gained an entry
     qc.invalidateQueries({ queryKey: ["part-history", id] });
-  };
+  }, [qc]);
 }
 
 export function useEditField() {
@@ -585,6 +695,52 @@ export function useDetachAsset() {
       qc.invalidateQueries({ queryKey: ["altium-status"] });
       qc.invalidateQueries({ queryKey: ["cad-source", vars.id] });
     },
+  });
+}
+
+/**
+ * What the Manage menu's shell actions may offer for one component.
+ *
+ * Read once per opened component and kept, because the answer changes when an application is
+ * installed or a CAD set is attached - not while a menu is open. A host with no native window
+ * answers `supported: false` and the three items are never drawn.
+ */
+export function usePartShellQuery(id: string | null) {
+  return useQuery({
+    queryKey: ["part-shell", id],
+    queryFn: () => api.partShell(id!),
+    enabled: !!id,
+    staleTime: 60_000,
+  });
+}
+
+/*
+ * The three shell actions invalidate NOTHING, deliberately.
+ *
+ * They are mutations only in the HTTP sense - they ask the host to do something outside the
+ * application - and none of them changes a byte the cache holds. Revealing a folder opens a file
+ * browser; exporting writes into a machine-local export directory that is not the library; opening
+ * in another application launches that application. Adding an invalidation would refetch the
+ * dossier to observe a change that cannot have happened, so the cost would be real and the benefit
+ * imaginary. `query-mutation-missing-invalidation` flags all three, and it is right to ask: this
+ * comment is the answer, not an oversight.
+ */
+export function useRevealPartFiles() {
+  return useMutation({
+    mutationFn: (id: string) => api.revealPartFiles(id),
+  });
+}
+
+export function useExportPart() {
+  return useMutation({
+    mutationFn: (vars: { partId: string; format: string }) => api.exportPart(vars),
+  });
+}
+
+export function useOpenPartIn() {
+  return useMutation({
+    mutationFn: (vars: { partId: string; applicationId: string; format: string }) =>
+      api.openPartIn(vars),
   });
 }
 
@@ -643,9 +799,7 @@ export function useRefreshSourcing(id: string) {
   const done = job.status === "done";
   useEffect(() => {
     if (done) invalidate(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- invalidate is a fresh
-    // closure every render; done/id are the real triggers.
-  }, [done, id]);
+  }, [done, id, invalidate]);
   return { ...job, run };
 }
 
@@ -716,6 +870,23 @@ export function usePreviewSvg(
     // fail. Retry (instead of sticking on the fallback glyph forever) so the real
     // symbol/footprint replaces the placeholder once the render warms up.
     retry: 2,
+  });
+}
+
+/**
+ * A symbol's pins and body geometry.
+ *
+ * Fetched only when the symbol module is actually expanded. Never retried: a part with no
+ * symbol legitimately 404s and a part whose library cannot be parsed will not parse on a second
+ * ask either, and both are states the module has to SAY rather than spin on.
+ */
+export function useSymbolGeometry(id: string, enabled: boolean) {
+  return useQuery({
+    queryKey: ["symbol-geometry", id],
+    queryFn: () => api.symbolGeometry(id),
+    enabled: enabled && !!id,
+    staleTime: 5 * 60_000,
+    retry: false,
   });
 }
 

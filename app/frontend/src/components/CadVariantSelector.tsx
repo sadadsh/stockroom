@@ -15,7 +15,7 @@ import type {
   CadVariantTool,
   SupplementaryCadEvidence,
 } from "../api/cadVariantClient";
-import { Text, useText } from "../lib/copy";
+import { Text, useCopyFormatter, useText } from "../lib/copy";
 import { Badge, Button, Card, Dot, EYEBROW_DENSE } from "./primitives";
 
 export type {
@@ -129,24 +129,27 @@ export function CadVariantSelector({
               <Text id="detail.cad-variants.title">CAD Variants</Text>
             </h2>
             <Badge tone="neutral" size="sm">
-              {retainedCount} Retained
+              <Text id="cad.variant.selector.retained-count" values={{ count: retainedCount }}>
+                {"{count} Retained"}
+              </Text>
             </Badge>
             {supplementaryCount ? (
               <Badge tone="neutral" size="sm">
-                {supplementaryCount} Originals
+                <Text
+                  id="cad.variant.selector.originals-count"
+                  values={{ count: supplementaryCount }}
+                >
+                  {"{count} Originals"}
+                </Text>
               </Badge>
             ) : null}
           </div>
           <p className="mt-1 text-2xs text-t2">
-            <Text id="detail.cad-variants.help">
-              Review every retained provider variant. Activation is available only when both
-              sides of an exact same-provider, same-download KiCad and Altium pair are reverified,
-              and one switch updates both.
-            </Text>
+            <Text id="detail.cad-variants.help">Review each retained provider variant. Activation is available just when both sides of an exact same-provider, same-download KiCad and Altium pair are revalidated, and one switch updates both.</Text>
           </p>
         </div>
         {activationError ? (
-          <p role="alert" className="text-2xs font-medium text-err">
+          <p role="alert" className="text-2xs font-medium text-err-text">
             {activationError}
           </p>
         ) : null}
@@ -205,6 +208,12 @@ function PairInventory({
   const sectionLabel = useText(
     "cad.variant.selector.pairs-aria",
     "Same-Download CAD Pairs",
+  );
+  // The accessible name of a row's one control, resolved above the map that renders the rows: it is
+  // the only text a screen reader has for a button whose visible label says just "Both Tools".
+  const pairActivateLabel = useCopyFormatter(
+    "cad.variant.selector.pair-activate-aria",
+    "Use {provider} for KiCad and Altium",
   );
   const kicad = inventories.find((inventory) => inventory.tool === "kicad");
   const altium = inventories.find((inventory) => inventory.tool === "altium");
@@ -275,19 +284,29 @@ function PairInventory({
                     </Badge>
                   ) : null}
                   <Badge tone="neutral" size="sm">
-                    {pair.trustRank === ordered[0]?.trustRank ? "Preferred" : "Fallback"}
+                    {pair.trustRank === ordered[0]?.trustRank ? (
+                      <Text id="cad.variant.selector.pair-preferred">Preferred</Text>
+                    ) : (
+                      <Text id="cad.variant.selector.pair-fallback">Fallback</Text>
+                    )}
                   </Badge>
                 </div>
                 <div className="mt-2 flex min-w-0 items-center gap-1.5 text-2xs text-t2">
                   <Dot tone={pairReverified ? "ok" : "warn"} />
                   <span
                     className={
-                      "font-medium " + (pairReverified ? "text-ok" : "text-warn")
+                      "font-medium " + (pairReverified ? "text-ok-text" : "text-warn")
                     }
                   >
-                    {pairReverified
-                      ? "Reverified Same-Download Pair"
-                      : "Verification Evidence Missing"}
+                    {pairReverified ? (
+                      <Text id="cad.variant.selector.pair-reverified">
+                        Reverified Same-Download Pair
+                      </Text>
+                    ) : (
+                      <Text id="cad.variant.selector.pair-evidence-missing">
+                        Verification Evidence Missing
+                      </Text>
+                    )}
                   </span>
                 </div>
                 {!active ? (
@@ -297,7 +316,7 @@ function PairInventory({
                       small
                       disabled={!pairReverified || switching || activating !== null}
                       aria-busy={switching || undefined}
-                      aria-label={`Use ${pair.provider} for KiCad and Altium`}
+                      aria-label={pairActivateLabel({ provider: pair.provider })}
                       onClick={() =>
                         onActivate({
                           kicadVariantId: pair.kicadVariantId,
@@ -307,7 +326,11 @@ function PairInventory({
                         })
                       }
                     >
-                      {switching ? "Switching Both..." : "Use In Both Tools"}
+                      {switching ? (
+                        <Text id="cad.variant.selector.pair-switching">Switching Both...</Text>
+                      ) : (
+                        <Text id="cad.variant.selector.pair-activate">Use In Both Tools</Text>
+                      )}
                     </Button>
                   </div>
                 ) : null}
@@ -340,7 +363,16 @@ function SupplementaryInventory({
 }) {
   const sectionLabel = useText(
     "cad.variant.selector.supplementary-aria",
-    "Supplementary Retained Artifacts",
+    "Additional Retained Artifacts",
+  );
+  // Resolved above the map for the same reason as the pair rows: a hook cannot run in the callback.
+  const cardLabel = useCopyFormatter(
+    "cad.variant.selector.supplementary-card-aria",
+    "{provider} retained originals",
+  );
+  const cardNote = useCopyFormatter(
+    "cad.variant.selector.supplementary-note",
+    "Original files from {surface}. These do not meet Symbol, Footprint or 3D Model coverage until a reverified CAD pipeline projects them.",
   );
   return (
     <section
@@ -361,7 +393,7 @@ function SupplementaryInventory({
         {evidence.map((manifest) => (
           <article
             key={manifest.id}
-            aria-label={`${manifest.provider} retained originals`}
+            aria-label={cardLabel({ provider: manifest.provider })}
             className="min-w-0 rounded-card border border-line bg-raise px-3 py-2"
           >
             <div className="flex min-w-0 flex-wrap items-center gap-1.5">
@@ -369,16 +401,13 @@ function SupplementaryInventory({
                 {manifest.provider}
               </h4>
               <Badge tone="neutral" size="sm">
-                <Text id="cad.variant.selector.supplementary-badge">Supplementary</Text>
+                <Text id="cad.variant.selector.supplementary-badge">Additional</Text>
               </Badge>
               <Badge tone="neutral" size="sm">
                 <Text id="cad.variant.selector.not-activatable">Not Activatable</Text>
               </Badge>
             </div>
-            <p className="mt-1 text-2xs text-t2">
-              Original files from {manifest.surface}. They do not satisfy Symbol, Footprint, or 3D
-              Model coverage until a reverified CAD pipeline projects them.
-            </p>
+            <p className="mt-1 text-2xs text-t2">{cardNote({ surface: manifest.surface })}</p>
             <ul className="mt-2 divide-y divide-line border-t border-line">
               {manifest.artifacts.map((artifact) => (
                 <li
@@ -421,10 +450,26 @@ function ToolInventory({
   const activeMissing = activePairVariantId !== null && !activeVariant;
   const unpairedSelection =
     inventory.activeVariantId !== null && activePairVariantId === null;
+  const sectionLabel = useCopyFormatter(
+    "cad.variant.selector.tool-aria",
+    "{tool} CAD Variants",
+  );
+  const missingActive = useCopyFormatter(
+    "cad.variant.selector.active-missing",
+    "The active pair's {tool} variant is unavailable. Refresh the retained evidence.",
+  );
+  const unpaired = useCopyFormatter(
+    "cad.variant.selector.unpaired",
+    "The stored {tool} selection is not pair-active. Choose a same-download pair above to update both tools in one atomic switch.",
+  );
+  const noneRetained = useCopyFormatter(
+    "cad.variant.selector.none-retained",
+    "No reverified {tool} variants are retained for this part.",
+  );
 
   return (
     <section
-      aria-label={`${toolLabel} CAD Variants`}
+      aria-label={sectionLabel({ tool: toolLabel })}
       className="min-w-0 bg-surface px-3 py-2.5"
     >
       <div className="mb-2 flex min-w-0 items-baseline gap-2">
@@ -442,13 +487,12 @@ function ToolInventory({
 
       {activeMissing ? (
         <p role="status" className="mb-2 text-2xs font-medium text-warn">
-          The active pair's {toolLabel} variant is unavailable. Refresh the retained evidence.
+          {missingActive({ tool: toolLabel })}
         </p>
       ) : null}
       {unpairedSelection ? (
         <p role="status" className="mb-2 text-2xs font-medium text-warn">
-          The stored {toolLabel} selection is not pair-active. Choose a same-download pair above
-          to update both tools atomically.
+          {unpaired({ tool: toolLabel })}
         </p>
       ) : null}
 
@@ -472,7 +516,7 @@ function ToolInventory({
         </div>
       ) : (
         <div className="rounded-card border border-dashed border-line px-3 py-3 text-2xs text-t2">
-          No reverified {toolLabel} variants are retained for this part.
+          {noneRetained({ tool: toolLabel })}
         </div>
       )}
     </section>
@@ -499,12 +543,27 @@ function VariantRow({
   ].join(", ");
   const fileSummary = artifacts.map((artifact) => artifact.fileName).join(", ");
   const reverified = variant.verificationState === "reverified";
+  // One id per state rather than one sentence with a spliced-in clause: the pair state is part of
+  // what a screen reader announces for this row, so it is reworded with the name it belongs to.
+  const rowActive = useCopyFormatter(
+    "cad.variant.selector.row-aria-active",
+    "{provider} {tool} variant, active in pair",
+  );
+  const rowStored = useCopyFormatter(
+    "cad.variant.selector.row-aria-stored",
+    "{provider} {tool} variant, stored without pair",
+  );
+  const rowPlain = useCopyFormatter(
+    "cad.variant.selector.row-aria",
+    "{provider} {tool} variant",
+  );
 
   return (
     <article
-      aria-label={`${variant.provider} ${toolLabel} variant${
-        active ? ", active in pair" : storedWithoutPair ? ", stored without pair" : ""
-      }`}
+      aria-label={(active ? rowActive : storedWithoutPair ? rowStored : rowPlain)({
+        provider: variant.provider,
+        tool: toolLabel,
+      })}
       aria-current={active ? "true" : undefined}
       className={`relative overflow-hidden rounded-card border bg-raise ${
         active ? "border-line2" : "border-line"
@@ -525,11 +584,15 @@ function VariantRow({
           ) : null}
           {storedWithoutPair ? (
             <Badge tone="warn" size="sm">
-              <Text id="cad.variant.selector.variant-stored-only">Stored Only</Text>
+              <Text id="cad.variant.selector.variant-stored-only">Stored, Not Active</Text>
             </Badge>
           ) : null}
           <Badge tone="neutral" size="sm">
-            {preferred ? "Preferred" : "Fallback"}
+            {preferred ? (
+              <Text id="cad.variant.selector.variant-preferred">Preferred</Text>
+            ) : (
+              <Text id="cad.variant.selector.variant-fallback">Fallback</Text>
+            )}
           </Badge>
         </div>
 
@@ -561,8 +624,14 @@ function VariantRow({
 
         <div className="mt-2 flex min-w-0 items-center gap-1.5 text-2xs text-t2">
           <Dot tone={reverified ? "ok" : "warn"} />
-          <span className={"font-medium " + (reverified ? "text-ok" : "text-warn")}>
-            {reverified ? "Reverified" : "Verification Evidence Missing"}
+          <span className={"font-medium " + (reverified ? "text-ok-text" : "text-warn")}>
+            {reverified ? (
+              <Text id="cad.variant.selector.variant-reverified">Reverified</Text>
+            ) : (
+              <Text id="cad.variant.selector.variant-evidence-missing">
+                Verification Evidence Missing
+              </Text>
+            )}
           </span>
           <span aria-hidden className="text-t3">
             ·

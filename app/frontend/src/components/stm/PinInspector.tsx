@@ -12,6 +12,7 @@ import { Eyebrow } from "../primitives";
 import { Text, useText } from "../../lib/copy";
 import { categoryFill, categoryLabel, isFiveVoltTolerant } from "./pinEncoding";
 import { AfOptionsPanel } from "./AfOptionsPanel";
+import { withStableKeys } from "./listKeys";
 
 const SIDE_LABEL: Record<string, string> = {
   left: "Left",
@@ -24,7 +25,7 @@ const SIDE_LABEL: Record<string, string> = {
 // composes in as a section of the inspector, reachable from both the pin and the signal directions.
 export function PinInspector({ pin, part }: { pin: PinDTO; part?: string | null }) {
   const fiveV = isFiveVoltTolerant(pin);
-  const supplyLabel = useText("stm.pinout.inspector.supply", "Supply");
+  const supplyLabel = useText("stm.pinout.inspector.supply", "Power Domain");
   const rolesLabel = useText("stm.pinout.inspector.roles", "Roles");
   const toleranceLabel = useText("stm.pinout.inspector.tolerance", "5V Tolerance");
   const tolerantLabel = useText("stm.pinout.inspector.tolerant", "Tolerant");
@@ -96,13 +97,18 @@ export function PinInspector({ pin, part }: { pin: PinDTO; part?: string | null 
           surface (both directions), so the static AF list is suppressed to avoid a duplicate. */}
       <FunctionSections pin={pin} showAf={!part} />
 
-      {part ? <AfOptionsPanel part={part} position={pin.position} /> : null}
+      {/* keyed on the pin: a new part/position remounts the panel, so its chosen signal resets
+          without an adjustment effect (the previous signal may not exist on the new pin). */}
+      {part ? (
+        <AfOptionsPanel key={`${part} ${pin.position}`} part={part} position={pin.position} />
+      ) : null}
 
       {pin.roles.length > 0 ? (
         <Section label={rolesLabel}>
           <ul className="flex flex-col gap-1">
-            {pin.roles.map((r, i) => (
-              <li key={`${r.role_name}-${i}`} className="flex items-baseline justify-between gap-3">
+            {/* pin_role is UNIQUE(mcu_package_pin_id, role_name), so role_name is the row's id. */}
+            {pin.roles.map((r) => (
+              <li key={r.role_name} className="flex items-baseline justify-between gap-3">
                 <span className="text-xs text-t1">{r.role_name}</span>
                 <span className="flex-none font-mono text-2xs text-t3">{r.role_class}</span>
               </li>
@@ -145,7 +151,7 @@ function FunctionSections({ pin, showAf }: { pin: PinDTO; showAf: boolean }) {
   const plain = pin.functions.filter((fn) => !afSignals.has(fn.signal));
   const functionsLabel = useText("stm.pinout.inspector.functions", "Functions");
   const afLabel = useText("stm.pinout.inspector.alternate-functions", "Alternate Functions");
-  const analogLabel = useText("stm.pinout.inspector.analog-system", "Analog & System");
+  const analogLabel = useText("stm.pinout.inspector.analog-system", "Additional Functions");
 
   if (afs.length === 0) {
     if (pin.functions.length === 0) return null;
@@ -161,9 +167,11 @@ function FunctionSections({ pin, showAf }: { pin: PinDTO; showAf: boolean }) {
       {showAf ? (
         <Section label={afLabel}>
           <ul className="flex flex-col gap-1">
-            {afs.map((af, i) => (
+            {/* pin_alternate_function is UNIQUE(mcu_package_pin_id, af_index, signal), so the
+                (af_index, signal) pair is this pin's row id. */}
+            {afs.map((af) => (
               <li
-                key={`${af.af_index}-${af.signal}-${i}`}
+                key={`${af.af_index}-${af.signal}`}
                 className="flex items-baseline justify-between gap-3"
               >
                 <span className="min-w-0 truncate font-mono text-xs text-t1">
@@ -187,10 +195,12 @@ function FunctionSections({ pin, showAf }: { pin: PinDTO; showAf: boolean }) {
 }
 
 function PlainFunctionList({ functions }: { functions: PinDTO["functions"] }) {
+  // pin_function carries no unique constraint, so key on the row's content (withStableKeys).
+  const rows = withStableKeys(functions, (fn) => `${fn.signal}|${fn.io_modes}`);
   return (
     <ul className="flex flex-col gap-1">
-      {functions.map((fn, i) => (
-        <li key={`${fn.signal}-${i}`} className="flex items-baseline justify-between gap-3">
+      {rows.map(({ key, item: fn }) => (
+        <li key={key} className="flex items-baseline justify-between gap-3">
           <span className="font-mono text-xs text-t1">{fn.signal}</span>
           {fn.io_modes ? <span className="truncate text-2xs text-t3">{fn.io_modes}</span> : null}
         </li>

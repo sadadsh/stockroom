@@ -142,9 +142,9 @@ function toggleDevMode() {
 const SECTION_NAV: Record<string, RegExp> = {
   "settings.appearance": /^general$/i,
   "settings.update": /^general$/i,
-  "settings.profiles": /library/i,
-  "settings.sync": /library/i,
-  "settings.github": /library/i,
+  "settings.profiles": /catalog/i,
+  "settings.sync": /catalog/i,
+  "settings.github": /catalog/i,
   "settings.health": /maintenance/i,
   "settings.completion": /maintenance/i,
   "settings.derivation": /maintenance/i,
@@ -303,7 +303,7 @@ describe("SettingsPage - library repositories", () => {
     expect(await screen.findByText("Archive")).toBeInTheDocument();
     expect(within(libraryRow("Main")).getByText(/active/i)).toBeInTheDocument();
     expect(within(libraryRow("Main")).queryByRole("button", { name: /switch/i })).toBeNull();
-    expect(within(libraryRow("Archive")).getByRole("button", { name: /switch library/i }))
+    expect(within(libraryRow("Archive")).getByRole("button", { name: /switch catalog/i }))
       .toBeInTheDocument();
   });
 
@@ -312,7 +312,7 @@ describe("SettingsPage - library repositories", () => {
     await openSettings("settings.profiles");
     await screen.findByText("Archive");
     await userEvent.click(
-      within(libraryRow("Archive")).getByRole("button", { name: /switch library/i }),
+      within(libraryRow("Archive")).getByRole("button", { name: /switch catalog/i }),
     );
     expect(mockApi.setLibrary).toHaveBeenCalledWith({
       mode: "open",
@@ -324,8 +324,8 @@ describe("SettingsPage - library repositories", () => {
     renderPage();
     await openSettings("settings.profiles");
     await screen.findByText("Archive");
-    await userEvent.type(screen.getByLabelText("New Library Folder"), "D:\\Libraries\\Scratch");
-    await userEvent.click(screen.getByRole("button", { name: /set up library repository/i }));
+    await userEvent.type(screen.getByLabelText("New Catalog Folder"), "D:\\Libraries\\Scratch");
+    await userEvent.click(screen.getByRole("button", { name: /set up catalog git remote/i }));
     expect(mockApi.setLibrary).toHaveBeenCalledWith({
       mode: "create",
       path: "D:\\Libraries\\Scratch",
@@ -347,10 +347,10 @@ describe("SettingsPage — distributor key", () => {
     renderPage();
     await openSettings("settings.distributor");
     await screen.findAllByText(/not set/i);
-    const input = screen.getByLabelText(/mouser api key/i) as HTMLInputElement;
+    const input = screen.getByLabelText(/mouser api credential/i) as HTMLInputElement;
     expect(input.type).toBe("password");
     await userEvent.type(input, "MOUSERKEY123");
-    await userEvent.click(screen.getByRole("button", { name: /save mouser key/i }));
+    await userEvent.click(screen.getByRole("button", { name: /save mouser credential/i }));
     expect(mockApi.updateSettings).toHaveBeenCalledWith({
       mouser_api_key: "MOUSERKEY123",
     });
@@ -366,7 +366,7 @@ describe("SettingsPage — distributor key", () => {
     renderPage();
     await openSettings("settings.distributor");
     await screen.findAllByText(/not set/i);
-    const input = screen.getByLabelText(/mouser api key/i);
+    const input = screen.getByLabelText(/mouser api credential/i);
     await userEvent.type(input, "MOUSERKEY123");
     await userEvent.type(input, "{Enter}{Enter}");
     expect(mockApi.updateSettings).toHaveBeenCalledTimes(1);
@@ -382,7 +382,7 @@ describe("SettingsPage — distributor key", () => {
     renderPage();
     await openSettings("settings.distributor");
     expect(await screen.findByText(/1234/)).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: /remove mouser key/i }));
+    await userEvent.click(screen.getByRole("button", { name: /remove mouser credential/i }));
     expect(mockApi.updateSettings).toHaveBeenCalledWith({ mouser_api_key: "" });
   });
 });
@@ -392,7 +392,7 @@ describe("SettingsPage — sync + kicad + update", () => {
     renderPage();
     await openSettings("settings.sync");
     expect((await screen.findAllByText(/main/)).length).toBeGreaterThan(0);
-    await userEvent.click(screen.getByRole("button", { name: /pull and push library/i }));
+    await userEvent.click(screen.getByRole("button", { name: /pull and push catalog/i }));
     expect(mockApi.doSync).toHaveBeenCalled();
   });
 
@@ -406,9 +406,9 @@ describe("SettingsPage — sync + kicad + update", () => {
     });
     renderPage();
     await openSettings("settings.sync");
-    const input = await screen.findByLabelText("Library GitHub Repository URL");
+    const input = await screen.findByLabelText("Catalog GitHub Remote URL");
     await userEvent.type(input, "https://github.com/sadadsh/parts.git");
-    await userEvent.click(screen.getByRole("button", { name: "Connect Library Repository" }));
+    await userEvent.click(screen.getByRole("button", { name: "Connect Catalog Git Remote" }));
     expect(mockApi.connectLibraryRemote).toHaveBeenCalledWith(
       "https://github.com/sadadsh/parts.git",
     );
@@ -465,8 +465,8 @@ describe("SettingsPage — sync + kicad + update", () => {
     });
     renderPage();
     await openSettings("settings.sync");
-    await screen.findByRole("button", { name: /pull and push library/i });
-    await userEvent.click(screen.getByRole("button", { name: /pull and push library/i }));
+    await screen.findByRole("button", { name: /pull and push catalog/i });
+    await userEvent.click(screen.getByRole("button", { name: /pull and push catalog/i }));
     expect(await screen.findByText(/diverged from the remote/i)).toBeInTheDocument();
     expect(screen.queryByText(/already up to date/i)).toBeNull();
   });
@@ -480,9 +480,9 @@ describe("SettingsPage — sync + kicad + update", () => {
     });
     renderPage();
     await openSettings("settings.sync");
-    await screen.findByRole("button", { name: /pull and push library/i });
-    await userEvent.click(screen.getByRole("button", { name: /pull and push library/i }));
-    expect(await screen.findByText(/denied this windows user's account/i)).toBeInTheDocument();
+    await screen.findByRole("button", { name: /pull and push catalog/i });
+    await userEvent.click(screen.getByRole("button", { name: /pull and push catalog/i }));
+    expect(await screen.findByText(/denied this windows account/i)).toBeInTheDocument();
     expect(screen.queryByText(/diverged/i)).toBeNull();
   });
 
@@ -495,8 +495,8 @@ describe("SettingsPage — sync + kicad + update", () => {
     });
     renderPage();
     await openSettings("settings.sync");
-    await screen.findByRole("button", { name: /pull and push library/i });
-    await userEvent.click(screen.getByRole("button", { name: /pull and push library/i }));
+    await screen.findByRole("button", { name: /pull and push catalog/i });
+    await userEvent.click(screen.getByRole("button", { name: /pull and push catalog/i }));
     expect(await screen.findByText(/no remote is configured/i)).toBeInTheDocument();
     expect(screen.queryByText(/already up to date/i)).toBeNull();
   });
@@ -511,7 +511,7 @@ describe("SettingsPage — sync + kicad + update", () => {
   it("shows the wiring status when SR_LIB points at the active library", async () => {
     renderPage();
     await openSettings("settings.kicad");
-    expect(await screen.findByText(/wired to the active library/i)).toBeInTheDocument();
+    expect(await screen.findByText(/wired to the active catalog/i)).toBeInTheDocument();
   });
 
   it("shows an honest not-wired status", async () => {
@@ -530,7 +530,7 @@ describe("SettingsPage — sync + kicad + update", () => {
     await openSettings("settings.kicad");
     // the prefill arrives with the settings query, so wait for the value itself
     await screen.findByDisplayValue("/opt/kicad/kicad-cli");
-    const cfg = screen.getByLabelText(/config directory override/i);
+    const cfg = screen.getByLabelText(/config folder override/i);
     await userEvent.type(cfg, "/custom/kicad/10.0");
     await userEvent.click(screen.getByRole("button", { name: /save paths and rewire/i }));
     expect(mockApi.updateSettings).toHaveBeenCalledWith({
@@ -542,7 +542,7 @@ describe("SettingsPage — sync + kicad + update", () => {
   it("disables saving overrides until something changed", async () => {
     renderPage();
     await openSettings("settings.kicad");
-    await screen.findByLabelText(/config directory override/i);
+    await screen.findByLabelText(/config folder override/i);
     expect(screen.getByRole("button", { name: /save paths and rewire/i })).toBeDisabled();
   });
 
@@ -602,7 +602,7 @@ describe("SettingsPage — sync + kicad + update", () => {
     renderPage();
     await openSettings("settings.update");
     expect(
-      await screen.findByText(/remote check incomplete; retrying automatically/i),
+      await screen.findByText(/remote check incomplete; automatic reruns continue/i),
     ).toBeInTheDocument();
     expect(screen.queryByText(/^current$/i)).toBeNull();
     expect(screen.queryByRole("button", { name: /install and restart/i })).toBeNull();
@@ -697,7 +697,7 @@ describe("SettingsPage - distributor API credentials", () => {
     expect(secret).toHaveAttribute("type", "password");
     await user.type(screen.getByLabelText("DigiKey API Client ID"), "CLIENTID");
     await user.type(secret, "APISECRET");
-    await user.click(screen.getByRole("button", { name: "Save DigiKey API Creds" }));
+    await user.click(screen.getByRole("button", { name: "Save DigiKey API Credentials" }));
     expect(mockApi.updateSettings).toHaveBeenCalledWith(
       expect.objectContaining({
         digikey_client_id: "CLIENTID",
@@ -750,7 +750,7 @@ describe("SettingsPage - copy adoption", () => {
     await openSettings("settings.github");
     expect(screen.getByText("Settings")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /sign in with github/i })).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: /pull and push library/i }));
+    await userEvent.click(screen.getByRole("button", { name: /pull and push catalog/i }));
     expect(mockApi.doSync).toHaveBeenCalled();
   });
 
@@ -758,7 +758,7 @@ describe("SettingsPage - copy adoption", () => {
     renderPage();
     await openSettings("settings.profiles");
     expect(
-      await screen.findByRole("button", { name: /set up library repository/i }),
+      await screen.findByRole("button", { name: /set up catalog git remote/i }),
     ).toBeInTheDocument();
   });
 });
@@ -826,17 +826,17 @@ describe("SettingsPage - grouped IA + Machine Setup band", () => {
       github_token_set: true,
     });
     renderPage();
-    expect(await screen.findByText("This Machine Is Ready")).toBeInTheDocument();
+    expect(await screen.findByText("This Machine Is Prepared")).toBeInTheDocument();
   });
 
   it("counts the unmet setup steps and jumps to the owning section on click", async () => {
     // BASE has no distributor key and no GitHub token: 2 steps remain
     renderPage();
     expect(await screen.findByText("2 Setup Steps Need Attention")).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: /add a distributor key/i }));
+    await userEvent.click(screen.getByRole("button", { name: /add a distributor credential/i }));
     // the jump lands on Data Sources and the permanent capability card is usable immediately
     await screen.findByTestId("settings.distributor.header");
-    expect(screen.getByLabelText(/mouser api key/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/mouser api credential/i)).toBeInTheDocument();
   });
 
   it("shows both EDA integrations immediately when KiCad needs attention", async () => {
@@ -863,7 +863,7 @@ describe("SettingsPage - grouped IA + Machine Setup band", () => {
     });
     renderPage();
     // with the probe honest-null, the ODBC step is absent and the machine still reads Ready
-    expect(await screen.findByText("This Machine Is Ready")).toBeInTheDocument();
+    expect(await screen.findByText("This Machine Is Prepared")).toBeInTheDocument();
     expect(screen.queryByText(/install the odbc driver/i)).toBeNull();
   });
 });
@@ -878,7 +878,7 @@ describe("SettingsPage - critique fixes", () => {
     renderPage();
     expect(await screen.findByText("KiCad Wired")).toBeInTheDocument();
     expect(screen.getByText("ODBC Driver Installed")).toBeInTheDocument();
-    expect(screen.getByText("Distributor Key Saved")).toBeInTheDocument();
+    expect(screen.getByText("Distributor Credential Saved")).toBeInTheDocument();
     expect(screen.getByText("GitHub Connected")).toBeInTheDocument();
     expect(screen.queryByText("Wire KiCad")).toBeNull();
   });
@@ -913,14 +913,14 @@ describe("SettingsPage - capability cards state their own status", () => {
     // and Procurement Rescan were equally silent and are covered in the same pass rather than
     // left to be rediscovered by a later critique of the same screen.
     const health = screen.getByTestId("settings.health.header");
-    expect(await within(health).findByText("Healthy")).toBeInTheDocument();
+    expect(await within(health).findByText("Sound")).toBeInTheDocument();
     const librarySync = screen.getByTestId("settings.librarysync.header");
     expect(await within(librarySync).findByText("62 In LFS")).toBeInTheDocument();
   });
 
   it("an LFS repo holding nothing yet reads as a state, not as the number zero", async () => {
     // Caught by LOOKING at the rendered surface against the real library, which showed
-    // "0 In LFS" beside siblings reading "None" and "Healthy". A zero dressed as a count is
+    // "0 In LFS" beside siblings reading "None" and "Sound". A zero dressed as a count is
     // the data-vomit the complaint register already names.
     mockApi.getLibraryLfs.mockResolvedValue({
       installed: true,
@@ -951,7 +951,7 @@ describe("SettingsPage - capability cards state their own status", () => {
 
     const seen: string[] = [];
     const silent: string[] = [];
-    for (const groupName of ["General", "Library", "EDA Tools", "Data Sources", "Maintenance"]) {
+    for (const groupName of ["General", "Catalog", "EDA Tools", "Data Sources", "Maintenance"]) {
       await user.click(
         within(nav).getByRole("button", { name: new RegExp(`^${groupName}$`, "i") }),
       );

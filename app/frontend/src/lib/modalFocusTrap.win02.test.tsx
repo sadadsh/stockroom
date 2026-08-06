@@ -95,7 +95,7 @@ describe("WIN-02 - the DevPanel edits an open modal through its focus trap", () 
       </>,
       { wrapper },
     );
-    await screen.findByText("Altium Database Library");
+    await screen.findByText("Altium Database Catalog");
 
     toggleDevMode();
 
@@ -106,13 +106,13 @@ describe("WIN-02 - the DevPanel edits an open modal through its focus trap", () 
 
     // The panel's Copy editor now targets that id; retype it to a new string.
     const editor = screen.getByLabelText("Edit copy text");
-    expect(editor).toHaveValue("Altium Database Library");
+    expect(editor).toHaveValue("Altium Database Catalog");
     fireEvent.change(editor, { target: { value: "Reworded Library" } });
 
     // The z-200 panel edit reached the z-95 modal content: the live title span shows the new copy.
     const liveTitle = container.querySelector('[data-copy-id="modal.altium.title"]');
     expect(liveTitle).toHaveTextContent("Reworded Library");
-    expect(liveTitle).not.toHaveTextContent("Altium Database Library");
+    expect(liveTitle).not.toHaveTextContent("Altium Database Catalog");
   });
 
   it("Proof B: the panel is interactive and outside the modal's [role=dialog] focus trap", async () => {
@@ -124,7 +124,7 @@ describe("WIN-02 - the DevPanel edits an open modal through its focus trap", () 
       </>,
       { wrapper },
     );
-    await screen.findByText("Altium Database Library");
+    await screen.findByText("Altium Database Catalog");
 
     toggleDevMode();
 
@@ -162,7 +162,7 @@ describe("WIN-02 - the DevPanel edits the open Complete Part window through its 
 
     const editor = screen.getByLabelText("Edit copy text");
     expect(editor).toHaveValue(
-      "You open the provider, sign in if it asks, and download. Stockroom captures what you download and validates it.",
+      "Open the provider, sign in if it asks, and download. Stockroom captures the download and validates it.",
     );
     fireEvent.change(editor, { target: { value: "Reworded Completion Subtitle" } });
 

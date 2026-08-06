@@ -1,5 +1,5 @@
 import { createElement, useState, type ReactNode } from "react";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { api } from "../api/client";
@@ -188,7 +188,7 @@ describe("CompletePartModal - automatic capture", () => {
     );
     const dialog = await screen.findByRole("dialog", { name: "Complete this part" });
 
-    expect(within(dialog).queryByLabelText("Library")).toBeNull();
+    expect(within(dialog).queryByLabelText("Catalog")).toBeNull();
     expect(within(dialog).queryByLabelText("Name")).toBeNull();
     expect(within(dialog).queryByRole("button", { name: "Attach" })).toBeNull();
 
@@ -275,11 +275,12 @@ describe("CompletePartModal - automatic capture", () => {
     expect(screen.getByRole("button", { name: "Refresh Sources" })).toBeInTheDocument();
     expect(
       await screen.findByText(
-        "Part Ready. One provider supplied a complete verified CAD package.",
+        "Part Prepared. One provider supplied a complete verified CAD package.",
       ),
     ).toHaveClass("text-t2");
-    expect(screen.getByText("Source Results")).toHaveClass("text-t2");
-    expect(screen.getByText("Ready")).toHaveClass("text-[var(--c-ok-text)]");
+    // The hand-rolled 10px uppercase+tracking micro-label became the shared section-title role.
+    expect(screen.getByText("Source Results")).toHaveClass("ui-section-title");
+    expect(screen.getByText("Prepared")).toHaveClass("text-ok-text");
   });
 
   it("keeps a verified part ready when later DigiKey author routes are not used", async () => {
@@ -368,17 +369,17 @@ describe("CompletePartModal - automatic capture", () => {
     expect(await screen.findByText("Files Reverified")).toBeInTheDocument();
     expect(
       await screen.findByText(
-        "Part Ready. One provider supplied a complete verified CAD package.",
+        "Part Prepared. One provider supplied a complete verified CAD package.",
       ),
     ).toHaveClass("text-t2");
-    expect(screen.getByText("Ready")).toHaveClass("text-[var(--c-ok-text)]");
+    expect(screen.getByText("Prepared")).toHaveClass("text-ok-text");
     expect(screen.queryByText(/Some optional provider variants were not collected/)).toBeNull();
     expect(screen.getByText("DigiKey / Ultra Librarian")).toBeInTheDocument();
     expect(screen.getByText("DigiKey / SnapMagic")).toBeInTheDocument();
     expect(screen.queryByText("DigiKey / TraceParts")).toBeNull();
     expect(screen.getByText("Unavailable")).toHaveClass("text-t2");
     expect(screen.getByText("Security Check Required")).toHaveClass(
-      "text-[var(--c-warn-text)]",
+      "text-warn-text",
     );
     expect(screen.queryByText("Not Attempted")).toBeNull();
     expect(screen.getByText("No exact deliverable was offered.")).toHaveClass("text-t2");
@@ -542,7 +543,7 @@ describe("CompletePartModal - copy + icon adoption", () => {
     // Subtitle + CAD section render their default text (no override).
     expect(
       await screen.findByText(
-        "You open the provider, sign in if it asks, and download. Stockroom captures what you download and validates it.",
+        "Open the provider, sign in if it asks, and download. Stockroom captures the download and validates it.",
       ),
     ).toBeInTheDocument();
     expect(await screen.findByText("Files From The Provider")).toBeInTheDocument();
@@ -586,7 +587,7 @@ describe("CompletePartModal - copy + icon adoption", () => {
       wrapper: devWrapper,
     });
     await screen.findByText(
-      "You open the provider, sign in if it asks, and download. Stockroom captures what you download and validates it.",
+      "Open the provider, sign in if it asks, and download. Stockroom captures the download and validates it.",
     );
 
     expect(screen.getByRole("dialog", { name: "Complete this part" })).toBeInTheDocument();
@@ -641,6 +642,45 @@ describe("CompletePartModal - one automatic acquisition workflow", () => {
     expect(screen.queryByText(/separate window/i)).toBeNull();
     expect(screen.queryByRole("button", { name: "Finish Route" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Skip This Part" })).toBeNull();
+  });
+
+  it("counts the seconds a trip has been out, instead of freezing on Starting", async () => {
+    // The seconds are an interval that now runs inside the FILES card rather than in the window
+    // around it. A card that mounted without ever starting its interval would still read
+    // "Starting" forever and look exactly like a trip that had only just begun, so what is
+    // asserted here is the TICK, not the first frame.
+    //
+    // The interval is captured through a DELEGATING spy rather than by faking the global clock:
+    // waitFor drives itself on `setInterval` too, and replacing it wholesale hangs every await in
+    // this file. The 1000ms delay is what distinguishes the card's timer from those.
+    const user = userEvent.setup();
+    mockCadSource(["kicad_symbol"]);
+    vi.spyOn(api, "runCapture").mockImplementation(() => new Promise(() => {}));
+    const realSetInterval = window.setInterval.bind(window);
+    let tick: (() => void) | undefined;
+    vi.spyOn(window, "setInterval").mockImplementation(((
+      handler: TimerHandler,
+      ms?: number,
+      ...rest: unknown[]
+    ) => {
+      if (ms === 1_000 && typeof handler === "function") tick = handler as () => void;
+      return realSetInterval(handler as never, ms as never, ...(rest as never[]));
+    }) as typeof window.setInterval);
+    const clock = vi.spyOn(Date, "now").mockReturnValue(1_000_000);
+
+    RENDER();
+    await screen.findByText("Files From The Provider");
+    await user.click(screen.getByRole("button", { name: "Get Files" }));
+    expect(await screen.findByText("Starting")).toBeInTheDocument();
+    expect(tick).toBeTypeOf("function");
+
+    clock.mockReturnValue(1_002_000);
+    act(() => {
+      tick?.();
+    });
+
+    expect(screen.queryByText("Starting")).toBeNull();
+    expect(screen.getByText("2s")).toBeInTheDocument();
   });
 
   it("queues selected downloads into the exact active durable provider task", async () => {

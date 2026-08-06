@@ -7,11 +7,13 @@ import {
   createContext,
   useCallback,
   useContext,
+  useMemo,
   useState,
   type ReactNode,
 } from "react";
-import { motion } from "motion/react";
+import * as m from "motion/react-m";
 import { Dot } from "../components/primitives";
+import { useCopyFormatter } from "./copy";
 
 export type ToastTone = "ok" | "err" | "neutral";
 
@@ -39,6 +41,9 @@ let seq = 0;
 
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<ToastItem[]>([]);
+  // The dismiss control is a glyph, so its accessible name is the only text it has. The message in
+  // the hole is whatever the toast is carrying; the verb around it is ours.
+  const dismissName = useCopyFormatter("toast.dismiss-aria", "Dismiss {message}");
 
   const dismiss = useCallback((id: number) => {
     setItems((current) => current.filter((t) => t.id !== id));
@@ -53,12 +58,18 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     [dismiss],
   );
 
+  // `toast` is already stable, but the object around it was not: this provider re-renders on every
+  // toast raised and every toast dismissed, and a fresh `{ toast }` each time re-rendered EVERY
+  // `useToast` consumer in the application - which is most of the surfaces, none of which have
+  // anything to redraw because a toast appeared somewhere else.
+  const api = useMemo(() => ({ toast }), [toast]);
+
   return (
-    <ToastContext.Provider value={{ toast }}>
+    <ToastContext.Provider value={api}>
       {children}
       <div className="pointer-events-none fixed bottom-4 right-4 z-[100] flex flex-col gap-2">
         {items.map((t) => (
-          <motion.div
+          <m.div
             key={t.id}
             onClick={() => dismiss(t.id)}
             role="status"
@@ -85,7 +96,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             ) : null}
             <button
               type="button"
-              aria-label={`Dismiss ${t.message}`}
+              aria-label={dismissName({ message: t.message })}
               onClick={(event) => {
                 event.stopPropagation();
                 dismiss(t.id);
@@ -94,7 +105,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             >
               ×
             </button>
-          </motion.div>
+          </m.div>
         ))}
       </div>
     </ToastContext.Provider>

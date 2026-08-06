@@ -41,7 +41,7 @@ export function CompatVerdictBanner({ verdict }: { verdict: UnionDTO["verdict"] 
         <Dot tone={interchangeable ? "ok" : "err"} />
         <h3
           className={
-            "text-lg font-semibold " + (interchangeable ? "text-ok" : "text-err")
+            "text-lg font-semibold " + (interchangeable ? "text-ok-text" : "text-err-text")
           }
         >
           {headline}
@@ -51,7 +51,7 @@ export function CompatVerdictBanner({ verdict }: { verdict: UnionDTO["verdict"] 
       {interchangeable ? (
         <p className="text-sm text-t2">
           <Text id="stm.compat.verdict.ok-body">
-            Every part in the set carries the union's signals, with the reconciling swap shown on
+            Each part in the set carries the union's signals, with the reconciling swap shown on
             each divergent position.
           </Text>
         </p>
@@ -59,7 +59,7 @@ export function CompatVerdictBanner({ verdict }: { verdict: UnionDTO["verdict"] 
         <>
           <p className="text-sm text-t2">
             <Text id="stm.compat.verdict.blocked-body">
-              A required signal cannot be placed on every part in the set.
+              A required signal cannot be placed on each part in the set.
             </Text>
             {blocking.length > 0 ? (
               <>
@@ -83,9 +83,10 @@ export function CompatVerdictBanner({ verdict }: { verdict: UnionDTO["verdict"] 
               className="flex max-h-56 flex-col gap-1.5 overflow-y-auto"
               data-testid="compat-blocking"
             >
-              {blocking.map((b, i) => (
+              {/* At most one blocking entry per union position, so the position is the row's id. */}
+              {blocking.map((b) => (
                 <li
-                  key={`${b.position}-${b.signal}-${i}`}
+                  key={b.position}
                   className="flex flex-col gap-0.5 rounded-control bg-raise2 px-3 py-2"
                 >
                   <div className="flex items-baseline gap-2">
@@ -97,7 +98,7 @@ export function CompatVerdictBanner({ verdict }: { verdict: UnionDTO["verdict"] 
                         {"Position {position}"}
                       </Text>
                     </span>
-                    <span className="min-w-0 truncate font-mono text-xs text-err">{b.signal}</span>
+                    <span className="min-w-0 truncate font-mono text-xs text-err-text">{b.signal}</span>
                   </div>
                   <p className="text-2xs text-t3">{b.reason}</p>
                 </li>

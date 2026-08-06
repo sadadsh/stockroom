@@ -164,7 +164,7 @@ describe("SearchOverlay 1,000-result performance contract", () => {
 
     expect(table).toHaveAttribute("aria-rowcount", "1001");
     expect(
-      within(table).getByRole("columnheader", { name: "Identity" }),
+      within(table).getByRole("columnheader", { name: "Identification" }),
     ).toBeInTheDocument();
     expect(
       within(table).getByRole("columnheader", { name: "Match & Evidence" }),
@@ -176,7 +176,7 @@ describe("SearchOverlay 1,000-result performance contract", () => {
       within(table).getByRole("columnheader", { name: "Dual-EDA" }),
     ).toBeInTheDocument();
     expect(
-      within(table).queryByRole("columnheader", { name: "Lifecycle" }),
+      within(table).queryByRole("columnheader", { name: "Product Status" }),
     ).not.toBeInTheDocument();
     expect(
       within(table).queryByRole("columnheader", { name: "In Stock" }),

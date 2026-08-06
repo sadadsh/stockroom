@@ -6,7 +6,7 @@
  * scrim; Escape or a scrim click closes it and returns focus where it was.
  */
 import { useEffect, useRef } from "react";
-import { motion } from "motion/react";
+import * as m from "motion/react-m";
 import { useAddPart } from "../lib/addPart";
 import { IngestPage } from "../pages/IngestPage";
 import { Text, useText } from "../lib/copy";
@@ -50,7 +50,7 @@ export function AddPartModal() {
       role="presentation"
       onClick={close}
     >
-      <motion.div
+      <m.div
         data-dev-id="addpart.root"
         initial={{ opacity: 0, scale: 0.965, y: 10 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -73,7 +73,7 @@ export function AddPartModal() {
             </div>
             <div className="mt-0.5 text-xs text-t3">
               <Text id="modal.addPart.subtitle">
-                Resolve exact identity and source evidence, then let Stockroom complete one shared
+                Resolve exact identification and source evidence, then let Stockroom complete one shared
                 CAD package.
               </Text>
             </div>
@@ -91,7 +91,7 @@ export function AddPartModal() {
         <div data-dev-id="addpart.body" className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
           <IngestPage />
         </div>
-      </motion.div>
+      </m.div>
     </div>
   );
 }

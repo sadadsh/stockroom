@@ -8,21 +8,6 @@
 import { vi } from "vitest";
 import { api } from "../api/client";
 
-/** An SSE body carrying the frames a real job emits, in order. */
-export function sseStream(frames: { event: string; data: unknown }[]): ReadableStream<Uint8Array> {
-  const encoder = new TextEncoder();
-  return new ReadableStream<Uint8Array>({
-    start(controller) {
-      for (const frame of frames) {
-        controller.enqueue(
-          encoder.encode(`event: ${frame.event}\ndata: ${JSON.stringify(frame.data)}\n\n`),
-        );
-      }
-      controller.close();
-    },
-  });
-}
-
 export interface CaptureMock {
   run: ReturnType<typeof vi.spyOn>;
   events: ReturnType<typeof vi.spyOn>;

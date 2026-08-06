@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   useApproveProjectReview,
   useConnectProjectRemote,
@@ -43,26 +43,18 @@ export function ProjectChangesWorkbench({
   const reviews = useProjectReviews(projectId, hasReviewRemote);
   const [selectedCommit, setSelectedCommit] = useState("");
   const candidates = reviews.data?.candidates ?? [];
+  // The chosen commit is only a preference: the review actually shown is resolved here, and
+  // falls back to the first candidate whenever the queue no longer carries the chosen one.
+  // An effect used to write that fallback into state as well, which rendered nothing new -
+  // every reader below goes through `selected`.
   const selected =
     candidates.find((candidate) => candidate.commit === selectedCommit) ?? candidates[0];
   const repository = collaboration.data?.repository;
 
-  useEffect(() => {
-    if (!candidates.length) {
-      if (selectedCommit) setSelectedCommit("");
-      return;
-    }
-    if (!candidates.some((candidate) => candidate.commit === selectedCommit)) {
-      setSelectedCommit(candidates[0].commit);
-    }
-  }, [candidates, selectedCommit]);
-
   if (collaboration.isLoading || (hasReviewRemote && reviews.isLoading)) {
     return (
       <ChangesMessage>
-        <LoadingState dense id="projects.activity.loading">
-          Loading this project's activity...
-        </LoadingState>
+        <LoadingState dense id="projects.activity.loading">Loading this project's recent work...</LoadingState>
       </ChangesMessage>
     );
   }
@@ -89,7 +81,7 @@ export function ProjectChangesWorkbench({
     <div data-dev-id="projects.activity" className="flex min-h-0 flex-1 flex-col">
       <div className="flex flex-none items-center gap-4 pb-3">
         <div>
-          <SectionHeading><Text id="projects.activity.heading">Activity</Text></SectionHeading>
+          <SectionHeading><Text id="projects.activity.heading">Recent Work</Text></SectionHeading>
           <p className="mt-0.5 text-xs text-t3">
             <Text id="projects.activity.subtitle">Protected work and commit review</Text>
           </p>
@@ -149,7 +141,7 @@ function ReviewQueueEmpty({ reason = "" }: { reason?: string }) {
       </div>
       <div className="w-full max-w-[520px] px-5 py-5">
         <p className="text-sm font-semibold text-t1">
-          <Text id="projects.activity.no-reviews-title">No shared work yet</Text>
+          <Text id="projects.activity.no-reviews-title">No shared work so far</Text>
         </p>
         <p className="mt-1.5 text-xs leading-5 text-t3">
           {reason ? (
@@ -224,7 +216,7 @@ function GitRequiredPanel() {
     <>
       <div className="flex h-[34px] items-center border-b border-line bg-band px-4">
         <span className="text-xs font-semibold text-t2">
-          <Text id="projects.activity.local-repository">Local Repository</Text>
+          <Text id="projects.activity.local-repository">Local Git Checkout</Text>
         </span>
       </div>
       <section className="w-full max-w-[520px] px-5 py-5">
@@ -234,9 +226,7 @@ function GitRequiredPanel() {
           </Text>
         </p>
         <p className="mt-1.5 text-xs leading-5 text-t3">
-          <Text id="projects.activity.git-required-detail">
-            Initialize Git in this project folder before connecting the shared repository.
-          </Text>
+          <Text id="projects.activity.git-required-detail">Initialize Git in this project folder before connecting the shared Git remote.</Text>
         </p>
       </section>
     </>
@@ -258,15 +248,15 @@ function ConnectRepositoryPanel({
   const repository = collaboration.repository!;
   const connectedLabel = useText(
     "projects.activity.toast-repository-connected",
-    "Repository connected",
+    "Git remote connected",
   );
   const connectFailed = useText(
     "projects.activity.toast-repository-connect-failed",
-    "Could not connect repository",
+    "Could not connect the Git remote",
   );
   const requirement = useText(
     "projects.activity.remote-url-requirement",
-    "Use a secure HTTPS or SSH repository URL.",
+    "Use a secure HTTPS or SSH Git remote URL.",
   );
   const branchLabel = useText("projects.activity.branch", "Branch");
   const remotePlaceholder = useText(
@@ -308,7 +298,7 @@ function ConnectRepositoryPanel({
     <div className="@container/repository flex min-h-0 flex-1 flex-col overflow-y-auto rounded-card border border-line bg-surface">
       <div className="flex h-[34px] items-center border-b border-line bg-band px-4">
         <span className="text-xs font-semibold text-t2">
-          <Text id="projects.activity.shared-repository">Shared Repository</Text>
+          <Text id="projects.activity.shared-repository">Shared Git Remote</Text>
         </span>
       </div>
       <div className="grid min-h-0 flex-1 content-start @[46rem]/repository:grid-cols-[minmax(220px,0.78fr)_minmax(340px,1.22fr)]">
@@ -317,9 +307,7 @@ function ConnectRepositoryPanel({
             <Text id="projects.activity.local-project">Local Project</Text>
           </h2>
           <p className="mt-1.5 max-w-[34rem] text-xs leading-5 text-t3">
-            <Text id="projects.activity.local-project-detail">
-              This project has local Git history and is ready to connect.
-            </Text>
+            <Text id="projects.activity.local-project-detail">This project has local Git commits and is prepared to connect.</Text>
           </p>
           <ProjectInspectorFacts
             className="mt-4"
@@ -345,14 +333,10 @@ function ConnectRepositoryPanel({
         </section>
         <section className="px-5 py-5">
           <h2 className="text-sm font-semibold text-t1">
-            <Text id="projects.activity.connect-repository">
-              Remote Repository
-            </Text>
+            <Text id="projects.activity.connect-repository">Git Remote</Text>
           </h2>
           <p className="mt-1.5 max-w-[38rem] text-xs leading-5 text-t3">
-            <Text id="projects.activity.connect-repository-detail">
-              Connect the repository both engineers use for protected work and review.
-            </Text>
+            <Text id="projects.activity.connect-repository-detail">Connect the Git remote both engineers use for protected work and review.</Text>
           </p>
           <form
             className="mt-5"
@@ -362,7 +346,7 @@ function ConnectRepositoryPanel({
             }}
           >
             <label htmlFor="project-remote-url" className="text-xs font-semibold text-t2">
-              <Text id="projects.activity.repository-url">Repository URL</Text>
+              <Text id="projects.activity.repository-url">Git Remote URL</Text>
             </label>
             <input
               ref={inputRef}
@@ -379,7 +363,7 @@ function ConnectRepositoryPanel({
             />
             <p
               id="project-remote-guidance"
-              className={`mt-2 text-xs leading-5 ${error ? "text-err" : "text-t3"}`}
+              className={`mt-2 text-xs leading-5 ${error ? "text-err-text" : "text-t3"}`}
             >
               {error || (
                 <Text id="projects.activity.repository-url-detail">
@@ -395,7 +379,7 @@ function ConnectRepositoryPanel({
             >
               {connect.isPending
                 ? <Text id="projects.activity.connecting">Connecting...</Text>
-                : <Text id="projects.activity.connect">Connect Repository</Text>}
+                : <Text id="projects.activity.connect">Connect Git Remote</Text>}
             </Button>
           </form>
         </section>
@@ -457,7 +441,7 @@ function ReviewList({
               </span>
               <Badge size="sm" tone={candidate.ready ? "ok" : "warn"}>
                 {candidate.ready
-                  ? <Text id="projects.activity.ready">Ready</Text>
+                  ? <Text id="projects.activity.ready">Prepared</Text>
                   : <Text id="projects.activity.blocked">Blocked</Text>}
               </Badge>
             </span>
@@ -498,7 +482,7 @@ function RepositoryStanding({
   if (!repo.has_remote) {
     return (
       <Badge className="ml-auto" tone="warn">
-        <Text id="projects.activity.local-only">Local Only</Text>
+        <Text id="projects.activity.local-only">Local, Not Shared</Text>
       </Badge>
     );
   }
@@ -509,7 +493,7 @@ function RepositoryStanding({
       <span className="font-mono">{repo.branch}</span>
       <Badge tone={synced ? "ok" : "warn"}>
         {synced
-          ? <Text id="projects.activity.synced">Synced</Text>
+          ? <Text id="projects.activity.synced">Aligned</Text>
           : !repo.clean
             ? <Text id="projects.activity.local-changes">Local Changes</Text>
             : `${repo.ahead} ${aheadLabel} · ${repo.behind} ${behindLabel}`}
@@ -551,20 +535,26 @@ function WorkSessionCard({
   const session = collaboration?.session;
   const recovery = collaboration?.recovery;
 
+  // The files a claim can cover, read once per document set. Both the seeding below and the
+  // claim list itself need exactly these, so the project's documents are walked once here
+  // rather than filtered and mapped again at each use.
+  const claimable = useMemo(
+    () => workspace.documents.filter((document) => document.lock_required),
+    [workspace.documents],
+  );
+
   // Seed the claim list ONCE per lock-required document set. `documents.length` must not be
   // the guard (nor a dependency): unchecking the last file re-fired this effect and re-checked
   // every document, so a deliberate zero selection could not be reached at all. The signature
   // still re-seeds when the project itself offers a different set of documents.
   const seededDocumentsRef = useRef<string | null>(null);
   useEffect(() => {
-    const lockRequired = workspace.documents
-      .filter((document) => document.lock_required)
-      .map((document) => document.path);
+    const lockRequired = claimable.map((document) => document.path);
     const signature = JSON.stringify(lockRequired);
     if (!lockRequired.length || seededDocumentsRef.current === signature) return;
     seededDocumentsRef.current = signature;
     setDocuments(lockRequired);
-  }, [workspace.documents]);
+  }, [claimable]);
 
   if (session) {
     const needsResume = recovery && recovery.state !== "healthy";
@@ -668,6 +658,8 @@ function WorkSessionCard({
   const branch = owner.trim()
     ? `work/${slug(owner)}/${slug(workspace.project.name)}`
     : "";
+  // One membership set for the whole list rather than a scan of the claim array per row.
+  const claimed = new Set(documents);
   return (
     <div className="p-4">
       <div className="flex items-center gap-2">
@@ -679,9 +671,7 @@ function WorkSessionCard({
         </Badge>
       </div>
       <p className="mt-1.5 text-xs leading-5 text-t3">
-        <Text id="projects.activity.start-work-detail">
-          Claim the project files you plan to edit before opening the native editor.
-        </Text>
+        <Text id="projects.activity.start-work-detail">Claim the project files to be edited before opening the native editor.</Text>
       </p>
       <label className="mt-4 block">
         <span className="mb-1.5 block text-xs font-medium text-t2">
@@ -705,28 +695,26 @@ function WorkSessionCard({
         </Badge>
       </div>
       <div className="border-y border-line">
-        {workspace.documents
-          .filter((document) => document.lock_required)
-          .map((document) => (
-            <label
-              key={document.document_id}
-              className="flex items-center gap-2 border-b border-line px-1 py-2.5 text-xs text-t2 transition-colors last:border-b-0 hover:bg-raise"
-            >
-              <input
-                type="checkbox"
-                checked={documents.includes(document.path)}
-                onChange={(event) =>
-                  setDocuments((current) =>
-                    event.target.checked
-                      ? [...current, document.path]
-                      : current.filter((path) => path !== document.path),
-                  )
-                }
-                className="accent-[var(--c-acc)]"
-              />
-              <span className="truncate">{document.label}</span>
-            </label>
-          ))}
+        {claimable.map((document) => (
+          <label
+            key={document.document_id}
+            className="flex items-center gap-2 border-b border-line px-1 py-2.5 text-xs text-t2 transition-colors last:border-b-0 hover:bg-raise"
+          >
+            <input
+              type="checkbox"
+              checked={claimed.has(document.path)}
+              onChange={(event) =>
+                setDocuments((current) =>
+                  event.target.checked
+                    ? [...current, document.path]
+                    : current.filter((path) => path !== document.path),
+                )
+              }
+              className="accent-[var(--c-acc)]"
+            />
+            <span className="truncate">{document.label}</span>
+          </label>
+        ))}
       </div>
       <Button
         variant="accent"
@@ -839,7 +827,7 @@ function ReviewInspector({
         </div>
         <Badge tone={candidate.ready ? "ok" : "warn"}>
           {candidate.ready
-            ? <Text id="projects.activity.review-ready">Ready</Text>
+            ? <Text id="projects.activity.review-ready">Prepared</Text>
             : <Text id="projects.activity.review-blocked-state">Blocked</Text>}
         </Badge>
       </div>
@@ -873,7 +861,7 @@ function ReviewInspector({
                   <span
                     className={`font-mono ${
                       result.bom.lines.every((line) => line.identity_ready)
-                        ? "text-ok"
+                        ? "text-ok-text"
                         : "text-warn"
                     }`}
                   >
@@ -888,8 +876,8 @@ function ReviewInspector({
                   <span
                     className={`font-mono ${
                       result.semantic_audit.counts.by_severity.error === 0
-                        ? "text-ok"
-                        : "text-err"
+                        ? "text-ok-text"
+                        : "text-err-text"
                     }`}
                   >
                     {result.semantic_audit.counts.by_severity.error} {errorsLabel}

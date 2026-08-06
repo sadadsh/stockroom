@@ -10,22 +10,14 @@
  * off or on) - the provider's token effect runs regardless of `enabled`, so the shipped design
  * is whatever was last saved. `enabled` only gates the editing surface. A default no-op context
  * lets <Text> resolve committed copy even with no provider mounted (so isolated tests still work).
+ *
+ * The provider is a composition of five focused hooks, one per concern: the override draft
+ * (devModeDraft), undo/redo (devModeHistory), Save + dirty (devModeSave), the inspect-first
+ * selection (devModeSelection) and the on/off switch (devModeToggle).
  */
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type ReactNode,
-} from "react";
-import { api } from "../api/client";
-import { ApiError } from "../api/client";
+import { createContext, useCallback, useContext, useMemo, type ReactNode } from "react";
 import { useTheme, type Theme } from "./theme";
-import { DEV_TOKENS, DEV_TOKEN_BY_VAR } from "./devTokens";
-import { TOKEN_OVERRIDES } from "./token.overrides";
+import { DEV_TOKEN_BY_VAR } from "./devTokens";
 import { COPY_OVERRIDES } from "./copy.overrides";
 import { ICON_OVERRIDES, type IconOverride } from "./icon.overrides";
 import { ELEMENT_OVERRIDES } from "./element.overrides";
@@ -33,24 +25,11 @@ import {
   BEHAVIOR_OVERRIDES,
   type BehaviorOverride,
 } from "./behavior.overrides";
-import {
-  applicableOverrides,
-  applyElementOverrides,
-  startElementOverrideObserver,
-} from "./applyElementOverrides";
-import { copyPlaceholderDeclarations } from "./copyPlaceholders";
-
-// The two override blocks: dark colours + shared radii on :root ("root"), light colours on
-// :root[data-theme="light"] ("light"). Defined here (not in the regenerated overrides file) so the
-// backend writer can rewrite token.overrides.ts as a bare const.
-interface TokenOverrides {
-  root: Record<string, string>;
-  light: Record<string, string>;
-}
-
-// Which override block a token edit lands in: dark colours + shared radii live on :root ("root"),
-// light colours on :root[data-theme="light"] ("light").
-type TokenSelector = keyof TokenOverrides;
+import { useApplyDraftOverrides, useDevModeDraft } from "./devModeDraft";
+import { useDevModeHistory, useDevModeHistoryKeys } from "./devModeHistory";
+import { useDevModeSave } from "./devModeSave";
+import { useDevModeSelection } from "./devModeSelection";
+import { useDevModeToggle } from "./devModeToggle";
 
 interface DevModeContextValue {
   enabled: boolean;
@@ -192,456 +171,45 @@ const DEFAULT: DevModeContextValue = {
 
 const DevModeContext = createContext<DevModeContextValue>(DEFAULT);
 
-function cloneTokens(src: TokenOverrides): TokenOverrides {
-  return { root: { ...src.root }, light: { ...src.light } };
-}
-
-// A shallow clone of the committed icon overrides for the working-state (each entry copied so an
-// edit never mutates the frozen imported module).
-function cloneIcons(src: Record<string, IconOverride>): Record<string, IconOverride> {
-  const out: Record<string, IconOverride> = {};
-  for (const [id, ov] of Object.entries(src)) out[id] = { ...ov };
-  return out;
-}
-
-// A shallow clone of the committed element overrides for the working-state (each per-id prop map
-// copied so an edit never mutates the frozen imported module).
-function cloneElements(
-  src: Record<string, Record<string, string>>,
-): Record<string, Record<string, string>> {
-  const out: Record<string, Record<string, string>> = {};
-  for (const [id, props] of Object.entries(src)) out[id] = { ...props };
-  return out;
-}
-
 export function DevModeProvider({ children }: { children: ReactNode }) {
   const { theme } = useTheme();
-  const [enabled, setEnabled] = useState(false);
-  const [tokens, setTokens] = useState<TokenOverrides>(() => cloneTokens(TOKEN_OVERRIDES));
-  const [copy, setCopyState] = useState<Record<string, string>>(() => ({ ...COPY_OVERRIDES }));
-  const [icons, setIcons] = useState<Record<string, IconOverride>>(() => cloneIcons(ICON_OVERRIDES));
-  const [elements, setElements] = useState<Record<string, Record<string, string>>>(() =>
-    cloneElements(ELEMENT_OVERRIDES),
-  );
-  const [behaviors, setBehaviors] = useState<Record<string, BehaviorOverride>>(() => ({
-    ...BEHAVIOR_OVERRIDES,
-  }));
-  const [selectedCopy, setSelectedCopy] = useState<{ id: string; def: string } | null>(null);
-  const [selectedDevId, setSelectedDevId] = useState<string | null>(null);
-  const [inspect, setInspect] = useState(false);
-  const [showIds, setShowIds] = useState(false);
-  const [highlightedVars, setHighlightedVars] = useState<string[]>([]);
-  const [saving, setSaving] = useState(false);
-  const [lastError, setLastError] = useState<string | null>(null);
-  // The last-saved baseline, so `dirty` reflects unsaved edits (the imported modules are frozen).
-  const [savedTokens, setSavedTokens] = useState(() => JSON.stringify(TOKEN_OVERRIDES));
-  const [savedCopy, setSavedCopy] = useState(() => JSON.stringify(COPY_OVERRIDES));
-  const [savedIcons, setSavedIcons] = useState(() => JSON.stringify(ICON_OVERRIDES));
-  const [savedElements, setSavedElements] = useState(() => JSON.stringify(ELEMENT_OVERRIDES));
-  const [savedBehaviors, setSavedBehaviors] = useState(() => JSON.stringify(BEHAVIOR_OVERRIDES));
-  const currentSnapshot = JSON.stringify({ tokens, copy, icons, elements, behaviors });
-  const lastSnapshotRef = useRef(currentSnapshot);
-  const undoRef = useRef<string[]>([]);
-  const redoRef = useRef<string[]>([]);
-  const restoringHistoryRef = useRef(false);
-  // The stacks live in refs so recording history does not itself create another snapshot. Keep a
-  // small revision counter in the context memo dependencies so Undo/Redo enable immediately after
-  // a ref-only stack mutation.
-  const [historyRevision, setHistoryRevision] = useState(0);
+  // The hook call order below is the effect order: snapshot, the Ctrl/Cmd+Shift+D toggle, the
+  // Ctrl/Cmd+Z history keys, then the two document applies (tokens, elements).
+  const { draft, restore, resetDraft, api: draftApi } = useDevModeDraft(theme);
+  const { api: historyApi, historyRevision, undo, redo } = useDevModeHistory(draft, restore);
+  const { api: toggleApi, enabled, clearSelectedCopy } = useDevModeToggle();
+  useDevModeHistoryKeys(enabled, undo, redo);
+  useApplyDraftOverrides(draft.tokens, draft.elements, theme);
+  const selectionApi = useDevModeSelection();
+  const saveApi = useDevModeSave(draft);
 
-  useEffect(() => {
-    if (currentSnapshot === lastSnapshotRef.current) return;
-    if (restoringHistoryRef.current) {
-      restoringHistoryRef.current = false;
-    } else {
-      undoRef.current = [...undoRef.current.slice(-49), lastSnapshotRef.current];
-      redoRef.current = [];
-    }
-    lastSnapshotRef.current = currentSnapshot;
-    setHistoryRevision((revision) => revision + 1);
-  }, [currentSnapshot]);
-
-  const restoreSnapshot = useCallback((raw: string) => {
-    const next = JSON.parse(raw) as {
-      tokens: TokenOverrides;
-      copy: Record<string, string>;
-      icons: Record<string, IconOverride>;
-      elements: Record<string, Record<string, string>>;
-      behaviors: Record<string, BehaviorOverride>;
-    };
-    restoringHistoryRef.current = true;
-    setTokens(next.tokens);
-    setCopyState(next.copy);
-    setIcons(next.icons);
-    setElements(next.elements);
-    setBehaviors(next.behaviors);
-  }, []);
-
-  const undo = useCallback(() => {
-    const previous = undoRef.current.pop();
-    if (!previous) return;
-    redoRef.current.push(lastSnapshotRef.current);
-    restoreSnapshot(previous);
-  }, [restoreSnapshot]);
-
-  const redo = useCallback(() => {
-    const next = redoRef.current.pop();
-    if (!next) return;
-    undoRef.current.push(lastSnapshotRef.current);
-    restoreSnapshot(next);
-  }, [restoreSnapshot]);
-
-  // Two refs drive the element-override apply: prevElementsRef holds the previously-applied map so a
-  // re-apply can compute exactly which props to clear; elementsRef always holds the latest map so the
-  // observer's getter re-applies the current overrides to late-mounted nodes.
-  const prevElementsRef = useRef<Record<string, Record<string, string>>>(elements);
-  const elementsRef = useRef(elements);
-  elementsRef.current = elements;
-
-  // Ctrl/Cmd+Shift+D toggles the whole surface. It is the only way in, so dev mode is hidden.
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === "D" || e.key === "d")) {
-        e.preventDefault();
-        setEnabled((v) => !v);
-      }
-    }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, []);
-
-  useEffect(() => {
-    function onHistoryKey(event: KeyboardEvent) {
-      if (!enabled || !(event.ctrlKey || event.metaKey) || event.altKey) return;
-      const target = event.target;
-      if (target instanceof Element && target.matches("input, textarea, [contenteditable='true']")) return;
-      if (event.key.toLowerCase() !== "z") return;
-      event.preventDefault();
-      if (event.shiftKey) redo();
-      else undo();
-    }
-    window.addEventListener("keydown", onHistoryKey);
-    return () => window.removeEventListener("keydown", onHistoryKey);
-  }, [enabled, undo, redo]);
-
-  // Apply the committed + edited tokens to the document for the ACTIVE theme (colours are
-  // theme-specific, radii shared). Runs regardless of `enabled` so the shipped design is whatever
-  // was last saved; a token with no override is cleared so it falls back to the index.css default.
-  useEffect(() => {
-    const root = document.documentElement;
-    for (const token of DEV_TOKENS) {
-      const selector: TokenSelector = token.themed && theme === "light" ? "light" : "root";
-      const value = tokens[selector][token.cssVar];
-      if (value != null && value !== "") root.style.setProperty(token.cssVar, value);
-      else root.style.removeProperty(token.cssVar);
-    }
-  }, [tokens, theme]);
-
-  // Apply the committed + edited per-element overrides as inline styles on every matching
-  // [data-dev-id] node. Runs regardless of `enabled` (like the token effect) so a saved tweak ships
-  // for everyone. Diffs against the previously-applied map to clear exactly the props that were
-  // removed, then starts an observer so a node that mounts later still receives its override.
-  useEffect(() => {
-    applyElementOverrides(elements, prevElementsRef.current);
-    prevElementsRef.current = elements;
-    return startElementOverrideObserver(() => elementsRef.current);
-  }, [elements]);
-
-  const activeSelector: TokenSelector = theme === "light" ? "light" : "root";
-
-  const tokenValue = useCallback(
-    (cssVar: string): string => {
-      const token = DEV_TOKEN_BY_VAR.get(cssVar);
-      if (!token) return "";
-      const selector: TokenSelector = token.themed ? activeSelector : "root";
-      const override = tokens[selector][cssVar];
-      if (override != null) return override;
-      return token.themed
-        ? (theme === "light" ? token.default.light : token.default.dark) ?? token.default.dark
-        : token.default.dark;
-    },
-    [tokens, activeSelector, theme],
-  );
-
-  const isTokenOverridden = useCallback(
-    (cssVar: string): boolean => {
-      const token = DEV_TOKEN_BY_VAR.get(cssVar);
-      if (!token) return false;
-      const selector: TokenSelector = token.themed ? activeSelector : "root";
-      return tokens[selector][cssVar] != null;
-    },
-    [tokens, activeSelector],
-  );
-
-  const setToken = useCallback(
-    (cssVar: string, value: string) => {
-      const token = DEV_TOKEN_BY_VAR.get(cssVar);
-      if (!token) return;
-      const selector: TokenSelector = token.themed ? activeSelector : "root";
-      setTokens((prev) => ({ ...prev, [selector]: { ...prev[selector], [cssVar]: value } }));
-    },
-    [activeSelector],
-  );
-
-  const resetToken = useCallback(
-    (cssVar: string) => {
-      const token = DEV_TOKEN_BY_VAR.get(cssVar);
-      if (!token) return;
-      const selector: TokenSelector = token.themed ? activeSelector : "root";
-      setTokens((prev) => {
-        const next = { ...prev[selector] };
-        delete next[cssVar];
-        return { ...prev, [selector]: next };
-      });
-    },
-    [activeSelector],
-  );
-
-  const resolveCopy = useCallback(
-    (id: string, fallback: string): string => copy[id] ?? fallback,
-    [copy],
-  );
-  const isCopyOverridden = useCallback((id: string): boolean => id in copy, [copy]);
-  const setCopy = useCallback((id: string, text: string) => {
-    setCopyState((prev) => ({ ...prev, [id]: text }));
-  }, []);
-  const resetCopy = useCallback((id: string) => {
-    setCopyState((prev) => {
-      const next = { ...prev };
-      delete next[id];
-      return next;
-    });
-  }, []);
-
-  // --- icons (D-02 / D-04) --- the working override map mirrors the copy state one-for-one:
-  // read (iconOverrideFor / resolveIconOverride), edit (setIconBody / setIconSwap), clear (resetIcon).
-  const iconOverrideFor = useCallback(
-    (id: string): IconOverride | undefined => icons[id],
-    [icons],
-  );
-  // Under a provider <Icon> resolves through the working-state, so a working edit renders live.
-  const resolveIconOverride = useCallback(
-    (id: string): IconOverride | undefined => icons[id],
-    [icons],
-  );
-  const isIconOverridden = useCallback(
-    (id: string): boolean => {
-      const ov = icons[id];
-      return ov != null && (ov.body != null || ov.swapToId != null);
-    },
-    [icons],
-  );
-  const setIconBody = useCallback((id: string, body: string) => {
-    setIcons((prev) => ({ ...prev, [id]: { ...prev[id], body } }));
-  }, []);
-  const setIconSwap = useCallback((id: string, swapToId: string) => {
-    setIcons((prev) => ({ ...prev, [id]: { ...prev[id], swapToId } }));
-  }, []);
-  const resetIcon = useCallback((id: string) => {
-    setIcons((prev) => {
-      const next = { ...prev };
-      delete next[id];
-      return next;
-    });
-  }, []);
-
-  // --- per-element overrides (ELEM-01) --- the working map mirrors the icon state one-for-one:
-  // read (elementOverridesFor), edit (setElementProp), clear (resetElementProp / clearElement).
-  const elementOverridesFor = useCallback(
-    (id: string): Record<string, string> | undefined => elements[id],
-    [elements],
-  );
-  const isElementPropOverridden = useCallback(
-    (id: string, prop: string): boolean => elements[id] != null && prop in elements[id],
-    [elements],
-  );
-  const setElementProp = useCallback((id: string, prop: string, value: string) => {
-    setElements((prev) => ({ ...prev, [id]: { ...prev[id], [prop]: value } }));
-  }, []);
-  const resetElementProp = useCallback((id: string, prop: string) => {
-    setElements((prev) => {
-      const props = { ...prev[id] };
-      delete props[prop];
-      const next = { ...prev };
-      // Drop the id entirely once its last property is gone, so the map never holds an empty entry.
-      if (Object.keys(props).length === 0) delete next[id];
-      else next[id] = props;
-      return next;
-    });
-  }, []);
-  const clearElement = useCallback((id: string) => {
-    setElements((prev) => {
-      const next = { ...prev };
-      delete next[id];
-      return next;
-    });
-  }, []);
-
-  const behaviorOverrideFor = useCallback((id: string) => behaviors[id], [behaviors]);
-  const setBehaviorOverride = useCallback((id: string, override: BehaviorOverride) => {
-    setBehaviors((prev) => ({ ...prev, [id]: { ...(prev[id] ?? {}), ...override } }));
-  }, []);
-  const resetBehaviorOverride = useCallback((id: string) => {
-    setBehaviors((prev) => {
-      const next = { ...prev };
-      delete next[id];
-      return next;
-    });
-  }, []);
-
+  // Reset all is one draft action - all five slices clear together - plus dropping the label the
+  // copy editor was pointed at, which is not part of the saved document.
   const resetAll = useCallback(() => {
-    setTokens({ root: {}, light: {} });
-    setCopyState({});
-    setIcons({});
-    setElements({});
-    setBehaviors({});
-    setSelectedCopy(null);
-  }, []);
-
-  const selectCopy = useCallback((id: string, defaultText: string) => {
-    setSelectedCopy({ id, def: defaultText });
-  }, []);
-  const clearSelectedCopy = useCallback(() => setSelectedCopy(null), []);
-
-  const selectDevId = useCallback((id: string | null) => setSelectedDevId(id), []);
-  const toggleInspect = useCallback(() => setInspect((v) => !v), []);
-  const toggleShowIds = useCallback(() => setShowIds((v) => !v), []);
-  const selectVars = useCallback((vars: string[]) => setHighlightedVars(vars), []);
-
-  const dirty =
-    JSON.stringify(tokens) !== savedTokens ||
-    JSON.stringify(copy) !== savedCopy ||
-    JSON.stringify(icons) !== savedIcons ||
-    JSON.stringify(elements) !== savedElements ||
-    JSON.stringify(behaviors) !== savedBehaviors;
-
-  const save = useCallback(async () => {
-    setSaving(true);
-    setLastError(null);
-    try {
-      // D-04 / ELEM-01: carry the working icon + element overrides as the `icons` / `elements`
-      // blocks; the backend (already wired) validates them and writes lib/icon.overrides.ts +
-      // lib/element.overrides.ts alongside the token/copy files.
-      //
-      // `elements` is narrowed to what the runtime would actually apply, so Save writes only
-      // source-backed overrides: a property that is no longer editable, or a value outside the safe
-      // grammar, is dropped here rather than sent to earn a 400 that names a value nobody typed.
-      //
-      // `copyPlaceholders` carries what each seen default DECLARES, so the writer can reject a
-      // rewording that dropped a required placeholder or invented one. The default lives in the
-      // JSX, so the backend has no other way to know the required set.
-      await api.devSave({
-        tokens,
-        copy,
-        icons,
-        elements: applicableOverrides(elements),
-        behaviors,
-        copyPlaceholders: copyPlaceholderDeclarations(),
-      });
-      setSavedTokens(JSON.stringify(tokens));
-      setSavedCopy(JSON.stringify(copy));
-      setSavedIcons(JSON.stringify(icons));
-      setSavedElements(JSON.stringify(elements));
-      setSavedBehaviors(JSON.stringify(behaviors));
-    } catch (err) {
-      setLastError(err instanceof ApiError ? err.message : "Could not save to source");
-    } finally {
-      setSaving(false);
-    }
-  }, [tokens, copy, icons, elements, behaviors]);
+    resetDraft();
+    clearSelectedCopy();
+  }, [resetDraft, clearSelectedCopy]);
 
   const value = useMemo<DevModeContextValue>(
     () => ({
-      enabled,
-      toggle: () => setEnabled((v) => !v),
+      ...toggleApi,
       theme,
-      tokenValue,
-      isTokenOverridden,
-      setToken,
-      resetToken,
-      resolveCopy,
-      isCopyOverridden,
-      setCopy,
-      resetCopy,
-      iconOverrideFor,
-      resolveIconOverride,
-      isIconOverridden,
-      setIconBody,
-      setIconSwap,
-      resetIcon,
-      elementOverridesFor,
-      isElementPropOverridden,
-      setElementProp,
-      resetElementProp,
-      clearElement,
-      behaviorOverrideFor,
-      setBehaviorOverride,
-      resetBehaviorOverride,
-      canUndo: undoRef.current.length > 0,
-      canRedo: redoRef.current.length > 0,
-      undo,
-      redo,
-      selectedCopyId: selectedCopy?.id ?? null,
-      selectedCopyDefault: selectedCopy?.def ?? "",
-      selectCopy,
-      clearSelectedCopy,
-      selectedDevId,
-      selectDevId,
-      inspect,
-      toggleInspect,
-      showIds,
-      toggleShowIds,
-      highlightedVars,
-      selectVars,
-      dirty,
-      saving,
-      lastError,
-      save,
+      ...draftApi,
+      ...historyApi,
+      ...selectionApi,
+      ...saveApi,
       resetAll,
     }),
     [
-      enabled,
+      toggleApi,
       theme,
-      tokenValue,
-      isTokenOverridden,
-      setToken,
-      resetToken,
-      resolveCopy,
-      isCopyOverridden,
-      setCopy,
-      resetCopy,
-      iconOverrideFor,
-      resolveIconOverride,
-      isIconOverridden,
-      setIconBody,
-      setIconSwap,
-      resetIcon,
-      elementOverridesFor,
-      isElementPropOverridden,
-      setElementProp,
-      resetElementProp,
-      clearElement,
-      behaviorOverrideFor,
-      setBehaviorOverride,
-      resetBehaviorOverride,
+      draftApi,
+      historyApi,
+      // The undo/redo stacks are refs, so a push or pop alone does not re-render. This counter is
+      // what makes Undo/Redo enable immediately after a ref-only stack mutation.
       historyRevision,
-      undo,
-      redo,
-      selectedCopy,
-      selectCopy,
-      clearSelectedCopy,
-      selectedDevId,
-      selectDevId,
-      inspect,
-      toggleInspect,
-      showIds,
-      toggleShowIds,
-      highlightedVars,
-      selectVars,
-      dirty,
-      saving,
-      lastError,
-      save,
+      selectionApi,
+      saveApi,
       resetAll,
     ],
   );

@@ -33,7 +33,7 @@ interface Props {
 export function DiffModal({ open, partId, partName, a, b, assets, onClose }: Props) {
   const changed = (["symbol", "footprint"] as const).filter((k) => assets[k]);
   const [kind, setKind] = useState<DiffKind>(changed[0] ?? "symbol");
-  const tablistLabel = useText("modal.diff.tablist", "Diff Type");
+  const tablistLabel = useText("modal.diff.tablist", "Diff Kind");
   const soleKind: DiffKind = changed[0] ?? "symbol";
   const kindTabs: TabItem<DiffKind>[] = changed.map((k) => ({
     id: k,
@@ -104,9 +104,7 @@ function DiffBody({
       <Centered>
         {/* One written sentence per kind, never the fetch's own exception text. */}
         {kind === "symbol" ? (
-          <ErrorState dense id="modal.diff.failed-symbol">
-            This symbol could not be drawn for either revision.
-          </ErrorState>
+          <ErrorState dense id="modal.diff.failed-symbol">The schematic asset could not be drawn for either revision.</ErrorState>
         ) : (
           <ErrorState dense id="modal.diff.failed-footprint">
             This footprint could not be drawn for either revision.

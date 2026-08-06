@@ -53,7 +53,8 @@ import { Button } from "./primitives";
 // system rather than from a private set of class strings that drift away from it.
 import { SectionHeader } from "./productState";
 import { ModalActions } from "./modalParts";
-import { Icon, resolveIcon, sanitizeIconBody } from "./Icon";
+import { Icon } from "./Icon";
+import { resolveIcon, sanitizeIconBody } from "./iconResolve";
 import { ICON_BY_ID, ICON_IDS_BY_CATEGORY } from "../lib/iconRegistry";
 import { api, ApiError } from "../api/client";
 import type { DevWorkspaceStatus } from "../api/types";
@@ -266,7 +267,7 @@ function CopyEditor() {
         </div>
       ) : null}
       {problem ? (
-        <div role="alert" className="mt-1 text-2xs leading-relaxed text-err">
+        <div role="alert" className="mt-1 text-2xs leading-relaxed text-err-text">
           {COPY_PROBLEM_TEXT[problem]} The default is shown until this is fixed.
         </div>
       ) : null}
@@ -373,6 +374,10 @@ function TokensTab({ showAll, setShowAll }: { showAll: boolean; setShowAll: (v: 
   const containerRef = useRef<HTMLDivElement>(null);
   const hasSelection = dev.selectedDevId != null;
   const used = dev.highlightedVars;
+  // Membership is asked once per token row, for every token in every group, on every render of the
+  // panel; the answer set is the selection's own variable list. One Set per selection change
+  // replaces a full scan of that list per row.
+  const usedVars = useMemo(() => new Set(used), [used]);
   const first = used[0];
   const scoped = hasSelection && !showAll;
 
@@ -424,7 +429,7 @@ function TokensTab({ showAll, setShowAll }: { showAll: boolean; setShowAll: (v: 
               <TokenRow
                 key={t.cssVar}
                 token={t}
-                highlighted={hasSelection && used.includes(t.cssVar)}
+                highlighted={hasSelection && usedVars.has(t.cssVar)}
               />
             ))}
           </section>
@@ -1010,6 +1015,15 @@ function BoxTab() {
   );
 }
 
+// Module scope: the preset table reads nothing local, so it is allocated once rather than on every
+// selection change.
+const BEHAVIOR_PRESETS = [
+  ["dropdown", "Dropdown"],
+  ["segmented", "Segmented Control"],
+  ["radio", "Radio Group"],
+  ["searchable", "Searchable Picker"],
+] as const;
+
 function BehaviorTab() {
   const dev = useDevMode();
   const id = dev.selectedDevId;
@@ -1024,17 +1038,11 @@ function BehaviorTab() {
     );
   }
   const current = dev.behaviorOverrideFor(id);
-  const presets = [
-    ["dropdown", "Dropdown"],
-    ["segmented", "Segmented Control"],
-    ["radio", "Radio Group"],
-    ["searchable", "Searchable Picker"],
-  ] as const;
   return (
     <div className="px-3.5 py-3">
       <SectionHeader title="Control Preset" className="mb-1" />
       <div className="grid grid-cols-2 gap-1.5">
-        {presets.map(([preset, label]) => (
+        {BEHAVIOR_PRESETS.map(([preset, label]) => (
           <button
             key={preset}
             type="button"
@@ -1144,7 +1152,7 @@ function Catalogue({
         type="button"
         aria-expanded={open}
         onClick={() => setOpen(!open)}
-        className="flex w-full items-center gap-1.5 px-3.5 py-2 text-2xs font-semibold uppercase tracking-[0.06em] text-t3 hover:text-t2"
+        className="flex w-full items-center gap-1.5 px-3.5 py-2 ui-property-label hover:text-t2"
       >
         <span aria-hidden="true">{open ? "▾" : "▸"}</span>
         Catalogue
@@ -1237,7 +1245,7 @@ function SelectionPane({
     <div>
       <div className="border-b border-line px-3.5 py-2.5">
         <div className="flex items-baseline gap-1.5">
-          <span className="text-2xs font-semibold uppercase tracking-[0.06em] text-t3">
+          <span className="ui-property-label">
             Selected
           </span>
           {selectedId ? (
@@ -1407,7 +1415,7 @@ export function DevPanel() {
       aria-label="Dev mode"
     >
       <header className="flex shrink-0 items-center gap-2 border-b border-line px-3.5 py-3">
-        <span className="rounded-control bg-acc px-1.5 py-0.5 text-2xs font-bold tracking-wide text-acc-on">
+        <span className="rounded-control bg-acc px-1.5 py-0.5 text-2xs font-semibold text-acc-on">
           DEV
         </span>
         <span className="text-sm font-semibold text-t1">Design</span>
@@ -1445,13 +1453,13 @@ export function DevPanel() {
 
       <footer className="max-h-[55vh] shrink-0 overflow-y-auto border-t border-line bg-popover px-3.5 py-3">
         {dev.lastError ? (
-          <div className="mb-2 text-2xs text-err">{dev.lastError}</div>
+          <div className="mb-2 text-2xs text-err-text">{dev.lastError}</div>
         ) : null}
-        {publishError ? <div className="mb-2 text-2xs text-err">{publishError}</div> : null}
+        {publishError ? <div className="mb-2 text-2xs text-err-text">{publishError}</div> : null}
         {!dev.dirty && publishStatus?.publish_blocker ? (
           <div className="mb-2 text-2xs text-t3">{publishStatus.publish_blocker}</div>
         ) : null}
-        {publishedCommit ? <div className="mb-2 text-2xs text-ok">Published {publishedCommit} to main.</div> : null}
+        {publishedCommit ? <div className="mb-2 text-2xs text-ok-text">Published {publishedCommit} to main.</div> : null}
         {publishOpen ? (
           <div className="mb-3 rounded-card border border-line bg-field p-2.5">
             <label className="block text-2xs font-semibold text-t2">
@@ -1487,7 +1495,7 @@ export function DevPanel() {
           <button
             type="button"
             onClick={dev.resetAll}
-            className="text-2xs text-t3 transition-colors hover:text-err"
+            className="text-2xs text-t3 transition-colors hover:text-err-text"
           >
             Reset All
           </button>

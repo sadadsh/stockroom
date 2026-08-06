@@ -16,10 +16,6 @@ export interface StmTargetRequest {
 
 const CSV_BOM = "\uFEFF";
 
-function json(value: unknown): string {
-  return JSON.stringify(value, null, 2) + "\n";
-}
-
 function unique(values: string[]): string[] {
   return [...new Set(values.filter(Boolean))].sort((a, b) =>
     a.localeCompare(b, undefined, { numeric: true }),
@@ -50,29 +46,32 @@ function positionRequirements(
   definition: TargetDefinitionDTO,
   position: TargetDefinitionPosition,
 ): string[] {
-  return definition.requirements
-    .filter((requirement) =>
-      requirement.routes.some((route) => route.position === position.position),
-    )
-    .map(
-      (requirement) =>
-        `${requirement.id}:${requirement.net}:${requirement.implementation_kind}:${requirement.coverage_status}`,
+  // One pass per position: this is called for every row of the pin plan, so the requirement list
+  // is walked once rather than once to select and again to format.
+  const out: string[] = [];
+  for (const requirement of definition.requirements) {
+    if (!requirement.routes.some((route) => route.position === position.position)) continue;
+    out.push(
+      `${requirement.id}:${requirement.net}:${requirement.implementation_kind}:${requirement.coverage_status}`,
     );
+  }
+  return out;
 }
 
 function positionFoundation(
   definition: TargetDefinitionDTO,
   position: TargetDefinitionPosition,
 ): { obligations: string[]; unresolved: string[] } {
-  const groups = definition.functional_foundation.groups.filter((group) =>
-    group.positions.includes(position.position),
-  );
-  return {
-    obligations: groups.map((group) => `${group.id}:${group.status}`),
-    unresolved: groups
-      .filter((group) => group.unresolved_positions.includes(position.position))
-      .map((group) => group.id),
-  };
+  // Both lists come out of ONE walk of the foundation groups (the obligations this position
+  // carries, and the subset of those still unresolved for it), in group order as before.
+  const obligations: string[] = [];
+  const unresolved: string[] = [];
+  for (const group of definition.functional_foundation.groups) {
+    if (!group.positions.includes(position.position)) continue;
+    obligations.push(`${group.id}:${group.status}`);
+    if (group.unresolved_positions.includes(position.position)) unresolved.push(group.id);
+  }
+  return { obligations, unresolved };
 }
 
 function positionSafety(
@@ -96,12 +95,32 @@ function positionRoutingPaths(
   definition: TargetDefinitionDTO,
   position: TargetDefinitionPosition,
 ): string[] {
-  return definition.routing_requirements.paths
-    .filter((path) => path.position === position.position)
-    .map((path) => {
-      const owner = path.branch_id ?? path.requirement_id ?? path.kind;
-      return `${path.path_id}:${owner}:${path.requested_net}:default-${path.safe_default}`;
-    });
+  // One pass per position, as with the requirements above: the path list is walked once.
+  const out: string[] = [];
+  for (const path of definition.routing_requirements.paths) {
+    if (path.position !== position.position) continue;
+    const owner = path.branch_id ?? path.requirement_id ?? path.kind;
+    out.push(`${path.path_id}:${owner}:${path.requested_net}:default-${path.safe_default}`);
+  }
+  return out;
+}
+
+/**
+ * The scope targets that carry no entry for this position, in scope order.
+ *
+ * One pass over the scope's targets against a membership set built once from the position's own
+ * per-target list, rather than re-scanning that list for every target of every row.
+ */
+function missingTargetRefs(
+  definition: TargetDefinitionDTO,
+  position: TargetDefinitionPosition,
+): string[] {
+  const present = new Set(position.per_target.map((candidate) => candidate.ref));
+  const missing: string[] = [];
+  for (const target of definition.scope.targets) {
+    if (!present.has(target.ref)) missing.push(target.ref);
+  }
+  return missing;
 }
 
 function positionUniversalization(
@@ -130,17 +149,6 @@ export function makeStmTargetRequest(
     },
     policy,
   };
-}
-
-export function stmTargetRequestJson(
-  definition: TargetDefinitionDTO,
-  policy: TargetDefinitionPolicy,
-): string {
-  return json(makeStmTargetRequest(definition, policy));
-}
-
-export function stmTargetDefinitionJson(definition: TargetDefinitionDTO): string {
-  return json(definition);
 }
 
 /**
@@ -253,14 +261,7 @@ export function stmPinPlanCsv(definition: TargetDefinitionDTO): string {
       ),
       position.present_on,
       position.total_targets,
-      join(
-        definition.scope.targets
-          .map((target) => target.ref)
-          .filter(
-            (targetRef) =>
-              !position.per_target.some((candidate) => candidate.ref === targetRef),
-          ),
-      ),
+      join(missingTargetRefs(definition, position)),
       join(position.identities),
       join(
         position.per_target.map(
@@ -375,11 +376,16 @@ export function stmAccessPlanCsv(definition: TargetDefinitionDTO): string {
     "implementation_notes",
   ];
 
+  // The service group each requirement names, indexed once instead of scanned per requirement.
+  // FIRST entry wins for a duplicated id, which is what `find` returned before.
+  const serviceById = new Map<string, (typeof definition.service_groups)[number]>();
+  for (const group of definition.service_groups) {
+    if (!serviceById.has(group.id)) serviceById.set(group.id, group);
+  }
+
   const rows: Array<Array<string | number | boolean | null | undefined>> = [];
   for (const requirement of definition.requirements) {
-    const service = definition.service_groups.find(
-      (group) => group.id === requirement.service_group,
-    );
+    const service = serviceById.get(requirement.service_group);
     for (const target of definition.scope.targets) {
       const targetRef = target.ref;
       const route = requirement.routes.find((candidate) => candidate.ref === targetRef);

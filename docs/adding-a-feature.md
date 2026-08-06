@@ -96,13 +96,20 @@ Pick the smallest recipe that fits — most features are one or two of these com
 
 ## Add a parametric spec / attribute
 
-No code change — these are registries:
+No code change — these are **backend** registries. The dossier decides grouping, key
+specifications, units, constraints and completeness once, per category, and serves the answer;
+the frontend renders what it is given and owns none of this.
 
-- To group / label / unit a new spec key in the detail sheet and the parametric search, add one row
-  to `SPEC_REGISTRY` in `lib/specSchema.ts`.
-- To make a category headline nicely or surface a key attribute chip, add a row to `TITLE_REGISTRY`
-  / `ATTRIBUTE_REGISTRY` in `lib/derive.ts`.
-- An unregistered key still lands in a sane group and renders honestly, so this only refines.
+- To name a canonical field (its label, group, value type, unit, filter/sort/compare behaviour,
+  and the distributor spellings that resolve to it), add one row to `FIELDS` in
+  `app/backend/stockroom/dossier/fields.py`.
+- To describe a **kind** of component — its key specifications, its group order, what it expects
+  and recommends, what does not apply to it, its units, its validation constraints, its search
+  facets, its comparison fields and its CAD validation relationships — add one `CategorySchema`
+  row to `CATEGORY_SCHEMAS` in `dossier/categories.py`. A schema is resolved from the part's own
+  words inside its filed category, so a new kind needs its `signals` and nothing else.
+- An unregistered key still lands in a sane group under the source's own wording and is reported
+  as an unmapped source field, so this only ever refines.
 
 ## Add a distributor / vendor scraper
 

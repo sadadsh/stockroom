@@ -14,6 +14,8 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
+  useMemo,
   useRef,
   useState,
   type ReactNode,
@@ -25,69 +27,17 @@ import type {
   CompletionEvidence,
   CompletionResult,
   CadSourceResponse,
-  ProviderOutcome,
   Requirement,
   WorkflowBatchSummary,
   WorkflowEvent,
 } from "../api/types";
 import { readUiSession, updateUiSession } from "./uiSession";
-
-export type { Requirement };
-
-export type GuidedStatus =
-  | "idle"
-  | "resolving"
-  | "window-open"
-  | "receiving"
-  | "attaching"
-  | "done"
-  | "timed-out"
-  | "unavailable"
-  | "error";
-
-export class CaptureBusyError extends Error {
-  constructor(partName: string) {
-    super(`Finish the active completion for ${partName || "the current part"} before starting another.`);
-    this.name = "CaptureBusyError";
-  }
-}
-
-export const KICAD_REQS: Requirement[] = [
-  "kicad_symbol",
-  "kicad_footprint",
-  "kicad_model",
-];
-export const ALTIUM_REQS: Requirement[] = [
-  "altium_symbol",
-  "altium_footprint",
-];
-
-export const REQ_LABELS: Record<Requirement, string> = {
-  kicad_symbol: "KiCad Symbol",
-  kicad_footprint: "KiCad Footprint",
-  kicad_model: "3D Model",
-  altium_symbol: "Altium Symbol",
-  altium_footprint: "Altium Footprint",
-};
-
-type Received = Partial<Record<Requirement, boolean>>;
-
-export interface CaptureState {
-  partId: string | null;
-  workflowItemId: string | null;
-  partName: string | null;
-  status: GuidedStatus;
-  message: string | null;
-  url: string | null;
-  routeToken: string | null;
-  vendor: string | null;
-  needs: Requirement[];
-  received: Received;
-  backgrounded: boolean;
-  providerOutcomes: ProviderOutcome[];
-  completionEvidence: CompletionEvidence | null;
-  completionEvidenceReported: boolean;
-}
+import {
+  CaptureBusyError,
+  captureInFlight,
+  REQ_LABELS,
+  type CaptureState,
+} from "./captureRequirements";
 
 const IDLE: CaptureState = {
   partId: null,
@@ -105,21 +55,6 @@ const IDLE: CaptureState = {
   completionEvidence: null,
   completionEvidenceReported: false,
 };
-
-// A capture that has not reached a terminal verdict yet. Starting a different part while one of
-// these is running is what abandons the earlier follow loop.
-const IN_FLIGHT: GuidedStatus[] = ["resolving", "window-open", "receiving", "attaching"];
-
-/**
- * Is this capture still running?
- *
- * There is exactly ONE capture slot here and a process-wide exclusive window in the backend, so
- * every surface that can START a capture has to ask this first. Exported rather than re-derived
- * per surface, because a second list of "busy" statuses is a second answer waiting to disagree.
- */
-export function captureInFlight(state: CaptureState): boolean {
-  return IN_FLIGHT.includes(state.status);
-}
 
 const EVENT_PAGE_LIMIT = 200;
 const POLL_INTERVAL_MS = 750;
@@ -350,14 +285,6 @@ function resultFromCanonicalProjection(
   };
 }
 
-export function subsetComplete(
-  needs: Requirement[],
-  received: Received,
-  subset: Requirement[],
-): boolean {
-  return needs.filter((need) => subset.includes(need)).every((need) => received[need]);
-}
-
 export interface CaptureApi {
   active: CaptureState;
   start: (
@@ -369,10 +296,20 @@ export interface CaptureApi {
   reset: () => void;
   keepWorking: () => void;
   showProvider: () => Promise<void>;
-  reopenPartId: string | null;
+  /**
+   * Register the surface that owns opening a part, and get its unsubscribe back.
+   *
+   * A CALLBACK rather than a `reopenPartId` value on this object, and the difference is not
+   * cosmetic. The latched id made the reopen a two-step: the click wrote state here, a render
+   * later the Library page's effect read it and moved the selection, and moving the selection woke
+   * the auto-select effect beside it - three renders and a chain of effects for one click, where
+   * the request had been known all along inside the click itself. It also could not deliver the
+   * SAME part twice, because the second request wrote the id the latch already held, so no effect
+   * re-ran and the pill simply stopped working; and nothing ever cleared the latch.
+   */
+  onReopen: (handler: (partId: string) => void) => () => void;
   requestReopen: () => void;
   requestOpenFor: (partId: string) => void;
-  clearReopen: () => void;
 }
 
 const CaptureContext = createContext<CaptureApi | null>(null);
@@ -409,8 +346,17 @@ function completionEvidenceMessage(evidence: CompletionEvidence | null): string 
 export function CaptureProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<CaptureState>(IDLE);
   const stateRef = useRef(state);
-  stateRef.current = state;
-  const [reopenPartId, setReopenPartId] = useState<string | null>(null);
+  // Synced in a layout effect, not during render: render can be replayed or thrown away, and the
+  // busy-slot guard in `start` must never reject against a capture state that no commit ever
+  // published. `start` only ever runs from an event or an awaited continuation, both after commit.
+  useLayoutEffect(() => {
+    stateRef.current = state;
+  });
+  // Who currently owns opening a part, and a request that arrived while nobody did. Refs, not
+  // state: a reopen request is a message delivered once, not a value this provider holds, and
+  // holding it as state re-rendered every capture consumer for something only one surface acts on.
+  const reopenHandlersRef = useRef(new Set<(partId: string) => void>());
+  const pendingReopenRef = useRef<string | null>(null);
   const queryClient = useQueryClient();
   const partIdRef = useRef<string | null>(null);
   const needsRef = useRef<Requirement[]>([]);
@@ -655,16 +601,29 @@ export function CaptureProvider({ children }: { children: ReactNode }) {
     if (!saved) return;
     const { batchId, itemId, cursor } = saved;
     const generation = ++followGenerationRef.current;
+    // Two guards, because there are two different things that can make this run irrelevant, and the
+    // generation ref only covers one of them. The REF says "some other capture now owns the slot" -
+    // it is shared, and a `start()` from a surface bumps it. This FLAG says "this effect instance is
+    // gone", which is a fact about this closure alone and is what a teardown actually means.
+    let cancelled = false;
 
     async function reconnect(): Promise<void> {
       let failures = 0;
-      while (generation === followGenerationRef.current) {
+      while (!cancelled && generation === followGenerationRef.current) {
         try {
           const session = await api.captureWorkflow(batchId);
           if (session.workflow_item_id !== itemId) {
             throw new Error("The saved capture item no longer matches its workflow.");
           }
           const detail = await api.partDetail(session.part_id);
+          // The loop condition was tested BEFORE those two requests. Between them the effect can be
+          // cleaned up, or a real capture can be started from a surface, and either bumps the
+          // generation - so re-test it here, before this abandoned reconnect writes the identity refs
+          // and the state. Without it a discarded reconnect could overwrite the refs the LIVE capture
+          // is following with the part it had set out to restore. The requests are not cancelled and
+          // nothing is deferred: only the result of a run nobody is waiting for is dropped.
+          if (cancelled) return;
+          if (generation !== followGenerationRef.current) return;
           const partName = detail.derived.display_name;
           partIdRef.current = session.part_id;
           needsRef.current = session.initial_needs;
@@ -693,6 +652,7 @@ export function CaptureProvider({ children }: { children: ReactNode }) {
           });
           return;
         } catch (error) {
+          if (cancelled) return;
           if (generation !== followGenerationRef.current) return;
           failures += 1;
           if (error instanceof ApiError && ![0, 503].includes(error.status)) {
@@ -711,6 +671,7 @@ export function CaptureProvider({ children }: { children: ReactNode }) {
 
     void reconnect();
     return () => {
+      cancelled = true;
       if (followGenerationRef.current === generation) followGenerationRef.current += 1;
     };
   }, [followDurable]);
@@ -877,34 +838,65 @@ export function CaptureProvider({ children }: { children: ReactNode }) {
     await api.showCaptureProvider(batchId);
   }, []);
 
+  const onReopen = useCallback((handler: (partId: string) => void) => {
+    const handlers = reopenHandlersRef.current;
+    handlers.add(handler);
+    // A request can arrive while no surface owns opening a part, because the pill both requests the
+    // reopen and navigates to the Library, and the Library is not mounted until that navigation
+    // commits. So the request waits here for exactly one subscriber and is then spent.
+    const waiting = pendingReopenRef.current;
+    if (waiting !== null) {
+      pendingReopenRef.current = null;
+      handler(waiting);
+    }
+    return () => {
+      handlers.delete(handler);
+    };
+  }, []);
+
+  const openPart = useCallback((partId: string) => {
+    const handlers = [...reopenHandlersRef.current];
+    if (handlers.length === 0) {
+      pendingReopenRef.current = partId;
+      return;
+    }
+    for (const handler of handlers) handler(partId);
+  }, []);
+
   const requestReopen = useCallback(() => {
-    setReopenPartId(partIdRef.current);
+    const partId = partIdRef.current;
     setState((current) => ({ ...current, backgrounded: false }));
-  }, []);
+    if (partId) openPart(partId);
+  }, [openPart]);
 
-  const requestOpenFor = useCallback((partId: string) => {
-    setReopenPartId(partId);
-  }, []);
-
-  const clearReopen = useCallback(() => setReopenPartId(null), []);
-
-  return (
-    <CaptureContext.Provider
-      value={{
-        active: state,
-        start,
-        reset,
-        keepWorking,
-        showProvider,
-        reopenPartId,
-        requestReopen,
-        requestOpenFor,
-        clearReopen,
-      }}
-    >
-      {children}
-    </CaptureContext.Provider>
+  const requestOpenFor = useCallback(
+    (partId: string) => {
+      openPart(partId);
+    },
+    [openPart],
   );
+
+  // Held by identity rather than rebuilt inline. Every action below is a stable `useCallback`, so
+  // the only thing that genuinely changes is the capture state. Rebuilding the object each render
+  // meant a poll tick - one every 750ms for the whole life of a capture - re-rendered every
+  // `useCapture` consumer in the application, including surfaces with nothing to redraw. Named
+  // `captureApi`, not `api`: this component reads the API CLIENT as `api`, and shadowing it here
+  // silently routes every request into this object.
+  const captureApi = useMemo<CaptureApi>(
+    () => ({
+      active: state,
+      start,
+      reset,
+      keepWorking,
+      showProvider,
+      onReopen,
+      requestReopen,
+      requestOpenFor,
+    }),
+    [state, start, reset, keepWorking, showProvider, onReopen, requestReopen, requestOpenFor],
+  );
+
+  return <CaptureContext.Provider value={captureApi}>{children}</CaptureContext.Provider>;
 }
 
 export function useCapture(): CaptureApi {

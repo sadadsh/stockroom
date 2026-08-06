@@ -79,7 +79,7 @@ def test_v3_migrates_to_v4_without_inventing_a_variant_for_an_existing_asset() -
     output = json.loads(record.dumps())
 
     assert source["schema_version"] == 3, "migration mutated its input"
-    assert migrated["schema_version"] == SCHEMA_VERSION == 4
+    assert migrated["schema_version"] == SCHEMA_VERSION == 5
     assert record.assets_for("kicad").symbol.ref.name == "S1M"
     assert record.cad_variants.is_empty()
     assert "cad_variants" not in output, "migration fabricated an evidence link"

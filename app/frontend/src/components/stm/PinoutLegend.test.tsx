@@ -59,13 +59,13 @@ describe("PinoutLegend", () => {
     expect(within(keyPins).getByText("Boot straps")).toBeInTheDocument();
     expect(within(keyPins).getByText("Debug access")).toBeInTheDocument();
     expect(within(keyPins).getByText("Oscillator")).toBeInTheDocument();
-    expect(within(keyPins).getByText("VDD supply")).toBeInTheDocument();
+    expect(within(keyPins).getByText("VDD rail")).toBeInTheDocument();
   });
 
   it("teaches all four encoding channels", () => {
     render(<PinoutLegend />);
     // fill = category (the saturated channel)
-    expect(screen.getByText("Category")).toBeInTheDocument();
+    expect(screen.getByText("Class")).toBeInTheDocument();
     // the full ten-bucket category vocabulary, including the io split
     expect(screen.getByText("GPIO")).toBeInTheDocument();
     expect(screen.getByText("Analog")).toBeInTheDocument();

@@ -18,11 +18,11 @@ import {
   useOdbcStatus,
 } from "../api/queries";
 import { useToast } from "../lib/toast";
-import { Text } from "../lib/copy";
+import { Text, useCopyFormatter, useText } from "../lib/copy";
 import { AltiumDbLibModal } from "./AltiumDbLibModal";
 import { AltiumSetupModal } from "./AltiumSetupModal";
 import { Button, Dot } from "./primitives";
-import { RefreshIcon, LibraryIcon, DownloadIcon, ExternalIcon } from "./icons";
+import { RefreshIcon, LibraryIcon, DownloadIcon, ExternalIcon, DuplicateIcon } from "./icons";
 import { Icon } from "./Icon";
 
 export function AltiumDbLibSection() {
@@ -32,6 +32,49 @@ export function AltiumDbLibSection() {
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
   const [setupOpen, setSetupOpen] = useState(false);
+  // The glyph carries the verb, so the label carries the object alone. The full action still has
+  // to be readable and announceable, which is what this string is for.
+  const copyPathAction = useText(
+    "altiumdb.section.copy-path.action",
+    "Place The Install Path On The Clipboard",
+  );
+  // A toast takes a resolved STRING, so the copy layer has to be read here and the result handed to
+  // it - the same contract as an `aria-label`. A counted sentence gets one id per number agreement
+  // rather than a stitched-in noun, so each override is a whole sentence somebody can reword.
+  const rebuiltOne = useCopyFormatter(
+    "altiumdb.section.toast-rebuilt-one",
+    "Regenerated the DbLib with {count} part.",
+  );
+  const rebuiltMany = useCopyFormatter(
+    "altiumdb.section.toast-rebuilt-many",
+    "Regenerated the DbLib with {count} parts.",
+  );
+  const rebuiltEmpty = useText(
+    "altiumdb.section.toast-rebuilt-empty",
+    "Regenerated. No parts hold Altium assets, so the catalog has no rows.",
+  );
+  const rebuildFailed = useText(
+    "altiumdb.section.toast-rebuild-failed",
+    "Could not regenerate the DbLib.",
+  );
+  const pathPlaced = useText("altiumdb.section.toast-path-placed", "Copied the install path.");
+  const pathNotPlaced = useText(
+    "altiumdb.section.toast-path-failed",
+    "Could not place the path on the clipboard.",
+  );
+  const setupFailed = useText(
+    "altiumdb.section.toast-setup-failed",
+    "Could not set up the DbLib in Altium.",
+  );
+  const rebuildBusyLabel = useText("altiumdb.section.rebuild-busy", "Rebuilding...");
+  const rebuildLabel = useText("altiumdb.section.rebuild", "Rebuild DbLib");
+  const setupBusyLabel = useText("altiumdb.section.setup-busy", "Setting Up...");
+  const setupLabel = useText("altiumdb.section.setup-action", "Set Up In Altium");
+  const setupTip = useText(
+    "altiumdb.section.setup-tip",
+    "This action opens Altium to install and validate the active DbLib.",
+  );
+  const setupBlockedTip = useText("altiumdb.section.setup-blocked-tip", "Rebuild the DbLib first.");
 
   const data = status.data;
   const pct = data && data.total > 0 ? Math.round((data.ready / data.total) * 100) : 0;
@@ -39,14 +82,14 @@ export function AltiumDbLibSection() {
   async function onRegenerate() {
     try {
       const r = await regenerate.mutateAsync();
+      const counted = r.emitted === 1 ? rebuiltOne : rebuiltMany;
       toast(
-        r.emitted > 0
-          ? `Regenerated the DbLib with ${r.emitted} ${r.emitted === 1 ? "part" : "parts"}.`
-          : "Regenerated. No parts carry Altium assets yet, so the library is empty.",
+        r.emitted > 0 ? counted({ count: r.emitted }) : rebuiltEmpty,
         r.emitted > 0 ? "ok" : "neutral",
       );
     } catch (err) {
-      toast(err instanceof Error ? err.message : "Could not regenerate the DbLib.", "err");
+      // The thrown message is a backend diagnostic, which is data; the fallback sentence is ours.
+      toast(err instanceof Error ? err.message : rebuildFailed, "err");
     }
   }
 
@@ -54,9 +97,9 @@ export function AltiumDbLibSection() {
     if (!data) return;
     try {
       await navigator.clipboard.writeText(data.dblib);
-      toast("Copied the install path.", "ok");
+      toast(pathPlaced, "ok");
     } catch {
-      toast("Could not copy the path.", "err");
+      toast(pathNotPlaced, "err");
     }
   }
 
@@ -65,7 +108,7 @@ export function AltiumDbLibSection() {
       const result = await setup.mutateAsync();
       toast(result.detail, ["verified", "already-verified"].includes(result.status) ? "ok" : "err");
     } catch (err) {
-      toast(err instanceof Error ? err.message : "Could not set up the DbLib in Altium.", "err");
+      toast(err instanceof Error ? err.message : setupFailed, "err");
     }
   }
 
@@ -73,27 +116,27 @@ export function AltiumDbLibSection() {
     <>
       {status.isLoading ? (
         <p className="py-1 text-sm text-t3">
-          <Text id="altiumdb.section.loading">Reading the library...</Text>
+          <Text id="altiumdb.section.loading">Reading the catalog...</Text>
         </p>
       ) : status.isError ? (
-        <p className="py-1 text-sm text-err">
-          <Text id="altiumdb.section.error">Could not read the Altium library.</Text>
+        <p className="py-1 text-sm text-err-text">
+          <Text id="altiumdb.section.error">Could not read the Altium catalog.</Text>
         </p>
       ) : data ? (
         <div className="flex flex-col gap-3">
           <div className="flex items-baseline justify-between gap-4">
             <div className="flex items-baseline gap-2">
-              <span className="tnum font-mono text-title font-bold leading-none text-t1">
+              <span className="tnum font-mono text-title font-semibold leading-none text-t1">
                 {data.ready}
               </span>
               <span className="text-sm text-t3">
                 <Text id="altiumdb.section.ready-of">of</Text>{" "}
                 <span className="tnum font-mono text-t2">{data.total}</span>{" "}
-                <Text id="altiumdb.section.ready-suffix">parts ready to place</Text>
+                <Text id="altiumdb.section.ready-suffix">parts prepared to place</Text>
               </span>
             </div>
             <span className="text-xs text-t3">
-              <Text id="altiumdb.section.library-label">Library</Text>{" "}
+              <Text id="altiumdb.section.library-label">Catalog</Text>{" "}
               <span className="text-t2">{data.profile}</span>
             </span>
           </div>
@@ -112,25 +155,26 @@ export function AltiumDbLibSection() {
             <span className="min-w-0 truncate font-mono text-xs text-t3" title={data.dblib}>
               {data.dblib}
             </span>
-            <Button small onClick={onCopyPath} className="flex-none">
-              <Text id="altiumdb.section.copy-path">Copy Path</Text>
+            <Button
+              small
+              onClick={onCopyPath}
+              className="flex-none"
+              title={copyPathAction}
+              aria-label={copyPathAction}
+              icon={<DuplicateIcon className="h-3.5 w-3.5" />}
+            >
+              <Text id="altiumdb.section.copy-path">Path</Text>
             </Button>
           </div>
           <p className="text-xs text-t3">
-            <Text id="altiumdb.section-install-note">
-              Opening Stockroom never launches Altium. Set Up In Altium performs the one-time
-              install and fresh-session verification when you choose it.
-            </Text>
+            <Text id="altiumdb.section-install-note">Opening Stockroom never launches Altium. Set Up In Altium performs the one-time install and fresh-session validation at the moment it is chosen.</Text>
           </p>
           {!data.datasource_present ? (
             // The data source is derived and is not shared through git, so a clone that has
             // never been opened here has none. Saying so beats letting Altium fail with an ODBC
             // error against a file nobody mentioned.
             <p className="text-xs text-warn" data-testid="altium-datasource-missing">
-              <Text id="altiumdb.section.datasource-missing">
-                This machine-local data source has not been built yet. Rebuild the DbLib before
-                setting it up in Altium.
-              </Text>
+              <Text id="altiumdb.section.datasource-missing">This machine-local data source has not been built. Rebuild the DbLib before setting it up in Altium.</Text>
             </p>
           ) : null}
         </div>
@@ -148,19 +192,15 @@ export function AltiumDbLibSection() {
           disabled={regenerate.isPending || !data}
           icon={<RefreshIcon className="h-3.5 w-3.5" />}
         >
-          {regenerate.isPending ? "Rebuilding..." : "Rebuild DbLib"}
+          {regenerate.isPending ? rebuildBusyLabel : rebuildLabel}
         </Button>
         <Button
           onClick={onSetup}
           disabled={setup.isPending || !data?.datasource_present}
-          title={
-            data?.datasource_present
-              ? "This action opens Altium to install and verify the active DbLib."
-              : "Rebuild the DbLib first."
-          }
+          title={data?.datasource_present ? setupTip : setupBlockedTip}
           icon={<ExternalIcon className="h-3.5 w-3.5" />}
         >
-          {setup.isPending ? "Setting Up..." : "Set Up In Altium"}
+          {setup.isPending ? setupBusyLabel : setupLabel}
         </Button>
         <EmbedAllModelsButton />
         <Button
@@ -168,7 +208,7 @@ export function AltiumDbLibSection() {
           disabled={!data}
           icon={<LibraryIcon className="h-3.5 w-3.5" />}
         >
-          <Text id="altiumdb.section.view-library">View Library</Text>
+          <Text id="altiumdb.section.view-library">View Catalog</Text>
         </Button>
         <Button onClick={() => setSetupOpen(true)} icon={<LibraryIcon className="h-3.5 w-3.5" />}>
           <Text id="altiumdb.section-setup">Setup Guide</Text>
@@ -195,15 +235,36 @@ function EmbedAllModelsButton() {
   const embed = useAltiumEmbedModels();
   const { toast } = useToast();
 
+  const blockedBusy = useCopyFormatter(
+    "altiumdb.embed.blocked-busy",
+    "Close Altium first: {app} is holding the license seat.",
+  );
+  const blockedMissing = useText(
+    "altiumdb.embed.blocked-missing",
+    "Altium is not installed on this machine.",
+  );
+  const partialRun = useCopyFormatter(
+    "altiumdb.embed.toast-partial",
+    "Embedded {done} of {attempted}. {failed} failed.",
+  );
+  const partialRunFirst = useCopyFormatter(
+    "altiumdb.embed.toast-partial-first",
+    "Embedded {done} of {attempted}. {failed} failed, starting with {part}: {detail}",
+  );
+  const embeddedOne = useCopyFormatter("altiumdb.embed.toast-one", "Embedded {count} 3D model.");
+  const embeddedMany = useCopyFormatter("altiumdb.embed.toast-many", "Embedded {count} 3D models.");
+  const embedFailed = useText("altiumdb.embed.toast-failed", "Could not embed the 3D models.");
+  const embedBusyLabel = useText("altiumdb.embed.busy", "Embedding...");
+  const embedLabel = useCopyFormatter("altiumdb.embed.action", "Embed 3D Models ({count})");
+
   const count = pending.data?.count ?? 0;
-  if (count === 0) return null;
 
   const cap = capability.data;
   const blocked =
     cap && !cap.available
       ? cap.busy
-        ? `Close Altium first: ${cap.busy} is holding the license seat.`
-        : cap.reason || "Altium is not installed on this machine."
+        ? blockedBusy({ app: cap.busy })
+        : cap.reason || blockedMissing
       : "";
   const running = embed.status === "running";
 
@@ -216,18 +277,23 @@ function EmbedAllModelsButton() {
       // walked away from this, so the one line they read has to say that something needs them.
       if (r.failed > 0) {
         const first = r.results.find((x) => x.status === "failed");
+        const run = { done: r.embedded, attempted: r.attempted, failed: r.failed };
         toast(
-          `Embedded ${r.embedded} of ${r.attempted}. ${r.failed} failed` +
-            (first?.detail ? `, starting with ${first.part_id}: ${first.detail}` : "."),
+          first?.detail
+            ? partialRunFirst({ ...run, part: first.part_id, detail: first.detail })
+            : partialRun(run),
           "err",
         );
         return;
       }
-      toast(`Embedded ${r.embedded} 3D ${r.embedded === 1 ? "model" : "models"}.`, "ok");
+      const counted = r.embedded === 1 ? embeddedOne : embeddedMany;
+      toast(counted({ count: r.embedded }), "ok");
     } catch (err) {
-      toast(err instanceof Error ? err.message : "Could not embed the 3D models.", "err");
+      toast(err instanceof Error ? err.message : embedFailed, "err");
     }
   }
+
+  if (count === 0) return null;
 
   return (
     <Button
@@ -237,7 +303,7 @@ function EmbedAllModelsButton() {
       data-dev-id="altiumdb.embed-all"
       icon={<Icon id="layer.model" className="h-3.5 w-3.5" />}
     >
-      {running ? embed.progress?.message || "Embedding..." : `Embed 3D Models (${count})`}
+      {running ? embed.progress?.message || embedBusyLabel : embedLabel({ count })}
     </Button>
   );
 }
@@ -265,9 +331,9 @@ function OdbcDriverRow() {
     label = <Text id="altiumdb.odbc.missing">Not Installed</Text>;
   } else if (!odbc.isLoading) {
     tone = "neutral";
-    label = <Text id="altiumdb.odbc.unknown">Cannot be verified on this platform</Text>;
+    label = <Text id="altiumdb.odbc.unknown">Cannot be validated on this platform</Text>;
   }
-  const toneText = tone === "ok" ? "text-ok" : tone === "warn" ? "text-warn" : "text-t3";
+  const toneText = tone === "ok" ? "text-ok-text" : tone === "warn" ? "text-warn" : "text-t3";
 
   return (
     <div

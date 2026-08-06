@@ -14,7 +14,8 @@ import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { ApiError, api } from "../../api/client";
 import { cadVariantApi } from "../../api/cadVariantClient";
-import type { ComponentWorkspaceResponse } from "../../api/workspaceTypes";
+import type { ComponentDossier } from "../../api/dossierTypes";
+import { DevModeProvider } from "../../lib/devMode";
 import { ThemeProvider } from "../../lib/theme";
 import { ToastProvider } from "../../lib/toast";
 import {
@@ -23,23 +24,25 @@ import {
   resetUiSessionForTests,
 } from "../../lib/uiSession";
 import {
-  makeFact,
+  makeCandidate,
+  makeDocument,
+  makeDossier,
   makeOffer,
-  makeSourceRecord,
-  makeWorkspace,
-} from "../../test/workspaceFixture";
+  makeRelatedPart,
+  makeSourceLedgerEntry,
+  makeSpecification,
+} from "../../test/dossierFixture";
 import { makePartDetail } from "../../test/partFixture";
 import { ComponentWorkspace } from "./ComponentWorkspace";
-import { canApplyAlternate } from "./SourcesSheet";
-import { factMatches, pinoutColumns, sheetGroups } from "./SpecificationsSheet";
-import { representativeLine } from "./InfoTabPanels";
+import { canApplyAlternate } from "./sourceCandidates";
+import { pinoutColumns } from "./pinoutRows";
 
 vi.mock("../../api/client", async (importActual) => {
   const actual = await importActual<typeof import("../../api/client")>();
   return {
     ...actual,
     api: {
-      partWorkspace: vi.fn(),
+      partDossier: vi.fn(),
       partHistory: vi.fn(),
       partDiff: vi.fn(),
       partDetail: vi.fn(),
@@ -110,17 +113,30 @@ function provide(ui: ReactNode) {
   return render(
     <QueryClientProvider client={qc}>
       <ThemeProvider>
-        <ToastProvider>{ui}</ToastProvider>
+        <DevModeProvider>
+          <ToastProvider>{ui}</ToastProvider>
+        </DevModeProvider>
       </ThemeProvider>
     </QueryClientProvider>,
   );
 }
 
-async function open(workspace: ComponentWorkspaceResponse = makeWorkspace()) {
+/**
+ * Turn developer mode on the way a person does: Ctrl+Shift+D, which is the only way in.
+ *
+ * It matters that this is the real path. Technical diagnostics are gated on the same flag the
+ * design panel is, and a test that reached past the gate would prove the panel renders rather
+ * than that the gate holds.
+ */
+async function enableDeveloperMode(user: ReturnType<typeof userEvent.setup>) {
+  await user.keyboard("{Control>}{Shift>}D{/Shift}{/Control}");
+}
+
+async function open(dossier: ComponentDossier = makeDossier()) {
   resetUiSessionForTests(openComponentInSession(defaultUiSession(), ID));
-  mockApi.partWorkspace.mockResolvedValue(workspace);
+  mockApi.partDossier.mockResolvedValue(dossier);
   const view = provide(<ComponentWorkspace componentId={ID} />);
-  await screen.findByRole("heading", { name: workspace.identity.displayName });
+  await screen.findByText(dossier.identity.mpn);
   return view;
 }
 
@@ -138,184 +154,66 @@ function streamOf(chunks: string[]): ReadableStream<Uint8Array> {
 function bigSpecs() {
   const electrical = ["Supply Voltage", "Quiescent Current", "Slew Rate", "Gain", "Noise"];
   const physical = ["Package", "Pitch", "Height", "Lead Count"];
-  return {
-    total: electrical.length + physical.length,
-    pinCount: 2,
-    pinout: [
-      { pin: "1", name: "OUT1", type: "output" },
-      { pin: "2", name: "IN1-", type: "input" },
-    ],
-    groups: [
+  const row = (label: string) =>
+    makeSpecification({ key: label, label, displayValue: `${label} value`, unit: "" });
+  return makeDossier({
+    specificationGroups: [
       {
         id: "electrical",
         label: "Electrical",
         count: electrical.length,
-        facts: electrical.map((label) =>
-          makeFact({ id: label, label, rawValue: `${label} value` }),
-        ),
+        specifications: electrical.map(row),
       },
       {
-        id: "physical",
-        label: "Physical",
+        id: "package_mechanical",
+        label: "Package and Mechanical",
         count: physical.length,
-        facts: physical.map((label) => makeFact({ id: label, label, rawValue: `${label} value` })),
+        specifications: physical.map(row),
       },
     ],
-  };
+    diagnostics: {
+      pinCount: 2,
+      pinout: [
+        { pin: "1", name: "OUT1", type: "output" },
+        { pin: "2", name: "IN1-", type: "input" },
+      ],
+    },
+  });
 }
 
-/** Open the Specifications sheet the way a person does: the tab, then its View All. */
-async function openSpecSheet(workspace: ComponentWorkspaceResponse) {
-  await open(workspace);
+/**
+ * Open a secondary surface by pressing the control that leads to it.
+ *
+ * Every one of these now hangs off a COLUMN or off the Manage menu rather than off an information
+ * tab, because there are no information tabs: the columns are all on screen at once, so a sheet is
+ * reached from the section it belongs to.
+ */
+async function openSheet(dossier: ComponentDossier, control: string, dialogName: string) {
+  await open(dossier);
   const user = userEvent.setup();
-  const strip = document.querySelector<HTMLElement>('[data-dev-id="component-browser.info.tabs"]')!;
-  await user.click(within(strip).getByRole("tab", { name: "Specifications" }));
-  await user.click(
-    within(await screen.findByLabelText("Specification Groups")).getByRole("button", {
-      name: "View All Specifications",
-    }),
-  );
-  return { user, dialog: await screen.findByRole("dialog", { name: "Specifications" }) };
-}
-
-async function openSheet(workspace: ComponentWorkspaceResponse, tab: string, title: string) {
-  await open(workspace);
-  const user = userEvent.setup();
-  const strip = document.querySelector<HTMLElement>('[data-dev-id="component-browser.info.tabs"]')!;
-  await user.click(within(strip).getByRole("tab", { name: tab }));
-  const trigger = await screen.findByRole("button", { name: title });
+  const trigger = await screen.findByRole("button", { name: control });
   await user.click(trigger);
-  return { user, trigger };
+  const dialog = await screen.findByRole("dialog", { name: dialogName });
+  return { user, trigger, dialog };
+}
+
+/** Open the Manage menu and run one of its items. */
+async function manage(item: string) {
+  const user = userEvent.setup();
+  await user.click(screen.getByRole("button", { name: "Manage" }));
+  await user.click(await screen.findByRole("menuitem", { name: item }));
+  return user;
 }
 
 // --------------------------------------------------------------- compact vs sheet
 
-describe("the compact specifications tab stays a summary", () => {
-  it("stands for each group with two representative facts, never every row", async () => {
-    await open(makeWorkspace({ specifications: bigSpecs() }));
-    const user = userEvent.setup();
-    const strip = document.querySelector<HTMLElement>('[data-dev-id="component-browser.info.tabs"]')!;
-    await user.click(within(strip).getByRole("tab", { name: "Specifications" }));
-
-    const region = await screen.findByLabelText("Specification Groups");
-    // The counts are real and complete...
-    expect(within(region).getByText("Electrical")).toBeInTheDocument();
-    expect(within(region).getByText("5")).toBeInTheDocument();
-    // ...but the facts themselves are a two-item stand-in, not the nine rows the record has.
-    expect(within(region).queryByText("Slew Rate")).toBeNull();
-    expect(within(region).queryByText("Lead Count")).toBeNull();
-    expect(
-      within(region).getByText("Supply Voltage Supply Voltage value · Quiescent Current Quiescent Current value"),
-    ).toBeInTheDocument();
-  });
-
-  it("names two facts per group and no more", () => {
-    const group = bigSpecs().groups[0];
-    expect(representativeLine(group).split(" · ")).toHaveLength(2);
-  });
-});
-
-describe("the full specification sheet", () => {
-  it("renders every group and every fact, with the source for each value", async () => {
-    const { dialog } = await openSpecSheet(makeWorkspace({ specifications: bigSpecs() }));
-    expect(within(dialog).getByText("Electrical (5)")).toBeInTheDocument();
-    expect(within(dialog).getByText("Physical (4)")).toBeInTheDocument();
-    for (const label of ["Supply Voltage", "Slew Rate", "Noise", "Lead Count"]) {
-      expect(within(dialog).getByText(label)).toBeInTheDocument();
-    }
-    // Every value says who supplied it. The fixture attributes each fact to DigiKey.
-    expect(within(dialog).getAllByText("DigiKey").length).toBe(9);
-  });
-
-  it("shows every alternate value beside the value in force, with its source", async () => {
-    const { dialog } = await openSpecSheet(
-      makeWorkspace({
-        specifications: {
-          total: 1,
-          groups: [
-            {
-              id: "electrical",
-              label: "Electrical",
-              count: 1,
-              facts: [
-                makeFact({
-                  id: "Supply Voltage",
-                  label: "Supply Voltage",
-                  rawValue: "3 V",
-                  state: "conflict",
-                  alternates: [
-                    {
-                      rawValue: "3.3 V",
-                      formattedValue: "3.3 V",
-                      sourceId: "mouser",
-                      sourceLabel: "Mouser",
-                    },
-                  ],
-                }),
-              ],
-            },
-          ],
-        },
-      }),
+describe("the pinout sheet", () => {
+  it("renders the complete pinout table and offers Commit Pinout beside it", async () => {
+    const { dialog } = await openSheet(
+      bigSpecs(),
+      "View Pinout",
+      "Pinout",
     );
-    const alternate = within(dialog).getByText("3.3 V").closest("li")!;
-    expect(within(alternate).getByText("Mouser")).toBeInTheDocument();
-    expect(within(dialog).getByText("Sources Disagree")).toBeInTheDocument();
-  });
-
-  it("searches by label, value or source", async () => {
-    const { user, dialog } = await openSpecSheet(makeWorkspace({ specifications: bigSpecs() }));
-    await user.type(within(dialog).getByLabelText("Search specifications"), "slew");
-    await waitFor(() => expect(within(dialog).queryByText("Lead Count")).toBeNull());
-    expect(within(dialog).getByText("Slew Rate")).toBeInTheDocument();
-    expect(within(dialog).queryByText("Physical (4)")).toBeNull();
-  });
-
-  it("dissolves the groups when sorted by name, so one ordered list answers the question", () => {
-    const specifications = makeWorkspace({ specifications: bigSpecs() }).specifications;
-    expect(sheetGroups(specifications, "", "group", "All").map((g) => g.id)).toEqual([
-      "electrical",
-      "physical",
-    ]);
-    const byName = sheetGroups(specifications, "", "name", "All");
-    expect(byName).toHaveLength(1);
-    expect(byName[0].facts.map((fact) => fact.label)).toEqual([
-      "Gain",
-      "Height",
-      "Lead Count",
-      "Noise",
-      "Package",
-      "Pitch",
-      "Quiescent Current",
-      "Slew Rate",
-      "Supply Voltage",
-    ]);
-    expect(factMatches(byName[0].facts[0], "digikey")).toBe(true);
-  });
-
-  it("sorts the sheet through the control, not only through the helper", async () => {
-    const { user, dialog } = await openSpecSheet(makeWorkspace({ specifications: bigSpecs() }));
-    await user.selectOptions(within(dialog).getByLabelText("Sort specifications"), "name");
-    await waitFor(() => expect(within(dialog).queryByText("Electrical (5)")).toBeNull());
-    expect(within(dialog).getByText("All Specifications (9)")).toBeInTheDocument();
-  });
-
-  it("pins a specification from the sheet and pulls it to the top", async () => {
-    const { user, dialog } = await openSpecSheet(makeWorkspace({ specifications: bigSpecs() }));
-    const pin = within(dialog).getByRole("button", { name: "Pin Slew Rate" });
-    expect(pin).toHaveAttribute("aria-pressed", "false");
-
-    await user.click(pin);
-
-    const pinnedSection = await within(dialog).findByLabelText("Pinned");
-    expect(within(pinnedSection).getByText("Slew Rate")).toBeInTheDocument();
-    expect(
-      within(dialog).getAllByRole("button", { name: "Pinned Slew Rate" })[0],
-    ).toHaveAttribute("aria-pressed", "true");
-  });
-
-  it("renders the complete pinout table and offers Apply Pinout beside it", async () => {
-    const { dialog } = await openSpecSheet(makeWorkspace({ specifications: bigSpecs() }));
     const table = within(dialog).getByRole("table", { name: "Pinout" });
     expect(within(table).getByText("OUT1")).toBeInTheDocument();
     expect(within(table).getByText("IN1-")).toBeInTheDocument();
@@ -330,6 +228,46 @@ describe("the full specification sheet", () => {
       "name",
       "type",
     ]);
+  });
+
+  /**
+   * A filtered row keeps the row it already had, instead of inheriting another pin's.
+   *
+   * The filter is the whole reason this table exists on a hundred-pin package, and it is also the
+   * one thing that makes a row's POSITION meaningless: narrow the search and the pin that was
+   * seventh is suddenly first. A row identified by where it currently sits therefore names a
+   * different pin on every keystroke, and the element that was drawn for one pin gets repainted
+   * with another's - which is how a row a person had selected, scrolled to or was reading ends up
+   * being a different pin than the one they were looking at.
+   *
+   * Identity here is the pin's ORDINAL IN THE RECORD, which the filter cannot move. Proved on the
+   * DOM node rather than on a key, because the node is what a person's selection and the browser's
+   * scroll position are attached to.
+   */
+  it("keeps a pin on its own row when the filter narrows around it", async () => {
+    const { dialog, user } = await openSheet(
+      makeDossier({
+        diagnostics: {
+          pinCount: 4,
+          pinout: [
+            { pin: "1", name: "VCC" },
+            { pin: "2", name: "GND" },
+            { pin: "3", name: "SDA" },
+            { pin: "4", name: "SCL" },
+          ],
+        },
+      }),
+      "View Pinout",
+      "Pinout",
+    );
+    const table = within(dialog).getByRole("table", { name: "Pinout" });
+    const before = within(table).getByText("SDA").closest("tr");
+    expect(before).not.toBeNull();
+
+    await user.type(within(dialog).getByRole("searchbox", { name: "Filter pins" }), "SDA");
+    await waitFor(() => expect(within(table).getAllByRole("row")).toHaveLength(2));
+
+    expect(within(table).getByText("SDA").closest("tr")).toBe(before);
   });
 
   it("persists a looked-up pinout through the specs seam, with its source", async () => {
@@ -354,10 +292,14 @@ describe("the full specification sheet", () => {
       ]),
     );
     mockApi.setSpecs.mockResolvedValue({} as never);
-    const { user, dialog } = await openSpecSheet(makeWorkspace({ specifications: bigSpecs() }));
+    const { user, dialog } = await openSheet(
+      bigSpecs(),
+      "View Pinout",
+      "Pinout",
+    );
 
     await user.click(within(dialog).getByRole("button", { name: "Look Up Pinout" }));
-    const apply = await within(dialog).findByRole("button", { name: "Apply Pinout" });
+    const apply = await within(dialog).findByRole("button", { name: "Commit Pinout" });
     await user.click(apply);
 
     await waitFor(() =>
@@ -379,191 +321,238 @@ describe("the full specification sheet", () => {
 // --------------------------------------------------------------- sourcing
 
 describe("the full sourcing sheet", () => {
-  const workspace = makeWorkspace({
-    sourcing: {
-      offers: [
-        makeOffer({
-          sourceId: "mouser",
-          sourceLabel: "Mouser",
-          partNumber: "511-LM358",
-          stock: 1240,
-          currency: "USD",
-          priceBreaks: [
-            { qty: 1, price: 0.42 },
-            { qty: 10, price: 0.31 },
-            { qty: 100, price: 0.22 },
-          ],
+  const dossier = makeDossier({
+    distributorOffers: [
+      makeOffer({
+        provider: "mouser",
+        providerLabel: "Mouser",
+        sku: "511-LM358",
+        stock: 1240,
+        currency: "USD",
+        unitPrice: 0.42,
+        moq: 1,
+        priceBreaks: [
+          { qty: 1, price: 0.42 },
+          { qty: 10, price: 0.31 },
+          { qty: 100, price: 0.22 },
+        ],
+      }),
+    ],
+    supplySummary: { offerCount: 1, totalStock: 1240, lifecycle: "Active" },
+    relatedParts: [
+      makeRelatedPart({
+        mpn: "LM2904DR",
+        manufacturer: "TI",
+        description: "Dual op-amp",
+        url: "https://example.invalid/sub",
+      }),
+    ],
+    documents: {
+      items: [
+        makeDocument({
+          documentType: "other",
+          documentTypeLabel: "Reference",
+          title: "3D Model",
+          localPath: "",
+          remoteUrl: "https://example.invalid/model",
+          sourceLabel: "DigiKey",
         }),
       ],
-      shared: [makeFact({ id: "lifecycle", label: "Lifecycle", rawValue: "Active" })],
-      relationships: [
-        {
-          id: "substitutions",
-          label: "Potential Substitutions",
-          count: 1,
-          items: [
-            {
-              mpn: "LM2904DR",
-              manufacturer: "TI",
-              description: "Dual op-amp",
-              url: "https://example.invalid/sub",
-              sourceId: "digikey",
-              sourceLabel: "DigiKey",
-            },
-          ],
-        },
-      ],
-      resources: [
-        {
-          title: "3D Model",
-          url: "https://example.invalid/model",
-          sourceId: "digikey",
-          sourceLabel: "DigiKey",
-        },
-      ],
+      count: 1,
+      hasDatasheet: false,
     },
-    sources: {
-      records: [
-        makeSourceRecord({ id: "mouser", label: "Mouser", state: "success", fieldCount: 3 }),
-        makeSourceRecord({ id: "digikey", label: "DigiKey", state: "failed", fieldCount: 0 }),
-        makeSourceRecord({ id: "lcsc", label: "LCSC", state: "not_configured", fieldCount: 0 }),
-        makeSourceRecord({ id: "arrow", label: "Arrow", state: "unavailable", fieldCount: 0 }),
+    provenance: {
+      sources: [
+        makeSourceLedgerEntry({ id: "mouser", label: "Mouser", state: "success", fieldCount: 3 }),
+        makeSourceLedgerEntry({ id: "digikey", label: "DigiKey", state: "failed", fieldCount: 0 }),
+        makeSourceLedgerEntry({
+          id: "lcsc",
+          label: "LCSC",
+          state: "not_configured",
+          fieldCount: 0,
+        }),
+        makeSourceLedgerEntry({
+          id: "arrow",
+          label: "Arrow",
+          state: "unavailable",
+          fieldCount: 0,
+        }),
       ],
     },
   });
 
   it("lists every price break for every offer, with stock, currency and fetch time", async () => {
-    await openSheet(workspace, "Sourcing", "View Full Sourcing");
-    const dialog = await screen.findByRole("dialog", { name: "Sourcing" });
+    const { dialog } = await openSheet(dossier, "View Price Breaks", "Price Breaks");
     const offer = within(dialog).getByLabelText("Mouser 511-LM358");
     expect(within(offer).getByText("511-LM358")).toBeInTheDocument();
     expect(within(offer).getByText("1,240")).toBeInTheDocument();
-    expect(within(offer).getByText("USD")).toBeInTheDocument();
-    expect(within(offer).getByText("2026-08-01T00:00:00Z")).toBeInTheDocument();
+    expect(within(offer).getByText("MOQ 1")).toBeInTheDocument();
     const ladder = within(offer).getByRole("table", { name: "Price breaks Mouser" });
     // Three quoted breaks plus the header row: the ladder is complete, not a "from" price.
     expect(within(ladder).getAllByRole("row")).toHaveLength(4);
-    expect(within(ladder).getByText("USD0.2200")).toBeInTheDocument();
+    expect(within(ladder).getByText("USD0.22")).toBeInTheDocument();
   });
 
   it("labels distributor relationships as unvalidated suggestions, in prose", async () => {
-    await openSheet(workspace, "Sourcing", "View Full Sourcing");
-    const dialog = await screen.findByRole("dialog", { name: "Sourcing" });
+    const { dialog } = await openSheet(dossier, "View Price Breaks", "Price Breaks");
     const related = within(dialog).getByLabelText("Related Parts");
     expect(
-      within(related).getByText(/Stockroom has not checked that any of them is electrically/),
+      within(related).getByText(/Stockroom has not checked whether these parts are interchangeable/),
     ).toBeInTheDocument();
-    expect(within(related).getByText("Potential Substitutions (1)")).toBeInTheDocument();
+    // And on the ROW itself, with the reason it is here at all.
+    expect(within(related).getByText(/Offered as a substitution/)).toBeInTheDocument();
     expect(within(related).getByText("LM2904DR")).toBeInTheDocument();
   });
 
   it("distinguishes a source that failed from one that does not carry the part", async () => {
-    await openSheet(workspace, "Sourcing", "View Full Sourcing");
-    const dialog = await screen.findByRole("dialog", { name: "Sourcing" });
+    const { dialog } = await openSheet(dossier, "View Price Breaks", "Price Breaks");
     const states = within(dialog).getByLabelText("Sources");
-    expect(within(within(states).getByText("Mouser").closest("li")!).getByText("Answered"))
+    expect(within(within(states).getByText("Mouser").closest("li")!).getByText("Supplied"))
       .toBeInTheDocument();
     expect(within(within(states).getByText("DigiKey").closest("li")!).getByText("Failed"))
       .toBeInTheDocument();
     expect(
-      within(within(states).getByText("LCSC").closest("li")!).getByText("Not Configured"),
+      within(within(states).getByText("LCSC").closest("li")!).getByText("Not Connected"),
     ).toBeInTheDocument();
     expect(
       within(within(states).getByText("Arrow").closest("li")!).getByText("Not Carried"),
     ).toBeInTheDocument();
   });
 
-  it("carries the shared trade facts and the provider documents", async () => {
-    await openSheet(workspace, "Sourcing", "View Full Sourcing");
-    const dialog = await screen.findByRole("dialog", { name: "Sourcing" });
-    expect(within(within(dialog).getByLabelText("Trade And Compliance")).getByText("Lifecycle"))
-      .toBeInTheDocument();
-    expect(within(within(dialog).getByLabelText("Documents")).getByText("3D Model"))
-      .toBeInTheDocument();
+  it("carries the typed documents, each labelled with what kind of document it is", async () => {
+    const { dialog } = await openSheet(dossier, "View Price Breaks", "Price Breaks");
+    const documents = within(dialog).getByLabelText("Documents");
+    expect(within(documents).getByText("3D Model")).toBeInTheDocument();
+    expect(within(documents).getByText("Reference")).toBeInTheDocument();
   });
 
-  it("surfaces the per-source outcome on the compact tab too", async () => {
-    await open(workspace);
-    const user = userEvent.setup();
-    const strip = document.querySelector<HTMLElement>('[data-dev-id="component-browser.info.tabs"]')!;
-    await user.click(within(strip).getByRole("tab", { name: "Sources & History" }));
-    const region = await screen.findByLabelText("Source Records");
-    expect(within(region).getByText("Failed")).toBeInTheDocument();
-    expect(within(region).getByText("Not Configured")).toBeInTheDocument();
-    expect(within(region).getByText("3 attributed")).toBeInTheDocument();
+  it("gives the sourcing column a Source, Fields Used, Retrieved and State table", async () => {
+    await open(dossier);
+    const table = screen.getByRole("table", { name: "Data sources" });
+    expect(
+      within(table)
+        .getAllByRole("columnheader")
+        .map((cell) => cell.textContent),
+    ).toEqual(["Source", "Fields Used", "Retrieved", "State"]);
+    const mouser = within(table).getByText("Mouser").closest("tr")!;
+    expect(within(mouser).getByText("3")).toBeInTheDocument();
+    expect(within(mouser).getByText("Supplied")).toBeInTheDocument();
+    // The three degraded outcomes stay apart: a broken fetch, a distributor that does not
+    // carry the part, and a machine that was never given credentials.
+    expect(
+      within(within(table).getByText("DigiKey").closest("tr")!).getByText("Failed"),
+    ).toBeInTheDocument();
+    expect(
+      within(within(table).getByText("LCSC").closest("tr")!).getByText("Not Connected"),
+    ).toBeInTheDocument();
+    expect(
+      within(within(table).getByText("Arrow").closest("tr")!).getByText("Not Carried"),
+    ).toBeInTheDocument();
   });
 });
 
 // --------------------------------------------------------------- sources & history
 
-const sourcesWorkspace = makeWorkspace({
-  sources: {
-    fields: [
-      makeFact({
-        id: "manufacturer",
+const sourcesDossier = makeDossier({
+  provenance: {
+    recordFields: [
+      {
+        key: "manufacturer",
         label: "Manufacturer",
-        rawValue: "Texas Instruments",
-        state: "conflict",
-        alternates: [
-          {
-            rawValue: "TI",
-            formattedValue: "TI",
+        preferredValue: "Texas Instruments",
+        displayValue: "Texas Instruments",
+        sourceCandidates: [
+          makeCandidate({ value: "Texas Instruments", displayValue: "Texas Instruments" }),
+          makeCandidate({
             sourceId: "mouser",
             sourceLabel: "Mouser",
-          },
+            value: "TI",
+            displayValue: "TI",
+          }),
         ],
-      }),
-      makeFact({
-        id: "Supply Voltage",
+        preferredSource: makeCandidate({
+          value: "Texas Instruments",
+          displayValue: "Texas Instruments",
+        }),
+        conflictState: "conflicting",
+        verificationState: "conflicting",
+        mapped: false,
+      },
+      {
+        key: "Supply Voltage",
         label: "Supply Voltage",
-        rawValue: "3 V",
-        alternates: [
-          { rawValue: "3.3 V", formattedValue: "3.3 V", sourceId: "mouser", sourceLabel: "Mouser" },
+        preferredValue: "3 V",
+        displayValue: "3 V",
+        sourceCandidates: [
+          makeCandidate({ value: "3 V", displayValue: "3 V" }),
+          makeCandidate({
+            sourceId: "mouser",
+            sourceLabel: "Mouser",
+            value: "3.3 V",
+            displayValue: "3.3 V",
+          }),
         ],
-      }),
+        preferredSource: makeCandidate({ value: "3 V", displayValue: "3 V" }),
+        conflictState: "conflicting",
+        verificationState: "conflicting",
+        mapped: false,
+      },
     ],
-    records: [makeSourceRecord({ id: "mouser", label: "Mouser", state: "failed", fieldCount: 1 })],
+    sources: [
+      makeSourceLedgerEntry({ id: "mouser", label: "Mouser", state: "failed", fieldCount: 1 }),
+    ],
   },
 });
 
 describe("the sources and history sheet", () => {
   it("opens on Field Sources and offers the four questions it answers", async () => {
-    await openSheet(sourcesWorkspace, "Sources & History", "View All");
-    const dialog = await screen.findByRole("dialog", { name: "Sources & History" });
+    const { dialog } = await openSheet(
+      sourcesDossier,
+      "View Data Provenance",
+      "Data Provenance",
+    );
     expect(within(dialog).getAllByRole("tab").map((tab) => tab.textContent)).toEqual([
       "Field Sources",
       "Source Records",
       "Changes",
-      "Diagnostics",
+      "Technical Diagnostics",
     ]);
     expect(within(dialog).getByText("Texas Instruments")).toBeInTheDocument();
-    expect(within(dialog).getByText("conflict")).toBeInTheDocument();
+    // The quality vocabulary, not the storage token: `conflicting` is what the record calls it.
+    expect(within(dialog).queryAllByText("conflicting")).toEqual([]);
+    expect(within(dialog).getAllByText("Conflicting").length).toBeGreaterThan(0);
   });
 
   it("applies an alternate onto a canonical field and refuses one it cannot write", async () => {
     mockApi.editField.mockResolvedValue({} as never);
-    const { user } = await openSheet(sourcesWorkspace, "Sources & History", "View All");
-    const dialog = await screen.findByRole("dialog", { name: "Sources & History" });
+    const { user, dialog } = await openSheet(
+      sourcesDossier,
+      "View Data Provenance",
+      "Data Provenance",
+    );
 
     // A record attribute can be put in force...
-    await user.click(within(dialog).getByRole("button", { name: "Apply TI Manufacturer" }));
+    await user.click(within(dialog).getByRole("button", { name: "Commit TI Manufacturer" }));
     await waitFor(() =>
       expect(mockApi.editField).toHaveBeenCalledWith(ID, "manufacturer", "TI"),
     );
-    // ...a SPEC key cannot: `editField` writes record attributes, so no Apply is offered.
-    expect(within(dialog).queryByRole("button", { name: /Apply 3\.3 V/ })).toBeNull();
+    // ...a SPEC key cannot: `editField` writes record attributes, so no Commit is offered.
+    expect(within(dialog).queryByRole("button", { name: /Commit 3\.3 V/ })).toBeNull();
   });
 
   it("knows which alternates are safe to apply", () => {
-    const alternate = { rawValue: "TI", formattedValue: "TI", sourceId: "m", sourceLabel: "M" };
+    const alternate = makeCandidate({ value: "TI", displayValue: "TI" });
     expect(canApplyAlternate("manufacturer", alternate)).toBe(true);
     expect(canApplyAlternate("Supply Voltage", alternate)).toBe(false);
-    expect(canApplyAlternate("mpn", { ...alternate, rawValue: { a: 1 } })).toBe(false);
+    expect(canApplyAlternate("mpn", { ...alternate, value: { a: 1 } })).toBe(false);
   });
 
   it("lists the captured source records with their outcome and a refresh action", async () => {
-    const { user } = await openSheet(sourcesWorkspace, "Sources & History", "View All");
-    const dialog = await screen.findByRole("dialog", { name: "Sources & History" });
+    const { user, dialog } = await openSheet(
+      sourcesDossier,
+      "View Data Provenance",
+      "Data Provenance",
+    );
     await user.click(within(dialog).getByRole("tab", { name: "Source Records" }));
 
     const row = document.querySelector<HTMLElement>(
@@ -604,8 +593,11 @@ describe("the sources and history sheet", () => {
       ],
       assets: { symbol: false, footprint: false, model: false, datasheet: false },
     });
-    const { user } = await openSheet(sourcesWorkspace, "Sources & History", "View All");
-    const dialog = await screen.findByRole("dialog", { name: "Sources & History" });
+    const { user, dialog } = await openSheet(
+      sourcesDossier,
+      "View Data Provenance",
+      "Data Provenance",
+    );
     await user.click(within(dialog).getByRole("tab", { name: "Changes" }));
 
     expect(await within(dialog).findByText("Edit lm358: manufacturer")).toBeInTheDocument();
@@ -639,8 +631,11 @@ describe("the sources and history sheet", () => {
       ],
       assets: { symbol: false, footprint: false, model: false, datasheet: false },
     });
-    const { user } = await openSheet(sourcesWorkspace, "Sources & History", "View All");
-    const dialog = await screen.findByRole("dialog", { name: "Sources & History" });
+    const { user, dialog } = await openSheet(
+      sourcesDossier,
+      "View Data Provenance",
+      "Data Provenance",
+    );
     await user.click(within(dialog).getByRole("tab", { name: "Changes" }));
     await user.click(await within(dialog).findByText("Edit lm358: manufacturer"));
 
@@ -668,8 +663,11 @@ describe("the sources and history sheet", () => {
       fields: [{ key: "symbol_content_hash", before: "aaa", after: "bbb", status: "changed" }],
       assets: { symbol: true, footprint: false, model: false, datasheet: false },
     });
-    const { user } = await openSheet(sourcesWorkspace, "Sources & History", "View All");
-    const sheet = await screen.findByRole("dialog", { name: "Sources & History" });
+    const { user, dialog: sheet } = await openSheet(
+      sourcesDossier,
+      "View Data Provenance",
+      "Data Provenance",
+    );
     await user.click(within(sheet).getByRole("tab", { name: "Changes" }));
     await user.click(await within(sheet).findByText("Redraw lm358 symbol"));
 
@@ -677,7 +675,7 @@ describe("the sources and history sheet", () => {
     await user.click(trigger);
 
     const overlay = await screen.findByRole("dialog", {
-      name: `Visual Diff for ${sourcesWorkspace.identity.displayName}`,
+      name: `Visual Diff for ${sourcesDossier.identity.mpn}`,
     });
     // Both windows are open at once, and the overlay paints above the sheet it came from.
     expect(sheet).toBeInTheDocument();
@@ -689,20 +687,39 @@ describe("the sources and history sheet", () => {
     await waitFor(() =>
       expect(
         screen.queryByRole("dialog", {
-          name: `Visual Diff for ${sourcesWorkspace.identity.displayName}`,
+          name: `Visual Diff for ${sourcesDossier.identity.mpn}`,
         }),
       ).toBeNull(),
     );
     // The sheet survives, and focus is back on the control inside it that opened the overlay.
-    expect(screen.getByRole("dialog", { name: "Sources & History" })).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "Data Provenance" })).toBeInTheDocument();
     expect(document.activeElement).toBe(trigger);
   });
 
-  it("keeps diagnostics collapsed until they are asked for, and the raw record until then", async () => {
+  it("keeps the schema version and the storage keys off the normal path entirely", async () => {
+    const { user, dialog } = await openSheet(
+      sourcesDossier,
+      "View Data Provenance",
+      "Data Provenance",
+    );
+    await user.click(within(dialog).getByRole("tab", { name: "Technical Diagnostics" }));
+
+    // Not collapsed - absent. A derivation identifier is machine text, and a person who is not
+    // debugging Stockroom has no use for it however few clicks away it is.
+    expect(within(dialog).queryByRole("button", { name: "Show Diagnostics" })).toBeNull();
+    expect(within(dialog).queryByText("rules@1")).toBeNull();
+    expect(within(dialog).getByText(/Turn on developer mode/)).toBeInTheDocument();
+  });
+
+  it("gives developer mode the schema, the derivation and the canonical record", async () => {
     mockApi.partDetail.mockResolvedValue({ id: ID, mpn: "LM358DR" } as never);
-    const { user } = await openSheet(sourcesWorkspace, "Sources & History", "View All");
-    const dialog = await screen.findByRole("dialog", { name: "Sources & History" });
-    await user.click(within(dialog).getByRole("tab", { name: "Diagnostics" }));
+    const { user, dialog } = await openSheet(
+      sourcesDossier,
+      "View Data Provenance",
+      "Data Provenance",
+    );
+    await user.click(within(dialog).getByRole("tab", { name: "Technical Diagnostics" }));
+    await enableDeveloperMode(user);
 
     const toggle = within(dialog).getByRole("button", { name: "Show Diagnostics" });
     expect(toggle).toHaveAttribute("aria-expanded", "false");
@@ -735,13 +752,11 @@ describe("identity editing, restored", () => {
     );
   });
 
-  it("edits a canonical identity field from the header", async () => {
+  it("edits a canonical identity field from the Manage menu", async () => {
     mockApi.editField.mockResolvedValue({} as never);
     await open();
-    const user = userEvent.setup();
-
-    await user.click(screen.getByRole("button", { name: "Edit Identity" }));
-    const dialog = await screen.findByRole("dialog", { name: "Edit Identity" });
+    const user = await manage("Edit Identification...");
+    const dialog = await screen.findByRole("dialog", { name: "Edit Identification" });
     await user.click(within(dialog).getByRole("button", { name: "Edit Manufacturer" }));
     const input = within(dialog).getByRole("textbox", { name: "Manufacturer" });
     await user.clear(input);
@@ -753,35 +768,14 @@ describe("identity editing, restored", () => {
   it("moves the component to another category through the move seam, not a field edit", async () => {
     mockApi.moveCategory.mockResolvedValue({} as never);
     await open();
-    const user = userEvent.setup();
-
-    await user.click(screen.getByRole("button", { name: "Edit Identity" }));
-    const dialog = await screen.findByRole("dialog", { name: "Edit Identity" });
+    const user = await manage("Edit Class and Classification...");
+    const dialog = await screen.findByRole("dialog", {
+      name: "Edit Class and Classification",
+    });
     await user.selectOptions(within(dialog).getByLabelText("Category"), "Passives");
 
     await waitFor(() => expect(mockApi.moveCategory).toHaveBeenCalledWith(ID, "Passives"));
     expect(mockApi.editField).not.toHaveBeenCalled();
-  });
-
-  it("opens identity editing from the attention item that names the missing field", async () => {
-    await open(
-      makeWorkspace({
-        attention: [
-          {
-            id: "identity.manufacturer",
-            severity: "blocking",
-            title: "Manufacturer Is Missing",
-            detail: "This component cannot be completed without it.",
-            action: "edit-identity",
-          },
-        ],
-      }),
-    );
-    const user = userEvent.setup();
-    await user.click(
-      screen.getByRole("button", { name: "Resolve: Manufacturer Is Missing" }),
-    );
-    expect(await screen.findByRole("dialog", { name: "Edit Identity" })).toBeInTheDocument();
   });
 
   it("renders the EDA handoff band from the registry, so its fields have exactly one editor", async () => {
@@ -791,13 +785,12 @@ describe("identity editing, restored", () => {
     // declaring `data_fields`, and it carries the symbol and footprint references and the datasheet
     // that the hand-written list had no way to show.
     await open();
-    const user = userEvent.setup();
-    await user.click(screen.getByRole("button", { name: "Edit Identity" }));
-    const dialog = await screen.findByRole("dialog", { name: "Edit Identity" });
+    await manage("Edit Identification...");
+    const dialog = await screen.findByRole("dialog", { name: "Edit Identification" });
 
     const band = await within(dialog).findByRole("region", { name: "EDA Handoff" });
     // The two fields the registry does NOT own stay in the sheet's own Identity section...
-    expect(within(dialog).getByRole("button", { name: "Edit Display Name" })).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "Edit Listed Name" })).toBeInTheDocument();
     // ...and the registry-owned ones appear once, in the band.
     expect(within(band).getByText("Symbol")).toBeInTheDocument();
     expect(within(band).getByText("Footprint")).toBeInTheDocument();
@@ -843,27 +836,28 @@ describe("the opened component is provider-neutral", () => {
 });
 
 describe("the workspace surface contract", () => {
-  it("gives only the modal a scrollbar: the workspace root and its regions never scroll", async () => {
-    await open(makeWorkspace({ specifications: bigSpecs() }));
+  it("scrolls in the three columns and nowhere else", async () => {
+    await open(bigSpecs());
     const root = document.querySelector<HTMLElement>('[data-dev-id="component-browser.root"]')!;
     expect(root.className).toContain("h-full");
     expect(root.className).toContain("min-h-0");
     expect(root.className).toContain("overflow-hidden");
-    for (const region of document.querySelectorAll<HTMLElement>(
-      '[data-dev-id="component-browser.specifications"], [data-dev-id="component-browser.pinout"]',
+    // Exactly three vertical scroll owners: one per column, and nothing above them.
+    const scrollers = document.querySelectorAll("[data-workspace-scroll]");
+    expect(scrollers).toHaveLength(3);
+    for (const section of document.querySelectorAll<HTMLElement>(
+      '[data-dev-id="component-browser.spec-group"], [data-dev-id="component-browser.lifecycle"]',
     )) {
-      expect(region.className).toContain("overflow-hidden");
-      expect(region.className).not.toContain("overflow-y-auto");
+      expect(section.className).not.toContain("overflow-y-auto");
     }
   });
 
   it("traps focus, closes on Escape, and hands focus back to the control that opened it", async () => {
-    const { user, trigger } = await openSheet(
-      makeWorkspace({ specifications: bigSpecs() }),
-      "Specifications",
-      "View All Specifications",
+    const { user, trigger, dialog } = await openSheet(
+      bigSpecs(),
+      "View Pinout",
+      "Pinout",
     );
-    const dialog = await screen.findByRole("dialog", { name: "Specifications" });
     expect(dialog).toHaveAttribute("aria-modal", "true");
     await waitFor(() => expect(document.activeElement).toBe(dialog));
 

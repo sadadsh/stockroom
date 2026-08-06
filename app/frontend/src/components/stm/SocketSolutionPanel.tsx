@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import type {
   SocketSolutionDTO,
   SocketSolutionPosition,
@@ -6,7 +6,7 @@ import type {
   SocketTargetCohort,
   TargetDefinitionPosition,
 } from "../../api/types";
-import { Text, useText } from "../../lib/copy";
+import { Text, useCopyFormatter, useText } from "../../lib/copy";
 import { Badge, Eyebrow } from "../primitives";
 import {
   TargetPackageMap,
@@ -210,13 +210,19 @@ function filterLabel(filter: PositionFilter): string {
   return labels[filter];
 }
 
+// A new solution invalidates every control in this panel - the selected position, the searches,
+// the filters, the open detail view. That is a full state reset, so the caller keys this component
+// on the solution's content-addressed artifact_digest and React remounts it. Resetting through an
+// effect instead cost a render where the previous solution's selection was still on screen.
 export function SocketSolutionPanel({
   solution,
 }: {
   solution: SocketSolutionDTO;
 }) {
+  // lazy: the opening selection is read once at mount, not recomputed and discarded every render.
   const [selectedPosition, setSelectedPosition] = useState<string | null>(
-    solution.positions.find((position) => position.controlled)?.position ??
+    () =>
+      solution.positions.find((position) => position.controlled)?.position ??
       solution.positions[0]?.position ??
       null,
   );
@@ -230,29 +236,10 @@ export function SocketSolutionPanel({
     "stm.socket.panel.aria",
     "Universal STM Socket Solution",
   );
-  const searchPlaceholder = useText(
-    "stm.socket.search.placeholder",
-    "Find Position, Role, Function, MCU",
-  );
-  const searchLabel = useText("stm.socket.search.aria", "Filter Socket Solution");
   const clearCohortLabel = useText(
     "stm.socket.cohort.clear.aria",
     "Clear Active Configuration",
   );
-
-  useEffect(() => {
-    setSelectedPosition(
-      solution.positions.find((position) => position.controlled)?.position ??
-        solution.positions[0]?.position ??
-        null,
-    );
-    setSearch("");
-    setFilter("all");
-    setTopology(null);
-    setDetailView("configurations");
-    setCohortSearch("");
-    setSelectedCohortId(null);
-  }, [solution.artifact_digest, solution.positions]);
 
   const mappedPositions = useMemo(
     () => solution.positions.map(mapPosition),
@@ -275,28 +262,29 @@ export function SocketSolutionPanel({
   const selectedCohort =
     solution.target_cohorts.find((cohort) => cohort.id === selectedCohortId) ??
     null;
-  const cohortMembers = useMemo(
-    () =>
-      new Map(
-        solution.target_cohorts.map((cohort) => [
-          cohort.id,
-          solution.scope.target_index
-            .filter((target) => maskIncludes(cohort.target_mask, target.index))
-            .map((target) => target.ref),
-        ]),
-      ),
-    [solution.scope.target_index, solution.target_cohorts],
-  );
+  const cohortMembers = useMemo(() => {
+    // one pass over the target index per cohort: select and project together
+    const members = new Map<string, string[]>();
+    for (const cohort of solution.target_cohorts) {
+      const refs: string[] = [];
+      for (const target of solution.scope.target_index) {
+        if (maskIncludes(cohort.target_mask, target.index)) refs.push(target.ref);
+      }
+      members.set(cohort.id, refs);
+    }
+    return members;
+  }, [solution.scope.target_index, solution.target_cohorts]);
   const matchingTargetIndices = useMemo(() => {
     const needle = search.trim().toLowerCase();
     if (!needle) return [];
-    return solution.scope.target_index
-      .filter((target) =>
-        [target.ref, target.family, target.line].some((value) =>
-          value.toLowerCase().includes(needle),
-        ),
-      )
-      .map((target) => target.index);
+    const indices: number[] = [];
+    for (const target of solution.scope.target_index) {
+      const hit = [target.ref, target.family, target.line].some((value) =>
+        value.toLowerCase().includes(needle),
+      );
+      if (hit) indices.push(target.index);
+    }
+    return indices;
   }, [search, solution.scope.target_index]);
 
   const matches = (position: SocketSolutionPosition): boolean => {
@@ -371,16 +359,20 @@ export function SocketSolutionPanel({
     return result;
   }, [proofPositions, selectedCohort, solution.positions]);
 
-  const topologyCounts = useMemo(
-    () =>
-      TOPOLOGIES.map((spec) => ({
-        ...spec,
-        count: solution.positions.filter(
-          (position) => position.cell_type === spec.type,
-        ).length,
-      })).filter((spec) => spec.count > 0),
-    [solution.positions],
-  );
+  const topologyCounts = useMemo(() => {
+    // Tally every position once, rather than re-scanning the whole position list per topology and
+    // then walking the built rows again to drop the empty ones. Same TOPOLOGIES order, same rows.
+    const counts = new Map<string, number>();
+    for (const position of solution.positions) {
+      counts.set(position.cell_type, (counts.get(position.cell_type) ?? 0) + 1);
+    }
+    const rows: (TopologySpec & { count: number })[] = [];
+    for (const spec of TOPOLOGIES) {
+      const count = counts.get(spec.type) ?? 0;
+      if (count > 0) rows.push({ ...spec, count });
+    }
+    return rows;
+  }, [solution.positions]);
 
   const selectCell = (cell: SocketSupportCell) => {
     setTopology((current) => (current === cell.type ? null : cell.type));
@@ -406,141 +398,24 @@ export function SocketSolutionPanel({
       className="flex min-h-0 flex-1 flex-col"
       aria-label={panelLabel}
     >
-      <header className="flex flex-none items-center gap-5 border-b border-line px-4 py-2.5">
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-baseline gap-2">
-            <h2 className="font-mono text-sm font-semibold text-t1">
-              {solution.scope.package} Socket Solution
-            </h2>
-            <Badge
-              size="sm"
-              tone={
-                solution.closure.zero_omission
-                  ? "ok"
-                  : "err"
-              }
-            >
-              {solution.closure.zero_omission
-                ? `Supports ${solution.closure.supported_target_count}/${solution.summary.target_count}`
-                : `${solution.closure.unsupported_target_count} Unsupported`}
-            </Badge>
-            {solution.closure.release !== "ready" ? (
-              <Badge size="sm" tone="warn">
-                <Text id="stm.socket.verification-open">Verification Open</Text>
-              </Badge>
-            ) : null}
-          </div>
-          <p className="mt-0.5 truncate text-xs text-t3">
-            Any selected target uses this socket after its{" "}
-            {solution.summary.target_cohort_count.toLocaleString()}-profile configuration
-            is applied and verified
-            {solution.bootstrap.status === "requires-declared-target"
-              ? " before target power"
-              : ""}
-            .
-          </p>
-        </div>
-        <Metric
-          value={percent(solution.closure.target_coverage_percentage)}
-          label="Targets Covered"
-        />
-        <Metric
-          value={String(solution.summary.target_cohort_count)}
-          label="Target Profiles"
-        />
-        <Metric
-          value={String(solution.summary.critical_hazard_positions)}
-          label="Critical Hazards"
-        />
-        <Metric
-          value={String(solution.summary.proof_open_positions)}
-          label="Verification Open"
-        />
-      </header>
+      <SolutionHeader solution={solution} />
       <ClosureGateStrip solution={solution} />
 
-      <div className="flex flex-none items-center gap-2 border-b border-line px-3 py-2">
-        <input
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-          placeholder={searchPlaceholder}
-          aria-label={searchLabel}
-          className="min-w-52 flex-1 rounded-control bg-field px-2.5 py-1.5 text-xs text-t1 outline-none placeholder:text-t3"
-        />
-        {(
-          [
-            "all",
-            "direct",
-            "configurable",
-            "mixed",
-            "critical",
-            "proof",
-          ] as PositionFilter[]
-        ).map((item) => (
-            <button
-              key={item}
-              type="button"
-              aria-pressed={filter === item}
-              onClick={() => setFilter(item)}
-              className={
-                "rounded-control border px-2 py-1 text-xs " +
-                (filter === item
-                  ? "border-acc bg-acc-soft text-t1"
-                  : "border-line text-t2 hover:text-t1")
-              }
-            >
-              {filterLabel(item)}
-            </button>
-          ))}
-        <span className="tnum min-w-14 text-right font-mono text-xs text-t3">
-          {matchingCount}/{solution.positions.length}
-        </span>
-      </div>
+      <PositionFilterBar
+        search={search}
+        onSearch={setSearch}
+        filter={filter}
+        onFilter={setFilter}
+        matchingCount={matchingCount}
+        totalCount={solution.positions.length}
+      />
 
-      <div className="flex flex-none flex-wrap items-stretch gap-1 border-b border-line px-3 py-1.5">
-        {topologyCounts.map((item) => {
-          const active = topology === item.type;
-          return (
-            <button
-              key={item.type}
-              type="button"
-              aria-pressed={active}
-              title={`${item.explanation} ${item.count} of ${solution.positions.length} positions.`}
-              onClick={() => setTopology(active ? null : item.type)}
-              className={
-                "flex min-w-fit items-center gap-2 rounded-control border px-2 py-1.5 text-left " +
-                (active
-                  ? "border-acc bg-acc-soft"
-                  : "border-line bg-raise hover:border-line2")
-              }
-            >
-              <span
-                className="h-2.5 w-2.5 flex-none rounded-sm"
-                style={{ backgroundColor: item.color }}
-              />
-              <span>
-                <span className="block text-xs text-t1">{item.label}</span>
-                <span className="block font-mono text-2xs text-t3">
-                  {item.count} ·{" "}
-                  {percent((item.count / solution.positions.length) * 100)}
-                </span>
-              </span>
-            </button>
-          );
-        })}
-        <div className="ml-auto flex min-w-fit items-center gap-3 px-2 text-2xs text-t3">
-          <span>
-            <span className="mr-1 inline-block h-2 w-2 border border-err bg-err/10" />
-            Red Cross = Critical Collision
-          </span>
-          <span>
-            <span className="mr-1 inline-block h-2 w-2 border border-warn" />
-            Amber Outline = Isolated Or Open
-          </span>
-          <span>Inset Bar = Target Share</span>
-          <span>Blue Center = Selected Profile</span>
-        </div>
-      </div>
+      <TopologyStrip
+        counts={topologyCounts}
+        totalPositions={solution.positions.length}
+        topology={topology}
+        onTopology={setTopology}
+      />
       {topology || selectedCohort ? (
         <div className="flex flex-none items-center gap-3 border-b border-line bg-raise px-3 py-1.5 text-xs">
           {topology ? (
@@ -554,10 +429,7 @@ export function SocketSolutionPanel({
             </>
           ) : (
             <span className="min-w-0 flex-1 text-t3">
-              <Text id="stm.socket.cohort.hint">
-                Blue center marks show the configurable positions applied by the selected target
-                cohort.
-              </Text>
+              <Text id="stm.socket.cohort.hint">Blue center marks show the configurable positions the selected target cohort sets.</Text>
             </span>
           )}
           {selectedCohort ? (
@@ -568,7 +440,14 @@ export function SocketSolutionPanel({
               aria-label={clearCohortLabel}
             >
               <span className="font-mono">{profileLabel(selectedCohort.id)}</span>
-              <span>{selectedCohort.target_count.toLocaleString()} MCUs</span>
+              <span>
+                <Text
+                  id="stm.socket.cohort-count"
+                  values={{ count: selectedCohort.target_count.toLocaleString() }}
+                >
+                  {"{count} MCUs"}
+                </Text>
+              </span>
               <span aria-hidden="true">×</span>
             </button>
           ) : null}
@@ -591,69 +470,333 @@ export function SocketSolutionPanel({
           />
         </div>
 
-        <aside className="flex min-h-0 flex-col border-l border-line bg-surface">
-          {selected ? (
-            <PositionSolution
-              position={selected}
-              totalTargets={solution.summary.target_count}
-              proofNeeded={proofPositions.has(selected.position)}
-              activeCohort={selectedCohort}
-            />
-          ) : (
-            <div className="p-4 text-xs text-t3">
-              <Text id="stm.socket.select-position">
-                Select a package position.
-              </Text>
-            </div>
-          )}
-
-          <div className="flex min-h-0 flex-1 flex-col border-t border-line">
-            <div className="grid flex-none grid-cols-3 border-b border-line">
-              {(
-                [
-                  ["configurations", "Target Profiles"],
-                  ["cells", "Circuit Cells"],
-                  ["contract", "Safety And Proof"],
-                ] as [DetailView, string][]
-              ).map(([view, label]) => (
-                <button
-                  key={view}
-                  type="button"
-                  aria-pressed={detailView === view}
-                  onClick={() => setDetailView(view)}
-                  className={
-                    "border-b-2 px-2 py-2 text-2xs font-medium " +
-                    (detailView === view
-                      ? "border-acc text-t1"
-                      : "border-transparent text-t3 hover:text-t1")
-                  }
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-            {detailView === "configurations" ? (
-              <ConfigurationList
-                cohorts={visibleCohorts}
-                members={cohortMembers}
-                search={cohortSearch}
-                onSearch={setCohortSearch}
-                selectedId={selectedCohortId}
-                onSelect={(cohort) =>
-                  setSelectedCohortId((current) =>
-                    current === cohort.id ? null : cohort.id,
-                  )
-                }
-              />
-            ) : detailView === "cells" ? (
-              <SolutionGroupList cells={solution.support_cells} onSelect={selectCell} />
-            ) : (
-              <SafetyContract solution={solution} />
-            )}
-          </div>
-        </aside>
+        <SolutionInspector
+          solution={solution}
+          selected={selected}
+          proofNeeded={selected ? proofPositions.has(selected.position) : false}
+          activeCohort={selectedCohort}
+          detailView={detailView}
+          onDetailView={setDetailView}
+          visibleCohorts={visibleCohorts}
+          cohortMembers={cohortMembers}
+          cohortSearch={cohortSearch}
+          onCohortSearch={setCohortSearch}
+          selectedCohortId={selectedCohortId}
+          onSelectCohort={setSelectedCohortId}
+          onSelectCell={selectCell}
+        />
       </div>
     </section>
+  );
+}
+
+
+// The solution header: what this socket is, whether it covers every selected target, and the
+// four headline metrics.
+
+// The right-hand inspector: the selected position's solution, and beneath it the three detail
+// views (target profiles, circuit cells, safety and proof).
+
+// The structure chip row: one chip per topology present, each filtering the map to it, plus the
+// map's own encoding key.
+function TopologyStrip({
+  counts,
+  totalPositions,
+  topology,
+  onTopology,
+}: {
+  counts: (TopologySpec & { count: number })[];
+  totalPositions: number;
+  topology: string | null;
+  onTopology: (update: (current: string | null) => string | null) => void;
+}) {
+  // The structure tooltip is written inside the button loop, where a hook cannot run, so the
+  // sentence is resolved here and the counts of each row are substituted at the row.
+  const structureTitle = useCopyFormatter(
+    "stm.socket.structure.title",
+    "{explanation} {count} of {total} positions.",
+  );
+  return (
+  <div className="flex flex-none flex-wrap items-stretch gap-1 border-b border-line px-3 py-1.5">
+    {counts.map((item) => {
+      const active = topology === item.type;
+      return (
+        <button
+          key={item.type}
+          type="button"
+          aria-pressed={active}
+          title={structureTitle({
+            explanation: item.explanation,
+            count: item.count,
+            total: totalPositions,
+          })}
+          onClick={() => onTopology(() => (active ? null : item.type))}
+          className={
+            "flex min-w-fit items-center gap-2 rounded-control border px-2 py-1.5 text-left " +
+            (active
+              ? "border-acc bg-acc-soft"
+              : "border-line bg-raise hover:border-line2")
+          }
+        >
+          <span
+            className="h-2.5 w-2.5 flex-none rounded-sm"
+            style={{ backgroundColor: item.color }}
+          />
+          <span>
+            <span className="block text-xs text-t1">{item.label}</span>
+            <span className="block font-mono text-2xs text-t3">
+              {item.count} ·{" "}
+              {percent((item.count / totalPositions) * 100)}
+            </span>
+          </span>
+        </button>
+      );
+    })}
+    <div className="ml-auto flex min-w-fit items-center gap-3 px-2 text-2xs text-t3">
+      <span>
+        <span className="mr-1 inline-block h-2 w-2 border border-err bg-err/10" />
+        Red Cross = Critical Collision
+      </span>
+      <span>
+        <span className="mr-1 inline-block h-2 w-2 border border-warn" />
+        Amber Outline = Isolated Or Open
+      </span>
+      <span>Inset Bar = Target Share</span>
+      <span>Blue Center = Selected Profile</span>
+    </div>
+  </div>
+  );
+}
+
+function SolutionInspector({
+  solution,
+  selected,
+  proofNeeded,
+  activeCohort,
+  detailView,
+  onDetailView,
+  visibleCohorts,
+  cohortMembers,
+  cohortSearch,
+  onCohortSearch,
+  selectedCohortId,
+  onSelectCohort,
+  onSelectCell,
+}: {
+  solution: SocketSolutionDTO;
+  selected: SocketSolutionPosition | null;
+  proofNeeded: boolean;
+  activeCohort: SocketTargetCohort | null;
+  detailView: DetailView;
+  onDetailView: (view: DetailView) => void;
+  visibleCohorts: SocketTargetCohort[];
+  cohortMembers: Map<string, string[]>;
+  cohortSearch: string;
+  onCohortSearch: (value: string) => void;
+  selectedCohortId: string | null;
+  onSelectCohort: (update: (current: string | null) => string | null) => void;
+  onSelectCell: (cell: SocketSupportCell) => void;
+}) {
+  return (
+    <aside className="flex min-h-0 flex-col border-l border-line bg-surface">
+      {selected ? (
+        <PositionSolution
+          position={selected}
+          totalTargets={solution.summary.target_count}
+          proofNeeded={proofNeeded}
+          activeCohort={activeCohort}
+        />
+      ) : (
+        <div className="p-4 text-xs text-t3">
+          <Text id="stm.socket.select-position">
+            Select a package position.
+          </Text>
+        </div>
+      )}
+
+      <div className="flex min-h-0 flex-1 flex-col border-t border-line">
+        <div className="grid flex-none grid-cols-3 border-b border-line">
+          {(
+            [
+              ["configurations", "Target Profiles"],
+              ["cells", "Circuit Cells"],
+              ["contract", "Safety And Proof"],
+            ] as [DetailView, string][]
+          ).map(([view, label]) => (
+            <button
+              key={view}
+              type="button"
+              aria-pressed={detailView === view}
+              onClick={() => onDetailView(view)}
+              className={
+                "border-b-2 px-2 py-2 text-2xs font-medium " +
+                (detailView === view
+                  ? "border-acc text-t1"
+                  : "border-transparent text-t3 hover:text-t1")
+              }
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        {detailView === "configurations" ? (
+          <ConfigurationList
+            cohorts={visibleCohorts}
+            members={cohortMembers}
+            search={cohortSearch}
+            onSearch={onCohortSearch}
+            selectedId={selectedCohortId}
+            onSelect={(cohort) =>
+              onSelectCohort((current) =>
+                current === cohort.id ? null : cohort.id,
+              )
+            }
+          />
+        ) : detailView === "cells" ? (
+          <SolutionGroupList cells={solution.support_cells} onSelect={onSelectCell} />
+        ) : (
+          <SafetyContract solution={solution} />
+        )}
+      </div>
+    </aside>
+  );
+}
+
+function SolutionHeader({ solution }: { solution: SocketSolutionDTO }) {
+  return (
+  <header className="flex flex-none items-center gap-5 border-b border-line px-4 py-2.5">
+    <div className="min-w-0 flex-1">
+      <div className="flex flex-wrap items-baseline gap-2">
+        <h2 className="font-mono text-sm font-semibold text-t1">
+          <Text
+            id="stm.socket.heading"
+            values={{ packageName: solution.scope.package }}
+          >
+            {"{packageName} Socket Solution"}
+          </Text>
+        </h2>
+        <Badge
+          size="sm"
+          tone={
+            solution.closure.zero_omission
+              ? "ok"
+              : "err"
+          }
+        >
+          {solution.closure.zero_omission ? (
+            <Text
+              id="stm.socket.closure.supported"
+              values={{
+                supported: solution.closure.supported_target_count,
+                total: solution.summary.target_count,
+              }}
+            >
+              {"Supports {supported}/{total}"}
+            </Text>
+          ) : (
+            <Text
+              id="stm.socket.closure.unsupported"
+              values={{ count: solution.closure.unsupported_target_count }}
+            >
+              {"{count} Unsupported"}
+            </Text>
+          )}
+        </Badge>
+        {solution.closure.release !== "ready" ? (
+          <Badge size="sm" tone="warn">
+            <Text id="stm.socket.verification-open">Verification Open</Text>
+          </Badge>
+        ) : null}
+      </div>
+      <p className="mt-0.5 truncate text-xs text-t3">
+        Any selected target uses this socket after its{" "}
+        {solution.summary.target_cohort_count.toLocaleString()}-profile configuration
+        is applied and verified
+        {solution.bootstrap.status === "requires-declared-target"
+          ? " before target power"
+          : ""}
+        .
+      </p>
+    </div>
+    <Metric
+      value={percent(solution.closure.target_coverage_percentage)}
+      label="Targets Covered"
+    />
+    <Metric
+      value={String(solution.summary.target_cohort_count)}
+      label="Target Profiles"
+    />
+    <Metric
+      value={String(solution.summary.critical_hazard_positions)}
+      label="Critical Hazards"
+    />
+    <Metric
+      value={String(solution.summary.proof_open_positions)}
+      label="Verification Open"
+    />
+  </header>
+  );
+}
+
+// The position search and the six structural filters, with the live match count.
+function PositionFilterBar({
+  search,
+  onSearch,
+  filter,
+  onFilter,
+  matchingCount,
+  totalCount,
+}: {
+  search: string;
+  onSearch: (value: string) => void;
+  filter: PositionFilter;
+  onFilter: (filter: PositionFilter) => void;
+  matchingCount: number;
+  totalCount: number;
+}) {
+  const searchPlaceholder = useText(
+    "stm.socket.search.placeholder",
+    "Find Position, Role, Function, MCU",
+  );
+  const searchLabel = useText("stm.socket.search.aria", "Filter Socket Solution");
+  return (
+  <div className="flex flex-none items-center gap-2 border-b border-line px-3 py-2">
+    <input
+      value={search}
+      onChange={(event) => onSearch(event.target.value)}
+      placeholder={searchPlaceholder}
+      aria-label={searchLabel}
+      className="min-w-52 flex-1 rounded-control bg-field px-2.5 py-1.5 text-xs text-t1 outline-none placeholder:text-t3"
+    />
+    {(
+      [
+        "all",
+        "direct",
+        "configurable",
+        "mixed",
+        "critical",
+        "proof",
+      ] as PositionFilter[]
+    ).map((item) => (
+        <button
+          key={item}
+          type="button"
+          aria-pressed={filter === item}
+          onClick={() => onFilter(item)}
+          className={
+            "rounded-control border px-2 py-1 text-xs " +
+            (filter === item
+              ? "border-acc bg-acc-soft text-t1"
+              : "border-line text-t2 hover:text-t1")
+          }
+        >
+          {filterLabel(item)}
+        </button>
+      ))}
+    <span className="tnum min-w-14 text-right font-mono text-xs text-t3">
+      {matchingCount}/{totalCount}
+    </span>
+  </div>
   );
 }
 
@@ -694,7 +837,7 @@ function ClosureGateStrip({ solution }: { solution: SocketSolutionDTO }) {
                 ? "text-t1"
                 : gate.status === "open"
                   ? "text-warn"
-                  : "text-err")
+                  : "text-err-text")
             }
           >
             {gate.value}
@@ -731,7 +874,7 @@ function ConfigurationList({
 }) {
   const cohortPlaceholder = useText(
     "stm.socket.cohort.search.placeholder",
-    "Find MCU, Family, or Profile",
+    "Find MCU, Series, or Profile",
   );
   const cohortSearchLabel = useText(
     "stm.socket.cohort.search.aria",
@@ -749,7 +892,7 @@ function ConfigurationList({
         />
         <p className="mt-1.5 text-2xs leading-relaxed text-t3">
           <Text id="stm.socket.cohort.explanation">
-            MCUs in one profile use the same branch state at every configurable socket position.
+            MCUs in one profile use the same branch state at each configurable socket position.
             Declare the installed MCU before target power.
           </Text>
         </p>
@@ -853,9 +996,16 @@ function SolutionGroupList({
                 Positions {cell.positions.join(", ")}
               </span>
               <span className="mt-1 block text-2xs text-t2">
-                {cell.controlled
-                  ? `${cell.mode_count} modes · Default open · Readback required`
-                  : "No configurable branch"}
+                {cell.controlled ? (
+                  <Text
+                    id="stm.socket.cells.controlled"
+                    values={{ count: cell.mode_count }}
+                  >
+                    {"{count} modes · Default open · Readback required"}
+                  </Text>
+                ) : (
+                  <Text id="stm.socket.cells.uncontrolled">No configurable branch</Text>
+                )}
               </span>
             </span>
           </span>
@@ -866,6 +1016,37 @@ function SolutionGroupList({
 }
 
 function SafetyContract({ solution }: { solution: SocketSolutionDTO }) {
+  // EvidenceSummary shows its heading as a plain string, so each closure heading is resolved here
+  // and the count it reports is substituted when the row is built.
+  const errorsTitle = useCopyFormatter(
+    "stm.socket.closure.errors.title",
+    "{count} Configuration Errors",
+  );
+  const coveredTitle = useCopyFormatter(
+    "stm.socket.closure.covered.title",
+    "{supported}/{total} Targets Covered",
+  );
+  const accessGapsTitle = useCopyFormatter(
+    "stm.socket.closure.access-gaps.title",
+    "{count} Required Access Gaps",
+  );
+  const siliconLimitsTitle = useCopyFormatter(
+    "stm.socket.closure.silicon-limits.title",
+    "{count} Limits On Silicon Capabilities",
+  );
+  const proofOpenTitle = useCopyFormatter(
+    "stm.socket.closure.proof-open.title",
+    "{count} Positions Need Electrical Verification",
+  );
+  const orderingTitle = useCopyFormatter(
+    "stm.socket.closure.ordering.title",
+    "{count} Target Masks Need Ordering MPNs",
+  );
+  const sourceFindingsTitle = useCopyFormatter(
+    "stm.socket.closure.source-findings.title",
+    "{count} Source Findings",
+  );
+
   const transitions = [
     ["Unknown Target", solution.safe_state_contract.unknown_target],
     ["Controller Startup", solution.safe_state_contract.controller_startup],
@@ -888,23 +1069,29 @@ function SafetyContract({ solution }: { solution: SocketSolutionDTO }) {
   return (
     <div className="min-h-0 flex-1 overflow-y-auto p-3">
       <Eyebrow>
-        <Text id="stm.socket.safety.identity-startup">Identity And Startup</Text>
+        <Text id="stm.socket.safety.identity-startup">Identification And Startup</Text>
       </Eyebrow>
       <div className="mt-1.5 rounded-control border border-line bg-raise p-2.5">
         <div className="flex items-center justify-between gap-3">
           <span className="text-xs font-medium text-t1">
-            {solution.bootstrap.status === "automatic"
-              ? "Common Debug Bootstrap"
-              : "Declared Target Required"}
+            {solution.bootstrap.status === "automatic" ? (
+              <Text id="stm.socket.bootstrap.common">Common Debug Bootstrap</Text>
+            ) : (
+              <Text id="stm.socket.bootstrap.declared">Declared Target Required</Text>
+            )}
           </span>
           <Badge size="sm" tone={solution.bootstrap.status === "automatic" ? "ok" : "warn"}>
-            {solution.bootstrap.status === "automatic" ? "Automatic" : "Gated"}
+            {solution.bootstrap.status === "automatic" ? (
+              <Text id="stm.socket.bootstrap.automatic">Automatic</Text>
+            ) : (
+              <Text id="stm.socket.bootstrap.gated">Gated</Text>
+            )}
           </Badge>
         </div>
         <p className="mt-1 text-2xs leading-relaxed text-t3">{solution.bootstrap.rule}</p>
       </div>
       <Eyebrow className="mt-4 block">
-        <Text id="stm.socket.safety.safe-states">Mandatory Safe States</Text>
+        <Text id="stm.socket.safety.safe-states">Required Safe States</Text>
       </Eyebrow>
       <div className="mt-1.5 divide-y divide-line rounded-control border border-line bg-stage">
         {transitions.map(([label, value]) => (
@@ -915,7 +1102,7 @@ function SafetyContract({ solution }: { solution: SocketSolutionDTO }) {
         ))}
       </div>
       <Eyebrow className="mt-4 block">
-        <Text id="stm.socket.safety.interlocks">Mandatory Interlocks</Text>
+        <Text id="stm.socket.safety.interlocks">Required Interlocks</Text>
       </Eyebrow>
       <div className="mt-1.5 grid grid-cols-2 gap-1">
         {solution.fabric.mandatory_interlocks.map((interlock) => (
@@ -935,7 +1122,7 @@ function SafetyContract({ solution }: { solution: SocketSolutionDTO }) {
         {solution.closure.configuration_errors.length ? (
           <EvidenceSummary
             tone="err"
-            title={`${solution.closure.configuration_errors.length} Configuration Errors`}
+            title={errorsTitle({ count: solution.closure.configuration_errors.length })}
             detail="At least one selected target does not resolve to exactly one safe socket state."
             items={solution.closure.configuration_errors.map(
               (error) =>
@@ -945,7 +1132,10 @@ function SafetyContract({ solution }: { solution: SocketSolutionDTO }) {
         ) : (
           <EvidenceSummary
             tone="ok"
-            title={`${solution.closure.supported_target_count}/${solution.summary.target_count} Targets Covered`}
+            title={coveredTitle({
+              supported: solution.closure.supported_target_count,
+              total: solution.summary.target_count,
+            })}
             detail="Every selected target resolves to one complete configuration profile."
             items={[]}
           />
@@ -953,7 +1143,7 @@ function SafetyContract({ solution }: { solution: SocketSolutionDTO }) {
         {missingRequirements.length ? (
           <EvidenceSummary
             tone="err"
-            title={`${missingRequirements.length} Required Access Gaps`}
+            title={accessGapsTitle({ count: missingRequirements.length })}
             detail="These required functions are not available on every selected target."
             items={missingRequirements.map(
               (requirement) =>
@@ -970,7 +1160,7 @@ function SafetyContract({ solution }: { solution: SocketSolutionDTO }) {
         {siliconLimitedRequirements.length ? (
           <EvidenceSummary
             tone="warn"
-            title={`${siliconLimitedRequirements.length} Silicon Capability Limits`}
+            title={siliconLimitsTitle({ count: siliconLimitedRequirements.length })}
             detail="The socket routes every available function; these MCU variants do not expose the function itself."
             items={siliconLimitedRequirements.map(
               (requirement) =>
@@ -985,7 +1175,7 @@ function SafetyContract({ solution }: { solution: SocketSolutionDTO }) {
         {solution.proofs.length ? (
           <EvidenceSummary
             tone="warn"
-            title={`${solution.summary.proof_open_positions} Positions Need Electrical Verification`}
+            title={proofOpenTitle({ count: solution.summary.proof_open_positions })}
             detail="The socket architecture covers these positions, but their exact electrical limits remain open."
             items={solution.proofs.map(
               (proof) =>
@@ -996,7 +1186,7 @@ function SafetyContract({ solution }: { solution: SocketSolutionDTO }) {
         {orderingWarnings.length ? (
           <EvidenceSummary
             tone="warn"
-            title={`${orderingWarnings.length} Target Masks Need Ordering MPNs`}
+            title={orderingTitle({ count: orderingWarnings.length })}
             detail="The architecture covers the indexed silicon masks; exact purchasable order codes remain unverified."
             items={orderingWarnings}
           />
@@ -1004,7 +1194,7 @@ function SafetyContract({ solution }: { solution: SocketSolutionDTO }) {
         {sourceMessages.length ? (
           <EvidenceSummary
             tone="warn"
-            title={`${sourceMessages.length} Source Findings`}
+            title={sourceFindingsTitle({ count: sourceMessages.length })}
             detail="Detailed target-definition findings retained for audit."
             items={sourceMessages}
           />
@@ -1076,7 +1266,7 @@ function PositionSolution({
       <div className="flex items-start justify-between gap-3">
         <div>
           <Eyebrow>
-            <Text id="stm.socket.position.physical">Physical Position</Text>
+            <Text id="stm.socket.position.physical">Package Position</Text>
           </Eyebrow>
           <h3 className="mt-1 font-mono text-base font-semibold text-t1">
             {position.position}
@@ -1097,18 +1287,31 @@ function PositionSolution({
         <div className="mt-3 rounded-control border border-acc bg-acc-soft px-3 py-2">
           <div className="flex items-center justify-between gap-2">
             <span className="text-xs font-semibold text-t1">
-              {activeMode?.label ?? "Open"}
+              {activeMode?.label ?? (
+                <Text id="stm.socket.position.active-open">Open</Text>
+              )}
             </span>
             <span className="font-mono text-2xs text-t3">
               {profileLabel(activeCohort.id)}
             </span>
           </div>
           <p className="mt-0.5 text-2xs text-t2">
-            {activeBranch
-              ? `Enable ${activeBranch.label}. Every other branch at this position remains open.`
-              : position.controlled
-                ? "No branch closes at this position for the active configuration."
-                : "This position is fixed and does not change with the active configuration."}
+            {activeBranch ? (
+              <Text
+                id="stm.socket.position.enable-branch"
+                values={{ branch: activeBranch.label }}
+              >
+                {"Enable {branch}. All other branches at this position remain open."}
+              </Text>
+            ) : position.controlled ? (
+              <Text id="stm.socket.position.no-branch-closes">
+                No branch closes at this position for the active configuration.
+              </Text>
+            ) : (
+              <Text id="stm.socket.position.fixed-across-configurations">
+                This position is fixed and does not change with the active configuration.
+              </Text>
+            )}
           </p>
         </div>
       ) : null}
@@ -1154,7 +1357,11 @@ function PositionSolution({
 
       <div className="mt-3 flex items-center gap-2 text-2xs text-t3">
         <Badge size="sm" tone={position.controlled ? "warn" : "ok"}>
-          {position.controlled ? "Software Selected" : "Fixed"}
+          {position.controlled ? (
+            <Text id="stm.socket.position.software-selected">Software Selected</Text>
+          ) : (
+            <Text id="stm.socket.position.fixed">Fixed</Text>
+          )}
         </Badge>
         {position.hazard_contract.level !== "none" ? (
           <Badge
@@ -1182,9 +1389,15 @@ function PositionSolution({
         </Eyebrow>
         <p className="mt-1 text-xs leading-relaxed text-t2">
           {position.cell_contract.architecture ===
-          "fail-closed-universal-position-cell"
-            ? "A fail-closed cell selects exactly one target-approved electrical plane."
-            : "One common network is valid across the selected targets."}
+          "fail-closed-universal-position-cell" ? (
+            <Text id="stm.socket.position.cell.fail-closed">
+              A fail-closed cell selects a single target-approved electrical plane.
+            </Text>
+          ) : (
+            <Text id="stm.socket.position.cell.common-network">
+              One common network is valid across the selected targets.
+            </Text>
+          )}
         </p>
         <div className="mt-1.5 flex flex-wrap gap-1">
           {position.cell_contract.planes.map((plane) => (
@@ -1224,9 +1437,18 @@ function PositionSolution({
               </span>
             </div>
             <p className="mt-0.5 text-2xs text-t3">
-              {mode.conductive
-                ? `Connects to ${mode.endpoint.replace("fixed:", "").replace("-", " ")}`
-                : "No conductive branch"}
+              {mode.conductive ? (
+                <Text
+                  id="stm.socket.position.mode.connects-to"
+                  values={{
+                    endpoint: mode.endpoint.replace("fixed:", "").replace("-", " "),
+                  }}
+                >
+                  {"Connects to {endpoint}"}
+                </Text>
+              ) : (
+                <Text id="stm.socket.position.mode.no-branch">No conductive branch</Text>
+              )}
             </p>
             {mode.target_examples.length ? (
               <p className="mt-1 truncate font-mono text-2xs text-t3">
@@ -1242,7 +1464,7 @@ function PositionSolution({
         <div className="mt-3">
           <Eyebrow>
             <Text id="stm.socket.position.node-topology">
-              Socket Node Topology
+              Socket Node Structure
             </Text>
           </Eyebrow>
           <div className="mt-1.5 flex items-center gap-1 overflow-x-auto rounded-control border border-line bg-stage p-2">
@@ -1264,10 +1486,14 @@ function PositionSolution({
                       "rounded-control px-1.5 py-0.5 " +
                       (branch.controlled
                         ? "bg-warn/10 text-warn"
-                        : "bg-ok/10 text-ok")
+                        : "bg-ok/10 text-ok-text")
                     }
                   >
-                    {branch.controlled ? "SELECT" : "DIRECT"}
+                    {branch.controlled ? (
+                      <Text id="stm.socket.position.branch.select">SELECT</Text>
+                    ) : (
+                      <Text id="stm.socket.position.branch.direct">DIRECT</Text>
+                    )}
                   </span>
                   <span className="truncate text-t2">{branch.label}</span>
                   <span className="text-t3">→ {branch.endpoint}</span>

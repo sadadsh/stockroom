@@ -68,7 +68,7 @@ the same rule twice on the same day:
   cads"* - files first, linking second.
 
 ### (4) Everything inside the app
-- **Every manual step is a MISSING FEATURE, not a solution.** Anything external tool runs by hand that the
+- **Every manual step is a MISSING FEATURE, not a solution.** Anything run by hand that the
   owner would want to repeat is a gap to be logged and closed.
 - Standing authority to install whatever tooling is needed.
 - Known outstanding: the app cannot ingest the register/a BOM itself; it could not answer "is my

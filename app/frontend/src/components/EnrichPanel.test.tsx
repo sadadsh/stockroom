@@ -103,7 +103,7 @@ describe("EnrichPanel", () => {
 
     await user.click(screen.getByRole("button", { name: "Enrich From Distributor" }));
     const row = (await screen.findByText("Texas Instruments")).closest("div")!;
-    await user.click(within(row).getByRole("button", { name: "Apply" }));
+    await user.click(within(row).getByRole("button", { name: "Commit" }));
 
     expect(onApply).toHaveBeenCalledWith("manufacturer", "Texas Instruments");
   });
@@ -126,8 +126,8 @@ describe("EnrichPanel", () => {
 
     await user.click(screen.getByRole("button", { name: "Enrich From Distributor" }));
 
-    expect(await screen.findByText("Already Set")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Apply" })).not.toBeInTheDocument();
+    expect(await screen.findByText("In Force")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Commit" })).not.toBeInTheDocument();
   });
 
   it("offers Apply Pinout when the lookup surfaces a pinout and applies it", async () => {
@@ -155,7 +155,7 @@ describe("EnrichPanel", () => {
     await user.click(screen.getByRole("button", { name: "Enrich From Distributor" }));
     // it reports how many pins it found
     expect(await screen.findByText(/2 pins/i)).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Apply Pinout" }));
+    await user.click(screen.getByRole("button", { name: "Commit Pinout" }));
 
     expect(onApplyPinout).toHaveBeenCalledWith({
       value: pins,
@@ -187,7 +187,7 @@ describe("EnrichPanel", () => {
     await user.click(screen.getByRole("button", { name: "Enrich From Distributor" }));
 
     expect(await screen.findByText(/1 pin/i)).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Apply Pinout" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Commit Pinout" })).not.toBeInTheDocument();
   });
 
   it("says so honestly when the lookup finds nothing new", async () => {

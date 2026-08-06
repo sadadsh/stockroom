@@ -119,6 +119,27 @@ public sealed class HandoffProtocolTests
         return framed;
     }
 
+    /// <summary>
+    /// One framed message whose payload is written verbatim, so a test can send a payload the
+    /// canonical encoder would never produce (a missing field, an extra one).
+    /// </summary>
+    internal static byte[] BuildRawMessage(
+        long sequence,
+        string name,
+        long deadline,
+        string payloadJson)
+    {
+        var document =
+            $$"""{"deadline_unix_ms":{{deadline}},"handoff_id":"{{HandoffId}}","name":"{{name}}","payload":{{payloadJson}},"schema":"stockroom.window-handoff","sequence":{{sequence}},"version":1}""";
+        var body = Encoding.UTF8.GetBytes(document);
+        var framed = new byte[body.Length + 4];
+        BinaryPrimitives.WriteUInt32LittleEndian(
+            framed,
+            checked((uint)body.Length));
+        body.CopyTo(framed, 4);
+        return framed;
+    }
+
     internal static HandoffBootstrap ParseBootstrap()
     {
         var message = HandoffCodec.Decode(

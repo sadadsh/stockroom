@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { apiBase, apiToken } from "./runtime";
 
@@ -8,6 +8,7 @@ const injectedToken = window.__STOCKROOM_TOKEN__;
 afterEach(() => {
   window.__API_BASE__ = injectedBase;
   window.__STOCKROOM_TOKEN__ = injectedToken;
+  vi.unstubAllEnvs();
 });
 
 describe("native host runtime boundary", () => {
@@ -23,6 +24,24 @@ describe("native host runtime boundary", () => {
 
   it("allows native request interception to own authentication", () => {
     delete window.__STOCKROOM_TOKEN__;
+    expect(apiToken()).toBe("");
+  });
+
+  it("reads the development .env token only while developing in a browser", () => {
+    delete window.__STOCKROOM_TOKEN__;
+    vi.stubEnv("DEV", true);
+    vi.stubEnv("VITE_API_TOKEN", "dev-only-bearer");
+    expect(apiToken()).toBe("dev-only-bearer");
+  });
+
+  it("keeps a build-time bearer token out of the shipped bundle", () => {
+    // A `VITE_` value is SUBSTITUTED at build time, and the built SPA is committed. Were the read
+    // ungated, a `vite build` on a machine holding a `.env` would bake that machine's token into a
+    // distributed artifact. In a production build `import.meta.env.DEV` is a static false, so the
+    // read is eliminated; this is that elimination observed from the one side a test can stand on.
+    delete window.__STOCKROOM_TOKEN__;
+    vi.stubEnv("DEV", false);
+    vi.stubEnv("VITE_API_TOKEN", "leaked-bearer");
     expect(apiToken()).toBe("");
   });
 });

@@ -69,4 +69,44 @@ describe("PinoutTable", () => {
     const row = screen.getByText("PA9").closest("tr")!;
     expect(row.getAttribute("aria-selected")).toBe("true");
   });
+
+  // The rows answer a click and carry aria-selected, which is a single-select grid. A keyboard user
+  // has to be able to reach and drive it, and a 176-pin part must not become 176 tab stops.
+  it("exposes the rows as a grid with ONE tab stop on the selected row", () => {
+    render(<PinoutTable pinout={PINOUT} selectedPosition="2" onSelectPosition={vi.fn()} />);
+    expect(screen.getByRole("grid")).toBeInTheDocument();
+    const rows = screen.getAllByRole("row").slice(1);
+    expect(rows.map((r) => r.getAttribute("tabindex"))).toEqual(["-1", "0", "-1"]);
+  });
+
+  it("falls back to the first row as the tab stop when nothing is selected", () => {
+    render(<PinoutTable pinout={PINOUT} selectedPosition={null} onSelectPosition={vi.fn()} />);
+    const rows = screen.getAllByRole("row").slice(1);
+    expect(rows.map((r) => r.getAttribute("tabindex"))).toEqual(["0", "-1", "-1"]);
+  });
+
+  it("Enter and Space select the focused row", () => {
+    const onSelect = vi.fn();
+    render(<PinoutTable pinout={PINOUT} selectedPosition={null} onSelectPosition={onSelect} />);
+    const row = screen.getByText("PA9").closest("tr")!;
+    fireEvent.keyDown(row, { key: "Enter" });
+    expect(onSelect).toHaveBeenCalledWith("2");
+    onSelect.mockClear();
+    fireEvent.keyDown(row, { key: " " });
+    expect(onSelect).toHaveBeenCalledWith("2");
+  });
+
+  it("the arrow keys move the selection, and Home/End reach the ends", () => {
+    const onSelect = vi.fn();
+    render(<PinoutTable pinout={PINOUT} selectedPosition="2" onSelectPosition={onSelect} />);
+    const row = screen.getByText("PA9").closest("tr")!;
+    fireEvent.keyDown(row, { key: "ArrowDown" });
+    expect(onSelect).toHaveBeenLastCalledWith("10");
+    fireEvent.keyDown(row, { key: "ArrowUp" });
+    expect(onSelect).toHaveBeenLastCalledWith("1");
+    fireEvent.keyDown(row, { key: "End" });
+    expect(onSelect).toHaveBeenLastCalledWith("10");
+    fireEvent.keyDown(row, { key: "Home" });
+    expect(onSelect).toHaveBeenLastCalledWith("1");
+  });
 });

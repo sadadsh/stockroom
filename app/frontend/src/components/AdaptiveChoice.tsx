@@ -1,5 +1,6 @@
 /** One semantic single-choice control with a Dev Mode-selectable presentation. */
 import { useId, useState, type KeyboardEvent } from "react";
+import { useCopyFormatter } from "../lib/copy";
 import { useDevMode } from "../lib/devMode";
 import type { ChoicePreset } from "../lib/behavior.overrides";
 
@@ -35,6 +36,9 @@ export function AdaptiveChoice({
   const listId = `choice-${useId().replace(/:/g, "")}`;
   const [search, setSearch] = useState("");
   const [searching, setSearching] = useState(false);
+  // The in-field hint of the searchable presentation. The field NAME in the hole is the caller's;
+  // the verb is ours.
+  const searchHint = useCopyFormatter("choice.search-placeholder", "Search {field}");
 
   function stepSegment(event: KeyboardEvent<HTMLButtonElement>, index: number) {
     if (options.length === 0) return;
@@ -141,13 +145,15 @@ export function AdaptiveChoice({
               setSearch("");
             }
           }}
-          placeholder={`Search ${label}`}
+          placeholder={searchHint({ field: label })}
           className="h-8 w-full rounded-control border border-line bg-field px-2 text-xs text-t1 outline-none focus:border-acc disabled:opacity-50"
         />
         <datalist id={listId}>
-          {options.filter((option) => !option.disabled).map((option) => (
-            <option key={option.value} value={option.label} />
-          ))}
+          {/* One pass over the options, in their given order: the same entries the
+              filter-then-map chain produced. */}
+          {options.flatMap((option) =>
+            option.disabled ? [] : [<option key={option.value} value={option.label} />],
+          )}
         </datalist>
       </div>
     );

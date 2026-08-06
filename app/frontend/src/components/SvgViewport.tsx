@@ -6,7 +6,7 @@
  * the app and never bakes a colour that only reads on one theme.
  */
 import { useEffect } from "react";
-import { Text, useText } from "../lib/copy";
+import { Text, useCopyFormatter, useText } from "../lib/copy";
 import { useObjectUrl } from "../lib/useObjectUrl";
 import { usePanZoom } from "../lib/usePanZoom";
 import { useTheme } from "../lib/theme";
@@ -37,6 +37,17 @@ export function SvgViewport({
   const zoomInLabel = useText("svg-view.zoom-in", "Zoom in");
   const resetViewLabel = useText("svg-view.reset-view", "Reset View");
   const exportSvgLabel = useText("svg-view.export-svg", "Export SVG");
+  // The pointer tooltips carry the keyboard shortcut as well as the action, which the accessible
+  // names above deliberately do not - a screen reader announces the key binding as noise.
+  const zoomOutTip = useText("svg-view.zoom-out-tip", "Zoom out (-)");
+  const zoomInTip = useText("svg-view.zoom-in-tip", "Zoom in (+)");
+  const fitTip = useText("svg-view.fit-tip", "Fit drawing (0 or F)");
+  const exportTip = useText("svg-view.export-tip", "Export the current vector drawing");
+  // The canvas's own accessible name, which is also the only place its gestures are stated.
+  const canvasName = useCopyFormatter(
+    "svg-view.canvas-aria",
+    "{subject} inspection canvas. Drag to pan, scroll or use plus and minus to zoom, and press 0 to fit.",
+  );
 
   useEffect(() => {
     onVisibilityChange?.("checking");
@@ -52,7 +63,7 @@ export function SvgViewport({
         aria-label={
           compact
             ? undefined
-            : `${alt} inspection canvas. Drag to pan, scroll or use plus and minus to zoom, and press 0 to fit.`
+            : canvasName({ subject: alt })
         }
         onDoubleClick={compact ? undefined : reset}
         onKeyDown={
@@ -100,11 +111,11 @@ export function SvgViewport({
         </div>
       </div>
       {!compact ? (
-      <div className="absolute bottom-3 right-3 flex items-center overflow-hidden rounded-control border border-line2 bg-popover/95 shadow-pop">
+      <div className="absolute bottom-3 right-3 flex items-center overflow-hidden rounded-control border border-line2 bg-popover shadow-pop">
         <button
           type="button"
           aria-label={zoomOutLabel}
-          title="Zoom out (-)"
+          title={zoomOutTip}
           onClick={zoomOut}
           className="flex h-7 w-7 items-center justify-center text-sm text-t2 hover:bg-raise hover:text-t1"
         >
@@ -119,7 +130,7 @@ export function SvgViewport({
         <button
           type="button"
           aria-label={zoomInLabel}
-          title="Zoom in (+)"
+          title={zoomInTip}
           onClick={zoomIn}
           className="flex h-7 w-7 items-center justify-center text-sm text-t2 hover:bg-raise hover:text-t1"
         >
@@ -128,7 +139,7 @@ export function SvgViewport({
         <button
           type="button"
           aria-label={resetViewLabel}
-          title="Fit drawing (0 or F)"
+          title={fitTip}
           onClick={reset}
           className="h-7 border-l border-line px-2 text-2xs font-medium text-t2 hover:bg-raise hover:text-t1"
         >
@@ -139,7 +150,7 @@ export function SvgViewport({
             href={url}
             download={downloadName}
             aria-label={exportSvgLabel}
-            title="Export the current vector drawing"
+            title={exportTip}
             className="flex h-7 items-center border-l border-line px-2 text-2xs font-medium text-t2 hover:bg-raise hover:text-t1"
           >
             <Text id="svg-view.export-label">SVG</Text>

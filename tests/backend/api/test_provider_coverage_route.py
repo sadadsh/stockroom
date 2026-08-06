@@ -49,11 +49,11 @@ def test_every_registered_provider_is_reachable_for_a_component(client, app_ctx)
     assert rows["traceparts"]["url"] == ""
 
 
-def test_the_workspace_carries_the_same_coverage(client, app_ctx):
+def test_the_dossier_carries_the_same_coverage(client, app_ctx):
     part_id = _add_part(app_ctx)
-    workspace = client.get(f"/api/library/parts/{part_id}/workspace").json()
+    dossier = client.get(f"/api/library/parts/{part_id}/dossier").json()
     coverage = client.get(f"/api/library/parts/{part_id}/providers").json()
-    assert workspace["providers"] == coverage
+    assert dossier["cadSourceCoverage"] == coverage
 
 
 def test_a_person_can_record_and_withdraw_what_they_know(client, app_ctx):
