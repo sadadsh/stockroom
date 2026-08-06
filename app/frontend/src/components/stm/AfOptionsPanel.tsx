@@ -11,11 +11,12 @@
  * routes to the same reused "index not built" message (decision 9). Read-only: it lists options,
  * it never applies one.
  */
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useStmPinAf, useStmSignalCandidates } from "../../api/stmQueries";
 import { ApiError } from "../../api/client";
 import { Eyebrow } from "../primitives";
 import { Text } from "../../lib/copy";
+import { withStableKeys } from "./listKeys";
 
 // The single numeric-aware collation (mirrors PinoutViewer.tsx): it orders "1","2","10" correctly
 // AND handles alphanumeric BGA labels "A1".."A10","AB12" - drop { numeric: true } and it goes red.
@@ -27,16 +28,14 @@ function is409(err: unknown): boolean {
   return err instanceof ApiError && err.status === 409;
 }
 
+// A new pin must clear the chosen signal (the previous signal may not exist on the new pin). That
+// is a full state reset, so the caller keys this component on (part, position) and React remounts
+// it - no adjustment effect, and no render where the old signal is still showing.
 export function AfOptionsPanel({ part, position }: { part: string; position: string }) {
   const [signal, setSignal] = useState<string | null>(null);
 
   const pinAf = useStmPinAf(part, position);
   const candidates = useStmSignalCandidates(part, signal);
-
-  // A new pin clears the chosen signal (the previous signal may not exist on the new pin).
-  useEffect(() => {
-    setSignal(null);
-  }, [part, position]);
 
   const afs = useMemo(
     () => [...(pinAf.data?.alternate_functions ?? [])].sort((a, b) => a.af_index - b.af_index),
@@ -45,6 +44,14 @@ export function AfOptionsPanel({ part, position }: { part: string; position: str
   const cands = useMemo(
     () => [...(candidates.data?.candidates ?? [])].sort((a, b) => comparePositions(a.position, b.position)),
     [candidates.data],
+  );
+  // mcu_package_pin is UNIQUE(mcu_id, physical_pin_number, raw_pin_name) and raw_pin_name is not in
+  // the candidate DTO, so two PINREMAP identities at one position can match on every field the row
+  // carries. Key on that content and let withStableKeys disambiguate an exact repeat.
+  const candRows = useMemo(
+    () =>
+      withStableKeys(cands, (c) => `${c.position}|${c.af_index}|${c.canonical_pin_name}`),
+    [cands],
   );
 
   const notBuilt = is409(pinAf.error) || is409(candidates.error);
@@ -64,7 +71,7 @@ export function AfOptionsPanel({ part, position }: { part: string; position: str
             <Text id="stm.af.options.loading">Loading alternate functions...</Text>
           </p>
         ) : pinAf.isError ? (
-          <p className="text-xs text-err">
+          <p className="text-xs text-err-text">
             <Text id="stm.af.options.failed">Could not load alternate functions.</Text>
           </p>
         ) : afs.length === 0 ? (
@@ -73,10 +80,12 @@ export function AfOptionsPanel({ part, position }: { part: string; position: str
           </p>
         ) : (
           <ul className="flex flex-col gap-1">
-            {afs.map((af, i) => {
+            {/* pin_alternate_function is UNIQUE(mcu_package_pin_id, af_index, signal), so the
+                (af_index, signal) pair is this pin's row id. */}
+            {afs.map((af) => {
               const active = af.signal === signal;
               return (
-                <li key={`${af.af_index}-${af.signal}-${i}`}>
+                <li key={`${af.af_index}-${af.signal}`}>
                   <button
                     type="button"
                     aria-pressed={active}
@@ -107,7 +116,7 @@ export function AfOptionsPanel({ part, position }: { part: string; position: str
         {!signal ? (
           <p className="text-xs text-t3">
             <Text id="stm.af.options.candidates-prompt">
-              Select a signal above to see every candidate pin for it.
+              Select a signal above to see each candidate pin for it.
             </Text>
           </p>
         ) : candidates.isLoading ? (
@@ -122,7 +131,7 @@ export function AfOptionsPanel({ part, position }: { part: string; position: str
               </Text>
             </p>
           ) : (
-            <p className="text-xs text-err">
+            <p className="text-xs text-err-text">
               <Text id="stm.af.options.candidates-failed">Could not load candidate pins.</Text>
             </p>
           )
@@ -135,9 +144,9 @@ export function AfOptionsPanel({ part, position }: { part: string; position: str
         ) : (
           <ul className="flex flex-col gap-1" data-testid="af-signal-candidates">
             <li className="px-2 pb-0.5 font-mono text-2xs text-t3">{signal}</li>
-            {cands.map((c, i) => (
+            {candRows.map(({ key, item: c }) => (
               <li
-                key={`${c.position}-${i}`}
+                key={key}
                 className="flex items-baseline justify-between gap-3 px-2 py-0.5"
               >
                 <span className="flex items-baseline gap-2">

@@ -186,7 +186,7 @@ const STATE_TEXT: Record<ProductState, string> = {
   empty: "text-t3",
   warning: "text-warn",
   unavailable: "text-t3",
-  error: "text-err",
+  error: "text-err-text",
 };
 
 /** The one shell all five states render in, so they differ by TONE and wording, never by shape. */
@@ -330,7 +330,7 @@ export function ErrorState({
 export function RetryAction({
   onRetry,
   id = "state.retry",
-  label = "Try Again",
+  label = "Rerun",
   devId,
   pending = false,
 }: {
@@ -341,7 +341,7 @@ export function RetryAction({
   pending?: boolean;
 }) {
   const resolved = useText(id, label);
-  const pendingLabel = useText("state.retrying", "Retrying");
+  const pendingLabel = useText("state.retrying", "Rerunning");
   return (
     <Button
       small
@@ -355,6 +355,14 @@ export function RetryAction({
     </Button>
   );
 }
+
+// Module scope: the table reads nothing local, so it is allocated once rather than per notice.
+const NOTICE_TONE_TEXT: Record<BadgeTone, string> = {
+  ok: "text-ok-text",
+  warn: "text-warn",
+  err: "text-err-text",
+  neutral: "text-t3",
+};
 
 /**
  * A one-line note inside a section: a qualification, not a state of the whole surface.
@@ -377,18 +385,12 @@ export function InlineNotice({
   action?: ReactNode;
   className?: string;
 }) {
-  const TONE_TEXT: Record<BadgeTone, string> = {
-    ok: "text-ok",
-    warn: "text-warn",
-    err: "text-err",
-    neutral: "text-t3",
-  };
   return (
     <p
       data-dev-id={devId}
       className={cx(
         "flex min-w-0 items-center gap-2 text-2xs leading-relaxed",
-        TONE_TEXT[tone],
+        NOTICE_TONE_TEXT[tone],
         className,
       )}
     >
@@ -468,6 +470,8 @@ export function Region({
 
 // --------------------------------------------------------------------------- compact fact row
 
+const FACT_VALUE_TONE = { t1: "text-t1", t2: "text-t2", warn: "text-warn" } as const;
+
 /**
  * One label-and-value line in a packed region.
  *
@@ -503,7 +507,6 @@ export function FactRow({
   className?: string;
 }) {
   const Element = as;
-  const VALUE_TONE = { t1: "text-t1", t2: "text-t2", warn: "text-warn" } as const;
   return (
     <Element
       data-dev-id={devId}
@@ -525,7 +528,7 @@ export function FactRow({
           className={cx(
             "flex-none text-2xs font-semibold",
             mono && "tnum font-mono",
-            VALUE_TONE[tone],
+            FACT_VALUE_TONE[tone],
           )}
         >
           {value}

@@ -29,7 +29,7 @@ import { useCadInventory } from "../api/queries";
 import type { CadInventory } from "../api/types";
 import { useJob } from "../lib/useJob";
 import { useToast } from "../lib/toast";
-import { Text } from "../lib/copy";
+import { Text, useCopyFormatter, useText } from "../lib/copy";
 import { Badge, Button } from "./primitives";
 import { ConfirmDialog } from "./ConfirmDialog";
 
@@ -39,6 +39,28 @@ export function CadClearSection() {
   const { toast } = useToast();
   const [confirming, setConfirming] = useState(false);
   const [report, setReport] = useState<CadInventory | null>(null);
+  // Resolved up here, above the two early returns below, because a toast and a dialog prop both
+  // take a plain string and neither can hold a copy element. One id per number agreement: the
+  // count and its noun have to move together when the sentence is reworded.
+  const startFailed = useText("cad.clear.toast-start-failed", "Could not start the clear.");
+  const clearFailed = useText("cad.clear.toast-failed", "The clear failed.");
+  const removedOne = useCopyFormatter("cad.clear.toast-removed-one", "Removed {count} CAD asset.");
+  const removedMany = useCopyFormatter(
+    "cad.clear.toast-removed-many",
+    "Removed {count} CAD assets.",
+  );
+  const removedNone = useText("cad.clear.toast-removed-none", "There was no CAD to remove.");
+  const confirmTitle = useText("cad.clear.confirm-title", "Remove All CAD Files");
+  // The dangling-reference report, one id per number agreement: three clauses have to agree with
+  // the count at once, so the sentence is reworded whole rather than assembled from four ternaries.
+  const missingOne = useCopyFormatter(
+    "cad.clear.missing-one",
+    "{count} reference pointed at a file that was not there. The reference is cleared regardless, and the path is listed, so nothing counts as deleted in silence.",
+  );
+  const missingMany = useCopyFormatter(
+    "cad.clear.missing-many",
+    "{count} references pointed at a file that was not there. The references are cleared regardless, and the paths are listed, so nothing counts as deleted in silence.",
+  );
 
   const onClear = useCallback(async () => {
     setConfirming(false);
@@ -47,12 +69,12 @@ export function CadClearSection() {
     try {
       ref = await api.clearCad({ dryRun: false });
     } catch (err) {
-      toast(err instanceof Error ? err.message : "Could not start the clear.", "err");
+      toast(err instanceof Error ? err.message : startFailed, "err");
       return;
     }
     const finished = await job.run(ref.job_id);
     if (finished.status === "error") {
-      toast(finished.error ?? "The clear failed.", "err");
+      toast(finished.error ?? clearFailed, "err");
       return;
     }
     const result = finished.result;
@@ -60,24 +82,33 @@ export function CadClearSection() {
     setReport(result);
     toast(
       result.cleared
-        ? `Removed ${result.cleared} CAD ${result.cleared === 1 ? "asset" : "assets"}.`
-        : "There was no CAD to remove.",
+        ? (result.cleared === 1 ? removedOne : removedMany)({ count: result.cleared })
+        : removedNone,
       result.cleared ? "ok" : "neutral",
     );
     inventory.refetch();
-  }, [job, toast, inventory]);
+  }, [
+    job,
+    toast,
+    inventory,
+    startFailed,
+    clearFailed,
+    removedOne,
+    removedMany,
+    removedNone,
+  ]);
 
   if (inventory.isLoading) {
     return (
       <p className="py-1 text-sm text-t3">
-        <Text id="cad.clear.loading">Counting the CAD your library holds...</Text>
+        <Text id="cad.clear.loading">Counting the CAD this catalog holds...</Text>
       </p>
     );
   }
   if (inventory.isError || !inventory.data) {
     return (
-      <p className="py-1 text-sm text-err">
-        <Text id="cad.clear.error">Could not read your library.</Text>
+      <p className="py-1 text-sm text-err-text">
+        <Text id="cad.clear.error">Could not read the catalog.</Text>
       </p>
     );
   }
@@ -89,7 +120,9 @@ export function CadClearSection() {
     <div className="flex flex-col gap-4">
       <p className="text-base text-t2">
         {cleared === 0 ? (
-          "Your library holds no CAD files of its own."
+          <Text id="cad.clear.none-of-its-own">
+            The catalog holds no CAD files of its own.
+          </Text>
         ) : (
           <>
             {/* "assets", not "files": a KiCad symbol is an ENTRY inside a shared
@@ -97,7 +130,8 @@ export function CadClearSection() {
                 the 184 things being removed are not 184 files. Saying "files" over-counts by
                 roughly a third and is the count-does-not-agree-with-its-noun defect this repo
                 already gates on the backend. The trailing clause names what they are. */}
-            Your library holds <span className="tnum font-medium text-t1">{cleared}</span> CAD{" "}
+            <Text id="cad.clear.holds">The catalog holds</Text>{" "}
+            <span className="tnum font-medium text-t1">{cleared}</span> CAD{" "}
             {cleared === 1 ? "asset" : "assets"} across{" "}
             <span className="tnum">{parts}</span> {parts === 1 ? "component" : "components"}:
             symbols, footprints and 3D models it downloaded or built.
@@ -128,19 +162,23 @@ export function CadClearSection() {
             disabled={job.status === "running"}
             data-dev-id="settings.cad-clear.run"
           >
-            {job.status === "running" ? "Removing" : "Remove All CAD Files"}
+            {job.status === "running" ? (
+              <Text id="cad.clear.run-busy">Removing</Text>
+            ) : (
+              <Text id="cad.clear.run">Remove All CAD Files</Text>
+            )}
           </Button>
           {/* Says what the disclosure's hint does NOT: that it is atomic and revertible. Repeating
               the hint's "components and specs all stay" here is the same duplication caught in
               DerivationSection, 230px apart on the same screen. */}
           <p className="text-sm text-t2">
-            <Text id="cad.clear.revertible">Lands as one change you can revert.</Text>
+            <Text id="cad.clear.revertible">Lands as one change that can be reverted.</Text>
           </p>
         </div>
       ) : null}
 
       {job.status === "error" && job.error ? (
-        <p className="text-sm text-err">{job.error}</p>
+        <p className="text-sm text-err-text">{job.error}</p>
       ) : null}
 
       {report ? (
@@ -154,12 +192,10 @@ export function CadClearSection() {
           </p>
           {report.missing_files.length > 0 ? (
             <div>
-              <p>
-                <span className="tnum">{report.missing_files.length}</span>{" "}
-                {report.missing_files.length === 1 ? "reference" : "references"} pointed at a file
-                that was not there. The {report.missing_files.length === 1 ? "reference is" : "references are"}{" "}
-                cleared either way, and the {report.missing_files.length === 1 ? "path is" : "paths are"} listed
-                so nothing is quietly counted as deleted.
+              <p className="tnum">
+                {(report.missing_files.length === 1 ? missingOne : missingMany)({
+                  count: report.missing_files.length,
+                })}
               </p>
               <ul className="mt-1 list-disc pl-5">
                 {report.missing_files.slice(0, 10).map((m) => (
@@ -182,9 +218,14 @@ export function CadClearSection() {
           {report.failed.length > 0 ? (
             <div>
               <Badge tone="err" size="sm">
-                {report.failed.length === 1
-                  ? "1 Component Could Not Be Cleared"
-                  : `${report.failed.length} Components Could Not Be Cleared`}
+                {report.failed.length === 1 ? (
+                  <Text id="cad.clear.failed-one">1 Component Could Not Be Cleared</Text>
+                ) : (
+                  <Text
+                    id="cad.clear.failed-many"
+                    values={{ count: report.failed.length }}
+                  >{"{count} Components Could Not Be Cleared"}</Text>
+                )}
               </Badge>
               <ul className="mt-1 list-disc pl-5">
                 {report.failed.map((f) => (
@@ -201,7 +242,7 @@ export function CadClearSection() {
       <ConfirmDialog
         open={confirming}
         danger
-        title="Remove All CAD Files"
+        title={confirmTitle}
         confirmLabel="Remove Them"
         body={
           <>
@@ -210,7 +251,9 @@ export function CadClearSection() {
             library holds. The components themselves, their specs, datasheets and imported
             distributor data are untouched, and{" "}
             {keptStock > 0 ? `the ${keptStock} references to KiCad's own libraries stay. ` : ""}
-            it lands as one change you can revert.
+            <Text id="cad.clear.confirm-revertible">
+              it lands as one change that can be reverted.
+            </Text>
           </>
         }
         onConfirm={onClear}

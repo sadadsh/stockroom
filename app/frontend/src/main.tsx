@@ -1,7 +1,7 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { MotionConfig } from "motion/react";
+import { LazyMotion, MotionConfig } from "motion/react";
 import App from "./App";
 import { RouterProvider } from "./lib/router";
 import { AddPartProvider } from "./lib/addPart";
@@ -35,6 +35,10 @@ const queryClient = new QueryClient({
   },
 });
 
+// The animation runtime, fetched as its own chunk after boot. See src/lib/motionFeatures.ts for
+// why the bundle is domMax and why deferring it costs nothing.
+const loadMotionFeatures = () => import("./lib/motionFeatures").then((mod) => mod.default);
+
 const rootEl = document.getElementById("root");
 if (!rootEl) throw new Error("root element not found");
 
@@ -43,23 +47,27 @@ createRoot(rootEl).render(
     <QueryClientProvider client={queryClient}>
       {/* reducedMotion="user" makes every animation collapse to instant when the OS asks. */}
       <MotionConfig reducedMotion="user">
-        <ThemeProvider>
-          {/* Dev mode wraps the app so its token overrides apply for everyone on boot; the panel
-              itself renders only while dev mode is toggled on (Ctrl/Cmd+Shift+D). */}
-          <DevModeProvider>
-            <ToastProvider>
-              <RouterProvider>
-                <CaptureProvider>
-                  <AddPartProvider>
-                    <App />
-                  </AddPartProvider>
-                </CaptureProvider>
-              </RouterProvider>
-            </ToastProvider>
-            <DevPanel />
-            <DevInspector />
-          </DevModeProvider>
-        </ThemeProvider>
+        {/* Every animating surface renders m.* (motion/react-m), which carries no animation
+            runtime; this is the one place the runtime is loaded, and it arrives as its own chunk. */}
+        <LazyMotion features={loadMotionFeatures}>
+          <ThemeProvider>
+            {/* Dev mode wraps the app so its token overrides apply for everyone on boot; the panel
+                itself renders only while dev mode is toggled on (Ctrl/Cmd+Shift+D). */}
+            <DevModeProvider>
+              <ToastProvider>
+                <RouterProvider>
+                  <CaptureProvider>
+                    <AddPartProvider>
+                      <App />
+                    </AddPartProvider>
+                  </CaptureProvider>
+                </RouterProvider>
+              </ToastProvider>
+              <DevPanel />
+              <DevInspector />
+            </DevModeProvider>
+          </ThemeProvider>
+        </LazyMotion>
       </MotionConfig>
     </QueryClientProvider>
   </StrictMode>,

@@ -7,108 +7,37 @@
  * refuses the hotlink (Mouser sits behind Akamai). When both lanes fail the `fallback`
  * renders instead - never a broken-image glyph.
  */
-import { useEffect, useState, type ReactNode } from "react";
+import { useState, type ReactNode, type Ref } from "react";
 import { useProductImage } from "../api/queries";
 import { useModalDismiss } from "../lib/useModalDismiss";
-import { orderPhotos } from "../lib/sourcingOrder";
 import { useObjectUrl } from "../lib/useObjectUrl";
-import { Text, useText } from "../lib/copy";
-import type { SourcedAlternate } from "../api/types";
+import { Text, useCopyFormatter, useText } from "../lib/copy";
+import type { PartPhoto } from "./partPhotos";
 
-/** The photo URL out of a spec bag - either shape: a plain string (a candidate's or a
- * committed record's specs) or a Sourced DTO ({value}) straight off an EnrichmentResult. */
-export function productPhotoUrl(
-  specs: Record<string, unknown> | null | undefined,
-): string {
-  const raw = (specs ?? {})["Image"];
-  const v =
-    raw != null && typeof raw === "object" ? (raw as { value?: unknown }).value : raw;
-  return typeof v === "string" && /^https?:\/\//i.test(v.trim()) ? v.trim() : "";
-}
-
-/** One photograph on offer, and which distributor served it. */
-export interface PartPhoto {
-  url: string;
-  /** The distributor that supplied it, already humanised. Empty when nothing named it. */
-  vendor: string;
-}
-
-// Internal source keys carry a lane suffix a person should never read ("mouser_web" is the
-// scraper lane, not a company). The vendor labels are deliberately NOT a hardcoded map of every
-// distributor: any unknown source is title-cased, so a new adapter shows a sensible name instead
-// of nothing on the day it lands.
-function vendorLabel(source: string): string {
-  const base = (source || "").split("_")[0].trim();
-  if (!base) return "";
-  if (base.toLowerCase() === "digikey") return "DigiKey";
-  if (base.toLowerCase() === "lcsc") return "LCSC";
-  return base.charAt(0).toUpperCase() + base.slice(1);
-}
-
-/**
- * EVERY photograph on record for this part, in-force first, then each distributor that offered a
- * different one.
- *
- * These are real, already-stored answers, not a second fetch: both distributor adapters write
- * `specs["Image"]` with `setdefault`, so the first source wins the slot and the rest are preserved
- * as spec conflicts (`record.alternates["Image"]`) by the Batch 3 machinery. Before this, that
- * second and third photo were carried all the way into the record and then shown to nobody.
- *
- * Deduplicated by URL, because two sources naming the SAME image is the common case and a carousel
- * that pages through three identical photographs reads as broken.
- */
-export function partPhotos(
-  specs: Record<string, unknown> | null | undefined,
-  // The record's REAL alternates type, not a structural stand-in: a hand-written shape here would
-  // silently stop matching the day the DTO grows a field, and it already rejected a valid caller.
-  alternates?: Record<string, SourcedAlternate[]> | null,
-): PartPhoto[] {
-  const out: PartPhoto[] = [];
-  const seen = new Set<string>();
-  const push = (url: string, source: string) => {
-    const clean = url.trim();
-    if (!clean || seen.has(clean)) return;
-    seen.add(clean);
-    out.push({ url: clean, vendor: vendorLabel(source) });
-  };
-
-  const hero = productPhotoUrl(specs);
-  // The in-force photo's own origin, when the spec bag kept it as a Sourced DTO.
-  const raw = (specs ?? {})["Image"];
-  const heroSource =
-    raw != null && typeof raw === "object" ? String((raw as { source?: unknown }).source ?? "") : "";
-  if (hero) push(hero, heroSource);
-
-  for (const alt of (alternates ?? {})["Image"] ?? []) {
-    const v = alt?.value;
-    if (typeof v === "string" && /^https?:\/\//i.test(v.trim())) push(v, alt.source ?? "");
-  }
-  // Quality order, not arrival order. Which adapter won the `specs["Image"]` slot is a race decided
-  // by `setdefault`, so the in-force photo was simply whoever answered first - and the owner's
-  // complaint (2026-07-26) is exactly that: the DigiKey photograph is much better than the Mouser
-  // one, and Mouser was winning the hero slot. Sorted here rather than at the call site so the
-  // carousel, the thumbnail and any future consumer all agree on which image leads.
-  return orderPhotos(out);
-}
-
-export function ProductPhoto({
-  url,
-  alt,
-  className,
-  fallback,
-}: {
+interface ProductPhotoProps {
   url: string;
   alt: string;
   className?: string;
   fallback?: ReactNode;
-}) {
+}
+
+/**
+ * A different part's photo must never inherit the previous url's lanes, so the url IS the identity
+ * of the lane state: React unmounts the old lanes and mounts fresh ones.
+ *
+ * Clearing them from an effect instead (`useEffect(() => { setDirect(true); setDead(false) }, [url])`)
+ * left one committed render in between that still carried the OLD url's verdict: a part whose direct
+ * hotlink had already failed switched to a new url and, for that frame, asked the backend proxy for
+ * it - a request the direct lane exists to avoid - or, once both lanes had failed, drew the fallback
+ * over a photo that was in fact fine.
+ */
+export function ProductPhoto(props: ProductPhotoProps) {
+  return <PhotoLanes key={props.url} {...props} />;
+}
+
+function PhotoLanes({ url, alt, className, fallback }: ProductPhotoProps) {
   const [direct, setDirect] = useState(true); // lane 1: the plain <img src>
   const [dead, setDead] = useState(false); // both lanes failed: the fallback
-  // a different part's photo resets the lanes (state must never leak across urls)
-  useEffect(() => {
-    setDirect(true);
-    setDead(false);
-  }, [url]);
   const proxy = useProductImage(url, !direct && !dead);
   const proxied = useObjectUrl(proxy.data ?? null);
 
@@ -156,6 +85,11 @@ export function PhotoTrigger({
   variant?: "chip" | "panel";
 }) {
   const [open, setOpen] = useState(false);
+  // The accessible names, resolved above the early return below. A photo button is a glyph plus two
+  // words, so the name is where the complete action lives, and the part it names is data.
+  const thisPart = useText("photo.this-part", "this part");
+  const viewManyName = useCopyFormatter("photo.view-many-aria", "View {count} Photos of {part}");
+  const viewOneName = useCopyFormatter("photo.view-one-aria", "View Photo of {part}");
   const shots: PartPhoto[] = photos && photos.length ? photos : url ? [{ url, vendor: "" }] : [];
   if (!shots.length) return null;
   const count = shots.length;
@@ -179,8 +113,8 @@ export function PhotoTrigger({
           onClick={() => setOpen(true)}
           aria-label={
             count > 1
-              ? `View ${count} Photos of ${partName || "this part"}`
-              : `View Photo of ${partName || "this part"}`
+              ? viewManyName({ count, part: partName || thisPart })
+              : viewOneName({ part: partName || thisPart })
           }
           className="group flex h-8 w-full items-center gap-2 rounded-control border border-line bg-field px-3 text-xs font-medium text-t1 transition-colors hover:border-line2 hover:bg-raise2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc"
         >
@@ -195,7 +129,11 @@ export function PhotoTrigger({
             <circle cx="9" cy="11" r="2" />
             <path d="m21 15-3.5-3.5L13 16l-2-2-5 5" />
           </svg>
-          {count > 1 ? `View ${count} Photos` : "View Photo"}
+          {count > 1 ? (
+            <Text id="photo.view-many" values={{ count }}>{"View {count} Photos"}</Text>
+          ) : (
+            <Text id="photo.view-one">View Photo</Text>
+          )}
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true" className="ml-auto flex-none text-t3 transition-colors group-hover:text-t1">
             <path d="M9 18l6-6-6-6" />
           </svg>
@@ -211,7 +149,7 @@ export function PhotoTrigger({
         type="button"
         data-dev-id={devId}
         onClick={() => setOpen(true)}
-        aria-label={`View Photo of ${partName || "this part"}`}
+        aria-label={viewOneName({ part: partName || thisPart })}
         className="inline-flex flex-none items-center gap-1.5 rounded-control border border-line bg-raise px-2 py-1 text-2xs font-medium text-t2 transition-colors hover:border-line2 hover:text-t1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc"
       >
         <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
@@ -249,22 +187,51 @@ export function PhotoCard({
   onClose: () => void;
 }) {
   const { ref: dialogRef, zIndex: modalZ } = useModalDismiss(open, onClose);
-  const closeLabel = useText("photo.close", "Close");
   const shots: PartPhoto[] =
     photos && photos.length ? photos : url ? [{ url, vendor: "" }] : [];
-  const [at, setAt] = useState(0);
   // A different part (or a refreshed set) must never open on a stale index: paging to photo 3 and
-  // reopening on a part with one photo would otherwise render an empty stage.
-  const key = shots.map((s) => s.url).join("|");
-  useEffect(() => {
-    setAt(0);
-  }, [key, open]);
+  // reopening on a part with one photo would otherwise render an empty stage. The SET is the page
+  // index's identity, and closing removes the stage outright, so neither case can survive - where
+  // an effect that reset the index ran only AFTER a render had already drawn the wrong slide.
+  const setKey = shots.map((s) => s.url).join("|");
+
+  if (!open || shots.length === 0) return null;
+  return (
+    <PhotoStage
+      key={setKey}
+      shots={shots}
+      partName={partName}
+      onClose={onClose}
+      dialogRef={dialogRef}
+      modalZ={modalZ}
+    />
+  );
+}
+
+/** The open viewer. Mounted only while it is open and remounted per photo SET, so the page index
+ * is born at zero rather than corrected after the fact. */
+function PhotoStage({
+  shots,
+  partName,
+  onClose,
+  dialogRef,
+  modalZ,
+}: {
+  shots: PartPhoto[];
+  partName: string;
+  onClose: () => void;
+  dialogRef: Ref<HTMLDivElement>;
+  modalZ: number;
+}) {
+  const closeLabel = useText("photo.close", "Close");
+  const thisPart = useText("photo.this-part", "this part");
+  const dialogName = useCopyFormatter("photo.dialog-aria", "Photo of {part}");
+  const [at, setAt] = useState(0);
 
   const count = shots.length;
-  const index = count ? Math.min(at, count - 1) : 0;
-  const step = (delta: number) => setAt((i) => (count ? (i + delta + count) % count : 0));
+  const index = Math.min(at, count - 1);
+  const step = (delta: number) => setAt((i) => (i + delta + count) % count);
 
-  if (!open || !count) return null;
   const shot = shots[index];
   return (
     <div
@@ -287,7 +254,7 @@ export function PhotoCard({
         data-dev-id="preview.photo"
         role="dialog"
         aria-modal="true"
-        aria-label={`Photo of ${partName || "this part"}`}
+        aria-label={dialogName({ part: partName || thisPart })}
         tabIndex={-1}
         // Left/Right page the carousel. Escape is already handled by useModalDismiss, and the
         // arrows are bound on the DIALOG rather than the window so they cannot fight a text
@@ -384,12 +351,14 @@ function CarouselArrow({
   devId: string;
   onClick: () => void;
 }) {
+  const previousName = useText("photo.previous", "Previous Photo");
+  const nextName = useText("photo.next", "Next Photo");
   return (
     <button
       type="button"
       data-dev-id={devId}
       onClick={onClick}
-      aria-label={side === "left" ? "Previous Photo" : "Next Photo"}
+      aria-label={side === "left" ? previousName : nextName}
       className={
         "absolute top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-control " +
         "border border-line bg-popover text-t2 shadow-pop transition-colors hover:text-t1 " +

@@ -35,9 +35,9 @@ export function ExternalIcon({ className }: { className?: string }) {
   return <Icon id="action.external" className={className} />;
 }
 
-export function EyeIcon({ className }: { className?: string }) {
-  return <Icon id="action.view" className={className} />;
-}
+// No `EyeIcon` wrapper. The `action.view` glyph is in the registry and drawn with
+// <Icon id="action.view" />; a named wrapper existed here with no call site, and these wrappers are
+// only for consumers that predate <Icon> - a new one should reach for the registry id directly.
 
 // Line art for the Symbol, Footprint and 3D Model file cards. Now registry glyphs; the wrappers
 // gain a `{ className }` prop for uniformity, but existing prop-less call sites are unaffected.

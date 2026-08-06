@@ -6,7 +6,7 @@
  * component is only the view.
  */
 import type { KeyboardEvent } from "react";
-import { useText } from "../lib/copy";
+import { useCopyFormatter, useText } from "../lib/copy";
 import { useInlineEdit } from "../lib/useInlineEdit";
 
 interface Props {
@@ -44,6 +44,8 @@ export function EditableText({
 }: Props) {
   // The prompt shown when a field is empty and no caller supplied its own word for the thing.
   const defaultPlaceholder = useText("editable.placeholder", "Add");
+  // The accessible name of the closed control, which reads as a value rather than as a control.
+  const editName = useCopyFormatter("editable.edit-aria", "Edit {field}");
   const shownPlaceholder = placeholder ?? defaultPlaceholder;
   const { editing, draft, setDraft, begin, commit, cancel } = useInlineEdit(
     value,
@@ -96,7 +98,7 @@ export function EditableText({
       type="button"
       disabled={disabled}
       onClick={begin}
-      aria-label={`Edit ${label}`}
+      aria-label={editName({ field: label })}
       className={
         // max-w-full is LOAD-BEARING for `truncate`. This button is sized by its CONTENT, so a long
         // unbroken value (a URL has no spaces to break at) made it wider than its own parent and the

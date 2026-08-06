@@ -3,12 +3,16 @@
  * Interactive labels are Title Case, and there are no em dashes in any copy
  * (owner rules). Radii use the 2px tokens (rounded-card / rounded-control).
  *
- * This module is the kit's ONE import surface. The product-state vocabulary (route header,
- * section header, the five states, retry, inline notice, bounded region, compact fact row,
- * attention item, data table) lives in `productState.tsx`, the modal frame in `modalParts.tsx`,
- * and the semantic text roles in `typography.tsx`; all three are re-exported here so no route has
- * to know which sibling a primitive happens to be declared in, and so there is never a second
- * parallel kit to drift against.
+ * The controls and surfaces of the kit are declared HERE. The kit's single import surface is the
+ * sibling barrel `primitives.ts`, which names this module alongside the product-state vocabulary
+ * (`productState.tsx`), the modal frame (`modalParts.tsx`) and the semantic text roles
+ * (`typography.ts`), so no route has to know which sibling a primitive happens to be declared in
+ * and there is never a second parallel kit to drift against. Keep importing `./primitives`.
+ *
+ * The re-exports used to sit at the top of this file, which meant the module both declared
+ * components and forwarded a mixed bag of values - not a Fast Refresh boundary, so editing any
+ * control here reloaded the whole page. They moved to the barrel; this module declares components
+ * only.
  */
 import { useState } from "react";
 import type { ButtonHTMLAttributes, HTMLAttributes, KeyboardEvent, ReactNode } from "react";
@@ -20,11 +24,8 @@ import {
   UI_PROPERTY_VALUE,
   UI_SECTION_TITLE,
   UI_STATUS_TEXT,
+  WarnMark,
 } from "./typography";
-
-export * from "./productState";
-export * from "./modalParts";
-export * from "./typography";
 
 /**
  * The one focus treatment for the whole kit: a 2px neutral outline, offset by 1px.
@@ -88,11 +89,12 @@ const BUTTON_VARIANTS: Record<ButtonVariant, string> = {
   // A quiet destructive TRIGGER (north-star restraint): a danger-tinted outline, not a solid
   // fill, so a page-level Remove/Delete/Clear reads as available without shouting. The loud
   // solid `danger` is reserved for the final in-modal confirm (the committed action). The err
-  // token is mixed against transparent so the tint adapts to both themes; text stays full err
-  // (>=3:1 both themes). Hover is a colour shift only (flat idiom); 6px radius from `base`.
+  // token is mixed against transparent so the tint adapts to both themes; the LABEL is a word and
+  // so wears the text strength `--c-err-text`, which clears 4.5:1 in both themes where the mark
+  // strength `--c-err` reached only 3.98 dark. Hover is a colour shift only (flat idiom).
   "ghost-danger":
     "border-[color-mix(in_srgb,var(--c-err)_42%,transparent)] " +
-    "bg-[color-mix(in_srgb,var(--c-err)_7%,transparent)] text-err font-semibold " +
+    "bg-[color-mix(in_srgb,var(--c-err)_7%,transparent)] text-err-text font-semibold " +
     "hover:border-[color-mix(in_srgb,var(--c-err)_60%,transparent)] " +
     "hover:bg-[color-mix(in_srgb,var(--c-err)_15%,transparent)]",
   // A neutral action tile, flat: a bordered fill that lightens one step on hover.
@@ -352,6 +354,22 @@ interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {
  * `size="sm"` remains as the inline step for dense rows; both sizes are the 10px status role, so
  * the difference is padding only.
  */
+// Module scope: neither table reads anything local, so one allocation serves every Badge and the
+// reference a memoised child sees stays the same one across renders.
+const BADGE_TONES: Record<BadgeTone, string> = {
+  // No tint on `warn`: `--c-warn` is a neutral now, so a 12% wash of it is a meaningless lighter
+  // rectangle behind the word rather than a findable colour. The triangle below is what marks it.
+  warn: "text-warn bg-transparent",
+  err: "text-err-text bg-[color-mix(in_srgb,var(--c-err)_14%,transparent)]",
+  ok: "text-ok-text bg-[color-mix(in_srgb,var(--c-ok)_12%,transparent)]",
+  neutral: "text-t3 bg-transparent",
+};
+
+const BADGE_SIZES: Record<BadgeSize, string> = {
+  default: "px-1.5 py-px",
+  sm: "px-1 py-px",
+};
+
 export function Badge({
   tone = "warn",
   size = "default",
@@ -359,43 +377,35 @@ export function Badge({
   children,
   ...rest
 }: BadgeProps) {
-  const tones: Record<BadgeTone, string> = {
-    warn: "text-warn bg-[color-mix(in_srgb,var(--c-warn)_12%,transparent)]",
-    err: "text-err bg-[color-mix(in_srgb,var(--c-err)_14%,transparent)]",
-    ok: "text-ok bg-[color-mix(in_srgb,var(--c-ok)_12%,transparent)]",
-    neutral: "text-t3 bg-transparent",
-  };
-  const sizes: Record<BadgeSize, string> = {
-    default: "px-1.5 py-px",
-    sm: "px-1 py-px",
-  };
   return (
     <span
       className={cx(
         "inline-flex items-center rounded-control",
         UI_STATUS_TEXT,
-        sizes[size],
-        tones[tone],
+        BADGE_SIZES[size],
+        BADGE_TONES[tone],
         className,
       )}
       {...rest}
     >
+      {tone === "warn" ? <WarnMark /> : null}
       {children}
     </span>
   );
 }
 
+const DOT_TONES: Record<BadgeTone, string> = {
+  ok: "bg-ok",
+  warn: "bg-warn",
+  err: "bg-err",
+  neutral: "bg-t3",
+};
+
 // The small colored status dot.
 export function Dot({ tone }: { tone: BadgeTone }) {
-  const tones: Record<BadgeTone, string> = {
-    ok: "bg-ok",
-    warn: "bg-warn",
-    err: "bg-err",
-    neutral: "bg-t3",
-  };
   return (
     <span
-      className={cx("inline-block h-[7px] w-[7px] flex-none rounded-full", tones[tone])}
+      className={cx("inline-block h-[7px] w-[7px] flex-none rounded-full", DOT_TONES[tone])}
     />
   );
 }
@@ -448,9 +458,11 @@ export interface TabItem<T extends string> {
 
 // The stable ids that tie a tab to the panel it reveals, so the two halves of the
 // ARIA tabs pattern (the tab in TabStrip, the panel in TabPanel) agree without the
-// caller hand-wiring them.
-export const tabButtonId = (idBase: string, id: string) => `${idBase}-tab-${id}`;
-export const tabPanelId = (idBase: string, id: string) => `${idBase}-panel-${id}`;
+// caller hand-wiring them. Module-local: both halves are declared here, so nothing outside ever
+// needed to derive one of these ids itself, and an exported id builder would only invite a caller
+// to hand-wire the pairing this module exists to guarantee.
+const tabButtonId = (idBase: string, id: string) => `${idBase}-tab-${id}`;
+const tabPanelId = (idBase: string, id: string) => `${idBase}-panel-${id}`;
 
 // The one guided tab control for the whole app: a segmented pill row, not a set
 // of loose buttons. Every tabbed workspace renders through this, so a tab reads
@@ -539,8 +551,13 @@ export function TabStrip<T extends string>({
             // the active tab carries the panel's own surface, a light top bevel, medium WEIGHT and
             // the brightest tier, so four independent signals separate it rather than one contrast
             // step. The selected tab is the one whose bottom edge is OPEN into the panel below.
+            // FIVE signals now, and the fifth is the one a desktop tab control actually leads with:
+            // a 2px accent along the tab's top edge. `shadow-[inset]` rather than a border, so the
+            // marker cannot change the tab's height and shift the strip by a pixel when selection
+            // moves.
             active === t.id
-              ? "border-line-dark border-t-line2 bg-surface font-medium text-t1"
+              ? "border-line-dark border-t-line2 bg-surface font-medium text-t1 " +
+                "shadow-[inset_0_2px_0_var(--c-selected-edge)]"
               : "border-transparent bg-control-bottom text-t2 hover:bg-control-hover hover:text-t1",
           )}
         >

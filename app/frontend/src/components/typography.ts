@@ -11,7 +11,8 @@
  * and ~200 semibold/bold decisions with nothing arbitrating between them.
  *
  * WHY BOTH A CLASS AND A COMPONENT
- * Each role ships as a CSS class in `styles/index.css` (@layer components) AND as a component here.
+ * Each role ships as a CSS class in `styles/index.css` (@layer components) AND as a component in
+ * the sibling `typographyRoles.tsx`.
  *
  *  - The CLASS is the authority. These roles land on a `span`, a `div`, a `dt`, a `dd`, a `th` and
  *    a `td` depending on where they sit, and a table header genuinely has to be a `<th>`. A class
@@ -25,6 +26,13 @@
  * `typography.test.tsx` reads the shipped stylesheet and asserts every role's size, weight,
  * leading and colour against `TYPOGRAPHY_SCALE` below.
  *
+ * WHY THIS MODULE IS VALUES ONLY
+ * The components used to live here beside the scale. A module that exports both is not a Fast
+ * Refresh boundary, so editing one text role reloaded the whole page. They moved to
+ * `typographyRoles.tsx` - which exports nothing but components - and are re-exported from the
+ * bottom of this file, so `./typography` remains the one import surface for the kit and no call
+ * site had to change.
+ *
  * THE BUDGET (enforced by that test)
  *   sizes    14 / 13 / 11 / 10 px, and nothing else
  *   weights  600 / 500 / 400, and nothing else
@@ -32,7 +40,6 @@
  * 14px is the canonical MPN and only the canonical MPN. Nothing in the normal workspace reaches
  * 16px, and nothing drops below 10px.
  */
-import type { ElementType, HTMLAttributes, ReactNode } from "react";
 
 export type TextTier = "primary" | "secondary" | "label" | "muted" | "disabled";
 export type TextSize = 10 | 11 | 13 | 14;
@@ -255,84 +262,28 @@ export const UI_NUMERIC = "ui-numeric";
 /** A value that is unavailable, rather than merely quiet. */
 export const UI_DISABLED = "ui-disabled";
 
-function cx(...parts: Array<string | false | null | undefined>): string {
-  return parts.filter(Boolean).join(" ");
-}
-
-interface RoleProps extends Omit<HTMLAttributes<HTMLElement>, "color"> {
-  /** The element to render. Defaults per role, because a table header must be a `th`. */
-  as?: ElementType;
-  /** Right-align with tabular figures. For stock, prices, quantities and price breaks. */
-  numeric?: boolean;
-  /** Paint the disabled tier: an unavailable value, not a quiet one. */
-  disabled?: boolean;
-  children?: ReactNode;
-}
-
-// One implementation behind every role. Each exported component is a thin binding of a role name
-// and a default element, so a role can never be half-applied and the props stay uniform.
-function role(name: TypographyRoleName, defaultAs: ElementType) {
-  const base = TYPOGRAPHY_SCALE[name].className;
-  function Role({ as, numeric, disabled, className, children, ...rest }: RoleProps) {
-    const Element = as ?? defaultAs;
-    return (
-      <Element
-        className={cx(base, numeric && UI_NUMERIC, disabled && UI_DISABLED, className)}
-        {...rest}
-      >
-        {children}
-      </Element>
-    );
-  }
-  Role.displayName = name;
-  return Role;
-}
-
-export const ComponentMpn = role("componentMpn", "span");
-export const DialogTitle = role("dialogTitle", "h2");
-export const ComponentDescription = role("componentDescription", "p");
-export const ComponentMetadata = role("componentMetadata", "span");
-export const KeyFact = role("keyFact", "span");
-export const PanelTitle = role("panelTitle", "div");
-export const SectionTitle = role("sectionTitle", "div");
-export const PropertyLabel = role("propertyLabel", "span");
-export const PropertyValue = role("propertyValue", "span");
-export const SourceText = role("sourceText", "span");
-export const TableHeader = role("tableHeader", "th");
-export const RowPrimary = role("rowPrimary", "span");
-export const RowSecondary = role("rowSecondary", "span");
-export const RowMetadata = role("rowMetadata", "span");
-export const MenuLabel = role("menuLabel", "span");
-export const ControlLabel = role("controlLabel", "span");
-export const MachineText = role("machineText", "span");
-
 export type StatusTone = "ok" | "warn" | "err" | "neutral";
 
-const STATUS_TONE: Record<StatusTone, string> = {
-  ok: "text-ok",
-  warn: "text-warn",
-  err: "text-err",
-  neutral: "text-t3",
-};
-
-/**
- * A status is a STATE, not a control.
- *
- * It renders as a bare `span` carrying the tone colour and nothing else: no border, no fill, no
- * rounded box, no pointer cursor, no hover, no press and no focus ring. Every one of those says
- * "you can click this", and a status cannot be clicked. The role class also pins `cursor: default`
- * so an ancestor's `cursor-pointer` cannot leak onto it.
- */
-export function StatusText({
-  tone = "neutral",
-  as: Element = "span",
-  className,
-  children,
-  ...rest
-}: { tone?: StatusTone } & RoleProps) {
-  return (
-    <Element className={cx(UI_STATUS_TEXT, STATUS_TONE[tone], className)} {...rest}>
-      {children}
-    </Element>
-  );
-}
+// The role components. They are DECLARED in `typographyRoles.tsx` so that module can be a Fast
+// Refresh boundary; they are named here so `./typography` stays the kit's single import surface.
+export {
+  ComponentDescription,
+  ComponentMetadata,
+  ComponentMpn,
+  ControlLabel,
+  DialogTitle,
+  KeyFact,
+  MachineText,
+  MenuLabel,
+  PanelTitle,
+  PropertyLabel,
+  PropertyValue,
+  RowMetadata,
+  RowPrimary,
+  RowSecondary,
+  SectionTitle,
+  SourceText,
+  StatusText,
+  TableHeader,
+  WarnMark,
+} from "./typographyRoles";

@@ -5,11 +5,12 @@
  * part's Complete-Part window. On a terminal state (done / needs attention) it can be dismissed.
  * Reads the single active capture from the global store; renders nothing when none is backgrounded.
  */
-import { AnimatePresence, motion } from "motion/react";
+import { AnimatePresence } from "motion/react";
+import * as m from "motion/react-m";
 import { useCapture } from "../lib/capture";
-import { useText } from "../lib/copy";
+import { useCopyFormatter, useText } from "../lib/copy";
 import { useRouter } from "../lib/router";
-import type { GuidedStatus } from "../lib/capture";
+import type { GuidedStatus } from "../lib/captureRequirements";
 
 const STATUS_LABEL: Record<GuidedStatus, string> = {
   idle: "",
@@ -27,6 +28,15 @@ export function CaptureStatusPill() {
   const cap = useCapture();
   const { navigate } = useRouter();
   const dismissLabel = useText("capture.dismiss", "Dismiss");
+  // The part name is data; this stands in for it before the capture reports one, so it is copy and
+  // is resolved as a string because it shares a slot with that data.
+  const unnamedCapture = useText("capture.unnamed-part", "Guided Capture");
+  // The pill's whole accessible name: what it reopens, and for which part.
+  const thisPart = useText("capture.this-part", "this part");
+  const reopenName = useCopyFormatter(
+    "capture.reopen-aria",
+    "Reopen the guided capture for {part}",
+  );
   const a = cap.active;
   const visible = !!a.partId && a.backgrounded && a.status !== "idle";
   const received = a.needs.filter((n) => a.received[n]).length;
@@ -43,7 +53,7 @@ export function CaptureStatusPill() {
   return (
     <AnimatePresence>
       {visible ? (
-        <motion.div
+        <m.div
           className="fixed bottom-4 right-4 z-[90] flex items-center gap-1"
           initial={{ opacity: 0, y: 14, scale: 0.96 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -53,13 +63,13 @@ export function CaptureStatusPill() {
           <button
             type="button"
             onClick={reopen}
-            aria-label={`Reopen the guided capture for ${a.partName ?? "this part"}`}
+            aria-label={reopenName({ part: a.partName ?? thisPart })}
             className="flex w-[248px] items-center gap-3 rounded-card border border-line2 bg-popover px-3.5 py-2.5 text-left shadow-pop transition-colors hover:brightness-110"
           >
             <span
               className={
                 "grid h-7 w-7 flex-none place-items-center rounded-control " +
-                (isDone ? "bg-ok/20 text-ok" : isAttention ? "bg-warn/20 text-warn" : "bg-raise2 text-t1")
+                (isDone ? "bg-ok/20 text-ok-text" : isAttention ? "bg-warn/20 text-warn" : "bg-raise2 text-t1")
               }
             >
               {isDone ? (
@@ -71,7 +81,7 @@ export function CaptureStatusPill() {
                   <path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" />
                 </svg>
               ) : (
-                <motion.span
+                <m.span
                   className="h-2.5 w-2.5 rounded-full bg-t1"
                   animate={{ opacity: [1, 0.35, 1] }}
                   transition={{ duration: 1.4, repeat: Infinity, ease: "easeInOut" }}
@@ -80,10 +90,10 @@ export function CaptureStatusPill() {
             </span>
             <span className="min-w-0 flex-1">
               <span className="block truncate text-sm font-medium text-t1">
-                {a.partName ?? "Guided Capture"}
+                {a.partName ?? unnamedCapture}
               </span>
               <span className="mt-0.5 flex items-center gap-2">
-                <span className={"text-2xs " + (isDone ? "text-ok" : isAttention ? "text-warn" : "text-t3")}>
+                <span className={"text-2xs " + (isDone ? "text-ok-text" : isAttention ? "text-warn" : "text-t3")}>
                   {STATUS_LABEL[a.status]}
                 </span>
                 {total > 0 && !isAttention ? (
@@ -116,7 +126,7 @@ export function CaptureStatusPill() {
               </svg>
             </button>
           ) : null}
-        </motion.div>
+        </m.div>
       ) : null}
     </AnimatePresence>
   );

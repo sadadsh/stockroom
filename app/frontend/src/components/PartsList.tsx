@@ -24,6 +24,7 @@ import { WarnIcon } from "./icons";
 import { Icon } from "./Icon";
 import { Text, useText } from "../lib/copy";
 import { Badge } from "./primitives";
+import { partAttention } from "./partAttention";
 
 // The row icon: a 30px tile carrying the part's category glyph. It deliberately does NOT render
 // the 3D model (the owner's call): a 30px 3D render of a chip/passive is a muddy grey blob that
@@ -83,71 +84,6 @@ const PART_ROW_HEIGHT = 46;
 const CATEGORY_ROW_HEIGHT = 30;
 const VIRTUAL_OVERSCAN = 8;
 const INITIAL_VIEWPORT = { width: 320, height: 640 };
-
-export interface PartAttention {
-  reason: string;
-  /**
-   * The whole sentence, for the row's tooltip and its accessible label - reason AND what Stockroom
-   * will do next.
-   *
-   * The next step used to have a LINE of its own in the row, and at a 290px picker it rendered as
-   * `Next: Collecting Ev...`, which names nothing and promises nothing. A hint cut mid-word is
-   * worse than no hint, so the row states the reason and this states the rest.
-   */
-  description: string;
-}
-
-/**
- * What a gap is CALLED in the picker.
- *
- * An EDA application's name never appears during ordinary component inspection, and browsing the
- * library is the most ordinary inspection there is. A key that arrives tool-qualified
- * (`kicad_model`, `altium_footprint`) names the same engineering artifact whichever tool can read
- * it, so the tool prefix is dropped and the ASSET is what the row states: a person scanning the
- * picker is asking "what is this part missing", not "which application could open the file".
- *
- * EDA compatibility is a real question with a real home - Export Component..., Open In...,
- * Compatibility Settings... - and this is not it.
- */
-const ASSET_LABELS: Record<string, string> = {
-  symbol: "Symbol",
-  footprint: "Footprint",
-  model: "3D Model",
-  "3d model": "3D Model",
-};
-
-function missingLabel(value: string): string {
-  const withoutTool = value.replace(/^(?:kicad|altium|eagle|orcad|easyeda)[_\s-]*/i, "");
-  const spaced = withoutTool.replace(/[_-]+/g, " ").trim();
-  const asset = ASSET_LABELS[spaced.toLowerCase()];
-  if (asset) return asset;
-  return spaced.replace(/\b\w/g, (character) => character.toUpperCase());
-}
-
-/**
- * The list warning is a decision summary, not a decorative triangle. It names
- * the blocking fact and the automatic next step in the same compact row.
- */
-export function partAttention(part: PartSummary): PartAttention | null {
-  if (part.is_complete) return null;
-  // Deduplicated: two tools missing the same artifact is ONE gap in the part, and listing it
-  // twice was only ever legible because the tool names made the entries look different.
-  const missing = [...new Set(part.missing.flatMap((key) => missingLabel(key) || []))];
-  const reason =
-    missing.length === 0
-      ? "Verification Evidence Pending"
-      : missing.length <= 2
-        ? `Missing ${missing.join(" + ")}`
-        : `Missing ${missing[0]} + ${missing.length - 1} More`;
-  const exactReason =
-    missing.length > 0
-      ? `Missing ${missing.join(", ")}`
-      : "Verification evidence is incomplete";
-  return {
-    reason,
-    description: `Needs Attention. ${exactReason}. Next: Stockroom will continue source collection and verification.`,
-  };
-}
 
 function groupByCategory(parts: PartSummary[]): GroupedParts {
   const groups = new Map<string, PartSummary[]>();
@@ -262,13 +198,6 @@ export function PartsList({
         : -1,
     [partItems, selectedId],
   );
-  const partPositionById = useMemo(
-    () =>
-      new Map(
-        partItems.map(({ part }, index) => [part.id, index + 1]),
-      ),
-    [partItems],
-  );
   const tabbableId =
     selectedPartIndex >= 0 ? selectedId : (partItems[0]?.part.id ?? null);
   const pendingFocusId = useRef<string | null>(null);
@@ -371,8 +300,6 @@ export function PartsList({
                 part={part}
                 selected={part.id === selectedId}
                 tabbable={part.id === tabbableId}
-                position={partPositionById.get(part.id) ?? 1}
-                setSize={partItems.length}
                 duplicate={duplicateIds?.has(part.id) ?? false}
                 onSelect={onSelect}
                 onNavigate={navigate}
@@ -431,8 +358,6 @@ export function PartsList({
                 part={item.part}
                 selected={item.part.id === selectedId}
                 tabbable={item.part.id === tabbableId}
-                position={partPositionById.get(item.part.id) ?? 1}
-                setSize={partItems.length}
                 duplicate={duplicateIds?.has(item.part.id) ?? false}
                 onSelect={onSelect}
                 onNavigate={navigate}
@@ -473,8 +398,6 @@ function PartRow({
   part,
   selected,
   tabbable,
-  position,
-  setSize,
   duplicate,
   onSelect,
   onNavigate,
@@ -483,8 +406,6 @@ function PartRow({
   part: PartSummary;
   selected: boolean;
   tabbable: boolean;
-  position: number;
-  setSize: number;
   duplicate: boolean;
   onSelect: (id: string) => void;
   onNavigate: (
@@ -509,8 +430,14 @@ function PartRow({
       onClick={() => onSelect(part.id)}
       onKeyDown={(event) => onNavigate(event, part.id)}
       aria-current={selected ? "true" : undefined}
-      aria-posinset={position}
-      aria-setsize={setSize}
+      // NO aria-posinset / aria-setsize here. They were added to tell a screen reader "row 3 of
+      // 1,000" while the virtualizer keeps only the visible rows in the DOM - a real need - but
+      // `role="button"` does not support either attribute, and the list container carries no list
+      // role, so nothing ever read them. They were a promise the accessibility tree never saw.
+      // Conveying position properly means giving the picker real listbox semantics (container
+      // `role="listbox"`, rows `role="option"` + `aria-selected`, category strips `role="group"`),
+      // which changes how every caller queries a row and so is a deliberate change of its own
+      // rather than a side effect of deleting two inert attributes.
       aria-describedby={attentionId}
       tabIndex={tabbable ? 0 : -1}
       className={
@@ -523,8 +450,14 @@ function PartRow({
         // list row is held to and made the virtual estimate a guess.
         "flex w-full items-center gap-2.5 overflow-hidden px-2.5 text-left transition-colors " +
         (virtual ? "h-full " : "h-[46px] ") +
+        // The selection is a muted amber fill plus a 2px amber edge. It used to be a neutral
+        // `#626262` with a grey marker, which is the same value range as the hover wash and light
+        // enough to drop the row's metadata line to 2.0:1 - so the selected row was both the
+        // hardest row to distinguish and the hardest to read. Hue separates at no cost to contrast:
+        // measured on the amber, t1 10.70, t2 7.25, t4 4.06 in dark and 12.86 / 8.20 / 3.85 in
+        // light. Still contiguous, still full-width, still not a rounded card.
         (selected
-          ? "bg-selected shadow-[inset_2px_0_0_var(--c-t3)]"
+          ? "bg-selected shadow-[inset_2px_0_0_var(--c-selected-edge)]"
           : "hover:bg-[var(--c-hover)]")
       }
     >
@@ -582,8 +515,8 @@ function PartRow({
                 title={attention.description}
               >
                 <span className="sr-only">{attention.description}</span>
-                <WarnIcon className="h-3 w-3 flex-none text-[var(--c-warn-text)]" />
-                <span className="ui-status-text truncate text-[var(--c-warn-text)]">
+                <WarnIcon className="h-3 w-3 flex-none text-warn-text" />
+                <span className="ui-status-text truncate text-warn-text">
                   {attention.reason}
                 </span>
               </span>

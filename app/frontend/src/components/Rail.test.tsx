@@ -105,7 +105,7 @@ describe("Rail", () => {
     updateState.update_available = true;
     updateState.state = "update_available";
     render(<Rail />);
-    expect(screen.getByText("Update Ready")).toBeInTheDocument();
+    expect(screen.getByText("Update Available")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Update/ })).toBeNull();
   });
 
@@ -120,7 +120,7 @@ describe("Rail", () => {
     updateState.state = "offline";
     updateState.target_revision = "";
     rerender(<Rail />);
-    expect(screen.getByText("Retrying...")).toBeInTheDocument();
+    expect(screen.getByText("Rerunning...")).toBeInTheDocument();
   });
 
   it("shows that the remote comparison is in progress only while there is nothing to show", () => {
@@ -146,7 +146,7 @@ describe("Rail", () => {
     const { container, rerender } = render(<Rail />);
     const glyph = () =>
       container.querySelector('[data-dev-id="rail.update"] span[aria-hidden]') as HTMLElement;
-    expect(screen.getByText("Retrying...")).toBeInTheDocument();
+    expect(screen.getByText("Rerunning...")).toBeInTheDocument();
     expect(glyph().style.color).toBe("var(--c-warn)");
 
     updateState.state = "rolled_back";

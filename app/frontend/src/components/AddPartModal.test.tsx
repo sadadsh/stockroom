@@ -41,7 +41,7 @@ describe("AddPartModal", () => {
     expect(screen.queryByRole("dialog")).toBeNull();
     await openModal(user);
     expect(screen.getByTestId("flow")).toBeInTheDocument();
-    expect(screen.getByText(/resolve exact identity and source evidence/i)).toBeInTheDocument();
+    expect(screen.getByText(/resolve exact identification and source evidence/i)).toBeInTheDocument();
   });
 
   it("closes on the Close button", async () => {

@@ -102,11 +102,15 @@ function readCollapsed(): boolean {
 
 export function Rail() {
   const { route, navigate } = useRouter();
-  const navLabel = useText("nav.rail-label", "Primary");
+  const navLabel = useText("nav.rail-label", "Main");
   // Labelled by CONSEQUENCE, not by subject. "Theme" names the setting and leaves the person to
   // guess which way it goes; "Use Light Theme" says what pressing it does.
   const useLightLabel = useText("nav.theme-use-light", "Use Light Theme");
   const useDarkLabel = useText("nav.theme-use-dark", "Use Dark Theme");
+  // One glyph serves both directions, so each direction needs its own name and its own tooltip.
+  const expandRailLabel = useText("nav.rail-expand", "Expand Rail");
+  const collapseRailLabel = useText("nav.rail-collapse", "Collapse Rail");
+  const railAboutLabel = useText("nav.about-label", "About");
   const [collapsed, setCollapsed] = useState(readCollapsed);
   // Persist only what the USER chose. This effect used to run on mount, which wrote the derived
   // value straight into the preference store - and after that first launch "never chosen" could
@@ -197,8 +201,8 @@ export function Rail() {
           <button
             type="button"
             data-dev-id="rail.collapse"
-            aria-label={collapsed ? "Expand Rail" : "Collapse Rail"}
-            title={collapsed ? "Expand Rail" : "Collapse Rail"}
+            aria-label={collapsed ? expandRailLabel : collapseRailLabel}
+            title={collapsed ? expandRailLabel : collapseRailLabel}
             aria-expanded={!collapsed}
             onClick={() => setCollapsedByUser((v) => !v)}
             className={
@@ -258,8 +262,8 @@ export function Rail() {
         <button
           type="button"
           data-dev-id="rail.about"
-          aria-label={collapsed ? "About" : undefined}
-          title={collapsed ? "About" : undefined}
+          aria-label={collapsed ? railAboutLabel : undefined}
+          title={collapsed ? railAboutLabel : undefined}
           onClick={() => setAboutOpen(true)}
           className={
             RAIL_ROW +
@@ -299,13 +303,13 @@ export function Rail() {
               </span>
               <span className={collapsed ? COLLAPSED_LABEL + " whitespace-nowrap" : ""}>
                 {updateView.standing === "available" ? (
-                  <Text id="nav.update-ready">Update Ready</Text>
+                  <Text id="nav.update-ready">Update Available</Text>
                 ) : updateView.standing === "updating" ? (
                   <Text id="nav.update-updating">Updating...</Text>
                 ) : updateView.standing === "checking" ? (
                   <Text id="nav.update-checking">Checking...</Text>
                 ) : updateView.standing === "retrying" ? (
-                  <Text id="nav.update-retrying">Retrying...</Text>
+                  <Text id="nav.update-retrying">Rerunning...</Text>
                 ) : updateView.standing === "blocked" ? (
                   <Text id="nav.update-blocked">Update Blocked</Text>
                 ) : (
@@ -429,7 +433,7 @@ function AboutModal({
           <Text id="modal.about.title">Stockroom</Text>
         </div>
         <p data-dev-id="about.credit" className="mt-1 text-sm text-t2">
-          <Text id="modal.about.credit">Developed with love by </Text>
+          <Text id="modal.about.credit">Made with love, from </Text>
           <span className="font-medium text-t1">
             <Text id="modal.about.author">Sadad Haidari</Text>
           </span>

@@ -43,7 +43,7 @@ describe("PinInspector", () => {
     expect(screen.getByText(/TIM2_CH1/)).toBeInTheDocument();
     expect(screen.getByText(/USART2_CTS/)).toBeInTheDocument();
     expect(screen.getByText("USART2")).toBeInTheDocument();
-    expect(screen.getByText("Analog & System")).toBeInTheDocument();
+    expect(screen.getByText("Additional Functions")).toBeInTheDocument();
     expect(screen.getByText("ADC1_IN0")).toBeInTheDocument();
     expect(screen.queryByText("Functions")).toBeNull();
     // 5V tolerance
@@ -67,7 +67,7 @@ describe("PinInspector", () => {
     expect(screen.getByText("USART1_TX")).toBeInTheDocument();
     expect(screen.getByText("ADC1_IN0")).toBeInTheDocument();
     expect(screen.queryByText("Alternate Functions")).toBeNull();
-    expect(screen.queryByText("Analog & System")).toBeNull();
+    expect(screen.queryByText("Additional Functions")).toBeNull();
   });
 
   it("shows the supply domain for a power pin", () => {
@@ -76,7 +76,7 @@ describe("PinInspector", () => {
         pin={pin({ canonical_pin_name: "VDD", category: "power", electrical_class: "power", supply: "VDD", five_v: null })}
       />,
     );
-    expect(screen.getByText("Supply")).toBeInTheDocument();
+    expect(screen.getByText("Power Domain")).toBeInTheDocument();
     // "VDD" is both the hero name and the supply value, so both instances render
     expect(screen.getAllByText("VDD")).toHaveLength(2);
   });

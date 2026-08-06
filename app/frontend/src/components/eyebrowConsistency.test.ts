@@ -4,8 +4,8 @@
  * one-off strings carrying FOUR different letter-spacings (0.04 / 0.05 / 0.07 / 0.08em).
  *
  * The DetailPanel-scoped gates that lived here went with the panel itself. What remains is the one
- * gate that guards a live component: the shared dense metadata role in primitives.tsx, which is the
- * single visual authority the deleted one-off strings were replaced by.
+ * gate that guards a live component: the shared dense metadata role in primitivesKit.tsx, which is
+ * the single visual authority the deleted one-off strings were replaced by.
  *
  * The source is read through Vite's `?raw` glob rather than node's `fs`, because the production
  * build type-checks this file too and the app carries no @types/node - reaching for `node:fs` here
@@ -13,7 +13,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-const RAW = import.meta.glob("./primitives.tsx", {
+const RAW = import.meta.glob("./primitivesKit.tsx", {
   query: "?raw",
   import: "default",
   eager: true,
@@ -30,7 +30,7 @@ describe("eyebrow consistency", () => {
     // Dense property metadata uses the semantic type and helper-colour roles.
     // Reintroducing arbitrary tracking here would create a second visual authority.
     const spacings = new Set(
-      [...source("primitives.tsx").matchAll(/tracking-\[([0-9.]+em)\]/g)].map((m) => m[1]),
+      [...source("primitivesKit.tsx").matchAll(/tracking-\[([0-9.]+em)\]/g)].map((m) => m[1]),
     );
     expect([...spacings]).toEqual([]);
   });

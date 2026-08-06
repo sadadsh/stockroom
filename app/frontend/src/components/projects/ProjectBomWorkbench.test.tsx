@@ -73,6 +73,38 @@ function bom(boards: number): ProjectBom {
   };
 }
 
+/** Two lines that no single search term matches, so a search always hides one of them. */
+function twoLineBom(): ProjectBom {
+  const one = bom(1);
+  const line = one.lines[0];
+  return {
+    ...one,
+    line_count: 2,
+    component_count: 2,
+    lines: [
+      {
+        ...line,
+        refs: ["R1"],
+        qty: 1,
+        final_qty: 1,
+        value: "10k",
+        mpn: "RC0402FR-0710KL",
+        footprint: "R_0402_1005Metric",
+      },
+      {
+        ...line,
+        refs: ["C1"],
+        qty: 1,
+        final_qty: 1,
+        value: "100n",
+        mpn: "CL05B104KO5NNNC",
+        manufacturer: "Samsung",
+        footprint: "C_0402_1005Metric",
+      },
+    ],
+  };
+}
+
 beforeEach(() => {
   mockApi.liveProjectBom.mockImplementation(async (_id, boards = 1) => bom(boards));
   mockApi.projectAssignments.mockResolvedValue({
@@ -110,7 +142,7 @@ describe("ProjectBomWorkbench build quantity", () => {
     const user = userEvent.setup();
     renderWorkbench();
 
-    const field = await screen.findByLabelText("Board Quantity");
+    const field = await screen.findByLabelText("Board Count");
     await waitFor(() =>
       expect(mockApi.liveProjectBom).toHaveBeenCalledWith("kicad-project", 1),
     );
@@ -134,7 +166,7 @@ describe("ProjectBomWorkbench build quantity", () => {
     const user = userEvent.setup();
     renderWorkbench();
 
-    const field = await screen.findByLabelText("Board Quantity");
+    const field = await screen.findByLabelText("Board Count");
     await user.clear(field);
     await user.type(field, "8");
     await user.clear(field);
@@ -143,6 +175,34 @@ describe("ProjectBomWorkbench build quantity", () => {
     expect(field).toHaveValue(8);
     await waitFor(() =>
       expect(mockApi.liveProjectBom).toHaveBeenLastCalledWith("kicad-project", 8),
+    );
+  });
+
+  it("holds the chosen line through a search that hides it", async () => {
+    // The shown line is resolved during render from the line the operator chose. An effect
+    // used to WRITE the fallback into that choice instead, so a search that hid the chosen
+    // line replaced it, and clearing the search left the search's first line selected.
+    mockApi.liveProjectBom.mockResolvedValue(twoLineBom());
+    const user = userEvent.setup();
+    renderWorkbench();
+
+    const chooser = await screen.findByRole("combobox", { name: "BOM line" });
+    await user.selectOptions(chooser, "C1:CL05B104KO5NNNC:C_0402_1005Metric");
+    expect(screen.getByRole("heading", { level: 3 })).toHaveTextContent(
+      "CL05B104KO5NNNC",
+    );
+
+    // A view that does not carry the chosen line opens on the first line it does carry.
+    const search = screen.getAllByPlaceholderText("Ref, MPN, value")[0];
+    await user.type(search, "R1");
+    expect(screen.getByRole("heading", { level: 3 })).toHaveTextContent(
+      "RC0402FR-0710KL",
+    );
+
+    // ...and the chosen line comes back the moment the view carries it again.
+    await user.clear(search);
+    expect(screen.getByRole("heading", { level: 3 })).toHaveTextContent(
+      "CL05B104KO5NNNC",
     );
   });
 

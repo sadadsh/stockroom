@@ -143,4 +143,31 @@ describe("SpecMatrixTable", () => {
     expect(within(otherRow).queryByText("STM32H743ZITx")).toBeNull();
     expect(otherRow).not.toHaveAttribute("aria-current");
   });
+
+  // The column edge is a real separator control, so it has to be reachable and drivable without a
+  // pointer: it takes focus, the arrows nudge the width, and Home puts it back.
+  it("resizes a column from the keyboard and resets it with Home", async () => {
+    render(<SpecMatrixTable rows={ROWS} activePart={null} onSelectPart={vi.fn()} />);
+    const handle = screen.getByTestId("col-resize-flash_kb");
+    expect(handle).toHaveAttribute("tabindex", "0");
+    expect(handle).toHaveAttribute("aria-orientation", "vertical");
+
+    const header = handle.parentElement!;
+    const widthOf = () => header.parentElement!.style.gridTemplateColumns;
+    const initial = widthOf();
+
+    handle.focus();
+    expect(handle).toHaveFocus();
+    await userEvent.keyboard("{ArrowRight}");
+    const widened = widthOf();
+    expect(widened).not.toBe(initial);
+
+    await userEvent.keyboard("{ArrowLeft}");
+    expect(widthOf()).toBe(initial);
+
+    await userEvent.keyboard("{ArrowRight}{ArrowRight}");
+    expect(widthOf()).not.toBe(initial);
+    await userEvent.keyboard("{Home}");
+    expect(widthOf()).toBe(initial);
+  });
 });

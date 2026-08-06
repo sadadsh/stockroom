@@ -74,7 +74,7 @@ describe("what the filters say about themselves", () => {
     renderFinder({ category: "Logic Gates", completeOnly: true, duplicatesOnly: true });
 
     expect(
-      screen.getByText("Showing: Logic Gates · Complete Only · Duplicates"),
+      screen.getByText("Showing: Logic Gates · Just Complete · Duplicates"),
     ).toBeInTheDocument();
   });
 

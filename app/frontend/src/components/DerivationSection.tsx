@@ -44,7 +44,7 @@ import { useLibraryDerivation } from "../api/queries";
 import type { DerivationReport, LibraryDerivation } from "../api/types";
 import { useJob } from "../lib/useJob";
 import { useToast } from "../lib/toast";
-import { Text } from "../lib/copy";
+import { Text, useCopyFormatter, useText } from "../lib/copy";
 import { Badge, Button, Dot } from "./primitives";
 
 // The empty stamp is a real state on disk, not a missing value: a record written before the
@@ -88,6 +88,26 @@ export function DerivationSection() {
   const job = useJob<DerivationReport>();
   const { toast } = useToast();
   const [report, setReport] = useState<DerivationReport | null>(null);
+  // A toast takes a resolved string, so the sentences are resolved here - above the two early
+  // returns below - and the count is passed in when the job comes back. One id per number
+  // agreement, so a rewording moves the count and its noun together.
+  const startFailed = useText(
+    "library.derivation.toast-start-failed",
+    "Could not start the rebuild.",
+  );
+  const rebuildFailed = useText("library.derivation.toast-failed", "The rebuild failed.");
+  const recomputedOne = useCopyFormatter(
+    "library.derivation.toast-recomputed-one",
+    "Recomputed {count} component.",
+  );
+  const recomputedMany = useCopyFormatter(
+    "library.derivation.toast-recomputed-many",
+    "Recomputed {count} components.",
+  );
+  const nothingStale = useText(
+    "library.derivation.toast-nothing-stale",
+    "All components were current.",
+  );
 
   const onRebuild = useCallback(async () => {
     setReport(null);
@@ -95,13 +115,13 @@ export function DerivationSection() {
     try {
       ref = await api.rebuildDerivation();
     } catch (err) {
-      toast(err instanceof Error ? err.message : "Could not start the rebuild.", "err");
+      toast(err instanceof Error ? err.message : startFailed, "err");
       return;
     }
     // Report from what the job ACTUALLY returned, never from the fact that it was started.
     const finished = await job.run(ref.job_id);
     if (finished.status === "error") {
-      toast(finished.error ?? "The rebuild failed.", "err");
+      toast(finished.error ?? rebuildFailed, "err");
       return;
     }
     const result = finished.result;
@@ -109,24 +129,33 @@ export function DerivationSection() {
     setReport(result);
     toast(
       result.rewritten
-        ? `Recomputed ${result.rewritten} ${result.rewritten === 1 ? "component" : "components"}.`
-        : "Every component was already current.",
+        ? (result.rewritten === 1 ? recomputedOne : recomputedMany)({ count: result.rewritten })
+        : nothingStale,
       result.rewritten ? "ok" : "neutral",
     );
     derivation.refetch();
-  }, [job, toast, derivation]);
+  }, [
+    job,
+    toast,
+    derivation,
+    startFailed,
+    rebuildFailed,
+    recomputedOne,
+    recomputedMany,
+    nothingStale,
+  ]);
 
   if (derivation.isLoading) {
     return (
       <p className="py-1 text-sm text-t3">
-        <Text id="library.derivation.loading">Reading which rules built your components...</Text>
+        <Text id="library.derivation.loading">Reading which rules built the components...</Text>
       </p>
     );
   }
   if (derivation.isError || !derivation.data) {
     return (
-      <p className="py-1 text-sm text-err">
-        <Text id="library.derivation.error">Could not read your library.</Text>
+      <p className="py-1 text-sm text-err-text">
+        <Text id="library.derivation.error">Could not read the catalog.</Text>
       </p>
     );
   }
@@ -142,19 +171,30 @@ export function DerivationSection() {
           disabled={job.status === "running" || derivation.data.stale === 0}
           data-dev-id="settings.derivation.rebuild"
         >
-          {job.status === "running" ? "Recomputing" : "Recompute Presentation Data"}
+          {job.status === "running" ? (
+            <Text id="library.derivation.rebuild-busy">Recomputing</Text>
+          ) : (
+            <Text id="library.derivation.rebuild">Recompute Presentation Data</Text>
+          )}
         </Button>
         <p className="text-sm text-t2">
-          {derivation.data.stale > 0
-            ? "Lands as one change: every component moves, or none does. What you imported is only ever read."
-            : "Every component was built by the rules this version runs."}
+          {derivation.data.stale > 0 ? (
+            <Text id="library.derivation.rebuild-atomic">
+              Lands as one change: each component moves, or none does. What was imported is just
+              read.
+            </Text>
+          ) : (
+            <Text id="library.derivation.rebuild-nothing-stale">
+              All components came from the rules this version runs.
+            </Text>
+          )}
         </p>
       </div>
       {job.status === "running" && job.progress?.message ? (
         <p className="text-sm text-t2">{job.progress.message}</p>
       ) : null}
       {job.status === "error" && job.error ? (
-        <p className="text-sm text-err">{job.error}</p>
+        <p className="text-sm text-err-text">{job.error}</p>
       ) : null}
       {report ? <Report report={report} /> : null}
     </div>
@@ -166,7 +206,7 @@ function Summary({ data }: { data: LibraryDerivation }) {
   if (total === 0)
     return (
       <p className="text-base text-t2">
-        <Text id="library.derivation.empty">Your library has no components yet.</Text>
+        <Text id="library.derivation.empty">This catalog holds no components so far.</Text>
       </p>
     );
   // Three sentences, not one with a ratio in it. "162 of 162 were built by different rules" is
@@ -183,7 +223,7 @@ function Summary({ data }: { data: LibraryDerivation }) {
       ) : data.current === 0 ? (
         <>
           None of the <span className="tnum font-medium text-t1">{total}</span>{" "}
-          <Text id="library.derivation.summary-none-built">components were built by</Text>{" "}
+          <Text id="library.derivation.summary-none-built">components came from</Text>{" "}
           <span className="font-medium text-t1">{data.ruleset}</span>, the rules this
           version runs, so their names and descriptions may not match what a rebuilt component
           shows.
@@ -194,7 +234,7 @@ function Summary({ data }: { data: LibraryDerivation }) {
           <span className="tnum">{total}</span> components were built by different rules than the{" "}
           <span className="font-medium text-t1">{data.ruleset}</span>{" "}
           <Text id="library.derivation.summary-mixed-tail">
-            this version runs, so their names and descriptions may not match what a rebuilt
+            this version runs, so their names and descriptions can not match what a rebuilt
             component shows.
           </Text>
         </>
@@ -214,9 +254,7 @@ function StampLedger({ data }: { data: LibraryDerivation }) {
   return (
     <table className="w-full border-collapse text-sm">
       <caption className="sr-only">
-        <Text id="library.derivation.table-caption">
-          Components by the ruleset that built them
-        </Text>
+        <Text id="library.derivation.table-caption">Components per the ruleset that built them</Text>
       </caption>
       <thead>
         <tr>
@@ -269,6 +307,16 @@ function StampLedger({ data }: { data: LibraryDerivation }) {
 
 function Report({ report }: { report: DerivationReport }) {
   const skipped = report.no_evidence;
+  // Four clauses agree with the count at once, so the sentence is reworded whole rather than
+  // assembled from four ternaries. One id per number agreement.
+  const skippedOne = useCopyFormatter(
+    "library.derivation.skipped-one",
+    "{count} component has no stored distributor data, so it was left as it is. Rebuilding it from nothing would erase what is there.",
+  );
+  const skippedMany = useCopyFormatter(
+    "library.derivation.skipped-many",
+    "{count} components have no stored distributor data, so those were left as those are. Rebuilding them from nothing would erase what is there.",
+  );
   return (
     <div className="flex flex-col gap-2 border-l-2 border-line pl-3 text-sm text-t2">
       <p>
@@ -278,19 +326,19 @@ function Report({ report }: { report: DerivationReport }) {
         <span className="tnum">{report.unchanged}</span>.
       </p>
       {skipped > 0 ? (
-        <p>
-          <span className="tnum">{skipped}</span>{" "}
-          {skipped === 1 ? "component has" : "components have"} no stored distributor data, so{" "}
-          {skipped === 1 ? "it was" : "they were"} left exactly as {skipped === 1 ? "it is" : "they are"}.
-          Rebuilding {skipped === 1 ? "it" : "them"} from nothing would erase what is there.
-        </p>
+        <p className="tnum">{(skipped === 1 ? skippedOne : skippedMany)({ count: skipped })}</p>
       ) : null}
       {report.failed.length > 0 ? (
         <div>
           <Badge tone="err" size="sm">
-            {report.failed.length === 1
-              ? "1 Component Could Not Be Read"
-              : `${report.failed.length} Components Could Not Be Read`}
+            {report.failed.length === 1 ? (
+              <Text id="library.derivation.failed-one">1 Component Could Not Be Read</Text>
+            ) : (
+              <Text
+                id="library.derivation.failed-many"
+                values={{ count: report.failed.length }}
+              >{"{count} Components Could Not Be Read"}</Text>
+            )}
           </Badge>
           <ul className="mt-1 list-disc pl-5">
             {report.failed.map((f) => (
