@@ -92,6 +92,35 @@ describe("pinMapGeometry — BGA/WLCSP ball grid", () => {
     expect(bgaRowIndex("AA")).toBe(25);
   });
 
+  it("drops a ball it cannot place and keeps the rest in pin order", () => {
+    // A ball with no row letter, an unreadable one, or no column cannot be put on the grid; the
+    // placeable ones must still come out in the order they arrived (the map is drawn in that
+    // order) and the grid must be sized from the balls that were actually placed.
+    const pins = [
+      pin({ position: "A1", position_kind: "alnum", bga_row: "A", bga_col: 1 }),
+      pin({ position: "X", position_kind: "alnum", bga_row: null, bga_col: null }),
+      pin({ position: "B2", position_kind: "alnum", bga_row: "B", bga_col: 2 }),
+      pin({ position: "?9", position_kind: "alnum", bga_row: "9", bga_col: 9 }),
+      pin({ position: "A2", position_kind: "alnum", bga_row: "A", bga_col: null }),
+    ];
+    const layout = pinMapGeometry(pins, { ...BGA_GEOM, rows: null, cols: null }, W, H);
+    expect(layout.pins.map((p) => p.position)).toEqual(["A1", "B2"]);
+    // rows/cols came from the real maxima of the two placed balls (2x2), so B2 is the far cell
+    expect(layout.pins[1].rect.x).toBeGreaterThan(layout.pins[0].rect.x);
+    expect(layout.pins[1].rect.y).toBeGreaterThan(layout.pins[0].rect.y);
+  });
+
+  it("returns the empty layout when no ball can be placed", () => {
+    const layout = pinMapGeometry(
+      [pin({ position: "X", position_kind: "alnum", bga_row: null, bga_col: null })],
+      BGA_GEOM,
+      W,
+      H,
+    );
+    expect(layout.pins).toEqual([]);
+    expect(layout.body).toEqual({ x: 0, y: 0, w: 0, h: 0 });
+  });
+
   it("places present balls at their (row,col) and leaves a depopulated cell empty", () => {
     // A 2x2 grid with B2 depopulated: only A1, A2, B1 are populated.
     const pins = [

@@ -6,9 +6,12 @@
  * for the committed token file, so each case is exactly "a previous Save committed this, and the
  * app has since booted with it".
  */
-import { render, screen } from "@testing-library/react";
+import { useEffect } from "react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Text, useCopyFormatter, useText } from "./copy";
+import { DevModeProvider, useDevMode } from "./devMode";
+import { ThemeProvider } from "./theme";
 import {
   copyDiagnosticFor,
   resetCopyDeclarations,
@@ -94,7 +97,13 @@ function Attribute() {
 
 function Deferred({ onReady }: { onReady: (text: string) => void }) {
   const format = useCopyFormatter("a.toast", "Added {name}");
-  onReady(format({ name: "STM32H743VIT6" }));
+  // The formatter still resolves and substitutes during render - that is the contract under test,
+  // and it is pure. Only the report out to the caller waits for the commit: in the app a formatter's
+  // result reaches a toast from an event, never from render, which React may replay or discard.
+  const text = format({ name: "STM32H743VIT6" });
+  useEffect(() => {
+    onReady(text);
+  }, [onReady, text]);
   return null;
 }
 
@@ -127,5 +136,56 @@ describe("the attribute and deferred forms follow the same rules", () => {
     MOCK_COPY["a.toast"] = "A part was added";
     render(<Deferred onReady={(text) => (out = text)} />);
     expect(out).toBe("Added STM32H743VIT6");
+  });
+});
+
+// --- selecting a string to reword, from the keyboard --------------------------------------------
+//
+// Dev Mode wraps every routed string in a click target so the panel can be pointed at it. That
+// target used to be pointer-only, which made rewording an unreachable action for anybody working
+// from the keyboard - and it is the ONE action the whole copy layer exists to enable.
+
+describe("Dev Mode copy selection", () => {
+  function EnabledText() {
+    const { enabled, toggle } = useDevMode();
+    return (
+      <>
+        {enabled ? null : (
+          <button type="button" onClick={toggle}>
+            on
+          </button>
+        )}
+        <Text id="k.probe">Probe Label</Text>
+      </>
+    );
+  }
+
+  function mountEnabled() {
+    render(
+      <ThemeProvider>
+        <DevModeProvider>
+          <EnabledText />
+        </DevModeProvider>
+      </ThemeProvider>,
+    );
+    fireEvent.click(screen.getByText("on"));
+    return screen.getByText("Probe Label");
+  }
+
+  it("puts the copy target in the tab order while Dev Mode is on", () => {
+    expect(mountEnabled().getAttribute("tabindex")).toBe("0");
+  });
+
+  it("selects the string on Enter and on Space, not on the pointer alone", () => {
+    const target = mountEnabled();
+    expect(target.getAttribute("data-copy-id")).toBe("k.probe");
+
+    fireEvent.keyDown(target, { key: "Enter" });
+    expect(target.className).toContain("bg-acc/20");
+
+    // A key the affordance does not claim must fall through untouched.
+    const before = target.className;
+    fireEvent.keyDown(target, { key: "a" });
+    expect(target.className).toBe(before);
   });
 });

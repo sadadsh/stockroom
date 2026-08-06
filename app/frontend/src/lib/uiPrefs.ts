@@ -16,13 +16,18 @@
  */
 import { api } from "../api/client";
 
+/**
+ * Every member is a SCALAR, and `uiPrefs.test.ts` holds it that way.
+ *
+ * The mirror is a string store, and `writePref` writes it with a bare `String(value)`. An
+ * object-valued preference added here would mirror as the literal "[object Object]", read back as
+ * undefined on the next launch, and silently lose whatever it held - so the type is the gate. A
+ * preference that genuinely needs structure has to bring its own encode/decode pair with it, rather
+ * than inherit one that only the type made reachable.
+ */
 export interface UiPrefs {
   theme?: "dark" | "light";
   rail_collapsed?: boolean;
-  /** Canonical spec ids pinned into Key Specifications, per canonical category id. Legacy maps
-   *  containing raw distributor labels/display categories are migrated on read by keySpecs.ts.
-   *  An OBJECT, unlike the two scalars above - see the JSON handling in `writePref`. */
-  pinned_specs?: Record<string, readonly string[]>;
 }
 
 declare global {
@@ -75,12 +80,10 @@ export function writePref(key: keyof UiPrefs, value: unknown, mirrorKey: string)
   // "does not double-save" test see phantom calls.
   if (injectedPrefs()[key] === value) return;
   try {
-    // JSON for anything that is not a primitive. `String(value)` on an object yields the literal
-    // "[object Object]", so an object-valued preference (pinned_specs) would mirror as garbage and
-    // read back as undefined on the next launch - silently losing every pin. The two scalar prefs
-    // keep their bare string form, so nothing already persisted has to be migrated.
-    const encoded = value !== null && typeof value === "object" ? JSON.stringify(value) : String(value);
-    localStorage.setItem(mirrorKey, encoded);
+    // The bare string form, which is what both preferences already have persisted on every machine
+    // this has ever run on. Nothing here encodes structure: `UiPrefs` is scalars only (see the note
+    // on the interface), so an encoder for objects would be a branch no call site could take.
+    localStorage.setItem(mirrorKey, String(value));
   } catch {
     /* the mirror is best-effort */
   }

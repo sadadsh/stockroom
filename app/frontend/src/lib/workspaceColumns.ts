@@ -32,6 +32,30 @@ export const WORKSPACE_COLUMN_MIN: Record<WorkspaceColumnId, number> = {
   sourcing: 250,
 };
 
+/**
+ * The sourcing column's floor when there is nothing to source.
+ *
+ * 250 exists for ONE reason, stated above: the column has to hold a provider name beside a price. A
+ * component nobody has sourced has no provider and no price - the column holds the five lifecycle
+ * rows and the control that reveals the blank sections, whose widest label is `Manufacturer Status`
+ * beside `Unknown` - so the reason for 250 is not present and the number is not either.
+ *
+ * MEASURED: at 1600x900 the default proportions gave the column 416px to draw five label/value rows
+ * in, which is the "sourcing is so dead space" the owner reported. It was NOT a design fault in the
+ * column and it was not a fault in the sections either - the seeded capacitor genuinely has no
+ * offers, no documents, no related parts and no provenance, so the column was correctly empty. But
+ * being correctly empty is not a reason to hold a quarter of the window, so the width follows the
+ * content: the surplus goes to the two columns that always have something in it, and it comes back
+ * the moment an offer, a document, a related part or a provenance record arrives.
+ *
+ * THE COLUMN NEVER COLLAPSES AND NEVER HIDES. Same title strip, same name, same six sections in the
+ * same order, same blank-section control: only the width changes. The alternative - a collapsed
+ * vertical strip - would be a fourth kind of chrome with its own affordance to learn, and a strip
+ * narrow enough to be worth collapsing to cannot render a label beside a value at all, so it would
+ * be the same dead space in a thinner shape plus a control to undo it.
+ */
+export const WORKSPACE_SOURCING_SPARSE_MIN = 190;
+
 /** The proportions a machine that has never been dragged opens at. */
 export const WORKSPACE_COLUMN_FRACTION: Record<WorkspaceColumnId, number> = {
   cad: 0.29,
@@ -39,13 +63,31 @@ export const WORKSPACE_COLUMN_FRACTION: Record<WorkspaceColumnId, number> = {
   sourcing: 0.26,
 };
 
+/**
+ * The proportions it opens at when there is nothing to source. The 10 points sourcing gives up go
+ * mostly to Specifications, which is the dominant surface and the one that always has more to show.
+ */
+export const WORKSPACE_COLUMN_FRACTION_SPARSE: Record<WorkspaceColumnId, number> = {
+  cad: 0.31,
+  specifications: 0.53,
+  sourcing: 0.16,
+};
+
+/** Every column's floor, for a workspace whose sourcing column is carrying lifecycle rows or more. */
+export function columnMinimums(sparseSourcing = false): WorkspaceColumnWidths {
+  return sparseSourcing
+    ? { ...WORKSPACE_COLUMN_MIN, sourcing: WORKSPACE_SOURCING_SPARSE_MIN }
+    : { ...WORKSPACE_COLUMN_MIN };
+}
+
+/** The smallest viewport at which all three columns still clear their floors. */
+export function columnsMinTotal(sparseSourcing = false): number {
+  const min = columnMinimums(sparseSourcing);
+  return min.cad + min.specifications + min.sourcing;
+}
+
 /** The splitter between one column and the next. Two splitters, three columns. */
 export type WorkspaceSplitterId = "cad-specifications" | "specifications-sourcing";
-
-export const WORKSPACE_SPLITTERS: readonly WorkspaceSplitterId[] = [
-  "cad-specifications",
-  "specifications-sourcing",
-];
 
 /** Which two columns a splitter moves between. Dragging never touches the third. */
 export const SPLITTER_NEIGHBOURS: Record<
@@ -59,10 +101,6 @@ export const SPLITTER_NEIGHBOURS: Record<
 export type WorkspaceColumnWidths = Record<WorkspaceColumnId, number>;
 
 export const WORKSPACE_COLUMNS_STORAGE_KEY = "stockroom.component-workspace.columns.v1";
-
-/** The smallest viewport at which all three columns still clear their minimums. */
-export const WORKSPACE_COLUMNS_MIN_TOTAL =
-  WORKSPACE_COLUMN_MIN.cad + WORKSPACE_COLUMN_MIN.specifications + WORKSPACE_COLUMN_MIN.sourcing;
 
 function isFiniteWidth(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value) && value > 0;
@@ -129,17 +167,25 @@ export function writeColumnFractions(widths: WorkspaceColumnWidths): void {
  *
  * The clamp is done in one pass and then the REMAINDER is redistributed across the columns that
  * are still above their floor, so raising one column to its minimum never quietly pushes another
- * below its own. Below `WORKSPACE_COLUMNS_MIN_TOTAL` nothing can satisfy all three; the minimums
- * are returned anyway and the workspace scrolls its column band horizontally rather than deleting
- * a column, which is the one outcome the layout forbids.
+ * below its own. Below the three columns' combined minimum nothing can satisfy all of them; the
+ * minimums are returned anyway and the workspace scrolls its column band horizontally rather than
+ * deleting a column, which is the one outcome the layout forbids.
  */
 export function resolveColumnWidths(
   total: number,
   fractions: StoredColumnFractions | null = null,
+  sparseSourcing = false,
 ): WorkspaceColumnWidths {
-  const source = fractions ?? WORKSPACE_COLUMN_FRACTION;
-  if (!Number.isFinite(total) || total <= WORKSPACE_COLUMNS_MIN_TOTAL) {
-    return { ...WORKSPACE_COLUMN_MIN };
+  // A STORED PREFERENCE ALWAYS WINS over the content-aware default. Somebody who dragged this
+  // splitter told the workstation what they want; narrowing the column under them the next time they
+  // open a part with no offers would be the layout arguing with them.
+  const source =
+    fractions ??
+    (sparseSourcing ? WORKSPACE_COLUMN_FRACTION_SPARSE : WORKSPACE_COLUMN_FRACTION);
+  const min = columnMinimums(sparseSourcing);
+  const minTotal = min.cad + min.specifications + min.sourcing;
+  if (!Number.isFinite(total) || total <= minTotal) {
+    return { ...min };
   }
   const raw: WorkspaceColumnWidths = {
     cad: total * source.cad,
@@ -148,18 +194,18 @@ export function resolveColumnWidths(
   };
   const widths: WorkspaceColumnWidths = { ...raw };
   for (const id of WORKSPACE_COLUMN_IDS) {
-    widths[id] = Math.max(WORKSPACE_COLUMN_MIN[id], widths[id]);
+    widths[id] = Math.max(min[id], widths[id]);
   }
   // Give the rounding error (and whatever the floors just claimed) to the columns with slack.
   let drift = widths.cad + widths.specifications + widths.sourcing - total;
   for (let pass = 0; pass < WORKSPACE_COLUMN_IDS.length && Math.abs(drift) > 0.5; pass += 1) {
     const elastic = WORKSPACE_COLUMN_IDS.filter(
-      (id) => widths[id] - WORKSPACE_COLUMN_MIN[id] > 0.5 || drift < 0,
+      (id) => widths[id] - min[id] > 0.5 || drift < 0,
     );
     if (elastic.length === 0) break;
     const share = drift / elastic.length;
     for (const id of elastic) {
-      widths[id] = Math.max(WORKSPACE_COLUMN_MIN[id], widths[id] - share);
+      widths[id] = Math.max(min[id], widths[id] - share);
     }
     drift = widths.cad + widths.specifications + widths.sourcing - total;
   }
@@ -178,11 +224,16 @@ export function moveSplitter(
   widths: WorkspaceColumnWidths,
   splitter: WorkspaceSplitterId,
   delta: number,
+  sparseSourcing = false,
 ): WorkspaceColumnWidths {
   const [left, right] = SPLITTER_NEIGHBOURS[splitter];
   if (!Number.isFinite(delta) || delta === 0) return widths;
-  const lowest = -(widths[left] - WORKSPACE_COLUMN_MIN[left]);
-  const highest = widths[right] - WORKSPACE_COLUMN_MIN[right];
+  // The SAME floors the automatic width uses. A width the layout is willing to choose has to be one
+  // a person is allowed to drag to, or the handle stops following the pointer somewhere the column
+  // has already sat by itself.
+  const min = columnMinimums(sparseSourcing);
+  const lowest = -(widths[left] - min[left]);
+  const highest = widths[right] - min[right];
   const applied = Math.max(lowest, Math.min(highest, delta));
   if (applied === 0) return widths;
   return {

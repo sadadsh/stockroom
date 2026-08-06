@@ -811,12 +811,12 @@ export const ICON_BY_ID: Map<string, IconEntry> = new Map(
 export const ICON_CATEGORIES: IconCategory[] = ["primary", "bespoke", "art", "brand"];
 
 /** Icon ids grouped by category (inventory order), for the catalogue / glyph picker. */
-export const ICON_IDS_BY_CATEGORY: Record<IconCategory, string[]> = ICON_CATEGORIES.reduce(
-  (acc, category) => {
-    acc[category] = ICON_REGISTRY.filter((entry) => entry.category === category).map(
-      (entry) => entry.id,
-    );
-    return acc;
-  },
-  { primary: [], bespoke: [], art: [], brand: [] } as Record<IconCategory, string[]>,
-);
+export const ICON_IDS_BY_CATEGORY: Record<IconCategory, string[]> = (() => {
+  // Seeded from ICON_CATEGORIES so every declared category has a list (and the keys read in
+  // inventory order) even when the registry carries no entry for it, then filled in ONE pass
+  // over the registry rather than one pass per category.
+  const byCategory = {} as Record<IconCategory, string[]>;
+  for (const category of ICON_CATEGORIES) byCategory[category] = [];
+  for (const entry of ICON_REGISTRY) byCategory[entry.category]?.push(entry.id);
+  return byCategory;
+})();

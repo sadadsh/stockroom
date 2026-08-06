@@ -81,6 +81,27 @@ export function Text({
       // placeholders in it, and reading the rendered text back would bake this render's values in.
       data-copy-default={children}
       title={`Edit copy: ${id}`}
+      // Reachable and operable from the keyboard, not the pointer alone. This element exists ONLY
+      // while Dev Mode is on - the branch above returns a bare fragment otherwise - so the tab stop
+      // is a tab stop through the EDITOR, and selecting a string to reword was previously something
+      // only a mouse could do.
+      //
+      // Deliberately NO `role="button"`, though a lint rule asks for one on a focusable click
+      // target. A routed string is usually a real control's LABEL, so this span sits inside a real
+      // `<button>` - and a button-roled span inside a button puts TWO controls with the same
+      // accessible name in the tree for every labelled control in the application. That was measured
+      // (`ConfirmDialog.test.tsx` finds two buttons named Cancel with the role on), and duplicating
+      // every name is worse for a screen-reader user than an unroled focusable span. Announcing this
+      // properly needs a different affordance for the editor - a modifier-click, or selection driven
+      // from the panel itself - not a role on an element that cannot legally carry one here.
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key !== "Enter" && e.key !== " ") return;
+        // Same stop as the click below: Space inside a button would otherwise press the button too.
+        e.stopPropagation();
+        e.preventDefault();
+        selectCopy(id, children);
+      }}
       onClickCapture={(e) => {
         // Capture + stop so a label inside a button edits instead of triggering the button.
         e.stopPropagation();

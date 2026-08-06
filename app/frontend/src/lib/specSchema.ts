@@ -35,27 +35,17 @@ export const EMPTY_SPEC_VALUES = new Set([
 ]);
 
 // The presentation groups, mirroring the north-star spec sheet. "Other" is the fallback
-// bucket every UNKNOWN key routes to, so a never-seen spec always has a sane home. The
-// array order IS the render order of the groups.
+// bucket every UNKNOWN key routes to, so a never-seen spec always has a sane home.
 export type SpecGroupName =
   | "Electrical"
   | "Physical"
+  // WHAT THE PART IS AND DOES: its type, topology, channel count, what it is for. These are
+  // real, first-class characteristics that are neither electrical quantities nor dimensions,
+  // and with no home of their own every one of them fell into "Other".
   | "Device"
   | "Ratings & Compliance"
   | "Trade & Compliance"
   | "Other";
-
-export const SPEC_GROUP_ORDER: readonly SpecGroupName[] = [
-  "Electrical",
-  "Physical",
-  // WHAT THE PART IS AND DOES: its type, topology, channel count, what it is for. These are
-  // real, first-class characteristics that are neither electrical quantities nor dimensions,
-  // and with no home of their own every one of them fell into "Other".
-  "Device",
-  "Ratings & Compliance",
-  "Trade & Compliance",
-  "Other",
-];
 
 // The procurement group: origin, the page's own tariff rate, export classification, order
 // quantities. Real vendor data, and not a physical parameter, so the parametric search ranks it

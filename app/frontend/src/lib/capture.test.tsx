@@ -715,7 +715,7 @@ describe("CaptureProvider store", () => {
     expect(result.current.active.backgrounded).toBe(true);
   });
 
-  it("requestReopen exposes the part id and unbackgrounds; clearReopen clears it", async () => {
+  it("requestReopen hands the part id to the subscribed surface and unbackgrounds", async () => {
     mockSource();
     mockCapture();
     const { result } = renderHook(() => useCapture(), { wrapper: wrap(new QueryClient()) });
@@ -726,16 +726,71 @@ describe("CaptureProvider store", () => {
     act(() => {
       result.current.keepWorking();
     });
+
+    const opened: string[] = [];
+    const unsubscribe = result.current.onReopen((partId) => opened.push(partId));
+
     act(() => {
       result.current.requestReopen();
     });
-    expect(result.current.reopenPartId).toBe("p1");
+    // Delivered INSIDE the request, not on a later render. Read before any act() boundary could
+    // flush an effect, which is what stops this from passing on a chain it was meant to remove.
+    expect(opened).toEqual(["p1"]);
     expect(result.current.active.backgrounded).toBe(false);
 
+    // The same part, twice. The latched id this replaced could not do it: the second request wrote
+    // the value already held, so nothing downstream re-ran and the pill silently stopped working.
     act(() => {
-      result.current.clearReopen();
+      result.current.keepWorking();
     });
-    expect(result.current.reopenPartId).toBeNull();
+    act(() => {
+      result.current.requestReopen();
+    });
+    expect(opened).toEqual(["p1", "p1"]);
+
+    unsubscribe();
+    act(() => {
+      result.current.requestReopen();
+    });
+    expect(opened).toEqual(["p1", "p1"]);
+  });
+
+  it("holds a request made while no surface is subscribed, then spends it on the first one", async () => {
+    mockSource();
+    mockCapture();
+    const { result } = renderHook(() => useCapture(), { wrapper: wrap(new QueryClient()) });
+
+    await act(async () => {
+      await result.current.start("p1", "One", ["kicad_symbol"]);
+    });
+
+    // What the capture pill does: it requests the reopen and navigates, so the Library page that
+    // owns opening a part does not exist yet at the moment of the click.
+    act(() => {
+      result.current.requestReopen();
+    });
+
+    const first: string[] = [];
+    result.current.onReopen((partId) => first.push(partId));
+    expect(first).toEqual(["p1"]);
+
+    // Spent, not latched: a page that mounts later must not reopen a part nobody asked for again.
+    const second: string[] = [];
+    result.current.onReopen((partId) => second.push(partId));
+    expect(second).toEqual([]);
+  });
+
+  it("requestOpenFor delivers a part the capture never ran, for the intake continuation", async () => {
+    mockSource();
+    mockCapture();
+    const { result } = renderHook(() => useCapture(), { wrapper: wrap(new QueryClient()) });
+
+    const opened: string[] = [];
+    result.current.onReopen((partId) => opened.push(partId));
+    act(() => {
+      result.current.requestOpenFor("freshly-added");
+    });
+    expect(opened).toEqual(["freshly-added"]);
   });
 
   it("reset clears the active capture back to idle", async () => {
@@ -1077,5 +1132,62 @@ describe("CaptureProvider store", () => {
     expect(result.current.active.message?.indexOf("snapmagic")).toBeLessThan(
       result.current.active.message?.indexOf("Still missing") ?? 0,
     );
+  });
+
+  it("drops a superseded reconnect instead of letting it overwrite the live capture", async () => {
+    // The reconnect loop tests its generation token BEFORE its two requests. A real capture started
+    // while those requests are in flight bumps that token, so the abandoned reconnect must not go on
+    // to write the identity refs and the state - it would replace the capture the person is actually
+    // watching with the one it had set out to restore.
+    const restored = defaultUiSession();
+    restored.selected_ids.workflow_batch = "batch-stale";
+    restored.selected_ids.workflow_item = "item-stale";
+    restored.event_sequence = 3;
+    resetUiSessionForTests(restored);
+
+    mockSource();
+    mockCapture();
+    const liveSession = vi.mocked(api.captureWorkflow).getMockImplementation();
+    vi.mocked(api.captureWorkflow).mockImplementation(async (batchId: string) =>
+      batchId === "batch-stale"
+        ? ({
+            workflow_batch_id: "batch-stale",
+            workflow_item_id: "item-stale",
+            part_id: "p1",
+            vendor: "ultralibrarian",
+            background: false,
+            initial_needs: ["kicad_symbol"],
+            report: null,
+          } as never)
+        : ((await liveSession?.(batchId)) as never),
+    );
+
+    // Held open so the superseded reconnect is genuinely mid-request when the real capture starts.
+    let releaseDetail: (() => void) | null = null;
+    vi.spyOn(api, "partDetail").mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          releaseDetail = () =>
+            resolve({ id: "p1", derived: { display_name: "Part One" } } as never);
+        }),
+    );
+
+    const { result } = renderHook(() => useCapture(), { wrapper: wrap(new QueryClient()) });
+    await waitFor(() => expect(api.partDetail).toHaveBeenCalled());
+    expect(result.current.active.partId).toBeNull();
+
+    await act(async () => {
+      await result.current.start("p2", "Part Two", ["kicad_symbol"]);
+    });
+    expect(result.current.active.partId).toBe("p2");
+
+    await act(async () => {
+      releaseDetail?.();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(result.current.active.partId).toBe("p2");
+    expect(result.current.active.status).toBe("done");
   });
 });

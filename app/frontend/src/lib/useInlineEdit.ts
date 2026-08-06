@@ -10,22 +10,24 @@
  * single tick: commit() and cancel() clear it immediately, so any second commit
  * queued in the same tick (Enter-then-blur, Escape-then-blur) is a no-op.
  */
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 
 export function useInlineEdit(value: string, onSave: (next: string) => void) {
   const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(value);
+  // What the person has TYPED. Only meaningful while editing, which is why the draft below is
+  // derived rather than stored: outside an edit the draft simply IS the underlying value.
+  const [typed, setTyped] = useState(value);
   const active = useRef(false);
 
-  // Keep the draft in sync when the underlying value changes (a different part is
-  // selected, or a save lands) but never clobber an in-progress edit.
-  useEffect(() => {
-    if (!editing) setDraft(value);
-  }, [value, editing]);
+  // The draft, derived. This used to be a second piece of state kept in step by an effect, which
+  // cost a wasted render every time a different part was selected or a save landed - and left one
+  // frame in which the field was not editing but still showed the previous edit's text. Derived,
+  // the two cannot disagree and there is no frame to be wrong in.
+  const draft = editing ? typed : value;
 
   function begin() {
     active.current = true;
-    setDraft(value);
+    setTyped(value);
     setEditing(true);
   }
 
@@ -39,9 +41,9 @@ export function useInlineEdit(value: string, onSave: (next: string) => void) {
 
   function cancel() {
     active.current = false;
-    setDraft(value);
+    setTyped(value);
     setEditing(false);
   }
 
-  return { editing, draft, setDraft, begin, commit, cancel };
+  return { editing, draft, setDraft: setTyped, begin, commit, cancel };
 }

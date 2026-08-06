@@ -158,7 +158,21 @@ import { DEV_IDS, DEV_ID_AREAS, DEV_ID_BY_ID } from "./devIds";
 // line one with a `flex-none` package while a fixed-width attention block held 112px beside them
 // both, so at a 290px picker the identifier rendered as one letter and an ellipsis. Neither box
 // was addressable, which is why the measurement that would have caught it could not be taken.
-const EXPECTED_ENTRIES = 441;
+// 447 as of collapsing the CAD column's visibility controls and the sourcing column's empty
+// sections. The left column carried its layer switches as always-visible outlined pills - three
+// under the symbol, ten under the land pattern - which measured fourteen bordered controls across
+// six toolbar rows in a ~300px column. They are now rows in a panel behind ONE icon per preview, so
+// the shell that opens it (2, one per preview), the panel itself (1) and the strip they sit on (1)
+// are new addressable elements; the twelve switch ids are unchanged and still one per switch.
+// The right column stopped rendering a full sentence per empty section, so the control that reveals
+// them (1) and the one line that names the silent provenance questions (1) are new. Nothing was
+// removed: `asset-measure` and `asset-maximize` moved file but kept their ids.
+// A deliberate re-baseline, which is what this gate is for.
+// 448 with `component-browser.spec-conflict-marker`. A specification row stopped printing three
+// pieces of metadata around every value - a source tier, a state word and the word `Evidence` - and
+// a conflict became a quiet marker instead of a sentence. The marker is a new addressable element;
+// the word it replaced was not one.
+const EXPECTED_ENTRIES = 448;
 
 describe("devIds catalogue", () => {
   // The count is asserted from a single constant so bumping it is one edit, and so the test NAME can

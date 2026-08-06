@@ -13,14 +13,12 @@
  * category from every source - so a pin set on a part whose distributor said `Voltage - Supply`
  * still applies to one whose distributor said `Supply Voltage`, without any spelling rules here.
  *
- * They persist through the machine config like the theme and the rail: localStorage alone resets on
- * every launch, because the host binds an ephemeral port and the origin moves with it (uiPrefs.ts).
- * Unlike the scalar preferences this one is JSON, so a malformed mirror must degrade to "nothing
- * pinned" rather than throwing during the first render of the surface that reads it.
+ * The preference belongs in the machine config like the theme and the rail (localStorage alone
+ * resets on every launch, because the host binds an ephemeral port and the origin moves with it -
+ * see uiPrefs.ts). Unlike the scalar preferences this one is JSON, so a stored mirror can be
+ * malformed, and `normalizePinnedSpecs` is what makes that degrade to "nothing pinned" rather than
+ * throw during the first render of the surface that reads it.
  */
-import { readPref, writePref } from "./uiPrefs";
-
-export const PINNED_SPECS_KEY = "stockroom.pinned-specs";
 
 /** Canonical specification keys, per canonical category id. */
 export type PinnedSpecs = Record<string, readonly string[]>;
@@ -109,26 +107,3 @@ export function isPinned(
   return pinsFor(pinned, category).includes(specificationKey.trim());
 }
 
-export function readPinnedSpecs(): PinnedSpecs {
-  return normalizePinnedSpecs(
-    readPref<PinnedSpecs>(
-      "pinned_specs",
-      PINNED_SPECS_KEY,
-      (raw) => {
-        try {
-          const parsed = JSON.parse(raw);
-          return parsed && typeof parsed === "object" && !Array.isArray(parsed)
-            ? (parsed as PinnedSpecs)
-            : undefined;
-        } catch {
-          return undefined;
-        }
-      },
-      {},
-    ),
-  );
-}
-
-export function writePinnedSpecs(pinned: PinnedSpecs): void {
-  writePref("pinned_specs", pinned, PINNED_SPECS_KEY);
-}
