@@ -16,8 +16,9 @@ import { useState } from "react";
 import { useRescanState } from "../api/queries";
 import { useRescan, type RescanTally } from "../lib/useRescan";
 import type { RescanStateResponse, RescanSummary } from "../api/types";
+import { lastChecked } from "./rescanState";
 import { useToast } from "../lib/toast";
-import { Text } from "../lib/copy";
+import { Text, useText } from "../lib/copy";
 import { Badge, Button, Dot } from "./primitives";
 import { RefreshIcon } from "./icons";
 
@@ -39,22 +40,21 @@ function countOf(counts: Record<string, number>, key: string): number {
   return counts[key] ?? 0;
 }
 
-// The idle-state "last refreshed" line, derived from GET /rescan/state (the last-known
-// outcome per part, uncommitted and per-machine). checked_at sorts lexically (UTC ISO-8601),
-// so the last entry after a plain string sort is the most recent check.
-export function lastChecked(data: RescanStateResponse): { checkedAt: string | null; total: number } {
-  const entries = Object.values(data.parts);
-  if (entries.length === 0) return { checkedAt: null, total: 0 };
-  const sorted = entries.map((e) => e.checked_at).sort();
-  const checkedAt = sorted[sorted.length - 1] ?? null;
-  return { checkedAt, total: entries.length };
-}
-
 export function RescanSection() {
   const state = useRescanState();
   const rescan = useRescan();
   const { toast } = useToast();
   const [force, setForce] = useState(false);
+  // Resolved during render: a toast is written inside the callback below, where a hook cannot run.
+  // The thrown error's own message is a backend diagnostic and stays as it arrived.
+  const attached = useText(
+    "library.rescan.toast-attached",
+    "A rescan is now running. Showing its live progress.",
+  );
+  const startFailed = useText(
+    "library.rescan.toast-start-failed",
+    "Could not start the rescan.",
+  );
 
   const busy = rescan.status === "running";
 
@@ -62,10 +62,10 @@ export function RescanSection() {
     try {
       const result = await rescan.start(force);
       if (result?.already_running) {
-        toast("A rescan was already running. Showing its live progress.", "neutral");
+        toast(attached, "neutral");
       }
     } catch (err) {
-      toast(err instanceof Error ? err.message : "Could not start the rescan.", "err");
+      toast(err instanceof Error ? err.message : startFailed, "err");
     }
   }
 
@@ -84,7 +84,7 @@ export function RescanSection() {
             <Text id="library.rescan.loading">Reading the last rescan...</Text>
           </p>
         ) : state.isError ? (
-          <p className="py-1 text-sm text-err">
+          <p className="py-1 text-sm text-err-text">
             <Text id="library.rescan.error">Could not read the last rescan.</Text>
           </p>
         ) : state.data ? (
@@ -92,18 +92,20 @@ export function RescanSection() {
         ) : null}
 
         {rescan.status === "error" ? (
-          <p className="mt-3 text-sm text-err" data-testid="rescan-error">
+          <p className="mt-3 text-sm text-err-text" data-testid="rescan-error">
             {rescan.error}
           </p>
         ) : null}
 
         <div className="mt-3.5 flex flex-wrap items-center gap-3">
           <Button variant="accent" onClick={onTrigger} disabled={busy} icon={<RefreshIcon className="h-3.5 w-3.5" />} data-dev-id="settings.rescan-action">
-            {busy
-              ? "Refreshing..."
-              : rescan.status === "done" || rescan.status === "error"
-                ? "Refresh Again"
-                : "Refresh Prices & Stock"}
+            {busy ? (
+              <Text id="library.rescan.action-running">Refreshing...</Text>
+            ) : rescan.status === "done" || rescan.status === "error" ? (
+              <Text id="library.rescan.action-again">Refresh Again</Text>
+            ) : (
+              <Text id="library.rescan.action">Refresh Prices &amp; Stock</Text>
+            )}
           </Button>
           <label className="flex cursor-pointer select-none items-center gap-2 text-sm text-t2">
             <span
@@ -135,7 +137,7 @@ function IdleBody({ data }: { data: RescanStateResponse }) {
       <div className="flex items-center gap-2.5 py-1" data-testid="rescan-never-run">
         <Dot tone="neutral" />
         <span className="text-sm text-t2">
-          <Text id="library.rescan.never-run">This library has never been rescanned.</Text>
+          <Text id="library.rescan.never-run">This catalog has never been rescanned.</Text>
         </span>
       </div>
     );
@@ -187,9 +189,11 @@ function RunningBody({
       </div>
       <div className="text-xs text-t3">
         {!heard ? (
-          "Starting the rescan..."
+          <Text id="library.rescan.progress-starting">Starting the rescan...</Text>
         ) : tally.total === 0 ? (
-          "Every part was checked recently. Nothing to refresh."
+          <Text id="library.rescan.progress-none-due">
+            Each part was checked in the recent past. Nothing to refresh.
+          </Text>
         ) : (
           <>
             <span className="tnum font-mono text-t1">{tally.done}</span> of{" "}
@@ -209,6 +213,15 @@ function RunningBody({
 }
 
 function DoneBody({ summary }: { summary: RescanSummary }) {
+  // One id per number agreement: the subject and its verb have to move together in a rewording.
+  const pausedOne = useText(
+    "library.rescan.paused-one",
+    "This provider hit a quota or authorization issue during the run and was skipped for the rest of it. Run the rescan again later to pick up where it left off.",
+  );
+  const pausedMany = useText(
+    "library.rescan.paused-many",
+    "These providers hit a quota or authorization issue during the run and were skipped for the rest of it. Run the rescan again later to pick up where it left off.",
+  );
   const headline =
     summary.failed > 0
       ? "Refreshed with some failures."
@@ -240,9 +253,7 @@ function DoneBody({ summary }: { summary: RescanSummary }) {
             <span className="text-sm text-t1">{summary.paused_providers.join(", ")}</span>
           </div>
           <p className="text-xs text-t3">
-            {summary.paused_providers.length === 1 ? "This provider" : "These providers"} hit a
-            quota or authorization issue partway through and were skipped for the rest of this
-            run. Run the rescan again later to pick up where it left off.
+            {summary.paused_providers.length === 1 ? pausedOne : pausedMany}
           </p>
         </div>
       ) : null}
@@ -263,10 +274,26 @@ function TallyRow({
 }) {
   return (
     <div className="flex flex-wrap items-center gap-2" data-testid="rescan-tally">
-      <Badge tone={updated > 0 ? "ok" : "neutral"}>{updated} Updated</Badge>
-      <Badge tone="neutral">{unchanged} Unchanged</Badge>
-      <Badge tone="neutral">{noData} No Data</Badge>
-      <Badge tone={failed > 0 ? "err" : "neutral"}>{failed} Failed</Badge>
+      <Badge tone={updated > 0 ? "ok" : "neutral"}>
+        <Text id="library.rescan.tally-updated" values={{ count: updated }}>
+          {"{count} Updated"}
+        </Text>
+      </Badge>
+      <Badge tone="neutral">
+        <Text id="library.rescan.tally-unchanged" values={{ count: unchanged }}>
+          {"{count} Unchanged"}
+        </Text>
+      </Badge>
+      <Badge tone="neutral">
+        <Text id="library.rescan.tally-no-data" values={{ count: noData }}>
+          {"{count} No Data"}
+        </Text>
+      </Badge>
+      <Badge tone={failed > 0 ? "err" : "neutral"}>
+        <Text id="library.rescan.tally-failed" values={{ count: failed }}>
+          {"{count} Failed"}
+        </Text>
+      </Badge>
     </div>
   );
 }

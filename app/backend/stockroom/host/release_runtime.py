@@ -1470,6 +1470,16 @@ class ProductionUpdateRuntime:
             provider_id=provider_id,
         )
 
+    @property
+    def native_shell(self) -> object | None:
+        """The window replacement, when one is running, as the shell bridge's owner.
+
+        Returned as-is rather than wrapped: the three shell operations are the replacement's own
+        methods, and a wrapper here would be a second place for their argument contract to drift.
+        """
+
+        return self._window_replacement
+
     def show_active_provider_browser(self) -> None:
         replacement = self._window_replacement
         if replacement is None:

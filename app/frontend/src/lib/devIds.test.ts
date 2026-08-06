@@ -102,7 +102,77 @@ import { DEV_IDS, DEV_ID_AREAS, DEV_ID_BY_ID } from "./devIds";
 // catalogue row covered and no selector could be safely derived from. Each is an instance id now
 // (stm.package[LQFP100]), built through the same escape every other dynamic id uses, and the role
 // it declares is the catalogue row here. A deliberate re-baseline, which is what this gate is for.
-const EXPECTED_ENTRIES = 351;
+// 343 as of the component dossier overhaul: the opened component became three columns with a
+// compact identity header, so the four information tabs, the representation dock, the
+// per-component tab strip and the header's four competing buttons went (50 ids), and the columns,
+// their regions, the splitters, the Manage menu, Copy MPN and the quality summary arrived (42).
+// A deliberate re-baseline, which is what this gate is for.
+// 387 as of wiring the dossier through: the specification row grew its inline provenance and the
+// four write controls behind it (16 ids), the datasheet became a split button with a real viewer
+// carrying page, zoom, rotation, outline and an in-place failure (26 ids), and the sourcing column
+// gained the total-stock cell, the per-source failure notice, the preferred-datasheet reason and
+// the related-part row with its evidence (8 ids). Three went: `related-group` and
+// `relationship-group` grouped related parts by the catalogue key they arrived under, and a
+// related part now states its own reason, so the ROW is the unit; `sourcing-shared` held the trade
+// and compliance facts, which are canonical specifications with a category-assigned group like any
+// other. Another deliberate re-baseline.
+// 389 as of closing the projection contract: a reviewed decision now travels on the specification
+// itself rather than being read back out of the value it produced, so the row states what an
+// override REPLACED and whether a pinned source is actually in force (2 ids). Both are states the
+// row could not previously show, and a pin that is silently ignored is worse than no pin.
+// 399 as of finishing the Specifications column. The sticky anchor strip and its per-section
+// jump (2), and the attached editor with the six controls a reviewed decision actually needs -
+// unit, value type, source, verification status, reason, and whether the value outranks the
+// sources - plus the refusal that says which category rule the entry broke (8). The editor was
+// previously one unlabelled value box, so none of these were addressable. A deliberate
+// re-baseline, which is what this gate is for.
+// 401 with the Manage menu's shell bridge: one export format action and one installed EDA
+// application (2). Both are per-row controls in the two dialogs behind Export Component... and
+// Open In..., and both are addressable because the SET they belong to is decided by the machine -
+// which formats this component has files for, and which applications are really installed - so a
+// dev-mode inspection has to be able to name the row it is looking at.
+// 416 with the Sourcing and Resources column in its six fixed sections. The lifecycle band gained
+// the manufacturer's own status beside the library's lifecycle (1), the offers became a dense
+// table with its own scroller (1), pricing and lead time became a section rather than three rows
+// borrowed from lifecycle (1), and provenance stopped being one flat source list: Data Sources,
+// Field Conflicts, Manual Overrides, Import and Enrichment History, Revision History and
+// Technical Diagnostics are six addressable regions with a row id each (9), plus the translated
+// compatibility warning and the control that names the fields it is about (3). Every one of them
+// is a region a dev-mode inspection has to be able to point at, and the flat list had exactly two.
+// 418 with the picker's corrected search band: the parametric search became its own control
+// beside the now-real inline input (1), and the active filters say in words what they are hiding
+// (1). Both were previously unaddressable because neither existed - the search box WAS the
+// parametric trigger, and the filter state was a bare count badge.
+// 439 with the CAD Assets column's real previews and its one column-level decision. The symbol
+// and land pattern are now DRAWN from geometry rather than shown as pictures, so every layer a
+// person can switch on is an addressable control: pin names, pin numbers and electrical type on
+// the symbol (3), and copper, mask, paste, silkscreen, fabrication, courtyard, pad numbers,
+// origin, dimensions and the ruler on the land pattern (10). Each is a real layer of the file,
+// and one shared "layers" id would make ten different switches the same element to an override.
+// The rest are states and controls that did not exist: the two drawing canvases (2), the asset
+// issue line held apart from its evidence line (1), the maximize glyph that replaced a text
+// button (1), the way back to all three modules (1), the confirmation that says what changing
+// the preferred source replaces (1), and the two ways to choose a source in the comparison -
+// the whole set and one asset (2). A deliberate re-baseline.
+// 441 with the picker row's identifier and its package label (2). The row's MPN had been sharing
+// line one with a `flex-none` package while a fixed-width attention block held 112px beside them
+// both, so at a 290px picker the identifier rendered as one letter and an ellipsis. Neither box
+// was addressable, which is why the measurement that would have caught it could not be taken.
+// 447 as of collapsing the CAD column's visibility controls and the sourcing column's empty
+// sections. The left column carried its layer switches as always-visible outlined pills - three
+// under the symbol, ten under the land pattern - which measured fourteen bordered controls across
+// six toolbar rows in a ~300px column. They are now rows in a panel behind ONE icon per preview, so
+// the shell that opens it (2, one per preview), the panel itself (1) and the strip they sit on (1)
+// are new addressable elements; the twelve switch ids are unchanged and still one per switch.
+// The right column stopped rendering a full sentence per empty section, so the control that reveals
+// them (1) and the one line that names the silent provenance questions (1) are new. Nothing was
+// removed: `asset-measure` and `asset-maximize` moved file but kept their ids.
+// A deliberate re-baseline, which is what this gate is for.
+// 448 with `component-browser.spec-conflict-marker`. A specification row stopped printing three
+// pieces of metadata around every value - a source tier, a state word and the word `Evidence` - and
+// a conflict became a quiet marker instead of a sentence. The marker is a new addressable element;
+// the word it replaced was not one.
+const EXPECTED_ENTRIES = 448;
 
 describe("devIds catalogue", () => {
   // The count is asserted from a single constant so bumping it is one edit, and so the test NAME can

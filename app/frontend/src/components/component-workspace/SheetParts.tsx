@@ -8,10 +8,11 @@
  * workbenches. What remains is genuinely about THIS domain - where one value came from, and what
  * happened to one source - so it stays beside the sheets that ask those questions.
  */
-import type { FactSource, SourceState } from "../../api/workspaceTypes";
+import type { SourceCandidate, SourceState } from "../../api/dossierTypes";
 import { useText } from "../../lib/copy";
 import { Badge } from "../primitives";
-import { SOURCE_STATE_LABEL, sourceStateOf, sourceStateTone } from "./workspaceStatus";
+import { SourceStateLabel } from "./provenanceText";
+import { sourceStateOf, sourceStateTone } from "./provenanceVocabulary";
 
 /**
  * Where one value came from.
@@ -19,12 +20,12 @@ import { SOURCE_STATE_LABEL, sourceStateOf, sourceStateTone } from "./workspaceS
  * A value with no recorded source is MANUAL, which is a real provenance and is said out loud -
  * an unattributed blank would read as an oversight rather than as "a person typed this".
  */
-export function SourceNote({ source }: { source?: FactSource | null }) {
+export function SourceNote({ source }: { source?: SourceCandidate | null }) {
   const manual = useText("component-browser.manual", "Manual");
   if (!source) return <span className="flex-none text-2xs text-t3">{manual}</span>;
   return (
-    <span className="flex-none text-2xs text-t3" title={source.fetchedAt ?? undefined}>
-      {source.label || source.id}
+    <span className="flex-none text-2xs text-t3" title={source.retrievedAt || undefined}>
+      {source.sourceLabel || source.sourceId}
     </span>
   );
 }
@@ -34,7 +35,7 @@ export function SourceStateBadge({ state }: { state: SourceState | undefined }) 
   const resolved = sourceStateOf(state);
   return (
     <Badge size="sm" tone={sourceStateTone(resolved)}>
-      {SOURCE_STATE_LABEL[resolved]}
+      <SourceStateLabel state={resolved} />
     </Badge>
   );
 }

@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { ApiError, api, type LandPattern } from "../api/client";
@@ -224,7 +224,7 @@ describe("Glb3DView scene synchronization", () => {
       drill: 0,
       pad_type: "smd",
       side: "front",
-      rratio: 0,
+      rratio: 0, layers: ["F.Cu"],
     }],
     graphics: [],
     model_placement: null,
@@ -387,6 +387,58 @@ describe("Glb3DView scene synchronization", () => {
     expect(handle.setPlacementMode).toHaveBeenLastCalledWith("kicad");
     await userEvent.click(screen.getByRole("button", { name: "Fit model" }));
     expect(handle.fit).toHaveBeenCalledOnce();
+  });
+
+  it("closes the settings panel on Escape, keeps the press to itself, and restores focus", async () => {
+    // The panel opens from a button inside the control surface while the dismissal listener is
+    // owned by the frame around it, so this asserts the two halves still meet: Escape reaches the
+    // frame, the frame closes the panel, and focus lands back on the control that opened it.
+    // `stopPropagation` is asserted because this viewer sits inside a modal that also answers
+    // Escape - without it, one press closes the whole opened component instead of the panel.
+    mountSpy.mockReturnValue(sceneHandle());
+    const escapedToTheApp = vi.fn();
+    document.addEventListener("keydown", escapedToTheApp);
+    try {
+      wrap(
+        <Glb3DView data={bytes} isLoading={false} isError={false} showViews compact />,
+      );
+      await waitFor(() => expect(mountSpy).toHaveBeenCalled());
+      const settings = screen.getByRole("button", { name: "3D view settings" });
+      await userEvent.click(settings);
+      expect(settings).toHaveAttribute("aria-expanded", "true");
+      const insidePanel = screen.getByRole("button", { name: "Fit model" });
+      // Move focus INTO the panel first. Without this the caret never leaves the settings button,
+      // and the restore below would pass whether or not it happens - which is exactly how this
+      // assertion was vacuous when it was first written.
+      insidePanel.focus();
+      expect(document.activeElement).toBe(insidePanel);
+
+      await userEvent.keyboard("{Escape}");
+
+      expect(settings).toHaveAttribute("aria-expanded", "false");
+      expect(screen.queryByRole("button", { name: "Fit model" })).not.toBeInTheDocument();
+      expect(document.activeElement).toBe(settings);
+      expect(escapedToTheApp).not.toHaveBeenCalled();
+    } finally {
+      document.removeEventListener("keydown", escapedToTheApp);
+    }
+  });
+
+  it("keeps the settings panel open for a press inside the viewer and closes it for one outside", async () => {
+    // The frame's element reference spans the canvas, the strip AND the panel, so an orbit drag on
+    // the render is a press "inside" and must not dismiss anything. Only a press elsewhere does.
+    mountSpy.mockReturnValue(sceneHandle());
+    wrap(<Glb3DView data={bytes} isLoading={false} isError={false} showViews compact />);
+    await waitFor(() => expect(mountSpy).toHaveBeenCalled());
+    const settings = screen.getByRole("button", { name: "3D view settings" });
+    await userEvent.click(settings);
+    expect(settings).toHaveAttribute("aria-expanded", "true");
+
+    fireEvent.pointerDown(screen.getByTestId("model-canvas"));
+    expect(settings).toHaveAttribute("aria-expanded", "true");
+
+    fireEvent.pointerDown(document.body);
+    expect(settings).toHaveAttribute("aria-expanded", "false");
   });
 
   it("does not carry a failed render across to replacement GLB bytes", async () => {

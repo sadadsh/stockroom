@@ -59,7 +59,7 @@ TMPBASE="${GATES_TMPDIR:-/dev/shm/pytest-stockroom-$$}"
 # REAP STALE BASETEMPS BEFORE RUNNING, because a full tmpfs does NOT fail as "disk full".
 #
 # Measured 2026-07-27, and it cost most of an hour plus one wrong diagnosis: /dev/shm was 4.5 GB
-# full of basetemps left by killed runs and by a SECOND Claude session. Playwright's `save_as` then
+# full of basetemps left by killed runs and by a second concurrent session. Playwright's `save_as` then
 # cannot write the download, and the capture tests fail as "a submitted capture reported no file at
 # all" - which reads exactly like a capture bug. I blamed a code change and reverted it; the revert
 # changed nothing, because the cause was the disk.

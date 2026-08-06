@@ -8,7 +8,9 @@
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  type Column,
   type ColumnDef,
+  type Table,
   type ColumnFiltersState,
   type SortingState,
   type VisibilityState,
@@ -64,6 +66,8 @@ const COLUMN_WIDTHS: Record<string, number> = {
 };
 const PERIPH_WIDTH = 60;
 const MIN_COLUMN_WIDTH = 48;
+// How far one arrow press moves a column edge, in the same pixels the drag handle works in.
+const KEY_RESIZE_STEP = 16;
 
 interface Props {
   rows: McuSpecRow[];
@@ -78,34 +82,12 @@ export function SpecMatrixTable({ rows, activePart, onSelectPart }: Props) {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
   const [columnSizing, setColumnSizing] = useState<Record<string, number>>({});
-  const [columnsOpen, setColumnsOpen] = useState(false);
-  const columnsRef = useRef<HTMLDivElement>(null);
-  const searchLabel = useText("stm.spec-matrix.search.placeholder", "Search Parts");
-  const resizeLabel = useCopyFormatter("stm.spec-matrix.resize.aria", "Resize {column}");
   const allShownLabel = useCopyFormatter("stm.spec-matrix.all-shown", "All {total} parts shown");
   const matchCountLabel = useCopyFormatter(
     "stm.spec-matrix.match-count",
     "{shown} of {total} parts match",
   );
 
-  // Close the column picker on any outside click or Escape (a mini popover, not a modal).
-  useEffect(() => {
-    if (!columnsOpen) return;
-    function onDown(e: MouseEvent) {
-      if (columnsRef.current && !columnsRef.current.contains(e.target as Node)) {
-        setColumnsOpen(false);
-      }
-    }
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") setColumnsOpen(false);
-    }
-    document.addEventListener("mousedown", onDown);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onDown);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [columnsOpen]);
 
   const columns = useMemo<ColumnDef<McuSpecRow>[]>(() => {
     const num = (key: keyof McuSpecRow, header: string, unit?: string): ColumnDef<McuSpecRow> => ({
@@ -209,6 +191,7 @@ export function SpecMatrixTable({ rows, activePart, onSelectPart }: Props) {
 
   const modelRows = table.getRowModel().rows;
 
+
   const scrollRef = useRef<HTMLDivElement>(null);
   const virtualizer = useVirtualizer({
     count: modelRows.length,
@@ -241,86 +224,15 @@ export function SpecMatrixTable({ rows, activePart, onSelectPart }: Props) {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      {/* toolbar: client-side search + the live result count + the filter toggle */}
-      <div className="mb-2.5 flex items-center gap-2.5">
-        <div className="flex h-8 min-w-0 flex-1 items-center gap-2 rounded-control bg-field pl-2.5 pr-2">
-          <SearchIcon className="flex-none text-t3" />
-          <input
-            value={globalFilter}
-            onChange={(e) => setGlobalFilter(e.target.value)}
-            placeholder={searchLabel}
-            aria-label={searchLabel}
-            className="min-w-0 flex-1 bg-transparent text-sm text-t1 outline-none placeholder:text-t3"
-          />
-        </div>
-        <span className="tnum flex-none font-mono text-xs text-t3">
-          <Text
-            id="stm.spec-matrix.count"
-            values={{
-              shown: modelRows.length.toLocaleString(),
-              total: rows.length.toLocaleString(),
-            }}
-          >
-            {"{shown} of {total}"}
-          </Text>
-        </span>
-        <button
-          type="button"
-          onClick={() => setFiltersOpen((v) => !v)}
-          aria-pressed={filtersOpen}
-          className={
-            "flex-none rounded-control border px-2.5 py-1 text-xs font-medium transition-colors " +
-            (filtersOpen
-              ? "border-line2 bg-raise2 text-t1"
-              : "border-line bg-raise text-t2 hover:text-t1")
-          }
-        >
-          <Text id="stm.spec-matrix.filters">Filters</Text>
-        </button>
-        {/* The column-visibility mini popover: every column toggleable except Part (the row
-            identity is never hideable). Hidden columns free horizontal room; visible ones keep
-            their fixed tracks (never squished). */}
-        <div className="relative flex-none" ref={columnsRef}>
-          <button
-            type="button"
-            onClick={() => setColumnsOpen((v) => !v)}
-            aria-pressed={columnsOpen}
-            aria-haspopup="true"
-            className={
-              "flex-none rounded-control border px-2.5 py-1 text-xs font-medium transition-colors " +
-              (columnsOpen
-                ? "border-line2 bg-raise2 text-t1"
-                : "border-line bg-raise text-t2 hover:text-t1")
-            }
-          >
-            <Text id="stm.spec-matrix.columns">Columns</Text>
-          </button>
-          {columnsOpen ? (
-            <div
-              data-testid="column-picker"
-              className="absolute right-0 top-full z-[60] mt-1.5 w-44 rounded-card border border-line bg-popover p-2 shadow-pop"
-            >
-              {table
-                .getAllLeafColumns()
-                .filter((c) => c.id !== "mpn_example")
-                .map((c) => (
-                  <label
-                    key={c.id}
-                    className="flex cursor-pointer items-center gap-2 rounded-control px-2 py-1 text-xs text-t2 hover:bg-hover hover:text-t1"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={c.getIsVisible()}
-                      onChange={c.getToggleVisibilityHandler()}
-                      className="accent-[var(--c-acc)]"
-                    />
-                    {String(c.columnDef.header)}
-                  </label>
-                ))}
-            </div>
-          ) : null}
-        </div>
-      </div>
+      <MatrixToolbar
+        table={table}
+        globalFilter={globalFilter}
+        onGlobalFilter={setGlobalFilter}
+        shown={modelRows.length}
+        total={rows.length}
+        filtersOpen={filtersOpen}
+        onToggleFilters={() => setFiltersOpen((v) => !v)}
+      />
 
       {/* the scroll container: header + filter row + virtualized body all share the grid */}
       <div
@@ -329,54 +241,14 @@ export function SpecMatrixTable({ rows, activePart, onSelectPart }: Props) {
         className="min-h-0 flex-1 overflow-auto rounded-card border border-line bg-raise"
       >
         <div className="min-w-max">
-          {/* header (sticky), one hairline underline (the whole border budget for the grid) */}
-          <div
-            style={gridStyle}
-            className="sticky top-0 z-[2] border-b border-line bg-[var(--c-sticky)] backdrop-blur"
-          >
-            {table.getHeaderGroups()[0].headers.map((header) => {
-              const meta = header.column.columnDef.meta as ColMeta | undefined;
-              const sorted = header.column.getIsSorted();
-              return (
-                <div key={header.id} className="relative flex min-w-0">
-                  <button
-                    type="button"
-                    onClick={header.column.getToggleSortingHandler()}
-                    className={
-                      "flex min-w-0 flex-1 items-center gap-1 px-2.5 py-2 text-2xs font-semibold text-t3 hover:text-t1 " +
-                      (meta?.align === "right" ? "justify-end" : "justify-start")
-                    }
-                  >
-                    <span className="truncate">
-                      {flexRender(header.column.columnDef.header, header.getContext())}
-                    </span>
-                    <span className="w-2 flex-none text-t2">
-                      {sorted === "asc" ? "↑" : sorted === "desc" ? "↓" : ""}
-                    </span>
-                  </button>
-                  {/* the drag handle: a hairline that widens on hover; double-click resets */}
-                  <div
-                    role="separator"
-                    aria-label={resizeLabel({
-                      column: String(header.column.columnDef.header),
-                    })}
-                    data-testid={`col-resize-${header.column.id}`}
-                    onMouseDown={header.getResizeHandler()}
-                    onTouchStart={header.getResizeHandler()}
-                    onDoubleClick={() => header.column.resetSize()}
-                    className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize select-none border-r border-line hover:border-acc"
-                  />
-                </div>
-              );
-            })}
-          </div>
+          <MatrixHeaderRow table={table} gridStyle={gridStyle} />
 
           {/* the per-column filter row, revealed on demand (dense, not noisy) */}
           {filtersOpen ? (
             <div
               style={gridStyle}
               data-testid="spec-matrix-filters"
-              className="sticky top-[33px] z-[1] border-b border-line bg-[var(--c-sticky)] backdrop-blur"
+              className="sticky top-[33px] z-[1] border-b border-line bg-[var(--c-sticky)]"
             >
               {table.getHeaderGroups()[0].headers.map((header) => (
                 <div key={header.id} className="flex items-stretch px-1.5 py-1.5">
@@ -468,6 +340,210 @@ function NumCell({ value, unit }: { value: number; unit?: string }) {
 
 // The per-column filter control: a text box for identity columns, a compact min/max pair for the
 // numeric columns (seeded from the faceted min/max). Mutates only the table's columnFilters state.
+
+// The matrix toolbar: the client-side search, the live result count, the filter-row toggle,
+// and the column-visibility popover. The popover is entirely the toolbar's business, so its
+// open state and outside-click dismissal live here rather than in the table body above.
+
+// The sticky header row: one sort button per column plus its resize separator.
+function MatrixHeaderRow({
+  table,
+  gridStyle,
+}: {
+  table: Table<McuSpecRow>;
+  gridStyle: React.CSSProperties;
+}) {
+  const resizeLabel = useCopyFormatter("stm.spec-matrix.resize.aria", "Resize {column}");
+  // The keyboard half of a column resize. getSize() already clamps to the column's min/max, so the
+  // nudge only has to write the requested width and let TanStack resolve it.
+  const resizeByKey = (
+    event: React.KeyboardEvent<HTMLDivElement>,
+    column: Column<McuSpecRow, unknown>,
+  ) => {
+    if (event.key === "Home" || event.key === "Enter") {
+      event.preventDefault();
+      column.resetSize();
+      return;
+    }
+    const step = event.key === "ArrowLeft" ? -KEY_RESIZE_STEP : event.key === "ArrowRight" ? KEY_RESIZE_STEP : 0;
+    if (step === 0) return;
+    event.preventDefault();
+    const next = column.getSize() + step;
+    table.setColumnSizing((current) => ({ ...current, [column.id]: next }));
+  };
+  return (
+      <div
+        style={gridStyle}
+        className="sticky top-0 z-[2] border-b border-line bg-[var(--c-sticky)]"
+      >
+        {table.getHeaderGroups()[0].headers.map((header) => {
+          const meta = header.column.columnDef.meta as ColMeta | undefined;
+          const sorted = header.column.getIsSorted();
+          return (
+            <div key={header.id} className="relative flex min-w-0">
+              <button
+                type="button"
+                onClick={header.column.getToggleSortingHandler()}
+                className={
+                  "flex min-w-0 flex-1 items-center gap-1 px-2.5 py-2 text-2xs font-semibold text-t3 hover:text-t1 " +
+                  (meta?.align === "right" ? "justify-end" : "justify-start")
+                }
+              >
+                <span className="truncate">
+                  {flexRender(header.column.columnDef.header, header.getContext())}
+                </span>
+                <span className="w-2 flex-none text-t2">
+                  {sorted === "asc" ? "↑" : sorted === "desc" ? "↓" : ""}
+                </span>
+              </button>
+              {/* The drag handle: a hairline that widens on hover; double-click resets. It is
+                  a real separator control, so it is also focusable and carries the splitter
+                  keyboard contract - arrows nudge the width, Home/Enter resets it - rather than
+                  being reachable by pointer only. */}
+              <div
+                role="separator"
+                aria-orientation="vertical"
+                tabIndex={0}
+                aria-label={resizeLabel({
+                  column: String(header.column.columnDef.header),
+                })}
+                data-testid={`col-resize-${header.column.id}`}
+                onMouseDown={header.getResizeHandler()}
+                onTouchStart={header.getResizeHandler()}
+                onDoubleClick={() => header.column.resetSize()}
+                onKeyDown={(event) => resizeByKey(event, header.column)}
+                className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize select-none border-r border-line outline-none hover:border-acc focus-visible:border-acc focus-visible:ring-1 focus-visible:ring-[var(--c-line2)]"
+              />
+            </div>
+          );
+        })}
+      </div>
+  );
+}
+
+function MatrixToolbar({
+  table,
+  globalFilter,
+  onGlobalFilter,
+  shown,
+  total,
+  filtersOpen,
+  onToggleFilters,
+}: {
+  table: Table<McuSpecRow>;
+  globalFilter: string;
+  onGlobalFilter: (value: string) => void;
+  shown: number;
+  total: number;
+  filtersOpen: boolean;
+  onToggleFilters: () => void;
+}) {
+  const [columnsOpen, setColumnsOpen] = useState(false);
+  const columnsRef = useRef<HTMLDivElement>(null);
+  const searchLabel = useText("stm.spec-matrix.search.placeholder", "Search Parts");
+  // Close the column picker on any outside click or Escape (a mini popover, not a modal).
+  useEffect(() => {
+    if (!columnsOpen) return;
+    function onDown(e: MouseEvent) {
+      if (columnsRef.current && !columnsRef.current.contains(e.target as Node)) {
+        setColumnsOpen(false);
+      }
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setColumnsOpen(false);
+    }
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [columnsOpen]);
+  return (
+    <div className="mb-2.5 flex items-center gap-2.5">
+      <div className="flex h-8 min-w-0 flex-1 items-center gap-2 rounded-control bg-field pl-2.5 pr-2">
+        <SearchIcon className="flex-none text-t3" />
+        <input
+          value={globalFilter}
+          onChange={(e) => onGlobalFilter(e.target.value)}
+          placeholder={searchLabel}
+          aria-label={searchLabel}
+          className="min-w-0 flex-1 bg-transparent text-sm text-t1 outline-none placeholder:text-t3"
+        />
+      </div>
+      <span className="tnum flex-none font-mono text-xs text-t3">
+        <Text
+          id="stm.spec-matrix.count"
+          values={{
+            shown: shown.toLocaleString(),
+            total: total.toLocaleString(),
+          }}
+        >
+          {"{shown} of {total}"}
+        </Text>
+      </span>
+      <button
+        type="button"
+        onClick={onToggleFilters}
+        aria-pressed={filtersOpen}
+        className={
+          "flex-none rounded-control border px-2.5 py-1 text-xs font-medium transition-colors " +
+          (filtersOpen
+            ? "border-line2 bg-raise2 text-t1"
+            : "border-line bg-raise text-t2 hover:text-t1")
+        }
+      >
+        <Text id="stm.spec-matrix.filters">Filters</Text>
+      </button>
+      {/* The column-visibility mini popover: every column toggleable except Part (the row
+          identity is never hideable). Hidden columns free horizontal room; visible ones keep
+          their fixed tracks (never squished). */}
+      <div className="relative flex-none" ref={columnsRef}>
+        <button
+          type="button"
+          onClick={() => setColumnsOpen((v) => !v)}
+          aria-pressed={columnsOpen}
+          aria-haspopup="true"
+          className={
+            "flex-none rounded-control border px-2.5 py-1 text-xs font-medium transition-colors " +
+            (columnsOpen
+              ? "border-line2 bg-raise2 text-t1"
+              : "border-line bg-raise text-t2 hover:text-t1")
+          }
+        >
+          <Text id="stm.spec-matrix.columns">Columns</Text>
+        </button>
+        {columnsOpen ? (
+          <div
+            data-testid="column-picker"
+            className="absolute right-0 top-full z-[60] mt-1.5 w-44 rounded-card border border-line bg-popover p-2 shadow-pop"
+          >
+            {/* one pass: Part is skipped inline rather than by a separate filter pass */}
+            {table.getAllLeafColumns().reduce<React.ReactNode[]>((rows: React.ReactNode[], c) => {
+              if (c.id === "mpn_example") return rows;
+              rows.push(
+                <label
+                  key={c.id}
+                  className="flex cursor-pointer items-center gap-2 rounded-control px-2 py-1 text-xs text-t2 hover:bg-hover hover:text-t1"
+                >
+                  <input
+                    type="checkbox"
+                    checked={c.getIsVisible()}
+                    onChange={c.getToggleVisibilityHandler()}
+                    className="accent-[var(--c-acc)]"
+                  />
+                  {String(c.columnDef.header)}
+                </label>,
+              );
+              return rows;
+            }, [])}
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 function ColumnFilter({
   column,
 }: {

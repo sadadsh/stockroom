@@ -18,7 +18,7 @@ import {
   targetPositionDescription,
   type TargetMapLens,
 } from "../../lib/stmTargetVisuals";
-import { Text } from "../../lib/copy";
+import { Text, useCopyFormatter } from "../../lib/copy";
 import { RefreshIcon } from "../icons";
 import { IconButton } from "../primitives";
 
@@ -77,6 +77,12 @@ export function TargetPackageMap({
   selectedPosition: string | null;
   onSelectPosition: (position: string) => void;
 }) {
+  // The drawing's own accessible name, and the name of each pad inside it. A pad is drawn in a
+  // callback where a hook cannot run, so its sentence is resolved here and filled in there.
+  const mapLabel = useCopyFormatter(
+    "stm.target.map.aria",
+    "Universal MCU pinout for {packageName}",
+  );
   const geometry = useMemo(() => targetGeometry(positions), [positions]);
   const layout = useMemo(
     () => pinMapGeometry(positions, geometry, VIEW, VIEW),
@@ -102,21 +108,29 @@ export function TargetPackageMap({
   useEffect(() => {
     const svg = svgRef.current;
     if (!svg) return;
+    const onZoom = (event: D3ZoomEvent<SVGSVGElement, unknown>) => {
+      const { k, x, y } = event.transform;
+      setCamera({ k, x, y });
+    };
     const behavior = zoom<SVGSVGElement, unknown>()
       .scaleExtent([0.5, 8])
       .extent([
         [0, 0],
         [VIEW, VIEW],
-      ])
-      .on("zoom", (event: D3ZoomEvent<SVGSVGElement, unknown>) => {
-        const { k, x, y } = event.transform;
-        setCamera({ k, x, y });
-      });
+      ]);
+    behavior.on("zoom", onZoom);
     zoomRef.current = behavior;
     const selection = select(svg);
     selection.call(behavior);
+    // Own every allocation this run made. Detaching the node's `.zoom` listeners is only half of it:
+    // d3-zoom parks a live gesture's mousemove/mouseup listeners on `window`, not on this node, and
+    // keeps a wheel-idle timer, so both can still dispatch after the node is detached. Severing the
+    // behavior's own "zoom" listener makes those dispatches inert, and dropping the ref leaves the
+    // next run to build its own behavior from scratch.
     return () => {
       selection.on(".zoom", null);
+      behavior.on("zoom", null);
+      zoomRef.current = null;
     };
   }, []);
 
@@ -156,9 +170,7 @@ export function TargetPackageMap({
         {unavailable ? (
           <div className="flex h-full flex-col p-3">
             <p className="mb-2 text-xs text-t3">
-              <Text id="stm.target.package-map.no-geometry">
-                This package has no drawable geometry. Select a physical position below.
-              </Text>
+              <Text id="stm.target.package-map.no-geometry">This package has no drawable outline. Select a package position below.</Text>
             </p>
             <div className="min-h-0 flex-1 overflow-y-auto">
               {positions.map((position) => (
@@ -192,7 +204,7 @@ export function TargetPackageMap({
             viewBox={`0 0 ${VIEW} ${VIEW}`}
             className="h-full w-full cursor-grab touch-none select-none active:cursor-grabbing"
             role="img"
-            aria-label={`Universal MCU pinout for ${packageName}`}
+            aria-label={mapLabel({ packageName })}
             data-testid="target-package-map-svg"
           >
             <g transform={`translate(${camera.x},${camera.y}) scale(${camera.k})`}>
@@ -231,7 +243,12 @@ export function TargetPackageMap({
                 className="fill-t3"
                 fontSize={8}
               >
-                {positions.length} Physical Positions
+                <Text
+                  id="stm.target.map.position-count"
+                  values={{ count: positions.length }}
+                >
+                  {"{count} Package Positions"}
+                </Text>
               </text>
               {layout.pins.map((pad) => {
                 const position = byPosition.get(pad.position);
@@ -293,9 +310,20 @@ export function TargetPackageMap({
         )}
         {!unavailable ? (
           <div className="pointer-events-none absolute inset-x-2 bottom-2 flex items-end justify-between gap-3">
-            <div className="min-w-0 rounded-control border border-line bg-popover/90 px-2 py-1 shadow-sm backdrop-blur-sm">
+            <div className="min-w-0 rounded-control border border-line bg-popover px-2 py-1 shadow-pop">
               <span className="font-mono text-2xs text-t1">
-                {selected ? `Position ${selected.position}` : "No Position Selected"}
+                {selected ? (
+                  <Text
+                    id="stm.target.package-map.selected-position"
+                    values={{ position: selected.position }}
+                  >
+                    {"Position {position}"}
+                  </Text>
+                ) : (
+                  <Text id="stm.target.package-map.no-position">
+                    No Position Selected
+                  </Text>
+                )}
               </span>
               {selected ? (
                 <span className="ml-1.5 text-2xs text-t3">
@@ -304,7 +332,7 @@ export function TargetPackageMap({
                 </span>
               ) : null}
             </div>
-            <span className="rounded-control bg-popover/80 px-2 py-1 text-2xs text-t3 backdrop-blur-sm">
+            <span className="rounded-control bg-popover px-2 py-1 text-2xs text-t3">
               Drag To Pan · Scroll To Zoom
               {unplaced ? ` · ${unplaced} Unplaced` : ""}
             </span>
@@ -341,6 +369,7 @@ const TargetPad = memo(function TargetPad({
   const description =
     visual?.description ??
     (position ? targetPositionDescription(position, lens) : "Unknown");
+  const padLabel = useCopyFormatter("stm.target.map.pad-aria", "Position {position}: {description}");
   return (
     <g
       onClick={() => onSelect(pad.position)}
@@ -352,7 +381,7 @@ const TargetPad = memo(function TargetPad({
       }}
       role="button"
       tabIndex={0}
-      aria-label={`Position ${pad.position}: ${description}`}
+      aria-label={padLabel({ position: pad.position, description })}
       className="cursor-pointer [&>rect.pad]:hover:brightness-110"
       opacity={dimmed ? 0.18 : 1}
       data-position={pad.position}

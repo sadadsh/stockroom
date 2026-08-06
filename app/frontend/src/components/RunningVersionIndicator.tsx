@@ -9,11 +9,11 @@ import { Dot, type BadgeTone } from "./primitives";
 
 const STANDING_TONE = {
   checking: "text-t3",
-  current: "text-ok",
+  current: "text-ok-text",
   available: "text-warn",
   updating: "text-acc",
   retrying: "text-warn",
-  blocked: "text-err",
+  blocked: "text-err-text",
   restart_required: "text-warn",
   unknown: "text-t3",
 } as const;
@@ -42,9 +42,20 @@ const STANDING_DOT: Record<UpdateStanding, BadgeTone> = {
 export function RunningVersionIndicator({
   view,
   buildVersion = __APP_VERSION__,
+  identity = true,
 }: {
   view: UpdateStandingView;
   buildVersion?: string;
+  /**
+   * Whether the revision identities are DRAWN.
+   *
+   * A commit hash is a build fact, and `r4f2a9c1 -> 2222222` in the corner of a component library
+   * is developer output on a person's screen: it names something they cannot act on and did not
+   * ask about. The standing is the actionable half and stays visible; the identities are drawn in
+   * developer mode, in About, and in the accessible name - which is where a person who does want
+   * the exact revision goes to find it.
+   */
+  identity?: boolean;
 }) {
   // One hook per standing rather than a lookup inside the map: hooks cannot be called conditionally,
   // and the label is also read aloud through the aria-label below, so every arm has to be resolved.
@@ -53,7 +64,7 @@ export function RunningVersionIndicator({
     current: useText("update.standing.current", "Current"),
     available: useText("update.standing.available", "Update Available"),
     updating: useText("update.standing.updating", "Updating…"),
-    retrying: useText("update.standing.retrying", "Retrying…"),
+    retrying: useText("update.standing.retrying", "Rerunning…"),
     blocked: useText("update.standing.blocked", "Blocked"),
     restart_required: useText("update.standing.restart-required", "Restart Required"),
     unknown: useText("update.standing.unknown", "Unknown"),
@@ -88,17 +99,21 @@ export function RunningVersionIndicator({
       className="inline-flex min-w-0 items-center gap-1.5 whitespace-nowrap"
     >
       <Dot tone={STANDING_DOT[view.standing]} />
-      {identityPrefix ? <span className="text-t3">{identityPrefix}</span> : null}
-      <span className="font-mono tabular-nums text-t2">{running.value}</span>
-      {other ? (
+      {identity ? (
         <>
-          <span aria-hidden className="text-line2">
-            →
-          </span>
-          <span className="font-mono tabular-nums text-t2">
-            {otherPrefix}
-            {other.value}
-          </span>
+          {identityPrefix ? <span className="text-t3">{identityPrefix}</span> : null}
+          <span className="font-mono tabular-nums text-t2">{running.value}</span>
+          {other ? (
+            <>
+              <span aria-hidden className="text-line2">
+                →
+              </span>
+              <span className="font-mono tabular-nums text-t2">
+                {otherPrefix}
+                {other.value}
+              </span>
+            </>
+          ) : null}
         </>
       ) : null}
       <span className={STANDING_TONE[view.standing]}>{label}</span>

@@ -85,6 +85,18 @@ describe("BulkImportSection", () => {
     expect(screen.getByRole("button", { name: "Import 2 Parts" })).toBeTruthy();
   });
 
+  it("names the paste well with the heading, not with its worked example", async () => {
+    const user = userEvent.setup();
+    wrap(<BulkImportSection />);
+    // The placeholder is three sample part numbers and it disappears at the first keystroke, so it
+    // cannot be the field's name. The heading labels it, and it keeps that name while typing.
+    const well = screen.getByRole("textbox", { name: "Import A List" });
+    expect(well).toBe(box());
+    await user.click(well);
+    await user.paste("595-A");
+    expect(screen.getByRole("textbox", { name: "Import A List" })).toBe(well);
+  });
+
   it("keeps both actions disabled until something is pasted", () => {
     wrap(<BulkImportSection />);
     expect(screen.getByRole("button", { name: "Import" })).toHaveProperty("disabled", true);

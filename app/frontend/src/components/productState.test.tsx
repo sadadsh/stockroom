@@ -102,7 +102,7 @@ describe("each product state renders itself, and says which one it is", () => {
     // A failure a person did not ask for has to announce itself.
     expect(block).toHaveAttribute("role", "alert");
 
-    const retries = within(block).getAllByRole("button", { name: "Try Again" });
+    const retries = within(block).getAllByRole("button", { name: "Rerun" });
     expect(retries).toHaveLength(1);
     await userEvent.click(retries[0]);
     expect(onRetry).toHaveBeenCalledTimes(1);
@@ -117,7 +117,7 @@ describe("each product state renders itself, and says which one it is", () => {
 
   it("renders the retry action on its own, and says so while it is running", () => {
     const { rerender } = provide(<RetryAction onRetry={() => {}} />);
-    expect(screen.getByRole("button", { name: "Try Again" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Rerun" })).toBeEnabled();
 
     rerender(
       <ThemeProvider>
@@ -126,7 +126,7 @@ describe("each product state renders itself, and says which one it is", () => {
         </DevModeProvider>
       </ThemeProvider>,
     );
-    const running = screen.getByRole("button", { name: "Retrying" });
+    const running = screen.getByRole("button", { name: "Rerunning" });
     expect(running).toBeDisabled();
     expect(running).toHaveAttribute("aria-busy", "true");
   });
@@ -163,12 +163,14 @@ describe("every message reaches the copy layer", () => {
 });
 
 describe("the structural primitives", () => {
-  it("renders the route header on the one 34px chrome band, with its count beside the title", () => {
+  it("renders the route header on the one 26px chrome band, with its count beside the title", () => {
     const { container } = provide(<RouteHeader right="12">Components</RouteHeader>);
     const header = container.firstElementChild as HTMLElement;
-    // Not decoration: the rail toggle, this strip and the tab band sit on ONE horizontal line, and
-    // a 4px difference between them reads as a mis-registration.
-    expect(header.className).toContain("h-[34px]");
+    // Not decoration: the rail wordmark, this strip and the Projects title strip sit on ONE
+    // horizontal line, and a 4px difference between them reads as a mis-registration. 26px is the
+    // desktop density a panel title strip is held to; it was 34px, which is a label with a third
+    // of its height spent on air.
+    expect(header.className).toContain("h-[26px]");
     expect(header.className).toContain("bg-band");
     expect(screen.getByText("Components")).toBeInTheDocument();
     expect(screen.getByText("12")).toBeInTheDocument();

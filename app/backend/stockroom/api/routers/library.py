@@ -5,26 +5,40 @@ at thousands of parts (spec section 2.2); part detail loads the canonical record
 from __future__ import annotations
 
 import json
+import mimetypes
 import re
 import threading
 from datetime import UTC, datetime
+from pathlib import Path, PurePosixPath
 from types import MappingProxyType
 
 from fastapi import APIRouter, Depends, Query, Request, Response
+from fastapi.responses import FileResponse
 
 from stockroom.api.errors import ApiError
 from stockroom.api.jobs import JobStatus
 from stockroom.api.schemas import (
+    CadPreferredSourceBody,
     EditFieldBody,
     FacetsDTO,
     MoveBody,
     ParametricFacetsDTO,
     PartSummary,
+    PreferredSourceBody,
     ProviderCoverageBody,
     SearchRow,
     SetSpecsBody,
+    SpecificationOverrideBody,
 )
 from stockroom.capture.runner import capture_candidates_root, capture_state_root
+from stockroom.dossier import component_dossier
+from stockroom.dossier.cad_preference import (
+    MixedCadSourceRefused,
+    UnknownCadAsset,
+    UnofferedCadSource,
+)
+from stockroom.dossier.decisions import UnknownSpecification, UnpinnableSource
+from stockroom.dossier.documents import find_document
 from stockroom.evidence import EvidenceStore
 from stockroom.ingest.candidates import RetainedCandidateStore
 from stockroom.ingest.passive_add import (
@@ -38,7 +52,6 @@ from stockroom.mutation.transaction import Transaction
 from stockroom.provider_coverage import provider_coverage, set_user_assertion
 from stockroom.verify.record_diff import extract_symbol_node, field_diff
 from stockroom.workflow import IntakeIdentity
-from stockroom.workspace import component_workspace
 
 # How deep the per-part timeline reads. A part rarely accrues this many commits;
 # the same cap governs history and the diff rev-validation so the two agree on what
@@ -73,6 +86,50 @@ _OPAQUE_WORKFLOW_REFERENCE = re.compile(
 # than a count, so each group is bounded and reports its own true total beside it. A surface can
 # then say "12 of 340" honestly instead of receiving a response sized by the library.
 _WORKLIST_MAX_ROWS = 200
+
+
+# The one spelling that predates the library-relative convention: a BARE filename, which has
+# always meant "under `datasheets/`". The projection states that convention for the legacy
+# `datasheet` slot, but a typed document is stored verbatim and can still carry the short form,
+# so it is accepted as a FALLBACK - checked under the same root, never outside it - and nothing
+# else is.
+_LEGACY_DOCUMENT_DIR = "datasheets"
+
+
+def _library_document_file(library_root, stored_path: str):
+    """The real file one recorded document path names, or None when it names nothing safe.
+
+    The path is RECORD data, never request data - the caller names a document id and the record
+    supplies this string - but it is still refused rather than trusted. A record can be wrong, or
+    hand-edited, or written by a build that had a bug, and a projection is not a permission
+    check. Absolute paths, traversal segments and drive letters are rejected before any resolve,
+    and the resolved result is required to stay inside the library root, so a symlink pointing
+    out of the library fails the same test as `..` does.
+    """
+    relative = PurePosixPath(str(stored_path or "").replace("\\", "/"))
+    if (
+        not relative.parts
+        or relative.is_absolute()
+        or any(part in {"", ".", ".."} for part in relative.parts)
+        or ":" in relative.parts[0]
+    ):
+        return None
+    root = Path(library_root).resolve()
+
+    def _under_root(candidate: Path) -> Path | None:
+        resolved = candidate.resolve()
+        try:
+            resolved.relative_to(root)
+        except ValueError:
+            return None
+        return resolved
+
+    inside = _under_root(root.joinpath(*relative.parts))
+    if inside is not None and inside.is_file():
+        return inside
+    if len(relative.parts) == 1:
+        return _under_root(root / _LEGACY_DOCUMENT_DIR / relative.parts[0])
+    return inside
 
 
 def _coverage(record: PartRecord) -> dict:
@@ -721,22 +778,273 @@ def library_router(require_token) -> APIRouter:
     @r.get("/parts/{part_id}")
     def part_detail(request: Request, part_id: str) -> dict:
         """The raw canonical record. Kept for compatibility and diagnostics; the opened
-        component reads the normalized workspace projection below instead."""
+        component reads the normalized dossier projection below instead."""
         ctx = request.app.state.ctx
         if ctx.index.get(part_id) is None:
             raise FileNotFoundError(f"no such part: {part_id}")
         return ctx.ops.load_record(part_id).to_dict()
 
-    @r.get("/parts/{part_id}/workspace")
-    def part_workspace(request: Request, part_id: str) -> dict:
-        """The opened component, already decided: identity, representations, specifications,
-        sourcing, provider coverage, sources, and what needs attention. See
-        `stockroom.workspace`."""
+    def _dossier(request: Request, part_id: str) -> dict:
         ctx = request.app.state.ctx
         if ctx.index.get(part_id) is None:
             raise FileNotFoundError(f"no such part: {part_id}")
         record = ctx.ops.load_record(part_id)
-        return component_workspace(record, coverage=_coverage(record))
+        # The reading clock is passed IN so the projection stays a pure function; it is the one
+        # thing offer freshness cannot answer without, and reading it inside would make the
+        # whole dossier untestable.
+        return component_dossier(
+            record,
+            coverage=_coverage(record),
+            now=datetime.now(UTC).isoformat(),
+        )
+
+    @r.get("/parts/{part_id}/dossier")
+    def part_dossier(request: Request, part_id: str) -> dict:
+        """The opened component, already decided: identity, quality, key specifications,
+        category-aware specification groups, CAD assets and their source coverage, supply,
+        distributor offers, typed documents, related parts with their reasons, provenance,
+        revisions and diagnostics. See `stockroom.dossier`."""
+        return _dossier(request, part_id)
+
+    @r.get("/parts/{part_id}/workspace")
+    def part_workspace(request: Request, part_id: str) -> dict:
+        """The dossier, under the route's historical name.
+
+        The same document as `/dossier`, not a second projection: a client pinned to this path
+        must never receive a different shape from the one beside it.
+        """
+        return _dossier(request, part_id)
+
+    # -- reviewed decisions about one specification ---------------------------
+    #
+    # Every one of these answers with the WHOLE recomputed dossier rather than the field it
+    # touched. That is deliberate: the reader replaces its state wholesale and can never drift by
+    # merging a partial response into a document whose completeness, conflict counts, attention
+    # list, provenance ledger and revision timeline all moved because of the same edit.
+
+    def _decided(request: Request, part_id: str, apply) -> dict:
+        """Run one decision and answer with the recomputed dossier.
+
+        The engine's refusals are translated here and nowhere else: an unknown field is a 404
+        because the address names a specification that does not exist, and a source that never
+        answered for the field is a 422 because the request was well-formed and wrong.
+        """
+        ctx = request.app.state.ctx
+        if ctx.index.get(part_id) is None:
+            raise FileNotFoundError(f"no such part: {part_id}")
+        try:
+            apply(ctx)
+        except (UnknownSpecification, UnknownCadAsset) as exc:
+            raise ApiError(404, str(exc)) from exc
+        except (UnpinnableSource, UnofferedCadSource, MixedCadSourceRefused) as exc:
+            raise ApiError(422, str(exc)) from exc
+        ctx.rebuild_index()
+        ctx.auto_push()  # a library write auto-pushes to git (non-fatal without a token)
+        return _dossier(request, part_id)
+
+    @r.put("/parts/{part_id}/specifications/{key}/override")
+    def set_specification_override(
+        request: Request, part_id: str, key: str, body: SpecificationOverrideBody
+    ) -> dict:
+        """Put a reviewed value at the top of one specification's precedence order.
+
+        Nothing is discarded: every source candidate the field carried is still carried, the
+        override is added above them, and the disagreement is reported as `resolved` rather than
+        erased. The override also records the sourced answer it displaced, so the row can say
+        what it overrode and clearing it is a real return to that answer.
+        """
+        return _decided(
+            request,
+            part_id,
+            lambda ctx: ctx.ops.set_specification_override(
+                part_id,
+                key,
+                body.value,
+                reviewed_by="user",
+                reviewed_at=datetime.now(UTC).isoformat(),
+                note=body.note,
+                verified=body.verified,
+            ),
+        )
+
+    @r.delete("/parts/{part_id}/specifications/{key}/override")
+    def clear_specification_override(request: Request, part_id: str, key: str) -> dict:
+        """Withdraw the reviewed value, returning the field to its sources.
+
+        Clearing a field that carries no override is a success, not a 404: the end state asked
+        for is already true, and failing would make the action unusable to any caller that
+        cannot know the current state before asking.
+        """
+        return _decided(
+            request,
+            part_id,
+            lambda ctx: ctx.ops.clear_specification_override(part_id, key),
+        )
+
+    @r.put("/parts/{part_id}/specifications/{key}/preferred-source")
+    def set_specification_preferred_source(
+        request: Request, part_id: str, key: str, body: PreferredSourceBody
+    ) -> dict:
+        """Pin one specification to one source's answer.
+
+        The pin follows the source rather than copying its value, so refreshing that source
+        moves the field with it. A source that offered nothing for this field is refused.
+        """
+        return _decided(
+            request,
+            part_id,
+            lambda ctx: ctx.ops.set_specification_preferred_source(
+                part_id,
+                key,
+                body.source_id,
+                reviewed_by="user",
+                reviewed_at=datetime.now(UTC).isoformat(),
+            ),
+        )
+
+    @r.delete("/parts/{part_id}/specifications/{key}/preferred-source")
+    def clear_specification_preferred_source(
+        request: Request, part_id: str, key: str
+    ) -> dict:
+        """Return one specification to computed precedence. Idempotent, like clearing an
+        override."""
+        return _decided(
+            request,
+            part_id,
+            lambda ctx: ctx.ops.clear_specification_preferred_source(part_id, key),
+        )
+
+    # -- the preferred CAD source ---------------------------------------------
+    #
+    # The one column-level fact the CAD column always STATED and never let anybody set. These
+    # answer with the whole recomputed dossier for the same reason the specification writes do:
+    # a preferred source moves the three asset modules, the coverage comparison, the quality
+    # summary and the revision timeline together, and a reader that merged a partial response
+    # would be holding a document whose parts disagree.
+    #
+    # What a change would REPLACE is not computed here and is not reported afterwards. It is
+    # published on the dossier itself (`cadAssets.preference.options`), planned by the same
+    # function these writes refuse with - so the confirmation a person approves and the decision
+    # the record makes cannot describe different outcomes.
+
+    @r.put("/parts/{part_id}/cad/preferred-source")
+    def set_cad_preferred_source(
+        request: Request, part_id: str, body: CadPreferredSourceBody
+    ) -> dict:
+        """Prefer one provider for this component's whole CAD set.
+
+        Refused (422) when that provider does not supply all three artifacts, in the coverage
+        vocabulary the comparison screen already speaks. Stockroom takes a component's CAD from
+        one provider's coherent download, so a set source that cannot answer for one of the
+        three is not a partial success - it is a preference the resolver could never honour.
+        """
+        return _decided(
+            request,
+            part_id,
+            lambda ctx: ctx.ops.set_cad_preferred_source(
+                part_id,
+                body.provider,
+                coverage=_coverage,
+                reviewed_by="user",
+                reviewed_at=datetime.now(UTC).isoformat(),
+            ),
+        )
+
+    @r.delete("/parts/{part_id}/cad/preferred-source")
+    def clear_cad_preferred_source(request: Request, part_id: str) -> dict:
+        """Return the whole set to the providers that actually supplied the files.
+
+        Idempotent, like clearing a specification override: the end state asked for is already
+        true when nothing was pinned, and failing would make the action unusable to a caller
+        that cannot know the current state before asking.
+        """
+        return _decided(
+            request,
+            part_id,
+            lambda ctx: ctx.ops.clear_cad_preferred_source(part_id),
+        )
+
+    @r.put("/parts/{part_id}/cad/{asset}/preferred-source")
+    def set_cad_asset_preferred_source(
+        request: Request, part_id: str, asset: str, body: CadPreferredSourceBody
+    ) -> dict:
+        """Prefer one provider for ONE asset, when that leaves the set coherent.
+
+        Two refusals, and they are different sentences. An asset kind this component does not
+        have is a 404, because the address names something that does not exist. A provider that
+        does not supply the artifact, or a pin that would leave two providers in force across
+        the three assets, is a 422: the request was well formed and the answer is no.
+
+        The second refusal is the product rule, not a storage limitation. A mixed set cannot be
+        indexed from one evidence manifest, so accepting the pin would only move the failure to
+        the moment the files are resolved - with the preference already written and a person
+        already believing it took.
+        """
+        return _decided(
+            request,
+            part_id,
+            lambda ctx: ctx.ops.set_cad_asset_preferred_source(
+                part_id,
+                asset,
+                body.provider,
+                coverage=_coverage,
+                reviewed_by="user",
+                reviewed_at=datetime.now(UTC).isoformat(),
+            ),
+        )
+
+    @r.delete("/parts/{part_id}/cad/{asset}/preferred-source")
+    def clear_cad_asset_preferred_source(request: Request, part_id: str, asset: str) -> dict:
+        """Withdraw one asset's own pin, leaving the whole-set preference standing. Idempotent."""
+        return _decided(
+            request,
+            part_id,
+            lambda ctx: ctx.ops.clear_cad_asset_preferred_source(part_id, asset),
+        )
+
+    @r.get("/parts/{part_id}/documents/{document_id}/file")
+    def part_document_file(request: Request, part_id: str, document_id: str) -> FileResponse:
+        """The bytes of one document this part holds.
+
+        This is NOT a file read primitive and must never become one. The caller names a document
+        id; the path comes from the record's own entry for that id and from nowhere else, so
+        there is no caller-supplied path to join and nothing to traverse with. A resolved path
+        that leaves the library root is refused even so, because the record itself could be
+        wrong and a projection is not a permission check.
+
+        Three absences are three different answers, and all of them are 404 rather than a stack
+        trace: the id names no document this part references, the document is a link with no
+        stored copy (the caller should open the URL), or the copy we recorded is gone from disk.
+        """
+        ctx = request.app.state.ctx
+        if ctx.index.get(part_id) is None:
+            raise FileNotFoundError(f"no such part: {part_id}")
+        document = find_document(ctx.ops.load_record(part_id), document_id)
+        if document is None:
+            raise FileNotFoundError(f"part {part_id} references no document {document_id}")
+        if not document["localPath"]:
+            raise FileNotFoundError(
+                f"{document['title']} is a referenced link with no stored copy; open its "
+                "source page instead"
+            )
+        path = _library_document_file(ctx.profile.library.root, document["localPath"])
+        if path is None or not path.is_file():
+            raise FileNotFoundError(
+                f"the stored copy of {document['title']} is no longer in the library"
+            )
+        media_type = (
+            mimetypes.guess_type(path.name)[0]
+            or document["mimeType"]
+            or "application/octet-stream"
+        )
+        return FileResponse(
+            path,
+            media_type=media_type,
+            filename=path.name,
+            # Inline, because the point of this route is a viewer inside the app rather than a
+            # download the reader then has to find again.
+            content_disposition_type="inline",
+        )
 
     @r.get("/parts/{part_id}/providers")
     def part_providers(request: Request, part_id: str) -> dict:
@@ -831,6 +1139,184 @@ def library_router(require_token) -> APIRouter:
             return updated.to_dict()
 
         return {"job_id": ctx.jobs.submit(work, write=True)}
+
+    def _shell(ctx):
+        """The native shell bridge, or an honest refusal.
+
+        Absent on a host that owns no native window (a source run behind a browser, a test
+        harness). The three Manage items that need it are hidden rather than disabled, so this
+        never has to explain itself twice.
+        """
+
+        shell = getattr(ctx, "native_shell", None)
+        if shell is None:
+            raise ApiError(409, "This Stockroom host cannot reach the file browser.")
+        return shell
+
+    @r.get("/parts/{part_id}/shell")
+    def part_shell(request: Request, part_id: str) -> dict:
+        """What Manage > Export Component... / Open In... / Reveal Component Files... may offer.
+
+        One request answers all three, because all three are decided by the same three facts:
+        whether this host owns a native window, which formats this component really has files
+        for, and which EDA applications this machine really has. Everything absent here is an
+        item the menu does not draw.
+        """
+
+        from stockroom.component_shell import (
+            available_export_formats,
+            component_directory,
+        )
+
+        if not is_valid_part_id(part_id):
+            raise ValueError(f"invalid part identifier: {part_id!r}")
+        ctx = request.app.state.ctx
+        if ctx.index.get(part_id) is None:
+            raise FileNotFoundError(f"no such part: {part_id}")
+        shell = getattr(ctx, "native_shell", None)
+        if shell is None:
+            return {
+                "supported": False,
+                "component_directory": False,
+                "export_formats": [],
+                "eda_applications": [],
+            }
+        record = ctx.ops.load_record(part_id)
+        try:
+            directory = component_directory(ctx.profile.library.root, part_id)
+            has_directory = directory.is_dir()
+        except Exception:  # noqa: BLE001 - an unresolvable directory is simply not offered
+            has_directory = False
+        try:
+            applications = list(shell.detected_eda_applications())
+        except Exception:  # noqa: BLE001 - a host that cannot answer offers nothing
+            applications = []
+        return {
+            "supported": True,
+            "component_directory": has_directory,
+            "export_formats": list(available_export_formats(ctx.profile.library, record)),
+            "eda_applications": applications,
+        }
+
+    @r.post("/parts/{part_id}/reveal")
+    def reveal_part_files(request: Request, part_id: str) -> dict:
+        """Open the OS file browser at this component's own directory.
+
+        The path is resolved HERE, from the active library root and the part id. No caller
+        supplies one, which is the whole reason this route takes no body: an endpoint that
+        reveals a path it was handed is a way to start Explorer on anything.
+        """
+
+        from stockroom.component_shell import ComponentShellError, component_directory
+
+        if not is_valid_part_id(part_id):
+            raise ValueError(f"invalid part identifier: {part_id!r}")
+        ctx = request.app.state.ctx
+        if ctx.index.get(part_id) is None:
+            raise FileNotFoundError(f"no such part: {part_id}")
+        shell = _shell(ctx)
+        library_root = Path(ctx.profile.library.root).resolve(strict=False)
+        try:
+            directory = component_directory(library_root, part_id)
+        except ComponentShellError as exc:
+            raise ApiError(400, str(exc)) from exc
+        if not directory.is_dir():
+            raise ApiError(409, "This component has no files in the library yet.")
+        try:
+            shell.reveal_component_directory(str(library_root), str(directory))
+        except Exception as exc:  # noqa: BLE001 - host errors become one actionable verdict
+            raise ApiError(409, "The file browser could not be opened.") from exc
+        return {"part_id": part_id, "revealed": True}
+
+    @r.post("/parts/{part_id}/export")
+    def export_part(request: Request, part_id: str, body: dict | None = None) -> dict:
+        """Write this component's CAD set for one format to its machine-local export folder."""
+
+        from stockroom.component_shell import (
+            EXPORT_FORMATS,
+            ComponentShellError,
+            export_component,
+        )
+
+        if not is_valid_part_id(part_id):
+            raise ValueError(f"invalid part identifier: {part_id!r}")
+        ctx = request.app.state.ctx
+        if ctx.index.get(part_id) is None:
+            raise FileNotFoundError(f"no such part: {part_id}")
+        payload = {} if body is None else body
+        unexpected = sorted(str(key) for key in payload if key != "format")
+        if unexpected:
+            raise ValueError("unknown export fields: " + ", ".join(unexpected))
+        export_format = payload.get("format")
+        if export_format not in EXPORT_FORMATS:
+            raise ValueError("format must be one of: " + ", ".join(EXPORT_FORMATS))
+        record = ctx.ops.load_record(part_id)
+        try:
+            exported = export_component(ctx.profile.library, record, export_format)
+        except ComponentShellError as exc:
+            raise ApiError(409, str(exc)) from exc
+        return {
+            "part_id": part_id,
+            "format": exported.format,
+            "file_count": len(exported.files),
+            "file_names": [item.name for item in exported.files],
+        }
+
+    @r.post("/parts/{part_id}/open-in")
+    def open_part_in(request: Request, part_id: str, body: dict | None = None) -> dict:
+        """Export this component and open the result in a detected EDA application.
+
+        The application is named by its stable id and resolved to a binary inside the window
+        host; the file is this backend's own export path. Neither crosses from the web layer.
+        """
+
+        from stockroom.component_shell import (
+            EXPORT_FORMATS,
+            ComponentShellError,
+            export_component,
+            export_root,
+        )
+
+        if not is_valid_part_id(part_id):
+            raise ValueError(f"invalid part identifier: {part_id!r}")
+        ctx = request.app.state.ctx
+        if ctx.index.get(part_id) is None:
+            raise FileNotFoundError(f"no such part: {part_id}")
+        shell = _shell(ctx)
+        payload = {} if body is None else body
+        unexpected = sorted(
+            str(key) for key in payload if key not in {"application_id", "format"}
+        )
+        if unexpected:
+            raise ValueError("unknown open fields: " + ", ".join(unexpected))
+        application_id = payload.get("application_id")
+        if type(application_id) is not str or not application_id:
+            raise ValueError("application_id is required")
+        known = {row["id"] for row in shell.detected_eda_applications()}
+        if application_id not in known:
+            raise ApiError(409, "That application is not installed on this machine.")
+        export_format = payload.get("format", "kicad")
+        if export_format not in EXPORT_FORMATS:
+            raise ValueError("format must be one of: " + ", ".join(EXPORT_FORMATS))
+        record = ctx.ops.load_record(part_id)
+        try:
+            exported = export_component(ctx.profile.library, record, export_format)
+        except ComponentShellError as exc:
+            raise ApiError(409, str(exc)) from exc
+        try:
+            shell.open_component_file(
+                application_id,
+                str(export_root()),
+                str(exported.primary_file),
+            )
+        except Exception as exc:  # noqa: BLE001 - host errors become one actionable verdict
+            raise ApiError(409, "That application could not be started.") from exc
+        return {
+            "part_id": part_id,
+            "application_id": application_id,
+            "format": exported.format,
+            "opened": True,
+        }
 
     @r.get("/parts/{part_id}/cad-source")
     def part_cad_source(request: Request, part_id: str) -> dict:
@@ -1111,9 +1597,8 @@ def library_router(require_token) -> APIRouter:
     def completion_coverage(request: Request) -> dict:
         """Is my library complete, and what is missing?
 
-        The owner's central question, and until now it lived in a script only Claude could
-        run -- which by the owner's own standing rule (*"everything u do manually the app
-        should do by itself"*) made it a missing feature rather than a tool. Read-only and
+        The central question about a library, and it used to be answerable only by running a
+        script by hand -- which made it a missing feature rather than a tool. Read-only and
         network-free: it counts the records on disk.
         """
         from stockroom.capture.runner import coverage

@@ -23,8 +23,15 @@ export type OpenSurface = "search" | "add_part" | "complete_part" | null;
 
 /** The four questions the opened component answers. Closed vocabulary, persisted per component. */
 export type ComponentInfoTab = "overview" | "specifications" | "sourcing" | "sources";
-/** Which representation the dock expands. `all` shows the three side by side. */
-export type RepresentationLayout = "all" | "symbol" | "footprint" | "model";
+/**
+ * Which representation the column focuses. `all` shows the three stacked.
+ *
+ * Listed in the column's own reading order - 3D Model, Footprint, Symbol - so the vocabulary reads
+ * the way the modules stack. Only membership is enforced (`REPRESENTATION_LAYOUTS.includes`), so the
+ * sequence here is documentation rather than behaviour; `CAD_ASSET_KINDS` is what actually orders
+ * anything on screen.
+ */
+export type RepresentationLayout = "all" | "model" | "footprint" | "symbol";
 
 /** One opened component's view state. Bounded, non-secret, and meaningless without the record. */
 export interface ComponentViewState {
@@ -48,9 +55,9 @@ export const COMPONENT_INFO_TABS: readonly ComponentInfoTab[] = [
 
 export const REPRESENTATION_LAYOUTS: readonly RepresentationLayout[] = [
   "all",
-  "symbol",
-  "footprint",
   "model",
+  "footprint",
+  "symbol",
 ];
 
 export function defaultComponentView(): ComponentViewState {
@@ -827,8 +834,12 @@ export function setComponentViewInSession(
   };
 }
 
+// A structural copy, not a JSON round trip. Everything cloned here is a snapshot that has already
+// been through `parseUiSession` / `plainObject` / `exactKeys`, so it holds nothing a structured
+// clone cannot carry - and unlike the round trip it neither serialises the whole tree to a string
+// to throw the string away, nor silently rewrites a value on the way through.
 function clone<T>(value: T): T {
-  return JSON.parse(JSON.stringify(value)) as T;
+  return structuredClone(value);
 }
 
 function initialSnapshot(): UiSessionSnapshotV2 {

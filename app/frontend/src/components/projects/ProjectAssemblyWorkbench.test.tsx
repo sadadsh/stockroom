@@ -164,6 +164,27 @@ describe("ProjectAssemblyWorkbench placement queue", () => {
     }
   });
 
+  it("opens on the first pending placement the board drawing can show", async () => {
+    // R1 sorts ahead of R2, but only R2 is in the placement map. A placement the stage
+    // cannot draw is one the operator cannot find on the board, so the queue rests on R2.
+    mockApi.activeAssembly.mockResolvedValue(run(1));
+    mockApi.projectPlacementGeometry.mockResolvedValue({
+      ...GEOMETRY,
+      placements: GEOMETRY.placements.filter(
+        (placement) => placement.reference === "R2",
+      ),
+      summary: { boards: 1, placements: 1, top: 1, bottom: 0 },
+    });
+    renderWorkbench();
+
+    const inspector = await screen.findByRole("complementary", {
+      name: "Selected placement",
+    });
+    expect(
+      await within(inspector).findByRole("heading", { level: 3 }),
+    ).toHaveTextContent("R2");
+  });
+
   it("leaves a single-board run unlabelled, since there is nothing to disambiguate", async () => {
     mockApi.activeAssembly.mockResolvedValue(run(1));
     const { container } = renderWorkbench();

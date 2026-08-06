@@ -23,13 +23,49 @@ export function PinoutTable({
   onSelectPosition: (position: string) => void;
 }) {
   const pins = pinout.pins.slice().sort(COLLATE);
+  // The rows carry aria-selected and answer a click, which is a single-select GRID, not a static
+  // table - so say so, and give the grid the keyboard contract that goes with it. Roving tabIndex:
+  // the selected row (or the first, before anything is selected) is the one tab stop, and the arrow
+  // keys move the selection from there, so a 176-pin part is one stop rather than 176.
+  const focusedIndex = Math.max(
+    0,
+    pins.findIndex((p) => p.position === selectedPosition),
+  );
+  const moveSelection = (from: number, delta: number) => {
+    const next = pins[Math.min(pins.length - 1, Math.max(0, from + delta))];
+    if (next) onSelectPosition(next.position);
+  };
+  const onRowKeyDown = (event: React.KeyboardEvent<HTMLTableRowElement>, index: number) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      onSelectPosition(pins[index].position);
+      return;
+    }
+    const step =
+      event.key === "ArrowDown"
+        ? 1
+        : event.key === "ArrowUp"
+          ? -1
+          : event.key === "Home"
+            ? -pins.length
+            : event.key === "End"
+              ? pins.length
+              : 0;
+    if (step === 0) return;
+    event.preventDefault();
+    moveSelection(index, step);
+    // The newly selected row becomes the tab stop, so move focus onto it too.
+    const rows = event.currentTarget.parentElement?.children;
+    const target = rows?.[Math.min(pins.length - 1, Math.max(0, index + step))];
+    if (target instanceof HTMLElement) target.focus();
+  };
   return (
     <div
       className="min-h-0 flex-1 overflow-auto rounded-card bg-stage shadow-[inset_0_1px_0_var(--edge-hi)]"
       data-testid="pinout-table"
     >
-      <table className="w-full border-collapse text-left">
-        <thead className="sticky top-0 z-[1] bg-[var(--c-sticky)] backdrop-blur">
+      <table role="grid" className="w-full border-collapse text-left">
+        <thead className="sticky top-0 z-[1] bg-[var(--c-sticky)]">
           <tr className="border-b border-line text-2xs font-semibold text-t3">
             <th className="px-2.5 py-1.5">
               <Text id="stm.pinout.table.pin">Pin</Text>
@@ -38,7 +74,7 @@ export function PinoutTable({
               <Text id="stm.pinout.table.name">Name</Text>
             </th>
             <th className="px-2.5 py-1.5">
-              <Text id="stm.pinout.table.category">Category</Text>
+              <Text id="stm.pinout.table.category">Class</Text>
             </th>
             <th className="px-2.5 py-1.5">
               <Text id="stm.pinout.table.five-v">5V</Text>
@@ -49,15 +85,18 @@ export function PinoutTable({
           </tr>
         </thead>
         <tbody>
-          {pins.map((p) => {
+          {pins.map((p, index) => {
             const selected = p.position === selectedPosition;
             return (
               <tr
                 key={`${p.position}-${p.raw_pin_name}`}
                 onClick={() => onSelectPosition(p.position)}
+                onKeyDown={(event) => onRowKeyDown(event, index)}
+                tabIndex={index === focusedIndex ? 0 : -1}
                 aria-selected={selected}
                 className={
-                  "cursor-pointer border-b border-line/60 align-top " +
+                  "cursor-pointer border-b border-line/60 align-top outline-none " +
+                  "focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-[var(--c-line2)] " +
                   (selected ? "bg-acc-soft" : "hover:bg-hover")
                 }
               >

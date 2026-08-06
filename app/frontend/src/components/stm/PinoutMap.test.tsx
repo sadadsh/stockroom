@@ -117,7 +117,7 @@ describe("PinoutMap", () => {
     const { rerender } = render(
       <PinoutMap pinout={inferred} selectedPosition={null} onSelectPosition={vi.fn()} />,
     );
-    expect(screen.getByText(/Layout inferred/i)).toBeInTheDocument();
+    expect(screen.getByText(/Arrangement inferred/i)).toBeInTheDocument();
     rerender(
       <PinoutMap
         pinout={{ ...BGA, geometry: { ...BGA.geometry, source: "curated" } }}
@@ -125,7 +125,7 @@ describe("PinoutMap", () => {
         onSelectPosition={vi.fn()}
       />,
     );
-    expect(screen.queryByText(/Layout inferred/i)).toBeNull();
+    expect(screen.queryByText(/Arrangement inferred/i)).toBeNull();
   });
 
   it("maximize opens a large modal specimen and Escape closes it", () => {
@@ -151,5 +151,33 @@ describe("PinoutMap", () => {
     };
     render(<PinoutMap pinout={partial} selectedPosition={null} onSelectPosition={vi.fn()} />);
     expect(screen.getByText(/1 pad without a mappable position/i)).toBeInTheDocument();
+  });
+
+  // The zoom behavior is a subscription: `sel.call(behavior)` installs `.zoom` listeners on the SVG
+  // node, and nothing removes them unless the effect's cleanup does. Asserting on the rendered camera
+  // would prove nothing here - React 18 drops a state update on an unmounted tree silently, so a
+  // leaked listener looks identical to a released one from the DOM side. d3 records every accepted
+  // gesture on the node itself as `__zoom`, so that is the honest witness: it moves while the
+  // listeners live and must not move once they are gone.
+  it("retires its zoom listeners on unmount, so a gesture on the discarded node is not handled", () => {
+    const { unmount } = render(
+      <PinoutMap pinout={LQFP} selectedPosition={null} onSelectPosition={vi.fn()} />,
+    );
+    const svg = screen.getByTestId("pinout-map-svg") as unknown as SVGSVGElement & {
+      __zoom?: unknown;
+    };
+    const cameraGroup = svg.querySelector("g")!;
+
+    // mounted: the wheel gesture is handled - it moves d3's node transform AND the rendered camera
+    fireEvent.wheel(svg, { deltaY: -400 });
+    const handled = svg.__zoom;
+    expect(handled).toBeDefined();
+    expect(cameraGroup.getAttribute("transform")).not.toBe("translate(0,0) scale(1)");
+
+    unmount();
+
+    // unmounted: this test still holds the node, but no listener of ours may remain on it
+    fireEvent.wheel(svg, { deltaY: -400 });
+    expect(svg.__zoom).toBe(handled);
   });
 });

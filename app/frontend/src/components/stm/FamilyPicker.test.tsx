@@ -76,10 +76,10 @@ describe("FamilyPicker", () => {
   it("renders the loading and error branches without throwing", () => {
     mockFamilies.mockReturnValue(fam({ isLoading: true }));
     const { rerender } = render(<FamilyPicker scope={EMPTY} onScopeChange={vi.fn()} />);
-    expect(screen.getByText("Loading families...")).toBeInTheDocument();
+    expect(screen.getByText("Loading series...")).toBeInTheDocument();
 
     mockFamilies.mockReturnValue(fam({ isError: true }));
     rerender(<FamilyPicker scope={EMPTY} onScopeChange={vi.fn()} />);
-    expect(screen.getByText("Could not load families.")).toBeInTheDocument();
+    expect(screen.getByText("Could not load series.")).toBeInTheDocument();
   });
 });

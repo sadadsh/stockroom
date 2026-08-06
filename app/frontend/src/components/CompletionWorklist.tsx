@@ -28,8 +28,9 @@
 import { useEffect, useRef, useState } from "react";
 import { useCaptureWorklist } from "../api/queries";
 import type { CaptureWorklistRow, Requirement } from "../api/types";
-import { captureInFlight, REQ_LABELS, useCapture } from "../lib/capture";
-import { Text } from "../lib/copy";
+import { useCapture } from "../lib/capture";
+import { captureInFlight, REQ_LABELS } from "../lib/captureRequirements";
+import { Text, useCopyFormatter, useText } from "../lib/copy";
 import { Badge, Button } from "./primitives";
 
 // A worklist is a sitting, not an inbox: the rows a person can realistically work through before
@@ -62,6 +63,60 @@ export function CompletionWorklist({ batchId, live }: { batchId: string; live: b
   });
   const rows = distinctRows.slice(0, VISIBLE_ROWS);
   const auto = useAutoAdvance(rows);
+  // The pass control's tooltip states the complete action, and a tooltip lives in an attribute, so
+  // it resolves as a string. Resolved above the early return below, because these are hooks and the
+  // count only reaches the sentence at call time.
+  const stopPassTitle = useText(
+    "settings.completion-worklist.stop-title",
+    "Stop starting the next component. Whatever is open now remains open.",
+  );
+  const oneSlotTitle = useText(
+    "settings.completion-worklist.one-slot-title",
+    "Stockroom runs one capture at a time. Finish or skip the one in progress first.",
+  );
+  const startOneTitle = useText(
+    "settings.completion-worklist.start-one-title",
+    "Start this component in order, one at a time",
+  );
+  const startAllTitle = useCopyFormatter(
+    "settings.completion-worklist.start-all-title",
+    "Start all {count} components in order, one at a time",
+  );
+  // The pass control's accessible name. It is separate copy from the tooltip above on purpose: the
+  // tooltip can name the count of the moment, while the name has to read the same on every render.
+  const stopPassName = useText(
+    "settings.completion-worklist.stop-aria",
+    "Stop working through the completion worklist",
+  );
+  const startPassName = useText(
+    "settings.completion-worklist.start-aria",
+    "Work through each listed component, one capture at a time",
+  );
+  // The two counted tails, one id per number agreement.
+  const hiddenOne = useCopyFormatter(
+    "settings.completion-worklist.hidden-one",
+    "{count} more component needs a person. Work through these first, then run it again: the next run re-reads what is in fact left.",
+  );
+  const hiddenMany = useCopyFormatter(
+    "settings.completion-worklist.hidden-many",
+    "{count} more components need a person. Work through these first, then run it again: the next run re-reads what is in fact left.",
+  );
+  const stalledOne = useCopyFormatter(
+    "settings.completion-worklist.stalled-one",
+    "{count} component finished with files still missing and no provider route a person could advance.",
+  );
+  const stalledMany = useCopyFormatter(
+    "settings.completion-worklist.stalled-many",
+    "{count} components finished with files still missing and no provider route a person could advance.",
+  );
+  const unreadableOne = useCopyFormatter(
+    "settings.completion-worklist.unreadable-one",
+    "{count} component report could not be read, so it is not counted above.",
+  );
+  const unreadableMany = useCopyFormatter(
+    "settings.completion-worklist.unreadable-many",
+    "{count} component reports could not be read, so those are not counted above.",
+  );
   // No projection yet, or a batch this route does not own: say nothing rather than claim a
   // library is finished. The run's own status block above is still authoritative.
   if (!data) return null;
@@ -82,6 +137,9 @@ export function CompletionWorklist({ batchId, live }: { batchId: string; live: b
   const capturing = captureInFlight(capture.active);
   const busy = capturing || auto.running;
   const runningPartId = capturing ? capture.active.partId : null;
+  // Membership, asked once per row: read as a set rather than scanned per row. Same answer, same
+  // order, and the pass's incomplete list only ever grows, so there is nothing to keep in step.
+  const incompleteIds = new Set(auto.incomplete);
 
   return (
     <div
@@ -98,21 +156,48 @@ export function CompletionWorklist({ batchId, live }: { batchId: string; live: b
             needed no person, which is what it now says, in the same register as the two badges
             beside it ("Still Working", "No Route"). */}
         {data.unattended_total > 0 ? (
-          <Badge tone="ok">{data.unattended_total} No Person Needed</Badge>
+          <Badge tone="ok">
+            <Text
+              id="settings.completion-worklist.unattended-count"
+              values={{ count: data.unattended_total }}
+            >
+              {"{count} No Person Needed"}
+            </Text>
+          </Badge>
         ) : null}
         {data.pending_items > 0 ? (
-          <Badge tone="neutral">{data.pending_items} Still Working</Badge>
+          <Badge tone="neutral">
+            <Text
+              id="settings.completion-worklist.pending-count"
+              values={{ count: data.pending_items }}
+            >
+              {"{count} Still Working"}
+            </Text>
+          </Badge>
         ) : null}
         {data.stalled_total > 0 ? (
-          <Badge tone="neutral">{data.stalled_total} No Route</Badge>
+          <Badge tone="neutral">
+            <Text
+              id="settings.completion-worklist.stalled-count"
+              values={{ count: data.stalled_total }}
+            >
+              {"{count} No Route"}
+            </Text>
+          </Badge>
         ) : null}
       </div>
 
       {actionableTotal === 0 ? (
         <p className="text-sm text-t2">
-          {data.pending_items > 0
-            ? "Nothing needs you yet. This fills in as each component settles."
-            : "Nothing on this run needs a person."}
+          {data.pending_items > 0 ? (
+            <Text id="settings.completion-worklist.empty-working">
+              Nothing needs a person so far. This fills in as each component settles.
+            </Text>
+          ) : (
+            <Text id="settings.completion-worklist.empty-settled">
+              Nothing on this run needs a person.
+            </Text>
+          )}
         </p>
       ) : (
         <>
@@ -120,11 +205,7 @@ export function CompletionWorklist({ batchId, live }: { batchId: string; live: b
               file the person downloads is snapshotted, adopted, and put through the unchanged
               identity gates. Only the clicking is theirs. */}
           <p className="text-sm text-t2">
-            <Text id="settings.completion-worklist.lede">
-              Get Files opens the provider page for one component. Sign in if the provider asks,
-              choose the formats you need, and download; Stockroom captures each file and validates
-              it. Work Through All opens the next component as each one finishes.
-            </Text>
+            <Text id="settings.completion-worklist.lede">Get Files opens the provider page for one component. Sign in if the provider asks, choose the formats the component needs, and download; Stockroom captures each file and validates it. Work Through All opens the next component as each one finishes.</Text>
           </p>
           <div className="flex flex-wrap items-center gap-2">
             <Button
@@ -134,25 +215,39 @@ export function CompletionWorklist({ batchId, live }: { batchId: string; live: b
               disabled={!auto.running && (busy || rows.length === 0)}
               title={
                 auto.running
-                  ? "Stop starting the next component. Whatever is open now stays open."
+                  ? stopPassTitle
                   : busy
-                    ? "Stockroom runs one capture at a time. Finish or skip the one in progress first."
-                    : `Start ${rows.length === 1 ? "this component" : `all ${rows.length} components`} in order, one at a time`
+                    ? oneSlotTitle
+                    : rows.length === 1
+                      ? startOneTitle
+                      : startAllTitle({ count: rows.length })
               }
-              aria-label={
-                auto.running
-                  ? "Stop working through the completion worklist"
-                  : "Work through every listed component, one capture at a time"
-              }
+              aria-label={auto.running ? stopPassName : startPassName}
               onClick={() => (auto.running ? auto.stop() : auto.begin())}
             >
-              {auto.running ? "Stop Advancing" : "Work Through All"}
+              {auto.running ? (
+                <Text id="settings.completion-worklist.stop">Stop Advancing</Text>
+              ) : (
+                <Text id="settings.completion-worklist.start">Work Through All</Text>
+              )}
             </Button>
             {auto.running ? (
               <span data-testid="completion-worklist-auto" className="text-2xs text-t2">
-                {auto.openName
-                  ? `Working through ${auto.done + 1} of ${auto.total}. ${auto.openName} is active in Stockroom; the next component starts when this capture finishes.`
-                  : `Working through ${auto.done} of ${auto.total}. Starting the next component.`}
+                {auto.openName ? (
+                  <Text
+                    id="settings.completion-worklist.pass-open"
+                    values={{ done: auto.done + 1, total: auto.total, name: auto.openName }}
+                  >
+                    {"Working through {done} of {total}. {name} is active in Stockroom; the next component starts when this capture finishes."}
+                  </Text>
+                ) : (
+                  <Text
+                    id="settings.completion-worklist.pass-between"
+                    values={{ done: auto.done, total: auto.total }}
+                  >
+                    {"Working through {done} of {total}. Starting the next component."}
+                  </Text>
+                )}
               </span>
             ) : null}
           </div>
@@ -168,38 +263,32 @@ export function CompletionWorklist({ batchId, live }: { batchId: string; live: b
                 row={row}
                 busy={busy}
                 runningPartId={runningPartId}
-                incomplete={auto.incomplete.includes(row.part_id)}
+                incomplete={incompleteIds.has(row.part_id)}
               />
             ))}
           </ul>
           {oldProjectionHasMore ? (
             <p className="text-sm text-t3">
-              <Text id="settings.worklist-more-routes">
-                More provider routes remain beyond this compatibility view. Work through these
-                components first, then run it again so Stockroom re-reads what is genuinely left.
-              </Text>
+              <Text id="settings.worklist-more-routes">More provider routes remain past this compatibility view. Work through these components first, then run it again so Stockroom re-reads what is in fact left.</Text>
             </p>
           ) : !projectedRouteRows && hidden > 0 ? (
-            <p className="text-sm text-t3">
-              {hidden} more {hidden === 1 ? "component needs" : "components need"} a person. Work
-              through these first, then run it again: the next run re-reads what is genuinely left.
+            <p className="tnum text-sm text-t3">
+              {(hidden === 1 ? hiddenOne : hiddenMany)({ count: hidden })}
             </p>
           ) : null}
         </>
       )}
 
       {data.stalled_total > 0 ? (
-        <p className="border-l-2 border-line pl-3 text-sm text-t2">
-          <span className="tnum text-t2">{data.stalled_total}</span>{" "}
-          {data.stalled_total === 1 ? "component" : "components"} finished with files still
-          missing and no provider route a person could advance.
+        <p className="tnum border-l-2 border-line pl-3 text-sm text-t2">
+          {(data.stalled_total === 1 ? stalledOne : stalledMany)({ count: data.stalled_total })}
         </p>
       ) : null}
       {data.unreadable.length > 0 ? (
-        <p className="text-sm text-t3">
-          {data.unreadable.length}{" "}
-          {data.unreadable.length === 1 ? "component report" : "component reports"} could not be
-          read, so {data.unreadable.length === 1 ? "it is" : "they are"} not counted above.
+        <p className="tnum text-sm text-t3">
+          {(data.unreadable.length === 1 ? unreadableOne : unreadableMany)({
+            count: data.unreadable.length,
+          })}
         </p>
       ) : null}
     </div>
@@ -241,13 +330,10 @@ function WorklistRow({
       <div className="flex flex-none flex-col items-end gap-1">
         <StartCapture row={row} busy={busy} running={running} />
       </div>
-      <p className="col-span-2 text-2xs leading-snug text-[var(--c-warn-text)]">{row.reason}</p>
+      <p className="col-span-2 text-2xs leading-snug text-warn-text">{row.reason}</p>
       {incomplete ? (
-        <p className="col-span-2 text-2xs leading-snug text-[var(--c-warn-text)]">
-          <Text id="settings.worklist-incomplete">
-            This capture ended without completing, so this component still needs a trip. Start it
-            again when you are ready.
-          </Text>
+        <p className="col-span-2 text-2xs leading-snug text-warn-text">
+          <Text id="settings.worklist-incomplete">This capture ended without completing, so this component still needs a trip. Start it again at the right moment.</Text>
         </p>
       ) : null}
       {row.remaining.length > 0 ? (
@@ -311,6 +397,10 @@ function useAutoAdvance(rows: CaptureWorklistRow[]) {
   const capture = useCapture();
   const start = capture.start;
   const active = capture.active;
+  // Read off the context here rather than through `capture` inside the effect: the effect's deps
+  // named `start` and `active` but not `capture`, so the call below was a capture of whatever the
+  // context object held when the effect last re-ran.
+  const keepWorking = capture.keepWorking;
   const [pass, setPass] = useState<AutoAdvance | null>(null);
   // Has the capture slot actually held the open row yet? `start` repoints the slot synchronously,
   // but the render carrying it can arrive a tick later, and a part id that does not match ours is
@@ -333,10 +423,18 @@ function useAutoAdvance(rows: CaptureWorklistRow[]) {
         }
       } else {
         if (!heldRef.current) return;
-        setPass({
-          ...pass,
-          ended: `Working through the list stopped: Stockroom lost ownership of the active capture for ${open.name}.`,
-        });
+        // Every write below spreads the LATEST pass, never the one this effect closed over. The
+        // `void running.catch` handler further down can land its own `ended` between this effect
+        // being scheduled and it running, and spreading the captured object would silently put
+        // that reason back to null - the pass would look alive with nothing driving it.
+        setPass((current) =>
+          current === null
+            ? current
+            : {
+                ...current,
+                ended: `Working through the list stopped: Stockroom lost ownership of the active capture for ${open.name}.`,
+              },
+        );
         return;
       }
       const incomplete =
@@ -345,27 +443,35 @@ function useAutoAdvance(rows: CaptureWorklistRow[]) {
         active.status === "unavailable" || (active.status !== "done" && !openedRef.current)
           ? `${open.name} could not be started, so working through the list stopped rather than opening every remaining page on the same fault.`
           : null;
-      setPass({ ...pass, open: null, incomplete, ended: stopped });
+      setPass((current) =>
+        current === null ? current : { ...current, open: null, incomplete, ended: stopped },
+      );
       return;
     }
 
     const next = pass.queue[0];
     if (next === undefined) {
       const missed = pass.incomplete.length;
-      setPass({
-        ...pass,
-        ended:
-          missed > 0
-            ? `Worked through all ${pass.total} ${pass.total === 1 ? "component" : "components"}. ${missed} did not complete and ${missed === 1 ? "is" : "are"} still listed above.`
-            : `Worked through all ${pass.total} ${pass.total === 1 ? "component" : "components"}.`,
-      });
+      setPass((current) =>
+        current === null
+          ? current
+          : {
+              ...current,
+              ended:
+                missed > 0
+                  ? `Worked through all ${current.total} ${current.total === 1 ? "component" : "components"}. ${missed} did not complete and ${missed === 1 ? "is" : "are"} still listed above.`
+                  : `Worked through all ${current.total} ${current.total === 1 ? "component" : "components"}.`,
+            },
+      );
       return;
     }
     heldRef.current = false;
     openedRef.current = false;
-    setPass({ ...pass, queue: pass.queue.slice(1), open: next });
+    setPass((current) =>
+      current === null ? current : { ...current, queue: current.queue.slice(1), open: next },
+    );
     const running = start(next.partId, next.name, next.remaining);
-    capture.keepWorking();
+    keepWorking();
     void running.catch(
       (error) => {
         const detail = error instanceof Error ? error.message : "the capture slot was unavailable";
@@ -379,7 +485,7 @@ function useAutoAdvance(rows: CaptureWorklistRow[]) {
         );
       },
     );
-  }, [pass, active, start]);
+  }, [pass, active, start, keepWorking]);
 
   return {
     running: pass !== null && pass.ended === null,
@@ -438,6 +544,25 @@ function StartCapture({
 }) {
   const capture = useCapture();
   const name = row.display_name || row.mpn || row.part_id;
+  // The three states this control's tooltip can be in. The part number in two of them is data
+  // reaching the sentence through a named hole, so a rewording can move it but never rewrite it.
+  const completingTitle = useCopyFormatter(
+    "settings.completion-worklist.row-completing-title",
+    "Completing {part}",
+  );
+  const rowOneSlotTitle = useText(
+    "settings.completion-worklist.row-one-slot-title",
+    "Stockroom runs one capture at a time. Finish or skip the one in progress first.",
+  );
+  const rowStartTitle = useCopyFormatter(
+    "settings.completion-worklist.row-start-title",
+    "Get the first complete validated file set for {part}",
+  );
+  // The accessible name, which is the whole label for a control whose visible text is two words.
+  const rowStartName = useCopyFormatter(
+    "settings.completion-worklist.row-start-aria",
+    "Get files for {part}",
+  );
   // One slot: a start here while another capture is in flight would displace it. Say so rather
   // than offering the click and reporting the loss afterwards.
   const blocked = busy && !running;
@@ -450,19 +575,23 @@ function StartCapture({
       disabled={busy}
       title={
         running
-          ? `Completing ${row.mpn || row.part_id}`
+          ? completingTitle({ part: row.mpn || row.part_id })
           : blocked
-            ? "Stockroom runs one capture at a time. Finish or skip the one in progress first."
-            : `Get the first complete validated file set for ${row.mpn || row.part_id}`
+            ? rowOneSlotTitle
+            : rowStartTitle({ part: row.mpn || row.part_id })
       }
-      aria-label={`Get files for ${name}`}
+      aria-label={rowStartName({ part: name })}
       onClick={() => {
         const running = capture.start(row.part_id, name, row.remaining);
         capture.keepWorking();
         void running.catch(() => capture.requestReopen());
       }}
     >
-      {running ? "Getting Files" : "Get Files"}
+      {running ? (
+        <Text id="settings.completion-worklist.row-running">Getting Files</Text>
+      ) : (
+        <Text id="settings.completion-worklist.row-start">Get Files</Text>
+      )}
     </Button>
   );
 }

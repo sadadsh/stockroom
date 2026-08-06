@@ -7,10 +7,10 @@ import type { ReactNode } from "react";
 import { Rail } from "./Rail";
 import { AddPartModal } from "./AddPartModal";
 import { Text, useCopyFormatter } from "../lib/copy";
-import { plural } from "../lib/plural";
 import { useRouter } from "../lib/router";
 import { useFacetsQuery, useOnboarding } from "../api/queries";
 import { useUpdateStanding } from "../lib/useUpdateStanding";
+import { useDevMode } from "../lib/devMode";
 import { RunningVersionIndicator } from "./RunningVersionIndicator";
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -43,6 +43,10 @@ function ShellStatusBar() {
   // "Components Loaded / Components": it said Components twice (the second was the section name,
   // already obvious from the rail's active item) and carried no information, since "loaded" is true
   // almost always. The section name is gone for the same reason - the rail already says where you are.
+  // A commit hash is a build fact. The standing ("Update Available") is what a person can act
+  // on and stays visible; the revision identities are drawn only in developer mode, and the
+  // accessible name carries them either way.
+  const { enabled: devMode } = useDevMode();
   const total = facets.data ? facets.data.complete + facets.data.incomplete : null;
   const incomplete = facets.data?.incomplete ?? 0;
   return (
@@ -52,14 +56,16 @@ function ShellStatusBar() {
     >
       {route !== "components" ? (
         <span className="text-t2">
-          {route === "projects"
-            ? "Projects"
-            : route === "stm"
-              ? "STM Viewer"
-              : "Settings"}
+          {route === "projects" ? (
+            <Text id="shell.status.section-projects">Projects</Text>
+          ) : route === "stm" ? (
+            <Text id="shell.status.section-stm">STM Viewer</Text>
+          ) : (
+            <Text id="shell.status.section-settings">Settings</Text>
+          )}
         </span>
       ) : facets.isError ? (
-        <span className="text-err">
+        <span className="text-err-text">
           <Text id="shell.status.load-failed">Could Not Load Components</Text>
         </span>
       ) : total == null ? (
@@ -68,16 +74,11 @@ function ShellStatusBar() {
         </span>
       ) : (
         <>
-          {/* Agrees with its number: this read "1 Components" on 10 of the 12 captured screens.
-              The count is a named PLACEHOLDER, so one overridable string covers every library size
-              and the word order (number before noun) is in the sentence rather than in the JSX. */}
-          <span className="tnum font-medium text-t1">
-            <Text
-              id="shell.status.count"
-              values={{ count: total.toLocaleString(), noun: plural(total, "Component") }}
-            >
-              {"{count} {noun}"}
-            </Text>
+          {/* The library SIZE is already the count beside the picker's own title, three inches to
+              the left, so stating it again here said nothing twice. What survives is the number
+              that is not on screen anywhere else and that someone can act on. */}
+          <span className="text-t2">
+            <Text id="shell.status.ready">Prepared</Text>
           </span>
           {incomplete > 0 ? (
             <>
@@ -93,7 +94,13 @@ function ShellStatusBar() {
         </>
       )}
       <span className="ml-auto flex items-center gap-2.5 text-t2">
-        <RunningVersionIndicator view={updateView} />
+        {/* The running revision identity is a BUILD fact, and a permanent `r4f2a9c1` in the corner
+            of a component library is developer output on a user's screen. It appears when the
+            update standing is something other than settled - which is the only moment it explains
+            anything - and otherwise lives in About and in developer mode. */}
+        {updateView.standing !== "current" ? (
+          <RunningVersionIndicator view={updateView} identity={devMode} />
+        ) : null}
         <LibraryStatus />
       </span>
     </footer>
@@ -108,7 +115,7 @@ function LibraryStatus() {
   const onboarding = useOnboarding();
   // The accessible name is a sentence with a slot, so it can be reworded without a call site
   // deciding where the library's name goes.
-  const libraryLabel = useCopyFormatter("shell.status.library-label", "Library: {name}");
+  const libraryLabel = useCopyFormatter("shell.status.library-label", "Catalog: {name}");
   const active = onboarding.data?.libraries.find((library) => library.active);
   if (!active) return null;
   return (
@@ -117,7 +124,7 @@ function LibraryStatus() {
       aria-label={libraryLabel({ name: active.name })}
       className="inline-flex min-w-0 items-center gap-1 text-t2"
     >
-      <span><Text id="shell.status.library">Library</Text>:</span>
+      <span><Text id="shell.status.library">Catalog</Text>:</span>
       <span className="max-w-[220px] truncate font-semibold text-t1">{active.name}</span>
     </span>
   );

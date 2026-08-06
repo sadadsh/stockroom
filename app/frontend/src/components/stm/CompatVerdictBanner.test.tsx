@@ -10,7 +10,7 @@ describe("CompatVerdictBanner", () => {
     render(<CompatVerdictBanner verdict={{ interchangeable: true, swaps_required: 3, blocking: [] }} />);
     const headline = screen.getByText("Interchangeable with 3 swaps");
     expect(headline).toBeInTheDocument();
-    expect(headline.className).toContain("text-ok");
+    expect(headline.className).toContain("text-ok-text");
     // no blocking list when the set is interchangeable
     expect(screen.queryByTestId("compat-blocking")).toBeNull();
   });
@@ -34,7 +34,7 @@ describe("CompatVerdictBanner", () => {
     };
     render(<CompatVerdictBanner verdict={verdict} />);
     const headline = screen.getByText("Incompatible");
-    expect(headline.className).toContain("text-err");
+    expect(headline.className).toContain("text-err-text");
     // the blocking entry's signal + reason both render beneath the verdict
     expect(screen.getByTestId("compat-blocking")).toBeInTheDocument();
     expect(screen.getByText("USART2_TX")).toBeInTheDocument();

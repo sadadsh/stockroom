@@ -5,17 +5,17 @@
  * caller's needs (so the checklist renders before start()). All the state-machine behavior - the
  * watchdog, the session-token gate, both-format attach - lives in the provider now.
  */
+import { useCapture } from "./capture";
 import {
-  captureInFlight,
-  useCapture,
-  subsetComplete,
-  KICAD_REQS,
   ALTIUM_REQS,
-} from "./capture";
+  captureInFlight,
+  KICAD_REQS,
+  subsetComplete,
+} from "./captureRequirements";
 import type { Requirement } from "../api/types";
 
-export type { Requirement } from "./capture";
-export type { GuidedStatus } from "./capture";
+export type { Requirement } from "../api/types";
+export type { GuidedStatus } from "./captureRequirements";
 
 export function useGuidedCapture(partId: string, needs: Requirement[] = [], partName = "") {
   const cap = useCapture();

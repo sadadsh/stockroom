@@ -1,7 +1,11 @@
 /**
- * The grouped parts list (the mockup's .pk-list). Rows show the display name over
- * the part number, with an incomplete warning triangle on the right. Parts are
- * grouped by category with sticky group headers, matching library-v2.html.
+ * The grouped parts list: the picker.
+ *
+ * A row is three lines and one primary item. The MPN leads and owns its whole line, because a
+ * picker row exists to be recognised by the identifier a person looks the part up by; the
+ * manufacturer and package qualify it on the second line, and the description - with the
+ * attention state right-aligned against it - is the third. Parts are grouped by category under
+ * sticky headers.
  */
 import {
   useCallback,
@@ -20,6 +24,7 @@ import { WarnIcon } from "./icons";
 import { Icon } from "./Icon";
 import { Text, useText } from "../lib/copy";
 import { Badge } from "./primitives";
+import { partAttention } from "./partAttention";
 
 // The row icon: a 30px tile carrying the part's category glyph. It deliberately does NOT render
 // the 3D model (the owner's call): a 30px 3D render of a chip/passive is a muddy grey blob that
@@ -75,49 +80,10 @@ type ListItem =
 // DOM cost must follow viewport size rather than library size. The value is a count boundary, not
 // a timing claim; the 1,000-row contract is locked by a rendered-node budget in PartsList.test.
 export const PARTS_LIST_VIRTUALIZATION_THRESHOLD = 100;
-const PART_ROW_HEIGHT = 48;
-const CATEGORY_ROW_HEIGHT = 38;
+const PART_ROW_HEIGHT = 46;
+const CATEGORY_ROW_HEIGHT = 30;
 const VIRTUAL_OVERSCAN = 8;
 const INITIAL_VIEWPORT = { width: 320, height: 640 };
-
-export interface PartAttention {
-  reason: string;
-  next: string;
-  description: string;
-}
-
-function missingLabel(value: string): string {
-  return value
-    .replace(/^kicad[_\s-]*/i, "KiCad ")
-    .replace(/^altium[_\s-]*/i, "Altium ")
-    .replace(/[_-]+/g, " ")
-    .replace(/\b\w/g, (character) => character.toUpperCase());
-}
-
-/**
- * The list warning is a decision summary, not a decorative triangle. It names
- * the blocking fact and the automatic next step in the same compact row.
- */
-export function partAttention(part: PartSummary): PartAttention | null {
-  if (part.is_complete) return null;
-  const missing = part.missing.map(missingLabel).filter(Boolean);
-  const reason =
-    missing.length === 0
-      ? "Verification Evidence Pending"
-      : missing.length <= 2
-        ? `Missing ${missing.join(" + ")}`
-        : `Missing ${missing[0]} + ${missing.length - 1} More`;
-  const next = "Next: Collecting Evidence";
-  const exactReason =
-    missing.length > 0
-      ? `Missing ${missing.join(", ")}`
-      : "Verification evidence is incomplete";
-  return {
-    reason,
-    next,
-    description: `Needs Attention. ${exactReason}. Next: Stockroom will continue source collection and verification.`,
-  };
-}
 
 function groupByCategory(parts: PartSummary[]): GroupedParts {
   const groups = new Map<string, PartSummary[]>();
@@ -232,13 +198,6 @@ export function PartsList({
         : -1,
     [partItems, selectedId],
   );
-  const partPositionById = useMemo(
-    () =>
-      new Map(
-        partItems.map(({ part }, index) => [part.id, index + 1]),
-      ),
-    [partItems],
-  );
   const tabbableId =
     selectedPartIndex >= 0 ? selectedId : (partItems[0]?.part.id ?? null);
   const pendingFocusId = useRef<string | null>(null);
@@ -330,10 +289,10 @@ export function PartsList({
       <div
         data-dev-id="components.list"
         data-virtualized="false"
-        className="flex flex-col gap-0.5"
+        className="flex flex-col"
       >
         {grouped.map(([category, groupParts]) => (
-          <div key={category} className="flex flex-col gap-0.5">
+          <div key={category} className="flex flex-col">
             <CategoryHeader category={category} count={groupParts.length} sticky />
             {groupParts.map((part) => (
               <PartRow
@@ -341,8 +300,6 @@ export function PartsList({
                 part={part}
                 selected={part.id === selectedId}
                 tabbable={part.id === tabbableId}
-                position={partPositionById.get(part.id) ?? 1}
-                setSize={partItems.length}
                 duplicate={duplicateIds?.has(part.id) ?? false}
                 onSelect={onSelect}
                 onNavigate={navigate}
@@ -401,8 +358,6 @@ export function PartsList({
                 part={item.part}
                 selected={item.part.id === selectedId}
                 tabbable={item.part.id === tabbableId}
-                position={partPositionById.get(item.part.id) ?? 1}
-                setSize={partItems.length}
                 duplicate={duplicateIds?.has(item.part.id) ?? false}
                 onSelect={onSelect}
                 onNavigate={navigate}
@@ -430,11 +385,11 @@ function CategoryHeader({
       data-dev-id="components.category-header"
       className={
         (sticky ? "sticky top-0 z-[1] " : "") +
-        "mb-0.5 flex h-9 items-baseline gap-2 bg-[var(--c-sticky)] px-2.5 pb-1.5 pt-3.5 backdrop-blur"
+        "flex h-[30px] items-baseline gap-2 border-b border-line bg-[var(--c-sticky)] px-2.5"
       }
     >
-      <span className="text-xs font-semibold text-t2">{category}</span>
-      <span className="tnum font-mono text-2xs text-t3">{count}</span>
+      <span className="ui-section-title truncate">{category}</span>
+      <span className="ui-component-metadata">{count}</span>
     </div>
   );
 }
@@ -443,8 +398,6 @@ function PartRow({
   part,
   selected,
   tabbable,
-  position,
-  setSize,
   duplicate,
   onSelect,
   onNavigate,
@@ -453,8 +406,6 @@ function PartRow({
   part: PartSummary;
   selected: boolean;
   tabbable: boolean;
-  position: number;
-  setSize: number;
   duplicate: boolean;
   onSelect: (id: string) => void;
   onNavigate: (
@@ -469,6 +420,8 @@ function PartRow({
   );
   const attention = partAttention(part);
   const attentionId = attention ? `part-attention-${part.id}` : undefined;
+  // The generated display name only earns a line when it says something the MPN does not.
+  const describes = Boolean(part.display_name) && part.display_name !== part.mpn;
   return (
     <button
       type="button"
@@ -477,67 +430,109 @@ function PartRow({
       onClick={() => onSelect(part.id)}
       onKeyDown={(event) => onNavigate(event, part.id)}
       aria-current={selected ? "true" : undefined}
-      aria-posinset={position}
-      aria-setsize={setSize}
+      // NO aria-posinset / aria-setsize here. They were added to tell a screen reader "row 3 of
+      // 1,000" while the virtualizer keeps only the visible rows in the DOM - a real need - but
+      // `role="button"` does not support either attribute, and the list container carries no list
+      // role, so nothing ever read them. They were a promise the accessibility tree never saw.
+      // Conveying position properly means giving the picker real listbox semantics (container
+      // `role="listbox"`, rows `role="option"` + `aria-selected`, category strips `role="group"`),
+      // which changes how every caller queries a row and so is a deliberate change of its own
+      // rather than a side effect of deleting two inert attributes.
       aria-describedby={attentionId}
       tabIndex={tabbable ? 0 : -1}
       className={
-        // Rows separate by whitespace + a rounded selection/hover pill, not a
-        // hairline on every row (the border-on-everything tell). The selected
-        // row is the one lift; the MPN reads in the mono index face.
-        "flex w-full items-center gap-2.5 rounded-control px-2.5 py-2 text-left transition-colors " +
-        (virtual ? "mb-0.5 h-[46px] " : "") +
+        // A CONTIGUOUS selected row, not a floating rounded card with a gap either side. The
+        // selection is an opaque neutral fill spanning the full width of the picker with a solid
+        // edge marker, which is what a desktop list does; the rounded pill it replaces made every
+        // row look like a control and made the selected one look like a pressed button.
+        // 46px: three lines of 15/14/14 leading plus 2px of air top and bottom. The row used to
+        // be padded to whatever three lines came to, which put it above the 42-50px a desktop
+        // list row is held to and made the virtual estimate a guess.
+        "flex w-full items-center gap-2.5 overflow-hidden px-2.5 text-left transition-colors " +
+        (virtual ? "h-full " : "h-[46px] ") +
+        // The selection is a muted amber fill plus a 2px amber edge. It used to be a neutral
+        // `#626262` with a grey marker, which is the same value range as the hover wash and light
+        // enough to drop the row's metadata line to 2.0:1 - so the selected row was both the
+        // hardest row to distinguish and the hardest to read. Hue separates at no cost to contrast:
+        // measured on the amber, t1 10.70, t2 7.25, t4 4.06 in dark and 12.86 / 8.20 / 3.85 in
+        // light. Still contiguous, still full-width, still not a rounded card.
         (selected
-          ? "bg-acc-soft shadow-[inset_2px_0_0_var(--c-acc)]"
+          ? "bg-selected shadow-[inset_2px_0_0_var(--c-selected-edge)]"
           : "hover:bg-[var(--c-hover)]")
       }
     >
       <RowThumbnail category={part.category} />
+      {/* Three lines, in the order the spec fixes them: the identifier, then Manufacturer ·
+          Package, then the description. Every one of them shares this one column, so the row has a
+          single left edge and the MPN owns the full width of it.
+
+          The MPN used to share line one with the package, and the ATTENTION block held a fixed
+          112px beside them both. At a 290px picker that left the identifier about 8px and it
+          rendered as `C...` - one letter and an ellipsis - while a footprint name and a truncated
+          hint kept their space. That is the hierarchy exactly inverted: the MPN is the one
+          visually primary item in a picker row, and everything else on the row qualifies it. So
+          the secondary items moved DOWN rather than the identifier being cut: nothing shares line
+          one, and both remaining lines hand their space to the MPN before it loses a character. */}
       <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-1.5">
-          <span
-            className={
-              "truncate text-sm " +
-              (selected ? "font-semibold text-t1" : "font-medium text-t1")
-            }
-          >
-            {part.display_name}
+        <span
+          data-dev-id="components.row-mpn"
+          className="ui-row-primary block truncate"
+          title={part.mpn || part.display_name}
+        >
+          {part.mpn || part.display_name}
+        </span>
+        {part.manufacturer || part.package ? (
+          // `flex-1` on the manufacturer is `flex: 1 1 0%`: it asks for none of the line and takes
+          // whatever is left, so the package keeps its own width and the manufacturer is the one
+          // that gives way. Both can still truncate; neither can reach the MPN's line.
+          <span className="flex items-baseline gap-2">
+            <span className="ui-row-secondary min-w-0 flex-1 truncate">{part.manufacturer}</span>
+            {part.package ? (
+              <span
+                data-dev-id="components.row-package"
+                className="ui-row-metadata min-w-0 truncate"
+              >
+                {part.package}
+              </span>
+            ) : null}
           </span>
-          {duplicate ? (
-            <span
-              data-dev-id="components.row-duplicate"
-              className="flex-none"
-              title={duplicateTitle}
-            >
-              <Badge tone="warn" size="sm">
-                <Text id="components.row-duplicate-label">Duplicate</Text>
-              </Badge>
+        ) : null}
+        {/* Line three: the description, and the attention state right-aligned against it. The
+            description is the one thing on the row whose truncation costs nothing - the whole of
+            it is on the opened component - so it is the item that yields, and the attention keeps
+            its words. The full sentence, reason and next step both, is on the row's tooltip and
+            its accessible label whatever the width. */}
+        {attention || describes ? (
+          <span className="flex items-center gap-2">
+            <span className="ui-row-metadata min-w-0 flex-1 truncate">
+              {describes ? part.display_name : ""}
             </span>
-          ) : null}
-        </div>
-        {part.mpn ? (
-          <div className="tnum mt-0.5 truncate font-mono text-2xs text-t3">
-            {part.mpn}
-          </div>
+            {attention ? (
+              <span
+                id={attentionId}
+                data-dev-id="components.row-warn"
+                className="flex min-w-0 items-center gap-1"
+                title={attention.description}
+              >
+                <span className="sr-only">{attention.description}</span>
+                <WarnIcon className="h-3 w-3 flex-none text-warn-text" />
+                <span className="ui-status-text truncate text-warn-text">
+                  {attention.reason}
+                </span>
+              </span>
+            ) : null}
+          </span>
         ) : null}
       </div>
-      {attention ? (
+      {duplicate ? (
         <span
-          id={attentionId}
-          data-dev-id="components.row-warn"
-          className="flex w-28 flex-none items-start gap-1.5"
-          title={attention.description}
+          data-dev-id="components.row-duplicate"
+          className="flex-none"
+          title={duplicateTitle}
         >
-          <span className="sr-only">{attention.description}</span>
-          <WarnIcon className="mt-0.5 h-3.5 w-3.5 flex-none text-[var(--c-warn-text)]" />
-          <span className="min-w-0">
-            <span className="block truncate text-ui-meta font-semibold text-[var(--c-warn-text)]">
-              {attention.reason}
-            </span>
-            <span className="block truncate text-ui-meta text-helper">
-              {attention.next}
-            </span>
-          </span>
+          <Badge tone="warn" size="sm">
+            <Text id="components.row-duplicate-label">Duplicate</Text>
+          </Badge>
         </span>
       ) : null}
     </button>

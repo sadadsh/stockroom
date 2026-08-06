@@ -40,13 +40,13 @@ export function FamilyPicker({ scope, onScopeChange }: Props) {
 
   const rows = families.data?.families ?? [];
   const selectedCount = scope.families.length + scope.mcus.length;
-  const allFamiliesLabel = useText("stm.family.all", "All Families");
+  const allFamiliesLabel = useText("stm.family.all", "All Series");
 
   return (
     <div className="flex min-h-0 flex-col">
       <div className="mb-2 flex items-center justify-between px-1">
         <Eyebrow>
-          <Text id="stm.family.title">Families</Text>
+          <Text id="stm.family.title">MCU Series</Text>
         </Eyebrow>
         {selectedCount > 0 ? (
           <button
@@ -61,15 +61,15 @@ export function FamilyPicker({ scope, onScopeChange }: Props) {
 
       {families.isLoading ? (
         <p className="px-2 py-3 text-xs text-t3">
-          <Text id="stm.family.loading">Loading families...</Text>
+          <Text id="stm.family.loading">Loading series...</Text>
         </p>
       ) : families.isError ? (
-        <p className="px-2 py-3 text-xs text-err">
-          <Text id="stm.family.failed">Could not load families.</Text>
+        <p className="px-2 py-3 text-xs text-err-text">
+          <Text id="stm.family.failed">Could not load series.</Text>
         </p>
       ) : rows.length === 0 ? (
         <p className="px-2 py-3 text-xs text-t3">
-          <Text id="stm.family.empty">No families in the index.</Text>
+          <Text id="stm.family.empty">No series in the index.</Text>
         </p>
       ) : (
         <div className="-mx-1 min-h-0 flex-1 overflow-y-auto px-1">
@@ -119,6 +119,8 @@ function FamilyGroup({
 }) {
   const active = scope.families.includes(family.family);
   const hasLines = family.lines.length > 0;
+  // one Set for the whole line list, instead of re-scanning the selected lines per rendered line
+  const selectedLines = new Set(scope.mcus);
   const collapseLabel = useCopyFormatter("stm.family.collapse.aria", "Collapse {family}");
   const expandLabel = useCopyFormatter("stm.family.expand.aria", "Expand {family}");
   return (
@@ -164,7 +166,7 @@ function FamilyGroup({
       {expanded && hasLines ? (
         <div className="ml-3.5 flex flex-col border-l border-line pl-2">
           {family.lines.map((line) => {
-            const lineActive = scope.mcus.includes(line);
+            const lineActive = selectedLines.has(line);
             return (
               <button
                 key={line}

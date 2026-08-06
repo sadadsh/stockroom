@@ -65,13 +65,13 @@ describe("PartTimeline", () => {
   it("shows an honest empty state for a part with no commits", async () => {
     mockApi.partHistory.mockResolvedValue({ commits: [], count: 0 });
     wrap(<PartTimeline partId="ghost" />);
-    expect(await screen.findByText(/No history yet/i)).toBeInTheDocument();
+    expect(await screen.findByText(/No timeline so far/i)).toBeInTheDocument();
   });
 
   it("surfaces a history load error honestly", async () => {
     mockApi.partHistory.mockRejectedValue(new Error("boom"));
     wrap(<PartTimeline partId="tps62130" />);
-    expect(await screen.findByText(/Could not load this part's history/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Could not load this part's timeline/i)).toBeInTheDocument();
   });
 
   it("selecting a commit shows its field diff against the previous part version", async () => {
@@ -189,7 +189,7 @@ describe("PartTimeline", () => {
     await userEvent.click(await screen.findByText("Edit tps62130: manufacturer"));
     await userEvent.click(await screen.findByRole("button", { name: "View Visual Diff" }));
 
-    // the overlay names the FOOTPRINT geometry, not "Symbol"
+    // the overlay names the FOOTPRINT geometry, not the schematic
     expect(await screen.findByAltText("Footprint Before")).toBeInTheDocument();
     expect(screen.getByAltText("Footprint After")).toBeInTheDocument();
     expect(screen.queryByAltText("Symbol Before")).toBeNull();

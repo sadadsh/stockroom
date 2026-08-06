@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import type { TargetDefinitionDTO } from "../../api/types";
 import {
   compatibilityKind,
@@ -31,7 +31,21 @@ function selectedDefault(definition: TargetDefinitionDTO): string | null {
   );
 }
 
+// A new definition invalidates the lens, the legend selection and the selected position - a full
+// state reset. This wrapper keys the body on the definition's content-addressed artifact_digest so
+// React remounts it, instead of an effect that costs a render still showing the old definition's
+// selection (and that had to read the whole `definition` while watching only its digest).
 export function TargetDefinitionPanel({
+  definition,
+}: {
+  definition: TargetDefinitionDTO;
+}) {
+  return (
+    <TargetDefinitionBody key={definition.artifact_digest} definition={definition} />
+  );
+}
+
+function TargetDefinitionBody({
   definition,
 }: {
   definition: TargetDefinitionDTO;
@@ -41,12 +55,6 @@ export function TargetDefinitionPanel({
   const [selectedPosition, setSelectedPosition] = useState<string | null>(() =>
     selectedDefault(definition),
   );
-
-  useEffect(() => {
-    setSelectedPosition(selectedDefault(definition));
-    setLens("compatibility");
-    setActiveLegendKey(null);
-  }, [definition.artifact_digest]);
 
   const selected = useMemo(
     () =>
@@ -91,15 +99,24 @@ export function TargetDefinitionPanel({
           <div className="min-w-0">
             <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
               <h2 className="font-mono text-sm font-semibold text-t1">
-                {definition.scope.package} Universal Support
+                <Text
+                  id="stm.target.definition.heading"
+                  values={{ packageName: definition.scope.package }}
+                >
+                  {"{packageName} Universal Support"}
+                </Text>
               </h2>
               <span
                 className={`flex items-center gap-1.5 text-2xs font-medium ${
-                  ready ? "text-ok" : "text-err"
+                  ready ? "text-ok-text" : "text-err-text"
                 }`}
               >
                 <span className="h-1.5 w-1.5 rounded-full bg-current" />
-                {ready ? "Definition Ready" : "Definition Blocked"}
+                {ready ? (
+                  <Text id="stm.target.definition-prepared">Definition Prepared</Text>
+                ) : (
+                  <Text id="stm.target.definition-blocked">Definition Blocked</Text>
+                )}
               </span>
             </div>
             <p className="mt-0.5 truncate text-2xs text-t3">
@@ -122,13 +139,18 @@ export function TargetDefinitionPanel({
               {formatPercent(universalPositions, definition.positions.length)}
             </span>
             <span className="block text-2xs text-t3">
-              {universalPositions}/{definition.positions.length} Shared
+              <Text
+                id="stm.target.definition.shared-count"
+                values={{ shared: universalPositions, total: definition.positions.length }}
+              >
+                {"{shared}/{total} Shared"}
+              </Text>
             </span>
           </div>
           <div className="pl-4">
             <span
               className={`block font-mono text-xs font-semibold ${
-                adaptedPositions ? "text-warn" : "text-ok"
+                adaptedPositions ? "text-warn" : "text-ok-text"
               }`}
             >
               {adaptedPositions}
@@ -182,7 +204,10 @@ export function TargetDefinitionPanel({
 
         <aside className="min-h-0 overflow-hidden border-l border-line bg-surface">
           {selected ? (
+            /* keyed on the position: a new position remounts the inspector, so its view resets to
+               "decision" without an adjustment effect. */
             <TargetPositionInspector
+              key={selected.position}
               definition={definition}
               position={selected}
             />

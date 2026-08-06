@@ -666,7 +666,10 @@ export function mountModelScene(
         offset: { top: 14, right: 14 },
         animated: !prefersReducedMotion(),
         speed: 1.35,
-        font: { family: "Work Sans, system-ui, sans-serif", weight: 700 },
+        // The gizmo's X/Y/Z caps are drawn to a canvas texture, so they name the interface face
+        // explicitly rather than inheriting it. Same stack as the chrome (Work Sans is no longer
+        // bundled), at the chrome's heaviest weight rather than a 700 that exists nowhere else.
+        font: { family: '"Segoe UI Variable", "Segoe UI", Tahoma, Arial, sans-serif', weight: 600 },
         background: MONOCHROME_VIEW_GIZMO.background,
         corners: MONOCHROME_VIEW_GIZMO.corners,
         edges: MONOCHROME_VIEW_GIZMO.edges,

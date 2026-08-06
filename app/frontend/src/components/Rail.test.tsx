@@ -105,19 +105,22 @@ describe("Rail", () => {
     updateState.update_available = true;
     updateState.state = "update_available";
     render(<Rail />);
-    expect(screen.getByText("Update Ready")).toBeInTheDocument();
+    expect(screen.getByText("Update Available")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Update/ })).toBeNull();
   });
 
-  it("calls the installed version Current only with an exact upstream match", () => {
+  it("says nothing at all while the installed version is a proven upstream match", () => {
+    // A permanent healthy row spent a rail slot every day of the year to report that nothing had
+    // happened, and trained the eye to skip the one place an update would have appeared. The row
+    // now exists only when there is something to do about it.
     const { rerender } = render(<Rail />);
-    expect(screen.getByText("Current")).toBeInTheDocument();
+    expect(document.querySelector('[data-dev-id="rail.update"]')).toBeNull();
+    expect(screen.queryByText("Current")).toBeNull();
 
     updateState.state = "offline";
     updateState.target_revision = "";
     rerender(<Rail />);
-    expect(screen.getByText("Retrying...")).toBeInTheDocument();
-    expect(screen.queryByText("Current")).toBeNull();
+    expect(screen.getByText("Rerunning...")).toBeInTheDocument();
   });
 
   it("shows that the remote comparison is in progress only while there is nothing to show", () => {
@@ -127,33 +130,29 @@ describe("Rail", () => {
     // "Checking..." constantly. Only `isPending` - no answer has ever landed - is genuinely unknown.
     updateState.isFetching = true;
     const { rerender } = render(<Rail />);
-    expect(screen.getByText("Current")).toBeInTheDocument();
     expect(screen.queryByText("Checking...")).toBeNull();
+    expect(document.querySelector('[data-dev-id="rail.update"]')).toBeNull();
 
     updateState.isFetching = false;
     updateState.isPending = true;
     rerender(<Rail />);
     expect(screen.getByText("Checking...")).toBeInTheDocument();
-    expect(screen.queryByText("Current")).toBeNull();
   });
 
   it("gives a blocked convergence a tone the healthy one does not have", () => {
     // C9: the glyph carried exactly one colour (ok, for current), so a blocked adoption and a
     // normal one were the same grey icon beside different words.
+    updateState.state = "offline";
     const { container, rerender } = render(<Rail />);
     const glyph = () =>
       container.querySelector('[data-dev-id="rail.update"] span[aria-hidden]') as HTMLElement;
-    expect(glyph().style.color).toBe("var(--c-ok)");
+    expect(screen.getByText("Rerunning...")).toBeInTheDocument();
+    expect(glyph().style.color).toBe("var(--c-warn)");
 
     updateState.state = "rolled_back";
     rerender(<Rail />);
     expect(screen.getByText("Update Blocked")).toBeInTheDocument();
     expect(glyph().style.color).toBe("var(--c-err)");
-
-    updateState.state = "offline";
-    rerender(<Rail />);
-    expect(screen.getByText("Retrying...")).toBeInTheDocument();
-    expect(glyph().style.color).toBe("var(--c-warn)");
   });
 
   it("says a restart is needed when the backend has moved past this window's bundle", () => {
@@ -409,6 +408,8 @@ describe("the rail's three reported defects", () => {
     // The panel itself never moved. Those differences came from four separate padding/wrapper
     // arrangements. One grid and one glyph box derive a 25.5px centerline for every control in
     // both states.
+    // A standing that needs action, so the update row is on screen to be measured at all.
+    updateState.state = "rolled_back";
     setWidth(1000);
     window.__STOCKROOM_UI__ = {};
     const compact = render(<DevModeProvider><Rail /></DevModeProvider>);

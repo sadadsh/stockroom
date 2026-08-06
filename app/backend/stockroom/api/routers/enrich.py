@@ -215,8 +215,11 @@ def enrich_router(require_token) -> APIRouter:
             complete-to-add gate, the same single git Transaction - only its thread differs."""
 
             @staticmethod
-            def add_part(staged):
-                return ctx.jobs.run_write(lambda: ctx.ops.add_part(staged))
+            def add_part(staged, *, now: str = ""):
+                # The import's own clock is forwarded rather than re-read here: the time the
+                # library took its copy of a datasheet belongs to the run, not to whichever
+                # thread the write lane happened to schedule it on.
+                return ctx.jobs.run_write(lambda: ctx.ops.add_part(staged, now=now))
 
             @staticmethod
             def add_passive_part(record):

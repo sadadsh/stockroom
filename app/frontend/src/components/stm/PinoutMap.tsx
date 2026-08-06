@@ -68,10 +68,15 @@ export function PinoutMap(props: Props) {
       <PinoutMapView {...props} onMaximize={() => setMaximized(true)} />
 
       {maximized ? (
+        // role="presentation", matching the shared modal frame in components/modalParts: the scrim
+        // is a pointer convenience with no semantics of its own, and every action it offers is
+        // already reachable from the keyboard - Escape through useModalDismiss, plus the dialog's
+        // own Close control - so it is not a control that needs a name, focus, or key handler.
         <div
           style={{ zIndex: modalZ }}
           className="fixed inset-0 flex items-center justify-center bg-black/50 p-6"
           data-testid="pinout-max-overlay"
+          role="presentation"
           onClick={close}
         >
           <div
@@ -172,6 +177,10 @@ function PinoutMapView({
   useEffect(() => {
     const svg = svgRef.current;
     if (!svg) return;
+    const onZoom = (event: D3ZoomEvent<SVGSVGElement, unknown>) => {
+      const { k, x, y } = event.transform;
+      setCamera({ k, x, y });
+    };
     const behavior = zoom<SVGSVGElement, unknown>()
       .scaleExtent([0.5, 8])
       // A constant extent matching the fixed viewBox: deterministic, and it avoids d3-zoom reading
@@ -179,16 +188,20 @@ function PinoutMapView({
       .extent([
         [0, 0],
         [VIEW, VIEW],
-      ])
-      .on("zoom", (event: D3ZoomEvent<SVGSVGElement, unknown>) => {
-        const { k, x, y } = event.transform;
-        setCamera({ k, x, y });
-      });
+      ]);
+    behavior.on("zoom", onZoom);
     zoomRef.current = behavior;
     const sel = select(svg);
     sel.call(behavior);
+    // Own every allocation this run made. Detaching the node's `.zoom` listeners is only half of it:
+    // d3-zoom parks a live gesture's mousemove/mouseup listeners on `window`, not on this node, and
+    // keeps a wheel-idle timer, so both can still dispatch after the node is detached. Severing the
+    // behavior's own "zoom" listener makes those dispatches inert, and dropping the ref leaves the
+    // next run to build its own behavior from scratch.
     return () => {
       sel.on(".zoom", null);
+      behavior.on("zoom", null);
+      zoomRef.current = null;
     };
   }, []);
 
@@ -219,7 +232,7 @@ function PinoutMapView({
           <div className="flex h-full min-h-0 flex-col gap-2 p-4" data-testid="pinout-pin-list">
             <p className="flex-none text-xs text-t3">
               <Text id="stm.pinout.map.no-layout">
-                No drawable layout for this package. Select a pin from the list to inspect it.
+                No drawable arrangement for this package. Select a pin from the list to inspect it.
               </Text>
             </p>
             <ul className="min-h-0 flex-1 overflow-y-auto">
@@ -381,7 +394,7 @@ function PinoutMapView({
           <div className="flex min-w-0 flex-wrap items-center gap-1.5">
             {inferred ? (
               <span className="rounded-control bg-raise px-2 py-0.5 text-2xs text-t3">
-                <Text id="stm.pinout.map.inferred">Layout inferred from pin positions</Text>
+                <Text id="stm.pinout.map.inferred">Arrangement inferred from pin positions</Text>
               </span>
             ) : null}
             {unplaced > 0 ? (

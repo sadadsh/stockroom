@@ -70,4 +70,34 @@ describe("toasts", () => {
     expect(() => render(<Trigger />)).toThrow(/ToastProvider/);
     spy.mockRestore();
   });
+
+  it("does not re-render every reader of the toast api when a toast comes and goes", () => {
+    // This provider re-renders on every toast raised and every toast dismissed. Most consumers only
+    // ever call `toast`, and a toast appearing in the corner gives them nothing to redraw - so the
+    // api they hold has to keep its identity across those renders, or the whole application
+    // re-renders twice per notification.
+    const seen: unknown[] = [];
+    function Reader() {
+      const api = useToast();
+      seen.push(api);
+      return null;
+    }
+    render(
+      <ToastProvider>
+        <Trigger />
+        <Reader />
+      </ToastProvider>,
+    );
+    const atMount = seen.length;
+    expect(atMount).toBeGreaterThan(0);
+
+    fireEvent.click(screen.getByText("fire"));
+    expect(screen.getByText("Saved")).toBeInTheDocument();
+    act(() => vi.advanceTimersByTime(4000));
+    expect(screen.queryByText("Saved")).not.toBeInTheDocument();
+
+    // Two provider renders happened (raise, then dismiss) and the reader saw neither.
+    expect(seen.length).toBe(atMount);
+    expect(new Set(seen).size).toBe(1);
+  });
 });

@@ -23,7 +23,7 @@
  * Outcomes are TEXT in a semantic color, not badges - the smallest element that carries the
  * meaning, which is the rule.
  */
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import type { BulkImportItem, BulkImportResult } from "../api/types";
 import {
@@ -39,12 +39,12 @@ import { Text, useCopyFormatter, useText } from "../lib/copy";
 // Outcome tiers in the order a reader needs them: what landed, what was already there, then the
 // two that want attention. `tone` maps to the semantic text colors, never a surface tint.
 const TIERS: { status: string; copyId: string; label: string; tone: string }[] = [
-  { status: "added", copyId: "bulk.outcome-added", label: "Added", tone: "text-ok" },
-  { status: "would-add", copyId: "bulk.outcome-would-add", label: "Would Add", tone: "text-ok" },
-  { status: "exists", copyId: "bulk.outcome-exists", label: "Already There", tone: "text-t2" },
+  { status: "added", copyId: "bulk.outcome-added", label: "Added", tone: "text-ok-text" },
+  { status: "would-add", copyId: "bulk.outcome-would-add", label: "Would Add", tone: "text-ok-text" },
+  { status: "exists", copyId: "bulk.outcome-exists", label: "Present", tone: "text-t2" },
   { status: "duplicate", copyId: "bulk.outcome-duplicate", label: "Duplicate", tone: "text-t3" },
   { status: "incomplete", copyId: "bulk.outcome-incomplete", label: "Needs More", tone: "text-warn" },
-  { status: "error", copyId: "bulk.outcome-error", label: "Failed", tone: "text-err" },
+  { status: "error", copyId: "bulk.outcome-error", label: "Failed", tone: "text-err-text" },
 ];
 
 function looksLikeCsv(text: string): boolean {
@@ -91,7 +91,7 @@ function Row({ item }: { item: BulkImportItem }) {
           a part can land complete on its identity and still have no symbol, footprint or 3D. */}
       <td className="whitespace-nowrap py-1.5 pr-3 text-xs">
         {item.assets === "kicad-stock" ? (
-          <span className="text-ok">
+          <span className="text-ok-text">
             <Text id="bulk.cad-complete">Symbol, Footprint, 3D</Text>
           </span>
         ) : item.status === "added" || item.status === "would-add" ? (
@@ -129,6 +129,10 @@ function Summary({ result }: { result: BulkImportResult }) {
 
 export function BulkImportSection() {
   const [showAll, setShowAll] = useState(false);
+  // Generated rather than a literal: this panel lives inside the Add-A-Part dialog, which can be
+  // mounted alongside other surfaces, and a duplicated `htmlFor` target would point the label at
+  // whichever field the document happened to hold first.
+  const inputId = useId();
   // State lives OUTSIDE React (lib/bulkImportStore): this panel sits inside the Add-A-Part
   // dialog, and a 166-part register import runs about 25 minutes. With the state in useState,
   // dismissing the dialog unmounted the reader and threw the finished report away while the job
@@ -151,7 +155,7 @@ export function BulkImportSection() {
   const importIdle = useText("bulk.import", "Import");
   const showAttentionLabel = useCopyFormatter(
     "bulk.show-attention",
-    "Show Only What Needs Attention ({count})",
+    "Show Just What Needs Attention ({count})",
   );
   const showAllLabel = useCopyFormatter("bulk.show-all", "Show All {count} Rows");
   const entryNounCsv = useText("bulk.entries-csv", " rows");
@@ -164,11 +168,23 @@ export function BulkImportSection() {
   const result = job.result;
   // Only the rows that need a decision are shown by default. A 169-row table where 160 rows say
   // "Added" buries the 9 that do not, and those 9 are what the reader came for.
-  const attention = useMemo(
-    () => (result?.items ?? []).filter((i) => i.status === "incomplete" || i.status === "error"),
+  // Each row is carried with the ORDINAL of its line in the submitted list, because that ordinal
+  // plus the line itself is the only thing that identifies a row: a bulk paste may legitimately
+  // repeat a query, and nothing the backend returns is unique per row. Keying on the position in
+  // the RENDERED array instead reassigned every row the moment the attention filter was toggled,
+  // so the two views handed each other's data to the same table rows.
+  const submitted = useMemo(
+    () => (result?.items ?? []).map((item, ordinal) => ({ item, ordinal })),
     [result],
   );
-  const rows = showAll ? (result?.items ?? []) : attention;
+  const attention = useMemo(
+    () =>
+      submitted.filter(
+        ({ item }) => item.status === "incomplete" || item.status === "error",
+      ),
+    [submitted],
+  );
+  const rows = showAll ? submitted : attention;
 
   return (
     // NOT a Panel. Inside the Add-A-Part dialog a bordered surface is a card in a card (design
@@ -177,9 +193,13 @@ export function BulkImportSection() {
     // lane reads as a peer of the single-part lane instead of a louder box nested in it.
     <div data-dev-id="ingest.bulk" className="mt-1 border-t border-line pt-4">
       <div className="flex items-baseline justify-between gap-3">
-        <div className="text-sm font-semibold text-t1">
+        {/* The heading IS the field's label, so it says so: the paste well is this lane's only
+            input, and its own placeholder is three example part numbers that vanish the moment
+            anyone types. A person using a screen reader was reaching an unnamed text box with a
+            worked example read out as its name. */}
+        <label htmlFor={inputId} className="text-sm font-semibold text-t1">
           <Text id="bulk.title">Import A List</Text>
-        </div>
+        </label>
         {count > 0 ? (
           <span className="text-2xs text-t3">
             <span className="font-mono tnum">{count}</span>
@@ -193,6 +213,7 @@ export function BulkImportSection() {
         </Text>
       </p>
       <textarea
+        id={inputId}
         data-dev-id="ingest.bulk-input"
         value={text}
         onChange={(e) => setText(e.target.value)}
@@ -234,14 +255,14 @@ export function BulkImportSection() {
       {busy && job.progress?.pct != null ? (
         <div className="mt-2.5 h-0.5 w-full overflow-hidden rounded-control bg-field">
           <div
-            className="h-full bg-acc transition-[width] duration-200"
+            className="h-full bg-acc transition-[width] duration-150"
             style={{ width: `${Math.round((job.progress.pct ?? 0) * 100)}%` }}
           />
         </div>
       ) : null}
 
       {job.status === "error" ? (
-        <p className="mt-3 text-xs text-err" data-dev-id="ingest.bulk-error">
+        <p className="mt-3 text-xs text-err-text" data-dev-id="ingest.bulk-error">
           {job.error}
         </p>
       ) : null}
@@ -252,7 +273,7 @@ export function BulkImportSection() {
           {attention.length === 0 && !showAll ? (
             <p className="mt-3 text-xs text-t2">
               <Text id="bulk.all-clean">
-                Every part in the list was handled. Nothing needs attention.
+                Each part in the list was handled. Nothing needs attention.
               </Text>
             </p>
           ) : null}
@@ -282,8 +303,8 @@ export function BulkImportSection() {
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.map((item, i) => (
-                    <Row key={`${item.query}-${i}`} item={item} />
+                  {rows.map(({ item, ordinal }) => (
+                    <Row key={`${ordinal}:${item.query}`} item={item} />
                   ))}
                 </tbody>
               </table>

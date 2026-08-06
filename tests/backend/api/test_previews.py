@@ -827,3 +827,109 @@ def test_footprint_preview_fills_its_frame_rather_than_stamping_a_speck(app_ctx)
         f"the footprint art fills only {coverage:.1%} of its viewBox "
         f"(box {vw:.3f}x{vh:.3f}), so the tile renders a speck"
     )
+
+
+# --------------------------------------------------------------- symbol geometry
+
+
+_GEOMETRY_LIB = (
+    "(kicad_symbol_lib\n"
+    "\t(version 20231120)\n"
+    '\t(generator "stockroom")\n'
+    '\t(symbol "TPS62130"\n'
+    '\t\t(property "Reference" "U" (at 0 0 0))\n'
+    '\t\t(symbol "TPS62130_1_1"\n'
+    "\t\t\t(rectangle (start -5.08 5.08) (end 5.08 -5.08)"
+    " (stroke (width 0.254) (type default)) (fill (type background)))\n"
+    "\t\t\t(circle (center 6.35 0) (radius 0.635)"
+    " (stroke (width 0.2) (type default)) (fill (type none)))\n"
+    "\t\t)\n"
+    '\t\t(symbol "TPS62130_0_1"\n'
+    "\t\t\t(pin power_in line (at -7.62 2.54 0) (length 2.54)"
+    ' (name "VIN" (effects)) (number "1" (effects)))\n'
+    "\t\t\t(pin output line (at 7.62 2.54 180) (length 2.54)"
+    ' (name "SW" (effects)) (number "2" (effects)) (hide yes))\n'
+    "\t\t)\n"
+    "\t)\n"
+    ")\n"
+)
+
+
+def _write_geometry_lib(app_ctx):
+    path = app_ctx.profile.library.symbol_lib_path("ICs")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(_GEOMETRY_LIB, encoding="utf-8", newline="")
+    return path
+
+
+def test_symbol_geometry_404_when_part_absent(client):
+    assert client.get("/api/previews/symbol/nope.json").status_code == 404
+
+
+def test_symbol_geometry_carries_every_pin_with_its_electrical_type(app_ctx):
+    """The facts a rendered SVG throws away.
+
+    Pin count, pin numbers and electrical types are what the CAD column has to answer about a
+    symbol, and none of them survive rasterisation - which is why the preview reads geometry
+    rather than measuring a picture.
+    """
+    _write_geometry_lib(app_ctx)
+    with _client_with_cli(app_ctx, _RecordingCli()) as c:
+        response = c.get("/api/previews/symbol/tps62130.json")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["units"] == "mm"
+    assert [pin["number"] for pin in body["pins"]] == ["1", "2"]
+    assert [pin["name"] for pin in body["pins"]] == ["VIN", "SW"]
+    assert [pin["electrical"] for pin in body["pins"]] == ["power_in", "output"]
+    assert [pin["hidden"] for pin in body["pins"]] == [False, True]
+    assert body["pins"][0]["at"] == [-7.62, 2.54]
+    assert body["pins"][1]["angle"] == 180.0
+
+
+def test_symbol_geometry_keeps_rectangles_and_circles_as_themselves(app_ctx):
+    _write_geometry_lib(app_ctx)
+    with _client_with_cli(app_ctx, _RecordingCli()) as c:
+        body = c.get("/api/previews/symbol/tps62130.json").json()
+
+    kinds = [shape["kind"] for shape in body["graphics"]]
+    assert kinds == ["rectangle", "circle"]
+    assert body["graphics"][0]["fill"] == "background"
+    assert body["graphics"][1]["radius"] == 0.635
+
+
+def test_symbol_geometry_reports_the_bounds_the_symbol_actually_draws(app_ctx):
+    """A real box or nothing. A fabricated zero box would read as a collapsed body."""
+    _write_geometry_lib(app_ctx)
+    with _client_with_cli(app_ctx, _RecordingCli()) as c:
+        bounds = c.get("/api/previews/symbol/tps62130.json").json()["bounds"]
+
+    assert bounds["x"] == -7.62
+    assert round(bounds["width"], 3) == 15.24
+    assert round(bounds["height"], 3) == 10.16
+
+
+def test_land_pattern_reports_the_layers_each_pad_declares(app_ctx):
+    """Mask and paste cannot be inferred from copper.
+
+    A pad that opens no solder-mask aperture and one that opens a full aperture are identical in
+    copper and are different fabrication outcomes, so the declared layers travel verbatim rather
+    than being defaulted by whoever draws them.
+    """
+    fp_file = app_ctx.profile.library.footprint_lib_path("ICs") / "TPS62130.kicad_mod"
+    fp_file.write_text(
+        '(footprint "TPS62130"\n'
+        '\t(layer "F.Cu")\n'
+        '\t(pad "1" smd roundrect (at 0 0) (size 1 2)'
+        ' (layers "F.Cu" "F.Paste" "F.Mask") (roundrect_rratio 0.25))\n'
+        '\t(pad "2" smd rect (at 2 0) (size 1 2) (layers "F.Cu"))\n'
+        ")\n",
+        encoding="utf-8",
+        newline="",
+    )
+    with _client_with_cli(app_ctx, _RecordingCli()) as c:
+        pads = c.get("/api/previews/land/tps62130.json").json()["pads"]
+
+    assert pads[0]["layers"] == ["F.Cu", "F.Paste", "F.Mask"]
+    assert pads[1]["layers"] == ["F.Cu"]

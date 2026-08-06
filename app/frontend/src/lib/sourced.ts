@@ -57,6 +57,3 @@ export function distributorLabel(key: string): string {
   // backend parity gate is what keeps a real source from ever reaching this line.
   return SOURCE_LABELS[lower] ?? (key ? key.charAt(0).toUpperCase() + key.slice(1) : key);
 }
-
-/** The source keys this module knows, for the backend parity gate to read. */
-export const KNOWN_SOURCE_KEYS = Object.keys(SOURCE_LABELS);

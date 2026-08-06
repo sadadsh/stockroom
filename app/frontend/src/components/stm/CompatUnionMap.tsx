@@ -101,21 +101,29 @@ export function CompatUnionMap({ union }: { union: UnionDTO }) {
   useEffect(() => {
     const svg = svgRef.current;
     if (!svg) return;
+    const onZoom = (event: D3ZoomEvent<SVGSVGElement, unknown>) => {
+      const { k, x, y } = event.transform;
+      setCamera({ k, x, y });
+    };
     const behavior = zoom<SVGSVGElement, unknown>()
       .scaleExtent([0.5, 8])
       .extent([
         [0, 0],
         [VIEW, VIEW],
-      ])
-      .on("zoom", (event: D3ZoomEvent<SVGSVGElement, unknown>) => {
-        const { k, x, y } = event.transform;
-        setCamera({ k, x, y });
-      });
+      ]);
+    behavior.on("zoom", onZoom);
     zoomRef.current = behavior;
     const sel = select(svg);
     sel.call(behavior);
+    // Own every allocation this run made. Detaching the node's `.zoom` listeners is only half of it:
+    // d3-zoom parks a live gesture's mousemove/mouseup listeners on `window`, not on this node, and
+    // keeps a wheel-idle timer, so both can still dispatch after the node is detached. Severing the
+    // behavior's own "zoom" listener makes those dispatches inert, and dropping the ref leaves the
+    // next run to build its own behavior from scratch.
     return () => {
       sel.on(".zoom", null);
+      behavior.on("zoom", null);
+      zoomRef.current = null;
     };
   }, []);
 
@@ -148,7 +156,7 @@ export function CompatUnionMap({ union }: { union: UnionDTO }) {
             <div className="flex h-full min-h-0 flex-col gap-2 p-4" data-testid="compat-union-list">
               <p className="flex-none text-xs text-t3">
                 <Text id="stm.compat.union-map.no-layout">
-                  No drawable layout for this package. Select a position from the list to inspect
+                  No drawable arrangement for this package. Select a position from the list to inspect
                   it.
                 </Text>
               </p>

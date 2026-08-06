@@ -7,10 +7,10 @@
  */
 import { apiBase, apiToken } from "../lib/runtime";
 import type {
+  ComponentDossier,
   ComponentProvidersView,
-  ComponentWorkspaceResponse,
   CoverageArtifact,
-} from "./workspaceTypes";
+} from "./dossierTypes";
 import type {
   ActivateResponse,
   ApproveProjectReviewResult,
@@ -37,6 +37,7 @@ import type {
   CaptureBatchWorklist,
   CaptureWorkflowSession,
   ConnectProjectRemoteResult,
+  PartShell,
   DiffResponse,
   DoctorScan,
   DuplicatesResponse,
@@ -279,6 +280,14 @@ export interface LandPad {
   side: string;
   /** KiCad's roundrect corner ratio */
   rratio: number;
+  /**
+   * The layers the pad DECLARES, verbatim (`F.Cu`, `F.Mask`, `F.Paste`, ...).
+   *
+   * Mask and paste cannot be inferred from copper: a pad that opens no aperture and one that
+   * opens a full aperture are identical in copper and are different fabrication outcomes. A
+   * viewer that defaulted them would draw an aperture the footprint never asked for.
+   */
+  layers: string[];
 }
 
 export interface LandGraphic {
@@ -298,6 +307,50 @@ export interface LandPattern {
     scale: [number, number, number];
     rotate: [number, number, number];
   } | null;
+}
+
+/** One terminal of a symbol, in KiCad's schematic frame (mm, +Y UP, degrees). */
+export interface SymbolPin {
+  number: string;
+  name: string;
+  /** The pin's electrical type: input, output, power_in, passive, ... A fact about the SYMBOL. */
+  electrical: string;
+  /** The drawn graphic style: line, inverted, clock, ... */
+  style: string;
+  /** The connection point. The pin body runs from here in the direction of `angle`. */
+  at: [number, number];
+  angle: number;
+  length: number;
+  hidden: boolean;
+}
+
+/** One drawn shape of a symbol body. Arcs arrive already flattened into a polyline. */
+export interface SymbolGraphic {
+  kind: "rectangle" | "circle" | "polyline";
+  points: [number, number][];
+  center: [number, number];
+  radius: number;
+  width: number;
+  /** KiCad's fill type: none / outline / background. */
+  fill: string;
+  closed: boolean;
+}
+
+/**
+ * A symbol's pins and body, read from the file rather than measured off a rendered picture.
+ *
+ * `bounds` is null when the symbol draws nothing at all - a real absence, not a zero box, which
+ * would read as a body that collapsed.
+ */
+export interface SymbolGeometry {
+  units: string;
+  name: string;
+  /** What the FILE asks for. A symbol whose author hid its names is not one missing them. */
+  namesHidden: boolean;
+  numbersHidden: boolean;
+  pins: SymbolPin[];
+  graphics: SymbolGraphic[];
+  bounds: { x: number; y: number; width: number; height: number } | null;
 }
 
 export interface ListPartsArgs {
@@ -633,12 +686,127 @@ export const api = {
     return apiGet<PartDetail>(`/api/library/parts/${encodeURIComponent(id)}`);
   },
 
-  // The normalized opened-component projection. The raw record above stays available for
-  // diagnostics; every presentation surface reads this instead, so no component has to
-  // decide for itself where a datum belongs or which provider shape it arrived in.
-  partWorkspace(id: string): Promise<ComponentWorkspaceResponse> {
-    return apiGet<ComponentWorkspaceResponse>(
-      `/api/library/parts/${encodeURIComponent(id)}/workspace`,
+  // The component dossier: the normalized opened-component projection. The raw record above
+  // stays available for diagnostics; every presentation surface reads this instead, so no
+  // component has to decide for itself where a datum belongs, which specification group it is
+  // in for THIS kind of part, or which provider shape it arrived in.
+  partDossier(id: string): Promise<ComponentDossier> {
+    return apiGet<ComponentDossier>(`/api/library/parts/${encodeURIComponent(id)}/dossier`);
+  },
+
+  // --- specification writes -------------------------------------------------
+  //
+  // Every one of these answers with the FULL updated dossier. The caller replaces its state
+  // wholesale rather than merging a fragment: an override changes the value, its verification
+  // state, the conflict state, the group counts, the completeness score and the revision
+  // history at once, and a partial merge would leave four of those six stale.
+
+  /** Record a reviewed override for one specification. Wins over every source. */
+  setSpecificationOverride(
+    id: string,
+    key: string,
+    value: string,
+    // Why the reviewer decided this, and whether they stand behind it as checked. Both are
+    // properties OF the decision, so they travel with the value rather than in a second write
+    // that could succeed while the first one failed.
+    review: { note?: string; verified?: boolean } = {},
+  ): Promise<ComponentDossier> {
+    return request<ComponentDossier>(
+      "PUT",
+      `/api/library/parts/${encodeURIComponent(id)}/specifications/` +
+        `${encodeURIComponent(key)}/override`,
+      { body: { value, note: review.note ?? "", verified: review.verified ?? true } },
+    );
+  },
+
+  /** Withdraw a reviewed override, so the sources decide the value again. */
+  clearSpecificationOverride(id: string, key: string): Promise<ComponentDossier> {
+    return request<ComponentDossier>(
+      "DELETE",
+      `/api/library/parts/${encodeURIComponent(id)}/specifications/` +
+        `${encodeURIComponent(key)}/override`,
+    );
+  },
+
+  /** Prefer one source's answer for one specification, without inventing a new value. */
+  setSpecificationPreferredSource(
+    id: string,
+    key: string,
+    sourceId: string,
+  ): Promise<ComponentDossier> {
+    return request<ComponentDossier>(
+      "PUT",
+      `/api/library/parts/${encodeURIComponent(id)}/specifications/` +
+        `${encodeURIComponent(key)}/preferred-source`,
+      { body: { sourceId } },
+    );
+  },
+
+  /** Go back to the precedence order's own answer for one specification. */
+  clearSpecificationPreferredSource(id: string, key: string): Promise<ComponentDossier> {
+    return request<ComponentDossier>(
+      "DELETE",
+      `/api/library/parts/${encodeURIComponent(id)}/specifications/` +
+        `${encodeURIComponent(key)}/preferred-source`,
+    );
+  },
+
+  /**
+   * Prefer one provider for this component's whole CAD set.
+   *
+   * Refused (422) when that provider does not supply all three artifacts. Stockroom takes a
+   * component's CAD from one provider's coherent download, so a set source that cannot answer
+   * for one of the three is a preference nothing could honour.
+   */
+  setCadPreferredSource(id: string, provider: string): Promise<ComponentDossier> {
+    return request<ComponentDossier>(
+      "PUT",
+      `/api/library/parts/${encodeURIComponent(id)}/cad/preferred-source`,
+      { body: { provider } },
+    );
+  },
+
+  clearCadPreferredSource(id: string): Promise<ComponentDossier> {
+    return request<ComponentDossier>(
+      "DELETE",
+      `/api/library/parts/${encodeURIComponent(id)}/cad/preferred-source`,
+    );
+  },
+
+  /** Prefer one provider for ONE asset. Refused (422) when it would mix two across the set. */
+  setCadAssetPreferredSource(
+    id: string,
+    asset: string,
+    provider: string,
+  ): Promise<ComponentDossier> {
+    return request<ComponentDossier>(
+      "PUT",
+      `/api/library/parts/${encodeURIComponent(id)}/cad/` +
+        `${encodeURIComponent(asset)}/preferred-source`,
+      { body: { provider } },
+    );
+  },
+
+  clearCadAssetPreferredSource(id: string, asset: string): Promise<ComponentDossier> {
+    return request<ComponentDossier>(
+      "DELETE",
+      `/api/library/parts/${encodeURIComponent(id)}/cad/` +
+        `${encodeURIComponent(asset)}/preferred-source`,
+    );
+  },
+
+  /**
+   * The bytes of one stored document.
+   *
+   * Fetched as a Blob with the bearer rather than pointed at with a plain URL, because the
+   * guard rejects an unauthenticated request and a viewer handed a 401 would show an empty
+   * grey pane instead of saying what failed.
+   */
+  documentFile(id: string, documentId: string): Promise<Blob> {
+    return fetchPreviewBlob(
+      `/api/library/parts/${encodeURIComponent(id)}/documents/` +
+        `${encodeURIComponent(documentId)}/file`,
+      "application/pdf",
     );
   },
 
@@ -714,6 +882,11 @@ export const api = {
    *  ONE response so the body and the land pattern it must line up with cannot disagree. */
   landPattern(id: string): Promise<LandPattern> {
     return apiGet<LandPattern>(`/api/previews/land/${encodeURIComponent(id)}.json`);
+  },
+
+  /** The symbol's pins and body geometry, so the preview can answer questions about the FILE. */
+  symbolGeometry(id: string): Promise<SymbolGeometry> {
+    return apiGet<SymbolGeometry>(`/api/previews/symbol/${encodeURIComponent(id)}.json`);
   },
 
   async modelGlb(id: string): Promise<ArrayBuffer> {
@@ -1213,6 +1386,43 @@ export const api = {
   }> {
     return request("POST", `/api/library/parts/${encodeURIComponent(input.partId)}/files`, {
       body: { paths: input.paths },
+    });
+  },
+
+  // What Manage may offer for this component: whether this host owns a native window at all,
+  // whether the component has a directory to reveal, which formats it really has files for, and
+  // which EDA applications this machine really carries. One request, because all three items are
+  // decided by the same facts and an item with nothing behind it is not drawn.
+  partShell(id: string): Promise<PartShell> {
+    return apiGet<PartShell>(`/api/library/parts/${encodeURIComponent(id)}/shell`);
+  },
+
+  // Reveal takes NO path. The backend resolves the component's directory from the active library
+  // root; a reveal endpoint that accepted a path would be a way to start the file browser on
+  // anything the browser process chose to name.
+  revealPartFiles(id: string): Promise<{ part_id: string; revealed: boolean }> {
+    return request("POST", `/api/library/parts/${encodeURIComponent(id)}/reveal`);
+  },
+
+  exportPart(input: { partId: string; format: string }): Promise<{
+    part_id: string;
+    format: string;
+    file_count: number;
+    file_names: string[];
+  }> {
+    return request("POST", `/api/library/parts/${encodeURIComponent(input.partId)}/export`, {
+      body: { format: input.format },
+    });
+  },
+
+  openPartIn(input: { partId: string; applicationId: string; format: string }): Promise<{
+    part_id: string;
+    application_id: string;
+    format: string;
+    opened: boolean;
+  }> {
+    return request("POST", `/api/library/parts/${encodeURIComponent(input.partId)}/open-in`, {
+      body: { application_id: input.applicationId, format: input.format },
     });
   },
 

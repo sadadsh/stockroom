@@ -6,11 +6,15 @@ labels - reads this registry. It is deliberately data plus URL resolution only: 
 no sign-in, no selectors, no browser policy. The person operates provider pages; Stockroom
 only needs to know where a page is, what it is called, and what it can be expected to offer.
 
-A provider with no search URL is honest data, not a gap: for TraceParts, CADENAS, and
+A provider with no search URL is honest data, not a gap: for LCSC, TraceParts, CADENAS, and
 manufacturer sites Stockroom only ever holds an exact page when distributor catalogue
 evidence names one, and inventing a search URL would send someone to a page that proves
 nothing. Expectations (`symbols`/`footprints`/`models`, `kicad`/`altium`) describe what the
 provider is built to offer, never whether a specific part is available there.
+
+A registered provider is not necessarily a CAD surface. A distributor can earn a row here for
+its catalogue alone - LCSC does - in which case every artifact expectation is False and the
+coverage table says so rather than opening a column nothing may ever fill.
 """
 
 from __future__ import annotations
@@ -58,12 +62,36 @@ class ProviderRecord:
         return _ORDER[self.key]
 
 
-# Trust order for the model authors is the owner's ranking, stated 2026-07-27: Ultra
+# This tuple's order IS the preferred order, and `dossier/precedence.py` settles a tie inside
+# one tier by it, so the distributors lead it in the owner's own trust order, stated 2026-08-05:
+# Mouser first, DigiKey second, LCSC third. It replaced digikey-then-mouser, which was never a
+# trust ranking - it only reflected DigiKey's one page gathering all three CAD authors, which is
+# a fact about CAD and not about whose catalogue answer to believe. LCSC is ranked last of the
+# three by POSITION rather than by a weaker tier, because its catalogue record is the same CLASS
+# of evidence as the other two - a distributor's own product data - and one tier keeps all three
+# equally, honestly, below the manufacturer's own word.
+#
+# Trust order for the model authors is a separate owner decision, stated 2026-07-27: Ultra
 # Librarian is manufacturer-verified, SamacSys is independently verified (and what Mouser
-# serves), SnapMagic blends community and AI-generated content. DigiKey leads only because
-# one product page gathers all three authors; Mouser follows the same reasoning as the
-# second distributor surface. The evidence-only providers close the list.
+# serves), SnapMagic blends community and AI-generated content. The evidence-only providers
+# close the list.
 PROVIDERS: tuple[ProviderRecord, ...] = (
+    ProviderRecord(
+        key="mouser",
+        label="Mouser",
+        domains=("mouser.com",),
+        search_template="https://www.mouser.com/c/?q={mpn}",
+        media_tokens=(),
+        symbols=True,
+        footprints=True,
+        models=True,
+        kicad=True,
+        altium=True,
+        needs_login=False,
+        aggregator=True,
+        distributor=True,
+        instruction="Open the part page, then use the ECAD Model links to download.",
+    ),
     ProviderRecord(
         key="digikey",
         label="DigiKey",
@@ -81,20 +109,46 @@ PROVIDERS: tuple[ProviderRecord, ...] = (
         instruction="Open the CAD Models section, then download for KiCad and for Altium.",
     ),
     ProviderRecord(
-        key="mouser",
-        label="Mouser",
-        domains=("mouser.com",),
-        search_template="https://www.mouser.com/c/?q={mpn}",
+        key="lcsc",
+        label="LCSC",
+        # `scrape/extract/sites/lcsc.py` claims a page by `"lcsc.com" in url`, and
+        # `enrich/distributor_url.py` by `"lcsc." in host`; the suffix match here covers both
+        # (`www.lcsc.com` and any subdomain). EasyEDA is deliberately NOT listed: it is a
+        # different surface whose geometry this product refuses, and claiming its domain would
+        # make an EasyEDA URL read as LCSC distributor evidence.
+        domains=("lcsc.com",),
+        # Blank on purpose, measured 2026-08-05: https://www.lcsc.com/search?<param>=S1M returns
+        # the same 89,805-byte JavaScript shell titled `Search by ""` for every candidate
+        # parameter name, so no parameter can be SHOWN to drive the search and the MPN never
+        # appears in the response. `enrich/pipeline.py` calls the same URL "the dead search-URL
+        # scrape" for exactly this reason. An LCSC page is reached by the exact product-detail
+        # URL the catalogue resolves (jlcsearch -> /product-detail/<C-number>.html), which is
+        # already how `LcscSource` gets there.
+        search_template="",
+        # Never named as an author inside another distributor's catalogue media, the same as the
+        # other two distributors.
         media_tokens=(),
-        symbols=True,
-        footprints=True,
-        models=True,
-        kicad=True,
-        altium=True,
+        # LCSC is registered for its CATALOGUE, not for CAD. Its EasyEDA-derived symbol,
+        # footprint and 3D geometry is explicitly refused as a source in two places
+        # (`api/routers/ingest.py` rejects LCSC/EasyEDA CAD ingest; `capture/runner.py` refuses
+        # a converted LCSC/EasyEDA trio as an active completion source), so claiming an artifact
+        # here would open a coverage column no honest capture could ever fill and would send a
+        # person to a surface this product does not accept geometry from.
+        symbols=False,
+        footprints=False,
+        models=False,
+        kicad=False,
+        altium=False,
+        # The product page and the jlcsearch catalogue leg both read without an account.
         needs_login=False,
-        aggregator=True,
+        # DigiKey and Mouser host the three registered CAD authors' downloads; LCSC hosts
+        # EasyEDA's, which this registry does not know and this product does not accept.
+        aggregator=False,
         distributor=True,
-        instruction="Open the part page, then use the ECAD Model links to download.",
+        instruction=(
+            "Open the LCSC product page for this exact part, then read its specifications, "
+            "stock and datasheet. Do not take CAD from here."
+        ),
     ),
     ProviderRecord(
         key="ultralibrarian",

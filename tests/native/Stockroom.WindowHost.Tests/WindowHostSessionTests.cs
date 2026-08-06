@@ -431,6 +431,139 @@ public sealed class WindowHostSessionTests
             state.GetProperty("navigation_error").GetString());
     }
 
+    [Fact]
+    public void ShellCommandsCarryTheResolvedRootAndNeverAProgramPath()
+    {
+        var incoming = Concatenate(
+            Frame(HandoffProtocolTests.PythonCanonicalBootstrap()),
+            HandoffProtocolTests.BuildMessage(
+                2,
+                "eda-applications",
+                Now + 30_000,
+                new Dictionary<string, object?>()),
+            HandoffProtocolTests.BuildMessage(
+                3,
+                "shell-reveal",
+                Now + 30_000,
+                new Dictionary<string, object?>
+                {
+                    ["root"] = @"C:\Libraries\Stockroom Library",
+                    ["path"] = @"C:\Libraries\Stockroom Library\sourced\part-1",
+                }),
+            HandoffProtocolTests.BuildMessage(
+                4,
+                "eda-open",
+                Now + 30_000,
+                new Dictionary<string, object?>
+                {
+                    ["application_id"] = "kicad",
+                    ["root"] = @"C:\Exports",
+                    ["path"] = @"C:\Exports\part-1\kicad\part-1.kicad_sym",
+                }),
+            HandoffProtocolTests.BuildMessage(
+                5,
+                "shutdown",
+                Now + 30_000,
+                new Dictionary<string, object?>()));
+        using var stream = new ScriptedDuplexStream(incoming);
+        using var channel = new HandoffChannel(stream, () => Now);
+        using var bootstrap = BootstrapParser.Parse(channel.Receive("bootstrap"));
+        var controller = new FakeController();
+
+        new WindowHostSession(channel, bootstrap, controller, 111, 222).Run();
+
+        Assert.Equal(
+            [
+                "eda-applications",
+                @"shell-reveal:C:\Libraries\Stockroom Library:"
+                    + @"C:\Libraries\Stockroom Library\sourced\part-1",
+                @"eda-open:kicad:C:\Exports:C:\Exports\part-1\kicad\part-1.kicad_sym",
+                "shutdown",
+            ],
+            controller.Operations);
+        var responses = DecodeFrames(stream.Written);
+        Assert.Equal(
+            [
+                "hello-hidden",
+                "eda-applications",
+                "shell-revealed",
+                "eda-opened",
+                "stopping",
+            ],
+            responses.Select(static item => item.Name));
+        var application = responses[1]
+            .Payload
+            .GetProperty("result")
+            .GetProperty("applications")[0];
+        Assert.Equal(
+            new[] { "id", "name", "version" },
+            application.EnumerateObject()
+                .Select(static item => item.Name)
+                .Order(StringComparer.Ordinal));
+        Assert.Equal("kicad", application.GetProperty("id").GetString());
+        // The executable never crosses the channel. Python asks for an application by id and the
+        // host resolves the binary itself, so no response here can be turned into a launch target.
+        Assert.DoesNotContain("KiCad\\\\bin", responses[1].Payload.GetRawText(), StringComparison.Ordinal);
+    }
+
+    [Theory]
+    // A command the allowlist does not carry, whatever it is named after.
+    [InlineData("shell-open")]
+    [InlineData("shell-execute")]
+    [InlineData("eda-applications-all")]
+    public void RefusesACommandThatIsNotInTheAllowlist(string name)
+    {
+        var incoming = Concatenate(
+            Frame(HandoffProtocolTests.PythonCanonicalBootstrap()),
+            HandoffProtocolTests.BuildMessage(
+                2,
+                name,
+                Now + 30_000,
+                new Dictionary<string, object?>
+                {
+                    ["path"] = @"C:\Windows\System32",
+                }));
+        using var stream = new ScriptedDuplexStream(incoming);
+        using var channel = new HandoffChannel(stream, () => Now);
+        using var bootstrap = BootstrapParser.Parse(channel.Receive("bootstrap"));
+        var controller = new FakeController();
+
+        Assert.Throws<WindowHostException>(
+            () => new WindowHostSession(channel, bootstrap, controller, 111, 222).Run());
+
+        // Refused at the channel, before any handler ran: nothing was dispatched and the only
+        // thing written back is the hello.
+        Assert.Empty(controller.Operations);
+        Assert.Equal(
+            ["hello-hidden"],
+            DecodeFrames(stream.Written).Select(static item => item.Name));
+    }
+
+    [Theory]
+    // Missing the root the backend is required to resolve.
+    [InlineData(@"{""path"":""C:\\Libraries\\L\\sourced\\part-1""}")]
+    // An extra field nobody reads is still a payload this host does not accept.
+    [InlineData(
+        @"{""root"":""C:\\Libraries\\L"",""path"":""C:\\Libraries\\L\\a"",""verb"":""runas""}")]
+    public void RefusesAShellRevealPayloadThatIsNotTheExactContract(string payload)
+    {
+        var incoming = Concatenate(
+            Frame(HandoffProtocolTests.PythonCanonicalBootstrap()),
+            HandoffProtocolTests.BuildRawMessage(2, "shell-reveal", Now + 30_000, payload));
+        using var stream = new ScriptedDuplexStream(incoming);
+        using var channel = new HandoffChannel(stream, () => Now);
+        using var bootstrap = BootstrapParser.Parse(channel.Receive("bootstrap"));
+        var controller = new FakeController();
+
+        Assert.Throws<WindowHostException>(
+            () => new WindowHostSession(channel, bootstrap, controller, 111, 222).Run());
+
+        Assert.Empty(controller.Operations);
+        Assert.Equal(
+            ["hello-hidden", "command-error"],
+            DecodeFrames(stream.Written).Select(static item => item.Name));
+    }
+
     private static byte[] Frame(byte[] body)
     {
         var framed = new byte[body.Length + 4];
@@ -592,6 +725,21 @@ public sealed class WindowHostSessionTests
                 ["provider_ready"] = true,
             };
         }
+
+        public IReadOnlyList<EdaApplication> DetectedEdaApplications()
+        {
+            Operations.Add("eda-applications");
+            return
+            [
+                new EdaApplication("kicad", "KiCad 9.0", "9.0.1", @"C:\KiCad\bin\kicad.exe"),
+            ];
+        }
+
+        public void RevealDirectory(string root, string path) =>
+            Operations.Add($"shell-reveal:{root}:{path}");
+
+        public void OpenFileWith(string applicationId, string root, string path) =>
+            Operations.Add($"eda-open:{applicationId}:{root}:{path}");
 
         public IReadOnlyDictionary<string, object?> Health()
         {

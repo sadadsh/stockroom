@@ -34,7 +34,7 @@ export function BuildIndexGate() {
   const buildingLabel = useText("stm.index.action.building", "Building...");
   const savingLabel = useText("stm.index.action.saving", "Saving...");
   const chooseFolderLabel = useText("stm.index.action.choose-source", "Choose CubeMX Folder");
-  const retryLabel = useText("stm.index.action.retry", "Try Again");
+  const retryLabel = useText("stm.index.action.retry", "Rerun");
   const buildLabel = useText("stm.index.action.build", "Build the Index");
 
   useEffect(() => {
@@ -75,11 +75,7 @@ export function BuildIndexGate() {
           <Text id="stm.index.title">Build the Index</Text>
         </h2>
         <p className="mb-4 text-sm text-t2">
-          <Text id="stm.index.body">
-            The STM32 spec matrix and pinout maps are served from a derived index built from your
-            CubeMX source. It has not been built yet on this machine. Building runs once and takes a
-            moment.
-          </Text>
+          <Text id="stm.index.body">The STM32 spec matrix and pinout maps are served from a derived index built from the CubeMX source. It has not been built on this machine. Building runs once and takes a moment.</Text>
         </p>
 
         {running ? (
@@ -95,12 +91,12 @@ export function BuildIndexGate() {
         ) : null}
 
         {build.status === "error" ? (
-          <p className="mb-4 text-sm text-err" data-testid="stm-build-error">
+          <p className="mb-4 text-sm text-err-text" data-testid="stm-build-error">
             {needsSource ? needsSourceLabel : build.error}
           </p>
         ) : null}
 
-        {pickerError ? <p className="mb-4 text-sm text-err">{pickerError}</p> : null}
+        {pickerError ? <p className="mb-4 text-sm text-err-text">{pickerError}</p> : null}
 
         {settings.data?.stm_cubemx_source ? (
           <p

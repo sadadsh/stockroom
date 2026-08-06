@@ -672,6 +672,13 @@ def run_windowed(
             )
             if callable(provider_surface):
                 setattr(ctx, "provider_browser_surface", provider_surface)
+            # The shell bridge behind Manage > Export Component... / Open In... / Reveal
+            # Component Files.... Absent (and the three menu items with it) on a host that does
+            # not own a native window, which is honest: nothing can reveal a folder from a
+            # headless process, and an item that cannot work is a dead click path.
+            native_shell = getattr(production_update_runtime, "native_shell", None)
+            if native_shell is not None:
+                setattr(ctx, "native_shell", native_shell)
         # Do not expose the local ASGI app until production authority is active
         # or explicitly bound fail-closed. This removes the startup interval in
         # which mutation routes previously ran without any service fence.

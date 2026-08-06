@@ -3,8 +3,30 @@ import { render, screen, fireEvent, waitFor, within } from "@testing-library/rea
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createElement, type ReactNode } from "react";
 import { AfOptionsPanel } from "./AfOptionsPanel";
+import { PinInspector } from "./PinInspector";
 import { api } from "../../api/client";
-import type { PinAfResponse, SignalCandidatesResponse } from "../../api/types";
+import type { PinAfResponse, PinDTO, SignalCandidatesResponse } from "../../api/types";
+
+// One pin at `position`, enough for PinInspector to mount the AF panel for it.
+function pinAt(position: string): PinDTO {
+  return {
+    position,
+    position_kind: "numeric",
+    lqfp_side: "left",
+    bga_row: null,
+    bga_col: null,
+    canonical_pin_name: `PA${position}`,
+    raw_pin_name: `PA${position}`,
+    pin_type: "I/O",
+    electrical_class: "io",
+    category: "io",
+    roles: [],
+    functions: [],
+    alternate_functions: [],
+    five_v: null,
+    supply: null,
+  };
+}
 
 const PIN_AF: PinAfResponse = {
   position: "23",
@@ -77,7 +99,27 @@ describe("AfOptionsPanel", () => {
     await screen.findByText(/USART2_TX/);
     expect(candSpy).not.toHaveBeenCalled();
     expect(
-      screen.getByText(/Select a signal above to see every candidate pin/),
+      screen.getByText(/Select a signal above to see each candidate pin/),
+    ).toBeInTheDocument();
+  });
+
+  // The chosen signal belongs to ONE pin: the previous pin's signal may not exist on the new one.
+  // The panel no longer clears it in an effect (which showed the stale candidate list for a render
+  // first); PinInspector keys the panel on the pin, so a new pin arrives already clear.
+  it("a new pin clears the chosen signal, with no render still showing the old candidates", async () => {
+    vi.spyOn(api, "getStmPinAf").mockResolvedValue(PIN_AF);
+    vi.spyOn(api, "getStmSignalCandidates").mockResolvedValue(CANDIDATES);
+    const { rerender } = render(<PinInspector pin={pinAt("23")} part="STM32F407VETx" />, {
+      wrapper: wrapperWith(freshClient()),
+    });
+    fireEvent.click(await screen.findByText(/USART2_TX/));
+    expect(await screen.findByTestId("af-signal-candidates")).toBeInTheDocument();
+
+    rerender(<PinInspector pin={pinAt("24")} part="STM32F407VETx" />);
+
+    expect(screen.queryByTestId("af-signal-candidates")).toBeNull();
+    expect(
+      screen.getByText(/Select a signal above to see each candidate pin/),
     ).toBeInTheDocument();
   });
 });

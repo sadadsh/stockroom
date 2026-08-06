@@ -58,11 +58,11 @@ export function LibraryHealthSection() {
     <>
         {scan.isLoading ? (
           <p className="py-1 text-sm text-t3">
-            <Text id="library.health.loading">Scanning your components...</Text>
+            <Text id="library.health.loading">Scanning the components...</Text>
           </p>
         ) : scan.isError ? (
-          <p className="py-1 text-sm text-err">
-            <Text id="library.health.error">Could not scan your components.</Text>
+          <p className="py-1 text-sm text-err-text">
+            <Text id="library.health.error">Could not scan the components.</Text>
           </p>
         ) : scan.data ? (
           <HealthBody data={scan.data} onRepair={onRepair} repairing={repair.isPending} />
@@ -86,7 +86,7 @@ function HealthBody({
         <Dot tone="ok" />
         <span className="text-sm text-t2">
           <Text id="library.health.healthy">
-            Your components are healthy. Every part matches its record and every file is committed.
+            Your components are sound. Each part matches its record and each file is committed.
           </Text>
         </span>
       </div>
@@ -101,8 +101,14 @@ function HealthBody({
           <div className="text-xs font-semibold text-t2">
             <Text id="library.health.fixable-heading">Can Be Repaired</Text>
           </div>
-          {data.fixable.map((action, i) => (
-            <ActionRow key={`${action.kind}-${action.part_id}-${i}`} action={action} />
+          {/* kind + part + detail IS the action's identity: `detail` names the exact field or
+              file, so two actions can never collide without being the same action. Keying on the
+              position reassigned rows every time a repair shortened the list. */}
+          {data.fixable.map((action) => (
+            <ActionRow
+              key={`${action.kind}:${action.part_id}:${action.detail}`}
+              action={action}
+            />
           ))}
         </div>
       ) : null}
@@ -113,14 +119,20 @@ function HealthBody({
             {data.uncommitted.length}{" "}
             {data.uncommitted.length === 1 ? "uncommitted change" : "uncommitted changes"}
           </span>{" "}
-          in the working tree will be committed by the repair.
+          <Text id="library.health.uncommitted-note">
+            in the working tree will be committed as part of the repair.
+          </Text>
         </div>
       ) : null}
 
       {fixableCount > 0 ? (
         <div>
           <Button variant="accent" onClick={onRepair} disabled={repairing} data-dev-id="settings.health-repair">
-            {repairing ? "Repairing..." : "Apply Safe Library Repairs"}
+            {repairing ? (
+              <Text id="library.health.repair-busy">Repairing...</Text>
+            ) : (
+              <Text id="library.health.repair">Commit Safe Catalog Repairs</Text>
+            )}
           </Button>
         </div>
       ) : null}
@@ -131,13 +143,13 @@ function HealthBody({
             <Text id="library.health.manual-heading">Needs Attention</Text>
           </div>
           <p className="text-xs text-t3">
-            <Text id="library.health.manual-note">
-              These cannot be fixed automatically. A missing file is never fabricated and a broken
-              reference is never silently removed.
-            </Text>
+            <Text id="library.health.manual-note">No automatic repair can fix these. A missing file is never fabricated and a broken reference is never removed in silence.</Text>
           </p>
-          {data.manual.map((finding, i) => (
-            <FindingRow key={`${finding.kind}-${finding.part_id}-${i}`} finding={finding} />
+          {data.manual.map((finding) => (
+            <FindingRow
+              key={`${finding.kind}:${finding.part_id}:${finding.detail}`}
+              finding={finding}
+            />
           ))}
         </div>
       ) : null}
@@ -158,7 +170,7 @@ function ActionRow({ action }: { action: RepairAction }) {
       <div className="text-sm text-t1">{action.detail}</div>
       <div className="flex flex-wrap items-center gap-2 font-mono text-xs">
         <span className="text-t3 line-through">{action.before || "(empty)"}</span>
-        <span className="text-ok">{action.after}</span>
+        <span className="text-ok-text">{action.after}</span>
       </div>
     </div>
   );

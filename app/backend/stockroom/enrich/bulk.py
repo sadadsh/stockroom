@@ -13,6 +13,7 @@ from __future__ import annotations
 import csv
 import io
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 
 from stockroom.enrich.datasheet import extract_datasheet_specs
 from stockroom.enrich.errors import EnrichError
@@ -373,7 +374,9 @@ def bulk_import(
                 item.status = "would-add"
                 added_mpns.add(item.mpn)
                 continue
-            record = ops.add_part(candidate.to_staged_part())
+            record = ops.add_part(
+                candidate.to_staged_part(), now=datetime.now(UTC).isoformat()
+            )
             item.status = "added"
             item.part_id = getattr(record, "id", "")
             item.display_name = getattr(record, "display_name", "") or item.display_name

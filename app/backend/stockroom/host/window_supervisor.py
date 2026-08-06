@@ -633,6 +633,32 @@ def _validate_staging_root(value: str) -> str:
     return value
 
 
+_EDA_APPLICATION_ID = re.compile(r"[a-z][a-z0-9-]{0,31}", re.ASCII)
+_MAX_SHELL_PATH_LENGTH = 4096
+
+
+def _validate_shell_path(value: str, label: str) -> str:
+    """An absolute, drive-rooted, already-canonical Windows path, or a refusal.
+
+    The window host repeats every one of these checks. That is deliberate: this is the boundary
+    where a path stops being data and starts being something Windows will act on, and a boundary
+    guarded on one side only is guarded by whichever side was not changed last.
+    """
+
+    if type(value) is not str or not value or len(value) > _MAX_SHELL_PATH_LENGTH:
+        raise ValueError(f"{label} is invalid")
+    if (
+        value != value.strip()
+        or any(character < " " or character == "\x7f" for character in value)
+        or any(character in value for character in '"*?<>|')
+        or value.startswith("\\\\")
+        or ".." in Path(value).parts
+        or not Path(value).is_absolute()
+    ):
+        raise ValueError(f"{label} must be an exact absolute local path")
+    return value
+
+
 def _validate_provider_identity(value: str, label: str) -> str:
     if (
         type(value) is not str
@@ -1417,6 +1443,101 @@ class WindowHostClient:
             return health
 
         return self._command("health", "health", parse)
+
+    def detected_eda_applications(self) -> tuple[dict[str, str], ...]:
+        """The EDA applications the window host proved are installed on this machine.
+
+        Each row is ``id`` / ``name`` / ``version`` and nothing else. The host deliberately does
+        not return the executable it found: naming an application is enough to offer it, and a
+        program path travelling back over this channel is the beginning of a launch primitive
+        that takes its target from the caller.
+        """
+
+        def parse(
+            response: HandoffMessage,
+            sequence: int,
+        ) -> tuple[dict[str, str], ...]:
+            result = _strict_result(
+                response,
+                request_sequence=sequence,
+                keys=frozenset({"applications"}),
+            )
+            rows = result["applications"]
+            if type(rows) is not list or len(rows) > 16:
+                raise WindowSupervisorProtocolError("EDA application inventory is invalid")
+            applications: list[dict[str, str]] = []
+            for row in cast(list[object], rows):
+                if type(row) is not dict or frozenset(row) != frozenset(
+                    {"id", "name", "version"}
+                ):
+                    raise WindowSupervisorProtocolError("EDA application row is invalid")
+                typed = cast(dict[str, object], row)
+                if any(type(typed[key]) is not str for key in typed):
+                    raise WindowSupervisorProtocolError("EDA application row is invalid")
+                applications.append({key: cast(str, typed[key]) for key in typed})
+            return tuple(applications)
+
+        return self._command("eda-applications", "eda-applications", parse)
+
+    def reveal_directory(self, root: str, path: str) -> None:
+        """Open the OS file browser at one directory the caller already resolved.
+
+        ``root`` travels with ``path`` so the host can refuse an escape on its own rather than
+        trusting that this process did. Both are absolute local paths this backend computed; no
+        value from the web layer reaches either argument.
+        """
+
+        root = _validate_shell_path(root, "shell root")
+        path = _validate_shell_path(path, "shell path")
+
+        def parse(response: HandoffMessage, sequence: int) -> None:
+            result = _strict_result(
+                response,
+                request_sequence=sequence,
+                keys=frozenset({"revealed"}),
+            )
+            if result["revealed"] is not True:
+                raise WindowSupervisorProtocolError("window-host did not report a reveal")
+
+        self._command(
+            "shell-reveal",
+            "shell-revealed",
+            parse,
+            payload={"root": root, "path": path},
+        )
+
+    def open_file_with_eda_application(
+        self,
+        application_id: str,
+        root: str,
+        path: str,
+    ) -> None:
+        """Start one detected EDA application on a file inside a resolved root."""
+
+        if type(application_id) is not str or not _EDA_APPLICATION_ID.fullmatch(application_id):
+            raise ValueError("EDA application id is invalid")
+        root = _validate_shell_path(root, "shell root")
+        path = _validate_shell_path(path, "shell path")
+
+        def parse(response: HandoffMessage, sequence: int) -> None:
+            result = _strict_result(
+                response,
+                request_sequence=sequence,
+                keys=frozenset({"opened"}),
+            )
+            if result["opened"] is not True:
+                raise WindowSupervisorProtocolError("window-host did not report an open")
+
+        self._command(
+            "eda-open",
+            "eda-opened",
+            parse,
+            payload={
+                "application_id": application_id,
+                "root": root,
+                "path": path,
+            },
+        )
 
     def export_session(self) -> object:
         def parse(response: HandoffMessage, sequence: int) -> object:

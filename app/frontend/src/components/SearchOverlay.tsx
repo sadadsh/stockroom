@@ -8,6 +8,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -27,6 +28,7 @@ import {
   emptyFilters,
   formatMagnitude,
   hasAnyFilter,
+  type FilterChip,
   PRICE_KEY,
   isOptionOn,
   makeScale,
@@ -46,7 +48,7 @@ import {
   VALUE_COLUMN_KEY,
 } from "../lib/searchFilters";
 import { prettifyValue } from "../lib/specSchema";
-import { Text, useText } from "../lib/copy";
+import { Text, useCopyFormatter, useText } from "../lib/copy";
 import { SearchIcon } from "./icons";
 import { Icon } from "./Icon";
 import { RouteHeader } from "./primitives";
@@ -57,6 +59,14 @@ import {
   type SearchSortState,
 } from "../lib/uiSession";
 import { SEARCH_FACET_RAIL_WIDTH } from "../lib/libraryLayout";
+import {
+  LIFECYCLE_KEYS,
+  PACKAGE_KEYS,
+  firstSpec,
+  normalizedLabel,
+  searchEvidenceColumns,
+  searchMatchEvidence,
+} from "./searchEvidence";
 
 // --- small inline glyphs (the artifact's own set) ---------------------------
 // Each helper keeps its wrapper + className passthrough so every call site is unchanged, but now
@@ -91,20 +101,11 @@ export function SearchOverlay({ onClose, onOpenPart }: Props) {
   const [activeId, setActiveId] = useState<string | null>(
     () => readUiSession().search_results.active_part_id,
   );
-  const inputRef = useRef<HTMLInputElement>(null);
   const [resultsScrollElement, setResultsScrollElement] =
     useState<HTMLDivElement | null>(null);
   const restoredResultsOffset = useRef(
     readUiSession().search_results.offset_px,
   ).current;
-  // Hoisted to the component top: the results table renders one row per part, so a per-row hook
-  // would both break the rules of hooks and cost the 1,000-row performance contract.
-  const queryPlaceholder = useText(
-    "search.query-placeholder",
-    "Search components using a name, MPN, value, or specification...",
-  );
-  const queryAriaLabel = useText("search.query-label", "Search components");
-  const clearSearchLabel = useText("search.clear-query", "Clear search");
 
   const category = filters.category;
   const spec = useMemo(() => toSpecParams(filters), [filters]);
@@ -122,8 +123,12 @@ export function SearchOverlay({ onClose, onOpenPart }: Props) {
     spec,
   });
 
-  const facets = paramFacets.data?.facets ?? [];
-  const serverRows = searchResults.data?.parts ?? [];
+  // The `?? []` these used to end in allocated a FRESH array on every render while the query was
+  // still in flight, so every downstream useMemo saw a changed dependency and recomputed each
+  // render - the memo was doing the work of no memo at all, plus a comparison. One shared empty
+  // array per shape fixes it without changing a single rendered value.
+  const facets = paramFacets.data?.facets ?? NO_FACETS;
+  const serverRows = searchResults.data?.parts ?? NO_ROWS;
   // the sourcing-derived Unit Price facet (not a spec) is synthesized from the rows and filtered
   // client-side; it rides the rail alongside the spec facets but never a column.
   const priceFacet = useMemo(() => makePriceFacet(serverRows), [serverRows]);
@@ -161,11 +166,17 @@ export function SearchOverlay({ onClose, onOpenPart }: Props) {
   }, [activeId, rows]);
   const activePartId = active >= 0 ? rows[active]?.id ?? null : null;
   const activeIdRef = useRef(activePartId);
-  activeIdRef.current = activePartId;
+  // Synced in a layout effect, not during render: render can be replayed or thrown away, and a ref
+  // written there would carry an anchor from a tree that never committed. Layout effects land before
+  // this commit's passive effects, so the scroll checkpoint below (and its teardown flush) still
+  // sees this render's anchor.
+  useLayoutEffect(() => {
+    activeIdRef.current = activePartId;
+  });
 
-  // Focus the field on open. Selection is identity-based rather than
-  // index-based, so a client-side sort cannot silently select another part.
-  useEffect(() => inputRef.current?.focus(), []);
+  // Selection is identity-based rather than index-based, so a client-side sort cannot silently
+  // select another part. (Focusing the query field on open belongs to the field, and lives with it
+  // in `SearchQueryBar`.)
   useEffect(() => {
     if (searchResults.isLoading) return;
     if (activePartId !== activeId) setActiveId(activePartId);
@@ -284,92 +295,18 @@ export function SearchOverlay({ onClose, onOpenPart }: Props) {
     // Every other modal escapes this by pairing an opaque popover card with a scrim; this
     // is the one full-screen surface with neither, so it needs a real opaque base.
     <div className="fixed inset-0 z-[100] flex flex-col bg-canvas" data-dev-id="search.root">
-      {/* top band: the overlay's title strip with the docked query field + the close affordance,
-          the same band + hairline family as every other panel header so the overlay reads as a
-          docked workspace, not a floating spotlight */}
-      <div className="flex h-[38px] flex-none items-center gap-3 border-b border-line bg-band px-3.5">
-        <span className="hidden flex-none text-xs font-semibold text-t2 sm:inline">
-          <Text id="search.title">Parametric Search</Text>
-        </span>
-        <div
-          className="flex h-[26px] min-w-0 flex-1 items-center gap-2 rounded-control border border-line bg-field px-2.5 focus-within:border-acc"
-          data-dev-id="search.query"
-        >
-          <SearchIcon className="h-3.5 w-3.5 flex-none text-t3" />
-          <input
-            ref={inputRef}
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder={queryPlaceholder}
-            aria-label={queryAriaLabel}
-            data-dev-id="search.query-input"
-            className="min-w-0 flex-1 bg-transparent text-sm text-t1 outline-none placeholder:text-t3"
-          />
-          {q ? (
-            <button
-              type="button"
-              onClick={() => setQ("")}
-              aria-label={clearSearchLabel}
-              className="grid h-[18px] w-[18px] flex-none place-items-center rounded-control text-t3 hover:bg-raise2 hover:text-t1"
-            >
-              <XSmall />
-            </button>
-          ) : null}
-        </div>
-        <button
-          type="button"
-          onClick={onClose}
-          className="ml-auto flex h-[26px] flex-none items-center gap-2 rounded-control border border-line bg-raise px-2.5 text-xs font-semibold text-t2 hover:bg-raise2 hover:text-t1"
-          data-dev-id="search.close"
-        >
-          <Text id="search.close">Close</Text>
-          <kbd className="inline-flex h-[16px] min-w-[20px] items-center justify-center rounded-control border border-line2 bg-raise2 px-1 font-mono text-2xs font-medium text-t2">
-            <Text id="search.close-key">Esc</Text>
-          </kbd>
-        </button>
-      </div>
+      <SearchQueryBar q={q} onQuery={setQ} onClose={onClose} />
 
-      {/* sub-strip: result count, the active-filter chips, and the sort control */}
-      <div
-        className="flex min-h-[34px] flex-none flex-wrap items-center gap-x-3 gap-y-1 border-b border-line bg-surface px-3.5 py-1"
-        data-dev-id="search.subbar"
-      >
-        <span className="flex-none text-sm font-bold text-t1" data-dev-id="search.result-count">
-          {searchResults.isLoading ? "…" : shown}
-          <span className="ml-1.5 text-xs font-medium text-t3">
-            {shown === 1 ? "result" : "results"}
-          </span>
-        </span>
-        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5" data-dev-id="search.chips">
-          {chips.map((chip) => (
-            <span
-              key={chip.id}
-              className="inline-flex items-center gap-1.5 rounded-control border border-line bg-raise2 py-0.5 pl-2 pr-1 text-xs font-semibold text-t1"
-            >
-              <span className="font-medium text-t3">{chip.keyLabel}:</span>
-              {chip.value}
-              <button
-                type="button"
-                onClick={() => setFilters(chip.remove)}
-                aria-label={`Remove ${chip.keyLabel} filter`}
-                className="grid h-4 w-4 place-items-center rounded-control text-t3 hover:bg-line2 hover:text-t1"
-              >
-                <XSmall />
-              </button>
-            </span>
-          ))}
-          {hasAnyFilter(filters) ? (
-            <button
-              type="button"
-              onClick={() => setFilters(clearAll(filters))}
-              className="text-xs font-semibold text-t2 hover:text-t1"
-            >
-              <Text id="search.clear-all">Clear All</Text>
-            </button>
-          ) : null}
-        </div>
-        <SortControl sort={sort} setSort={setSort} columns={columns} />
-      </div>
+      <SearchSubBar
+        loading={searchResults.isLoading}
+        shown={shown}
+        chips={chips}
+        filters={filters}
+        setFilters={setFilters}
+        sort={sort}
+        setSort={setSort}
+        columns={columns}
+      />
 
       {/* main: the schema-driven facet rail + the results grid, border-split docked panes */}
       <div
@@ -423,6 +360,156 @@ export function SearchOverlay({ onClose, onOpenPart }: Props) {
         <KbdHint keys={["↵"]} label="Open Part" />
         <KbdHint keys={["Esc"]} label="Close" />
       </div>
+    </div>
+  );
+}
+
+/**
+ * The overlay's title strip: the docked query field and the way out.
+ *
+ * Same band + hairline family as every other panel header, so the overlay reads as a docked
+ * workspace rather than a floating spotlight.
+ *
+ * It owns the field, so it owns the two things that belong to a field and to nothing else: the
+ * element reference, and the focus that has to land in it the moment the overlay opens. Neither
+ * was ever read anywhere else in the overlay - the arrow keys move a row, not a caret - and both
+ * used to sit at the top of a 360-line component, a long way from the one input they describe.
+ */
+function SearchQueryBar({
+  q,
+  onQuery,
+  onClose,
+}: {
+  q: string;
+  onQuery: (value: string) => void;
+  onClose: () => void;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const queryPlaceholder = useText(
+    "search.query-placeholder",
+    "Search components using a name, MPN, value, or specification...",
+  );
+  const queryAriaLabel = useText("search.query-label", "Search components");
+  const clearSearchLabel = useText("search.clear-query", "Clear search");
+  // Focus the field on open.
+  useEffect(() => inputRef.current?.focus(), []);
+  return (
+    <div className="flex h-[38px] flex-none items-center gap-3 border-b border-line bg-band px-3.5">
+      <span className="hidden flex-none text-xs font-semibold text-t2 sm:inline">
+        <Text id="search.title">Parametric Search</Text>
+      </span>
+      <div
+        className="flex h-[26px] min-w-0 flex-1 items-center gap-2 rounded-control border border-line bg-field px-2.5 focus-within:border-acc"
+        data-dev-id="search.query"
+      >
+        <SearchIcon className="h-3.5 w-3.5 flex-none text-t3" />
+        <input
+          ref={inputRef}
+          value={q}
+          onChange={(e) => onQuery(e.target.value)}
+          placeholder={queryPlaceholder}
+          aria-label={queryAriaLabel}
+          data-dev-id="search.query-input"
+          className="min-w-0 flex-1 bg-transparent text-sm text-t1 outline-none placeholder:text-t3"
+        />
+        {q ? (
+          <button
+            type="button"
+            onClick={() => onQuery("")}
+            aria-label={clearSearchLabel}
+            className="grid h-[18px] w-[18px] flex-none place-items-center rounded-control text-t3 hover:bg-raise2 hover:text-t1"
+          >
+            <XSmall />
+          </button>
+        ) : null}
+      </div>
+      <button
+        type="button"
+        onClick={onClose}
+        className="ml-auto flex h-[26px] flex-none items-center gap-2 rounded-control border border-line bg-raise px-2.5 text-xs font-semibold text-t2 hover:bg-raise2 hover:text-t1"
+        data-dev-id="search.close"
+      >
+        <Text id="search.close">Close</Text>
+        <kbd className="inline-flex h-[16px] min-w-[20px] items-center justify-center rounded-control border border-line2 bg-raise2 px-1 font-mono text-2xs font-medium text-t2">
+          <Text id="search.close-key">Esc</Text>
+        </kbd>
+      </button>
+    </div>
+  );
+}
+
+/**
+ * The sub-strip: how many results, which narrowings are in force, and how they are ordered.
+ *
+ * Everything on this strip answers "what is this list showing", which is why the three sit
+ * together on one band rather than beside the query field or above the table. The chip remover's
+ * accessible name resolves here because the chips are drawn in a callback where no hook can run,
+ * and it names a field off the wire.
+ */
+function SearchSubBar({
+  loading,
+  shown,
+  chips,
+  filters,
+  setFilters,
+  sort,
+  setSort,
+  columns,
+}: {
+  loading: boolean;
+  shown: number;
+  chips: FilterChip[];
+  filters: SearchFilters;
+  setFilters: (next: SearchFilters) => void;
+  sort: { key: SortKey; dir: "asc" | "desc" };
+  setSort: (next: { key: SortKey; dir: "asc" | "desc" }) => void;
+  columns: SpecColumn[];
+}) {
+  const removeChipName = useCopyFormatter("search.chip-remove-aria", "Remove {field} filter");
+  return (
+    <div
+      className="flex min-h-[34px] flex-none flex-wrap items-center gap-x-3 gap-y-1 border-b border-line bg-surface px-3.5 py-1"
+      data-dev-id="search.subbar"
+    >
+      <span className="flex-none text-sm font-semibold text-t1" data-dev-id="search.result-count">
+        {loading ? "…" : shown}
+        <span className="ml-1.5 text-xs font-medium text-t3">
+          {shown === 1 ? (
+            <Text id="search.count-noun-one">result</Text>
+          ) : (
+            <Text id="search.count-noun-many">results</Text>
+          )}
+        </span>
+      </span>
+      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5" data-dev-id="search.chips">
+        {chips.map((chip) => (
+          <span
+            key={chip.id}
+            className="inline-flex items-center gap-1.5 rounded-control border border-line bg-raise2 py-0.5 pl-2 pr-1 text-xs font-semibold text-t1"
+          >
+            <span className="font-medium text-t3">{chip.keyLabel}:</span>
+            {chip.value}
+            <button
+              type="button"
+              onClick={() => setFilters(chip.remove)}
+              aria-label={removeChipName({ field: chip.keyLabel })}
+              className="grid h-4 w-4 place-items-center rounded-control text-t3 hover:bg-line2 hover:text-t1"
+            >
+              <XSmall />
+            </button>
+          </span>
+        ))}
+        {hasAnyFilter(filters) ? (
+          <button
+            type="button"
+            onClick={() => setFilters(clearAll(filters))}
+            className="text-xs font-semibold text-t2 hover:text-t1"
+          >
+            <Text id="search.clear-all">Clear All</Text>
+          </button>
+        ) : null}
+      </div>
+      <SortControl sort={sort} setSort={setSort} columns={columns} />
     </div>
   );
 }
@@ -671,13 +758,17 @@ function FacetRail({
   setFilters: (updater: (f: SearchFilters) => SearchFilters) => void;
   activeCount: number;
 }) {
+  // `FacetGroup` takes a plain string for its heading, so the copy layer is read here and the
+  // resolved value handed down. Class, not Category: the value under it is a component's own
+  // classification, and Class is this product's word for that everywhere else.
+  const classHeading = useText("search.rail.class-heading", "Class");
   return (
     <div className="flex min-h-0 flex-col" data-dev-id="search.rail">
       <RouteHeader right={activeCount > 0 ? `${activeCount} active` : undefined}>
         <Text id="search.filters.header">Filters</Text>
       </RouteHeader>
       <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-2 pt-1">
-        <FacetGroup title="Category" first data-dev-id="search.rail-category">
+        <FacetGroup title={classHeading} first data-dev-id="search.rail-category">
           {categories.map(([name, count]) => (
             <OptionRow
               key={name}
@@ -689,7 +780,7 @@ function FacetRail({
           ))}
           {categories.length === 0 ? (
             <div className="py-2 text-xs text-t3">
-              <Text id="search.filters.no-categories">No categories so far.</Text>
+              <Text id="search.filters.no-categories">No classes so far.</Text>
             </div>
           ) : null}
         </FacetGroup>
@@ -768,13 +859,18 @@ function FacetRail({
 }
 
 function RailSection({ label, fromSpecs }: { label: string; fromSpecs?: boolean }) {
+  // A tooltip is interface text, so it belongs in the copy layer like any label.
+  const fromSpecsHint = useText(
+    "search.filters.from-specs.hint",
+    "These filters are generated from the part specs in this class",
+  );
   return (
     <div className="flex items-center gap-2 pb-0.5 pt-5 text-ui-caption font-semibold text-copy first:pt-0.5">
       {label}
       {fromSpecs ? (
         <span
           className="inline-flex flex-none items-center gap-1 whitespace-nowrap rounded-control bg-acc-soft px-1.5 py-0.5 text-ui-meta font-semibold text-copy"
-          title="These filters are generated from the category's part specs"
+          title={fromSpecsHint}
         >
           <Spark className="h-2.5 w-2.5" />
           <Text id="search.filters.from-specs">From Specifications</Text>
@@ -898,6 +994,12 @@ function RangeFacet({
   const lo = sel?.min ?? fmin;
   const hi = sel?.max ?? fmax;
   const unit = normalizeUnit(facet.unit);
+  // The two bound fields are numeric inputs with no visible label of their own - the facet's name
+  // sits in the group heading above them, which a screen reader does not read as their name. The
+  // BOUND is copy and the facet name is DATA, so the sentence is a formatter with the spec name
+  // substituted in. Resolved above the early returns below, so the hook count is stable.
+  const minBoundLabel = useCopyFormatter("search.filters.range-min", "Minimum {facet}");
+  const maxBoundLabel = useCopyFormatter("search.filters.range-max", "Maximum {facet}");
   // Keep the hook count stable as live facet data changes. A degenerate range
   // has no truthful slider scale, so it becomes a read-only value below.
   const scale = useMemo(
@@ -916,7 +1018,7 @@ function RangeFacet({
           className="flex items-baseline justify-between py-1 text-xs"
         >
           <span className="text-t3">
-            <Text id="search.filters.only-value">Only value</Text>
+            <Text id="search.filters.only-value">Sole value</Text>
           </span>
           <span className="font-mono font-medium text-t1">
             {formatMagnitude(fmin, unit)}
@@ -943,23 +1045,38 @@ function RangeFacet({
         }
       />
       <div className="mt-2 flex justify-between px-1.5 font-mono text-2xs text-t3">
-        {scale!.ticks.map((t, i) => (
-          <span key={i}>{formatMagnitude(t, unit)}</span>
+        {/* A tick's identity IS its value: keying on the position reassigned labels between
+            scales when the facet's range changed under a filter. */}
+        {scale!.ticks.map((t) => (
+          <span key={t}>{formatMagnitude(t, unit)}</span>
         ))}
       </div>
       <div className="mt-2.5 grid grid-cols-2 gap-2">
-        <RangeInput value={lo} unit={unit} onCommit={(v) => onChange({ min: v <= fmin ? null : v, max: sel?.max ?? null })} />
-        <RangeInput value={hi} unit={unit} onCommit={(v) => onChange({ min: sel?.min ?? null, max: v >= fmax ? null : v })} />
+        <RangeInput
+          label={minBoundLabel({ facet: facet.label })}
+          value={lo}
+          unit={unit}
+          onCommit={(v) => onChange({ min: v <= fmin ? null : v, max: sel?.max ?? null })}
+        />
+        <RangeInput
+          label={maxBoundLabel({ facet: facet.label })}
+          value={hi}
+          unit={unit}
+          onCommit={(v) => onChange({ min: sel?.min ?? null, max: v >= fmax ? null : v })}
+        />
       </div>
     </FacetGroup>
   );
 }
 
 function RangeInput({
+  label,
   value,
   unit,
   onCommit,
 }: {
+  /** The whole accessible name, e.g. "Minimum Capacitance". Not a truncated visible label. */
+  label: string;
   value: number;
   unit: string;
   onCommit: (v: number) => void;
@@ -976,6 +1093,7 @@ function RangeInput({
   };
   return (
     <input
+      aria-label={label}
       value={text}
       onChange={(e) => setText(e.target.value)}
       onBlur={commit}
@@ -997,6 +1115,10 @@ function RangeSlider({
   onChange: (lo: number, hi: number) => void;
 }) {
   const trackRef = useRef<HTMLDivElement>(null);
+  // The two handles are drawn in a callback, so their names are resolved here. A drag handle has no
+  // visible text at all, which makes these the whole of what a screen reader can announce.
+  const minimumName = useText("search.range-minimum", "Minimum");
+  const maximumName = useText("search.range-maximum", "Maximum");
   const loPct = scale.toPct(lo);
   const hiPct = scale.toPct(hi);
 
@@ -1030,7 +1152,7 @@ function RangeSlider({
         <button
           key={which}
           type="button"
-          aria-label={which === "lo" ? "Minimum" : "Maximum"}
+          aria-label={which === "lo" ? minimumName : maximumName}
           onPointerDown={drag(which)}
           className="absolute top-1/2 h-[13px] w-[13px] -translate-x-1/2 -translate-y-1/2 cursor-grab touch-none rounded-control border border-line2 bg-raise2 hover:bg-raise active:cursor-grabbing"
           style={{ left: `${which === "lo" ? loPct : hiPct}%` }}
@@ -1042,30 +1164,16 @@ function RangeSlider({
 
 // --- results table ---------------------------------------------------------
 
+// Stable empty fallbacks for the two query payloads. Shared, never mutated: they exist only so an
+// absent result reads as the SAME empty list every render.
+const NO_FACETS: ParametricFacet[] = [];
+const NO_ROWS: SearchRow[] = [];
+
 export const SEARCH_RESULTS_VIRTUALIZATION_THRESHOLD = 100;
 const SEARCH_RESULT_ROW_HEIGHT = 51;
 const SEARCH_RESULTS_HEADER_HEIGHT = 33;
 const SEARCH_RESULTS_OVERSCAN = 8;
 const SEARCH_RESULTS_INITIAL_RECT = { width: 1024, height: 640 };
-const PACKAGE_KEYS = ["Package", "Package / Case", "Case", "Footprint"];
-const LIFECYCLE_KEYS = ["Lifecycle", "Part Status"];
-
-function normalizedLabel(value: string): string {
-  return value.toLowerCase().replace(/[^a-z0-9]+/g, "");
-}
-
-function firstSpec(
-  specs: SearchRow["specs"],
-  keys: readonly string[],
-): string {
-  const wanted = new Set(keys.map(normalizedLabel));
-  for (const [key, raw] of Object.entries(specs)) {
-    if (!wanted.has(normalizedLabel(key)) || raw == null || raw === "") continue;
-    return prettifyValue(String(raw));
-  }
-  return "";
-}
-
 function isFixedEvidenceColumn(column: SpecColumn): boolean {
   const keys = column.keys ?? [column.key];
   const fixed = new Set(
@@ -1084,42 +1192,6 @@ function resultSpecValue(row: SearchRow, column: SpecColumn): string {
       ? rowPrimaryValue(row.category, row.specs)
       : cellValue(row.specs, column.key);
   return value === "—" ? "" : value;
-}
-
-export function searchEvidenceColumns(rows: SearchRow[]): {
-  package: boolean;
-  lifecycle: boolean;
-} {
-  return {
-    package: rows.some((row) => firstSpec(row.specs, PACKAGE_KEYS) !== ""),
-    lifecycle: rows.some((row) => firstSpec(row.specs, LIFECYCLE_KEYS) !== ""),
-  };
-}
-
-export function searchMatchEvidence(
-  row: SearchRow,
-  query: string,
-): { match: string; evidence: string } {
-  const exactMpn =
-    query.trim() !== "" &&
-    row.mpn.trim().toLowerCase() === query.trim().toLowerCase();
-  const missing = row.missing
-    .map((item) =>
-      item
-        .replace(/^kicad[_\s-]*/i, "KiCad ")
-        .replace(/^altium[_\s-]*/i, "Altium ")
-        .replace(/[_-]+/g, " ")
-        .replace(/\b\w/g, (letter) => letter.toUpperCase()),
-    )
-    .filter(Boolean);
-  return {
-    match: exactMpn ? "Exact MPN" : query.trim() ? "Catalog Match" : "Catalog Record",
-    evidence: row.is_complete
-      ? "Record Evidence Complete"
-      : missing.length > 0
-        ? `Needs ${missing.join(", ")}`
-        : "Evidence Incomplete",
-  };
 }
 
 function ResultsTable({
@@ -1246,7 +1318,7 @@ function ResultsTable({
       <thead>
         <tr>
           <th className={th + " min-w-[240px]"}>
-            <Text id="search.results.col-identity">Identity</Text>
+            <Text id="search.results.col-identity">Identification</Text>
           </th>
           <th className={th + " min-w-[190px]"}>
             <Text id="search.results.col-match">Match &amp; Evidence</Text>
@@ -1270,7 +1342,7 @@ function ResultsTable({
           ) : null}
           {presence.lifecycle ? (
             <th className={th}>
-              <Text id="search.results.col-lifecycle">Lifecycle</Text>
+              <Text id="search.results.col-lifecycle">Product Status</Text>
             </th>
           ) : null}
           <th className={th + " min-w-[150px]"}>
@@ -1344,6 +1416,12 @@ function SearchResultRow({
 }) {
   const evidence = searchMatchEvidence(row, query);
   const packageValue = firstSpec(row.specs, PACKAGE_KEYS);
+  // A native tooltip takes a resolved string, so the caveat about what a search row can and cannot
+  // prove is read here rather than wrapped at its cell.
+  const evidenceCaveat = useText(
+    "search.results.eda-caveat",
+    "Search results do not hold per-tool validation evidence. Open the record for the authoritative KiCad and Altium verdicts.",
+  );
   return (
     <tr
       data-dev-id="search.results-row"
@@ -1385,7 +1463,7 @@ function SearchResultRow({
         <div
           className={
             "max-w-[230px] truncate text-ui-caption " +
-            (row.is_complete ? "text-ok" : "text-warn")
+            (row.is_complete ? "text-ok-text" : "text-warn")
           }
           title={evidence.evidence}
         >
@@ -1418,13 +1496,17 @@ function SearchResultRow({
       ) : null}
       <td
         className={td}
-        title="Search results do not carry per-tool verification evidence. Open the record for the authoritative KiCad and Altium verdicts."
+        title={evidenceCaveat}
       >
         <div className="font-semibold text-ink">
           <Text id="search.results.dual-eda-tools">KiCad + Altium</Text>
         </div>
         <div className="text-ui-caption text-warn">
-          {row.is_complete ? "Open To Verify" : "Needs Evidence"}
+          {row.is_complete ? (
+            <Text id="search.results.open-to-validate">Open To Validate</Text>
+          ) : (
+            <Text id="search.results.needs-evidence">Needs Evidence</Text>
+          )}
         </div>
       </td>
     </tr>
@@ -1444,7 +1526,7 @@ function Lifecycle({ specs }: { specs: Record<string, string | number | boolean>
           : { color: "var(--c-t2)", background: "var(--c-field)" }
       }
     >
-      {isActive ? "Active" : raw}
+      {isActive ? <Text id="search.results.lifecycle-active">Active</Text> : raw}
     </span>
   );
 }

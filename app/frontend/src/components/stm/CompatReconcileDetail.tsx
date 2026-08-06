@@ -49,11 +49,9 @@ export function CompatReconcileDetail({ position }: { position: UnionPositionDTO
             </div>
             {reconcile.swaps.length > 0 ? (
               <ul className="flex flex-col gap-1">
-                {reconcile.swaps.map((s, i) => (
-                  <li
-                    key={`${s.ref}-${s.via_af_index}-${i}`}
-                    className="flex items-baseline justify-between gap-3"
-                  >
+                {/* One swap per diverging part, so the part ref is the row's id. */}
+                {reconcile.swaps.map((s) => (
+                  <li key={s.ref} className="flex items-baseline justify-between gap-3">
                     <span className="flex-none font-mono text-xs text-t1">{s.ref}</span>
                     <span className="min-w-0 truncate font-mono text-xs text-t2">
                       <span className="text-t3">AF{s.via_af_index}</span> {s.target_signal}
@@ -86,8 +84,9 @@ export function CompatReconcileDetail({ position }: { position: UnionPositionDTO
         {/* Bounded: the audit trail across a whole-family set runs to dozens of parts; it
             scrolls inside the card rather than stretching the page. */}
         <ul className="flex max-h-64 flex-col gap-2 overflow-y-auto" data-testid="compat-per-part">
-          {per_part.map((pp, i) => (
-            <li key={`${pp.ref}-${i}`} className="flex flex-col gap-0.5">
+          {/* One entry per part in the set, so the part ref is the row's id. */}
+          {per_part.map((pp) => (
+            <li key={pp.ref} className="flex flex-col gap-0.5">
               <div className="flex items-baseline justify-between gap-3">
                 <span className="flex-none font-mono text-xs text-t1">{pp.ref}</span>
                 <span className="font-mono text-2xs text-t3">{pp.canonical_pin_name}</span>

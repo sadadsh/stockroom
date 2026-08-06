@@ -12,20 +12,34 @@
  * not a spec token.
  */
 import type { ParametricFacet } from "../api/types";
-import { categoryPrimarySpecKey, PRIMARY_VALUE_KEYS } from "./derive";
 import { normalizeSpecKey, prettifyValue, resolveSpec, type SpecGroupName } from "./specSchema";
 
 // The synthetic column key for the mixed-list adaptive Value column (FIX-05). A sentinel, not a
 // real spec key, so cellValue / the sort control can recognize it and resolve each row's own value.
 export const VALUE_COLUMN_KEY = "__value__";
 
+// A passive's defining parametric value, per category. This lives HERE rather than in the detail
+// derivers because the parametric search is its only consumer: the opened component reads the
+// dossier's own `keySpecifications`, which the category schema chooses, so a client-side table of
+// "the important one" has no business being shared with it.
+const _CATEGORY_PRIMARY_SPEC: Record<string, string> = {
+  resistors: "resistance",
+  capacitors: "capacitance",
+  inductors: "inductance",
+  "ferrite beads": "impedance",
+};
+
+/** The defining spec key for a category, or null for one with no single primary value (an IC). */
+export function categoryPrimarySpecKey(category: string): string | null {
+  return _CATEGORY_PRIMARY_SPEC[normalizeSpecKey(category)] ?? null;
+}
+
 // The primary-value parameters that collapse into the one Value column on a mixed list: the
-// shared passive keys (resistance/capacitance/inductance) plus impedance (a ferrite bead's primary
-// value). Built from the shared PRIMARY_VALUE_KEYS so the mapping is never forked.
-const _VALUE_COLLAPSE_KEYS = new Set<string>([
-  ...PRIMARY_VALUE_KEYS,
-  normalizeSpecKey("impedance"),
-]);
+// shared passive keys plus impedance (a ferrite bead's primary value). Each of them is the value a
+// person reads the part BY, so N of them side by side is N columns of em dashes.
+const _VALUE_COLLAPSE_KEYS = new Set<string>(
+  ["resistance", "capacitance", "inductance", "impedance"].map(normalizeSpecKey),
+);
 
 // The order a row's own primary value is resolved when its category has no registered primary spec.
 const _VALUE_FALLBACK_ORDER = ["resistance", "capacitance", "inductance", "impedance"].map(
@@ -419,11 +433,16 @@ export function deriveColumns(
   maxCols = 5,
 ): SpecColumn[] {
   const cat = category ?? "";
-  const scored = facets
-    .filter((f) => f.kind === "range" || (f.options?.length ?? 0) > 1)
-    .map((f) => ({ f, score: _columnScore(f, cat) }))
-    .filter((s) => s.score > -Infinity)
-    .sort((a, b) => (b.score - a.score) || (b.f.count - a.f.count));
+  // Scored in ONE pass: a single-valued option is dropped before it is scored (so the score is
+  // computed exactly once per surviving facet, as before), then the commercial keys the score
+  // rejects outright drop out. The sort then ranks what is left.
+  const scored: { f: ParametricFacet; score: number }[] = [];
+  for (const f of facets) {
+    if (f.kind !== "range" && (f.options?.length ?? 0) <= 1) continue;
+    const score = _columnScore(f, cat);
+    if (score > -Infinity) scored.push({ f, score });
+  }
+  scored.sort((a, b) => (b.score - a.score) || (b.f.count - a.f.count));
   let cols: SpecColumn[] = scored.map(({ f }) => {
     const r = resolveSpec(f.key, cat);
     return {

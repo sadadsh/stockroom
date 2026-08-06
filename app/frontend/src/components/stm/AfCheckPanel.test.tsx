@@ -2,7 +2,8 @@ import { describe, expect, it, vi, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createElement, type ReactNode } from "react";
-import { AfCheckPanel, buildAssignments } from "./AfCheckPanel";
+import { AfCheckPanel } from "./AfCheckPanel";
+import { buildAssignments } from "./afAssignments";
 import { api } from "../../api/client";
 import type { UnionDTO, UnionPositionDTO } from "../../api/types";
 

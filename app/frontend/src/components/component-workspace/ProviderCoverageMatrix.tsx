@@ -1,11 +1,23 @@
 /**
- * Every provider's coverage of ONE component, in the order the backend ranked them.
+ * Compare Sources: every provider's coverage of ONE component, as a dense table.
  *
- * The screen answers one question: which provider can supply the whole set for this part - a
- * symbol, a footprint and a 3D model - so a person can go to that provider and come back with a
- * coherent download. Stockroom never combines files from two providers, so there is deliberately
- * NO per-artifact provider chooser here and there must never be one: what a row offers is a whole
- * set or an honest shortfall, and `complete` is the thing the eye should find first.
+ * Five columns of facts - `Provider | 3D Model | Footprint | Symbol | Validation` - and one
+ * action. The three asset columns run in the order the CAD modules beside this table are stacked,
+ * which is the frontend's `CAD_ASSET_KINDS`, not the order the payload happens to list them in.
+ * Never a card per provider: a person comparing eight providers is scanning a column,
+ * and eight stacked panels turn one comparison into eight readings of the same four fields.
+ *
+ * The screen answers one question: which provider can supply the whole set for this part, so a
+ * person can go there and come back with a coherent download. Stockroom never combines files
+ * from two providers, and this table does not offer a way to: the SET choice is the primary
+ * control, a per-asset choice exists because pinning one artifact is a legitimate thing to want,
+ * and a per-asset choice that would leave two providers in force is offered DISABLED with the
+ * reason on it rather than accepted and refused afterwards.
+ *
+ * No EDA application is named here. The two per-tool count columns this replaces put `KiCad` and
+ * `Altium` in the middle of an ordinary comparison, which is a compatibility report wearing a
+ * coverage table's clothes. What a person compares is availability, validation and source; which
+ * application can open the result belongs behind an explicit export action.
  *
  * Nothing is re-sorted: rows arrive ranked by evidence and are rendered in the given order. No
  * confidence percentages appear anywhere, because a number between 0 and 1 would only be an
@@ -13,20 +25,22 @@
  *
  * A person may correct two things and only two: whether a provider HAS an artifact, or does not.
  * "Downloaded" and "validated" are claims about bytes Stockroom is holding, so they are not
- * offered - the backend rejects them, and a control that could only produce a 422 is not a
- * control. When Stockroom's own evidence outranks a correction the row says so rather than
+ * offered. When Stockroom's own evidence outranks a correction the row says so rather than
  * quietly discarding what the person said.
  */
 import type {
+  CadPreferenceOption,
+  CadPreferenceView,
   ComponentProvidersView,
   CoverageArtifact,
   CoverageStatus,
   ProviderCoverageRow,
-} from "../../api/workspaceTypes";
-import { providerToolCoverage } from "../../api/workspaceTypes";
+} from "../../api/dossierTypes";
 import { componentProviderDevId } from "../../lib/componentDevIds";
 import { Text, useText } from "../../lib/copy";
-import { Badge, Button } from "../primitives";
+import { Button } from "../primitives";
+import { StatusText, type StatusTone } from "../typography";
+import { CAD_ASSET_KINDS } from "./cadPreference";
 
 /** The only two answers a person can give, plus withdrawing one they already gave. */
 export type UserCoverageStatus = "available" | "not_available" | "";
@@ -35,11 +49,6 @@ const ARTIFACT_LABEL: Record<CoverageArtifact, string> = {
   symbol: "Symbol",
   footprint: "Footprint",
   model: "3D Model",
-};
-
-const TOOL_LABEL: Record<string, string> = {
-  kicad: "KiCad",
-  altium: "Altium",
 };
 
 const STATUS_LABEL: Record<CoverageStatus, string> = {
@@ -57,16 +66,20 @@ const SUPPLIED: ReadonlySet<CoverageStatus> = new Set<CoverageStatus>([
   "validated",
 ]);
 
-function statusClass(status: CoverageStatus): string {
-  if (status === "validated" || status === "downloaded") return "text-ok";
-  if (status === "available") return "text-t1";
-  if (status === "not_available") return "text-warn";
-  return "text-t3";
+/**
+ * The tone a status carries. Semantic only where it means something: a file we hold and checked
+ * is good news, a provider that says it has nothing is a warning, and silence is neutral.
+ */
+function statusTone(status: CoverageStatus): StatusTone {
+  if (status === "validated" || status === "downloaded") return "ok";
+  if (status === "not_available") return "warn";
+  return "neutral";
 }
 
 export interface ProviderMatrixLabels {
   provider: string;
   action: string;
+  validation: string;
   statuses: Record<CoverageStatus, string>;
   artifacts: Record<CoverageArtifact, string>;
   completeSet: string;
@@ -83,8 +96,11 @@ export interface ProviderMatrixLabels {
   noPage: string;
   searchPage: string;
   empty: string;
-  toolNotOffered: string;
-  tools: Record<string, string>;
+  useForSet: string;
+  useForAsset: string;
+  inForce: string;
+  nothingValidated: string;
+  validatedCount: string;
 }
 
 /** Every user-visible string in the matrix, resolved once through the copy layer. */
@@ -92,6 +108,7 @@ export function useProviderMatrixLabels(): ProviderMatrixLabels {
   return {
     provider: useText("component-browser.provider-col-provider", "Provider"),
     action: useText("component-browser.provider-col-action", "Action"),
+    validation: useText("component-browser.provider-col-validation", "Validation"),
     statuses: {
       unknown: useText("component-browser.provider-status-unknown", STATUS_LABEL.unknown),
       available: useText("component-browser.provider-status-available", STATUS_LABEL.available),
@@ -110,24 +127,18 @@ export function useProviderMatrixLabels(): ProviderMatrixLabels {
     completeSet: useText("component-browser.provider-complete", "Complete Set"),
     completeHint: useText(
       "component-browser.provider-complete-hint",
-      "This provider can supply the symbol, the footprint and the 3D model for this component.",
+      "This provider can offer the symbol, the footprint and the 3D model for this component.",
     ),
     partialHint: useText(
       "component-browser.provider-partial-hint",
-      "This provider cannot supply the whole set for this component.",
+      "This provider cannot offer the whole set for this component.",
     ),
     signIn: useText("component-browser.provider-sign-in", "Sign In Needed"),
     aggregator: useText("component-browser.provider-aggregator", "Aggregator"),
     yourAnswer: useText("component-browser.provider-your-answer", "Your Answer"),
-    keepStockroom: useText(
-      "component-browser.provider-answer-keep",
-      "Use Stockroom's Answer",
-    ),
+    keepStockroom: useText("component-browser.provider-answer-keep", "Use Stockroom's Answer"),
     sayAvailable: useText("component-browser.provider-answer-available", "Available"),
-    sayNotAvailable: useText(
-      "component-browser.provider-answer-not-available",
-      "Not Available",
-    ),
+    sayNotAvailable: useText("component-browser.provider-answer-not-available", "Not Available"),
     evidenceWins: useText(
       "component-browser.provider-evidence-wins",
       "Your answer is recorded but not applied. Stockroom holds a file for this artifact, so its own evidence stands:",
@@ -145,30 +156,31 @@ export function useProviderMatrixLabels(): ProviderMatrixLabels {
       "component-browser.provider-empty",
       "No providers are registered for this component.",
     ),
-    toolNotOffered: useText(
-      "component-browser.provider-tool-not-offered",
-      "This provider does not export for this tool.",
-    ),
-    // The registered tools, by key. A tool the backend adds later still gets a column: it falls
-    // back to its own key rather than to a blank header.
-    tools: {
-      kicad: useText("component-browser.provider-col-kicad", TOOL_LABEL.kicad),
-      altium: useText("component-browser.provider-col-altium", TOOL_LABEL.altium),
-    },
+    useForSet: useText("component-browser.provider-use-set", "Use For The Whole Set"),
+    useForAsset: useText("component-browser.provider-use-asset", "Prefer This Source"),
+    inForce: useText("component-browser.provider-in-force", "Preferred"),
+    nothingValidated: useText("component-browser.provider-none-validated", "Nothing checked so far"),
+    validatedCount: useText("component-browser.provider-validated-count", "checked and passed"),
   };
 }
 
 export function ProviderCoverageMatrix({
   componentId,
   coverage,
+  preference,
   labels,
   onOpenProvider,
   onCorrect,
+  onPreferSet,
+  onPreferAsset,
   openDisabledReason = "",
   correcting = null,
+  preferring = false,
 }: {
   componentId: string;
   coverage: ComponentProvidersView;
+  /** What is in force and what each choice would replace, already planned by the backend. */
+  preference: CadPreferenceView;
   labels: ProviderMatrixLabels;
   /** The person goes to the provider; Stockroom only opens the page they asked for. */
   onOpenProvider: (row: ProviderCoverageRow) => void;
@@ -177,62 +189,75 @@ export function ProviderCoverageMatrix({
     artifact: CoverageArtifact,
     status: UserCoverageStatus,
   ) => void;
+  onPreferSet: (provider: string) => void;
+  onPreferAsset: (asset: CoverageArtifact, provider: string) => void;
   /** Why Open Provider is unavailable right now, independent of whether a page exists. */
   openDisabledReason?: string;
   /** The one correction currently in flight, so the row it belongs to can say so. */
   correcting?: { provider: string; artifact: CoverageArtifact } | null;
+  preferring?: boolean;
 }) {
   if (coverage.rows.length === 0) {
     return (
-      <p data-dev-id="component-browser.provider-matrix" className="py-2 text-2xs text-t3">
+      <p data-dev-id="component-browser.provider-matrix" className="ui-row-secondary py-2">
         {labels.empty}
       </p>
     );
   }
 
+  const options = new Map(preference.options.map((option) => [option.provider, option]));
+  // The COLUMN order is the column order of the CAD modules beside this table, not the payload's.
+  // The backend's artifact tuple is a domain ordering (it also decides persisted key order), so the
+  // reading order is applied here: a comparison table whose columns ran Symbol, Footprint, 3D Model
+  // while the three modules stacked 3D Model, Footprint, Symbol would be two answers to one question.
+  const artifacts = [...coverage.artifacts].sort(
+    (a, b) => CAD_ASSET_KINDS.indexOf(a) - CAD_ASSET_KINDS.indexOf(b),
+  );
+
   return (
-    // Wide by construction: seven columns of real facts. It scrolls sideways INSIDE its own box
+    // Wide by construction: six columns of real facts. It scrolls sideways INSIDE its own box
     // rather than widening the modal or the workspace behind it.
     <div data-dev-id="component-browser.provider-matrix" className="overflow-x-auto">
-      <table className="w-full min-w-[760px] border-collapse text-left text-xs">
+      <table className="w-full min-w-[720px] border-collapse text-left">
         <caption className="sr-only">
           <Text id="component-browser.provider-matrix-caption">
-            Which provider can supply the whole CAD set for this component
+            Which provider can offer the whole CAD set for this component
           </Text>
         </caption>
-        <thead className="text-2xs text-t3">
+        <thead>
           <tr>
-            <th scope="col" className="py-1 pr-3 font-medium">
+            <th scope="col" className="ui-table-header py-1 pr-3">
               {labels.provider}
             </th>
-            {coverage.artifacts.map((artifact) => (
-              <th key={artifact} scope="col" className="py-1 pr-3 font-medium">
+            {artifacts.map((artifact) => (
+              <th key={artifact} scope="col" className="ui-table-header py-1 pr-3">
                 {labels.artifacts[artifact]}
               </th>
             ))}
-            {coverage.tools.map((tool) => (
-              <th key={tool} scope="col" className="py-1 pr-3 font-medium">
-                {labels.tools[tool] ?? tool}
-              </th>
-            ))}
-            <th scope="col" className="py-1 font-medium">
+            <th scope="col" className="ui-table-header py-1 pr-3">
+              {labels.validation}
+            </th>
+            <th scope="col" className="ui-table-header py-1">
               {labels.action}
             </th>
           </tr>
         </thead>
-        <tbody className="text-t1">
+        <tbody>
           {coverage.rows.map((row) => (
             <ProviderRow
               key={row.id}
               componentId={componentId}
               row={row}
-              tools={coverage.tools}
-              artifacts={coverage.artifacts}
+              option={options.get(row.id) ?? null}
+              artifacts={artifacts}
               labels={labels}
               onOpenProvider={onOpenProvider}
               onCorrect={onCorrect}
+              onPreferSet={onPreferSet}
+              onPreferAsset={onPreferAsset}
               openDisabledReason={openDisabledReason}
               correcting={correcting}
+              preferring={preferring}
             />
           ))}
         </tbody>
@@ -244,17 +269,20 @@ export function ProviderCoverageMatrix({
 function ProviderRow({
   componentId,
   row,
-  tools,
+  option,
   artifacts,
   labels,
   onOpenProvider,
   onCorrect,
+  onPreferSet,
+  onPreferAsset,
   openDisabledReason,
   correcting,
+  preferring,
 }: {
   componentId: string;
   row: ProviderCoverageRow;
-  tools: string[];
+  option: CadPreferenceOption | null;
   artifacts: CoverageArtifact[];
   labels: ProviderMatrixLabels;
   onOpenProvider: (row: ProviderCoverageRow) => void;
@@ -263,99 +291,106 @@ function ProviderRow({
     artifact: CoverageArtifact,
     status: UserCoverageStatus,
   ) => void;
+  onPreferSet: (provider: string) => void;
+  onPreferAsset: (asset: CoverageArtifact, provider: string) => void;
   openDisabledReason: string;
   correcting: { provider: string; artifact: CoverageArtifact } | null;
+  preferring: boolean;
 }) {
   const reachable = row.url !== "";
+  const set = option?.set ?? null;
   return (
     <tr
-      // One row per provider, so the row names the provider it IS and the class it belongs to. An
-      // override on the instance retunes that provider's row; one on the role retunes every row.
+      // One row per provider, so the row names the provider it IS and the class it belongs to.
       data-dev-id={componentProviderDevId(componentId, row.id)}
       data-dev-role="component-browser.provider-row"
       data-provider={row.id}
       // A complete provider is the ANSWER to this screen, so it is marked three ways: a tinted
-      // row, a leading accent rule, and a badge that says it in words. Colour alone would fail a
-      // person who cannot see it.
+      // row, a leading accent rule, and a word. Colour alone would fail a person who cannot see it.
       data-complete={row.complete}
-      className={
-        "border-t border-line align-top " + (row.complete ? "bg-ok/[0.07]" : "")
-      }
+      data-preferred={set?.current ?? false}
+      className={"border-t border-line align-top " + (row.complete ? "bg-ok/[0.07]" : "")}
     >
-      <th scope="row" className="py-2 pr-3 text-left font-normal">
+      <th scope="row" className="py-1.5 pr-3 text-left font-normal">
         <span className="flex min-w-0 items-start gap-2">
           <span
             aria-hidden
             className={
-              "mt-0.5 w-0.5 flex-none self-stretch rounded-control " +
-              (row.complete ? "bg-ok" : "bg-transparent")
+              "mt-0.5 w-0.5 flex-none self-stretch " + (row.complete ? "bg-ok" : "bg-transparent")
             }
           />
           <span className="min-w-0">
-            <span
-              className="block truncate text-xs font-semibold text-t1"
-              title={row.instruction || row.label}
-            >
+            <span className="ui-row-primary block truncate" title={row.instruction || row.label}>
               {row.label}
             </span>
-            <span className="mt-1 flex flex-wrap items-center gap-1">
-              {row.complete ? (
-                <Badge tone="ok" size="sm" title={labels.completeHint}>
-                  {labels.completeSet}
-                </Badge>
-              ) : (
-                <span className="text-2xs text-t3" title={labels.partialHint}>
-                  {row.statusCounts.validated +
-                    row.statusCounts.downloaded +
-                    row.statusCounts.available}
-                  /{artifacts.length}
-                </span>
-              )}
+            <span className="mt-0.5 flex flex-wrap items-center gap-1.5">
+              <StatusText tone={row.complete ? "ok" : "neutral"}>
+                {row.complete ? (
+                  <span title={labels.completeHint}>{labels.completeSet}</span>
+                ) : (
+                  <span title={labels.partialHint}>
+                    {`${row.statusCounts.validated + row.statusCounts.downloaded + row.statusCounts.available}/${artifacts.length}`}
+                  </span>
+                )}
+              </StatusText>
               {row.needsLogin ? (
-                <Badge tone="neutral" size="sm">
-                  {labels.signIn}
-                </Badge>
+                <StatusText tone="neutral">{labels.signIn}</StatusText>
               ) : null}
               {row.aggregator ? (
-                <Badge tone="neutral" size="sm">
-                  {labels.aggregator}
-                </Badge>
+                <StatusText tone="neutral">{labels.aggregator}</StatusText>
               ) : null}
             </span>
+            {/* The SET choice: the primary control, on the provider itself, because the whole
+                table exists to answer "which provider supplies everything". */}
+            {set ? (
+              <label className="mt-1 flex items-center gap-1.5">
+                <input
+                  type="radio"
+                  data-dev-id="component-browser.provider-prefer-set"
+                  name={`cad-preferred-source-${componentId}`}
+                  checked={set.current}
+                  disabled={!set.allowed || preferring}
+                  aria-label={`${labels.useForSet}: ${row.label}`}
+                  title={set.allowed ? labels.useForSet : set.reason}
+                  onChange={() => onPreferSet(row.id)}
+                  className="h-3 w-3 flex-none accent-[var(--c-t1)]"
+                />
+                <span className="ui-control-label text-t2">
+                  {set.current ? labels.inForce : labels.useForSet}
+                </span>
+              </label>
+            ) : null}
+            {/* A disabled control has to SAY why, in the row: a `title` on a disabled input is
+                unreachable by keyboard and unannounced by a screen reader. */}
+            {set && !set.allowed && set.reason ? (
+              <span className="ui-row-metadata mt-0.5 block max-w-[16rem] leading-snug">
+                {set.reason}
+              </span>
+            ) : null}
           </span>
         </span>
       </th>
 
       {artifacts.map((artifact) => (
-        <td key={artifact} className="py-2 pr-3">
+        <td key={artifact} className="py-1.5 pr-3">
           <ArtifactCell
             row={row}
             artifact={artifact}
+            option={option}
             labels={labels}
             onCorrect={onCorrect}
+            onPreferAsset={onPreferAsset}
             busy={correcting?.provider === row.id && correcting.artifact === artifact}
+            preferring={preferring}
           />
         </td>
       ))}
 
-      {tools.map((tool) => {
-        const cell = providerToolCoverage(row, tool);
-        return (
-          <td key={tool} className="py-2 pr-3">
-            <span
-              className={
-                "tnum font-mono text-2xs " +
-                (cell?.complete ? "font-semibold text-ok" : "text-t2")
-              }
-              title={cell && !cell.supported ? labels.toolNotOffered : undefined}
-            >
-              {cell?.summary ?? ""}
-            </span>
-          </td>
-        );
-      })}
+      <td className="py-1.5 pr-3">
+        <ValidationCell row={row} artifacts={artifacts} labels={labels} />
+      </td>
 
-      <td className="py-2">
+      <td className="py-1.5">
         <Button
           type="button"
           data-dev-id="component-browser.provider-open"
@@ -376,15 +411,12 @@ function ProviderRow({
         >
           {labels.openProvider}
         </Button>
-        {/* A disabled control has to SAY why, in the row. A `title` on a disabled button is
-            unreachable by keyboard and unannounced by a screen reader, so the reason a trip is
-            unavailable was visible for one cause (no page) and invisible for the other. */}
         {!reachable ? (
-          <span className="mt-1 block max-w-[15rem] text-2xs leading-snug text-t3">
+          <span className="ui-row-metadata mt-1 block max-w-[15rem] leading-snug">
             {labels.noPage}
           </span>
         ) : openDisabledReason !== "" ? (
-          <span className="mt-1 block max-w-[15rem] text-2xs leading-snug text-t3">
+          <span className="ui-row-metadata mt-1 block max-w-[15rem] leading-snug">
             {openDisabledReason}
           </span>
         ) : null}
@@ -393,46 +425,114 @@ function ProviderRow({
   );
 }
 
+/**
+ * What this provider proved, counted from the statuses it already carries.
+ *
+ * `validated` says Stockroom read the artifact and the inspection passed; `downloaded` says only
+ * that we hold the bytes. Reporting them as one number would let an unchecked download read as a
+ * verified one, which is the distinction the whole coverage vocabulary exists to keep.
+ */
+function ValidationCell({
+  row,
+  artifacts,
+  labels,
+}: {
+  row: ProviderCoverageRow;
+  artifacts: CoverageArtifact[];
+  labels: ProviderMatrixLabels;
+}) {
+  const validated = row.statusCounts.validated;
+  return (
+    <span className="flex min-w-0 flex-col">
+      <StatusText tone={validated > 0 ? "ok" : "neutral"} data-validated={validated}>
+        {validated === 0
+          ? labels.nothingValidated
+          : `${validated}/${artifacts.length} ${labels.validatedCount}`}
+      </StatusText>
+      {row.statusCounts.downloaded > 0 ? (
+        <span className="ui-row-metadata">
+          {`${row.statusCounts.downloaded} ${labels.statuses.downloaded}`}
+        </span>
+      ) : null}
+    </span>
+  );
+}
+
 function ArtifactCell({
   row,
   artifact,
+  option,
   labels,
   onCorrect,
+  onPreferAsset,
   busy,
+  preferring,
 }: {
   row: ProviderCoverageRow;
   artifact: CoverageArtifact;
+  option: CadPreferenceOption | null;
   labels: ProviderMatrixLabels;
   onCorrect: (
     row: ProviderCoverageRow,
     artifact: CoverageArtifact,
     status: UserCoverageStatus,
   ) => void;
+  onPreferAsset: (asset: CoverageArtifact, provider: string) => void;
   busy: boolean;
+  preferring: boolean;
 }) {
   const cell = row[artifact];
   const assertion = cell.userAssertion;
   const overruled = assertion !== null && assertion.applied === false;
+  const scope = option?.assets[artifact] ?? null;
   return (
     <span className="flex min-w-0 flex-col gap-1">
-      <span
-        className={"text-2xs font-medium " + statusClass(cell.status)}
+      <StatusText
+        tone={statusTone(cell.status)}
         data-status={cell.status}
         data-supplied={SUPPLIED.has(cell.status)}
       >
         {labels.statuses[cell.status]}
-      </span>
+      </StatusText>
+      {/* The per-asset choice, offered only where the backend says it is legitimate - and
+          offered DISABLED with its reason where it is not, so a refusal is visible before the
+          click rather than arriving as an error after it. */}
+      {scope ? (
+        <button
+          type="button"
+          data-dev-id="component-browser.provider-prefer-asset"
+          data-current={scope.current}
+          disabled={!scope.allowed || scope.current || preferring}
+          aria-pressed={scope.current}
+          aria-label={`${labels.useForAsset}: ${row.label} ${labels.artifacts[artifact]}`}
+          title={scope.allowed ? labels.useForAsset : scope.reason}
+          onClick={() => onPreferAsset(artifact, row.id)}
+          className={
+            "ui-control-label h-[20px] rounded-control border border-line px-2 text-left " +
+            "text-t2 hover:bg-control-hover disabled:opacity-50 disabled:hover:bg-transparent " +
+            "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 " +
+            "focus-visible:outline-focus " +
+            (scope.current ? "bg-selected text-t1" : "")
+          }
+        >
+          {scope.current ? labels.inForce : labels.useForAsset}
+        </button>
+      ) : null}
       <select
         data-dev-id="component-browser.provider-assert"
         aria-label={`${labels.yourAnswer}: ${row.label} ${labels.artifacts[artifact]}`}
-        value={assertion?.status === "available" || assertion?.status === "not_available"
-          ? assertion.status
-          : ""}
-        disabled={busy}
-        onChange={(event) =>
-          onCorrect(row, artifact, event.target.value as UserCoverageStatus)
+        value={
+          assertion?.status === "available" || assertion?.status === "not_available"
+            ? assertion.status
+            : ""
         }
-        className="h-6 w-full min-w-[8.5rem] rounded-control border border-line bg-field px-1.5 text-2xs text-t2 outline-none focus:border-acc disabled:opacity-50"
+        disabled={busy}
+        onChange={(event) => onCorrect(row, artifact, event.target.value as UserCoverageStatus)}
+        className={
+          "ui-control-label h-[20px] w-full min-w-[8rem] rounded-control border border-line " +
+          "bg-field px-1.5 text-t2 outline-none focus-visible:outline focus-visible:outline-2 " +
+          "focus-visible:outline-offset-1 focus-visible:outline-focus disabled:opacity-50"
+        }
       >
         <option value="">{labels.keepStockroom}</option>
         <option value="available">{labels.sayAvailable}</option>
@@ -441,7 +541,7 @@ function ArtifactCell({
       {overruled ? (
         <span
           data-overruled="true"
-          className="max-w-[13rem] text-2xs leading-snug text-warn"
+          className="ui-row-metadata max-w-[13rem] leading-snug text-warn"
         >
           {`${labels.evidenceWins} ${labels.statuses[cell.status]}.`}
         </span>

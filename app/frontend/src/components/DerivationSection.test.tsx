@@ -83,7 +83,9 @@ it("names the ruleset running, so 'current' has a referent", async () => {
   mockApi.libraryDerivation.mockResolvedValue(derivation());
   renderSection();
 
-  expect(await screen.findByText(/All/)).toHaveTextContent("rules@2");
+  // Matched on the summary's own clause rather than on a bare "All": the note beside the rebuild
+  // button opens with the same word, so "All" alone no longer identifies one element.
+  expect(await screen.findByText(/components were built by/)).toHaveTextContent("rules@2");
 });
 
 it("offers nothing to do when every component is already current", async () => {
@@ -200,7 +202,7 @@ it("says ALL, not 'N of N', when nothing in the library is current", () => {
   renderSection();
 
   return waitFor(() => {
-    const summary = screen.getByText(/components were built/);
+    const summary = screen.getByText(/components came from/);
     expect(summary).toHaveTextContent("None of the 162 components");
     expect(summary.textContent).not.toMatch(/162 of 162/);
   });

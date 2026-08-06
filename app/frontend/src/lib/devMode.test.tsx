@@ -536,6 +536,92 @@ describe("reset works per property, per element, and globally", () => {
   });
 });
 
+// --- the two contracts the single-draft reducer makes explicit ---------------------------------
+// The five override slices are one document: Reset all clears them in one action, and one history
+// step restores all five at once. Both were previously only implied by per-facet tests, so a slice
+// that silently fell out of either would not have failed anything.
+
+describe("reset all clears the whole draft in one step", () => {
+  it("clears tokens, copy, icons, elements and behaviors together, plus the copy selection", async () => {
+    const { result } = renderHook(() => useDevMode(), { wrapper: elementWrapper });
+
+    act(() => {
+      result.current.setToken("--c-acc", "#123456");
+      result.current.setCopy("a.label", "Reworded");
+      result.current.setIconSwap("nav.components", "nav.settings");
+      result.current.setElementProp("detail.spec-sheet", "width", "300px");
+      result.current.setBehaviorOverride("detail.category-control", { preset: "segmented" });
+      result.current.selectCopy("a.label", "Default");
+    });
+
+    // Observe every slice actually take the edit BEFORE resetting: an assertion that a slice is
+    // clear proves nothing unless that slice was seen dirty first.
+    await waitFor(() => expect(result.current.tokenValue("--c-acc")).toBe("#123456"));
+    expect(result.current.resolveCopy("a.label", "Default")).toBe("Reworded");
+    expect(result.current.isIconOverridden("nav.components")).toBe(true);
+    expect(result.current.isElementPropOverridden("detail.spec-sheet", "width")).toBe(true);
+    expect(result.current.behaviorOverrideFor("detail.category-control")?.preset).toBe("segmented");
+    expect(result.current.selectedCopyId).toBe("a.label");
+
+    act(() => result.current.resetAll());
+
+    await waitFor(() => expect(result.current.isTokenOverridden("--c-acc")).toBe(false));
+    expect(result.current.tokenValue("--c-acc")).not.toBe("#123456");
+    expect(result.current.resolveCopy("a.label", "Default")).toBe("Default");
+    expect(result.current.isIconOverridden("nav.components")).toBe(false);
+    expect(result.current.elementOverridesFor("detail.spec-sheet")).toBeUndefined();
+    expect(result.current.behaviorOverrideFor("detail.category-control")).toBeUndefined();
+    expect(result.current.selectedCopyId).toBeNull();
+  });
+});
+
+describe("undo and redo across a multi-slice edit", () => {
+  it("walks a token, copy and element edit back newest-first and replays them", async () => {
+    const { result } = renderHook(() => useDevMode(), { wrapper: elementWrapper });
+
+    act(() => result.current.setToken("--c-acc", "#123456"));
+    await waitFor(() => expect(result.current.tokenValue("--c-acc")).toBe("#123456"));
+    act(() => result.current.setCopy("a.label", "Reworded"));
+    await waitFor(() => expect(result.current.resolveCopy("a.label", "Default")).toBe("Reworded"));
+    act(() => result.current.setElementProp("detail.spec-sheet", "width", "300px"));
+    await waitFor(() => expect(specNode().style.getPropertyValue("width")).toBe("300px"));
+    await waitFor(() => expect(result.current.canUndo).toBe(true));
+
+    // Newest first: the element prop goes and the two older slices are left exactly as they were.
+    act(() => result.current.undo());
+    await waitFor(() =>
+      expect(result.current.elementOverridesFor("detail.spec-sheet")).toBeUndefined(),
+    );
+    expect(specNode().style.getPropertyValue("width")).toBe("");
+    expect(result.current.resolveCopy("a.label", "Default")).toBe("Reworded");
+    expect(result.current.tokenValue("--c-acc")).toBe("#123456");
+
+    // Then the copy edit, leaving the token edit standing.
+    act(() => result.current.undo());
+    await waitFor(() => expect(result.current.resolveCopy("a.label", "Default")).toBe("Default"));
+    expect(result.current.tokenValue("--c-acc")).toBe("#123456");
+
+    // Then the token edit, back to the shipped design.
+    act(() => result.current.undo());
+    await waitFor(() => expect(result.current.isTokenOverridden("--c-acc")).toBe(false));
+
+    // Redo replays the same three, oldest first.
+    act(() => result.current.redo());
+    await waitFor(() => expect(result.current.tokenValue("--c-acc")).toBe("#123456"));
+    expect(result.current.resolveCopy("a.label", "Default")).toBe("Default");
+
+    act(() => result.current.redo());
+    await waitFor(() => expect(result.current.resolveCopy("a.label", "Default")).toBe("Reworded"));
+    expect(result.current.elementOverridesFor("detail.spec-sheet")).toBeUndefined();
+
+    act(() => result.current.redo());
+    await waitFor(() =>
+      expect(result.current.elementOverridesFor("detail.spec-sheet")).toEqual({ width: "300px" }),
+    );
+    expect(specNode().style.getPropertyValue("width")).toBe("300px");
+  });
+});
+
 describe("save writes only source-backed overrides", () => {
   it("drops a property or value the writer would reject, and declares the placeholder sets", async () => {
     mockApi.devSave.mockClear();

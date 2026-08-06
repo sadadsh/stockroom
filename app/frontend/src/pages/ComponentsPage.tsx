@@ -3,22 +3,20 @@
  * components themselves. Server state comes from TanStack Query; the only local state is the
  * search text, the active category facet, the complete-only toggle, and the selected part id.
  *
- * A component OPENS into a tab rather than replacing a single detail pane. Comparing two parts is
- * the ordinary case in a library - "is this the same footprint as the other one", "which of these
- * two has the stock" - and a one-slot detail pane made that a navigation exercise with the answer
- * held in the person's head. Tabs are bounded (a strip that can grow forever is not a strip),
- * keyed by stable component id, and persisted through the durable session, so closing the window
- * mid-comparison does not lose it.
+ * Selecting a picker row OPENS that component into the workspace beside it. There is no
+ * per-component tab strip: the native window already carries one tab for Stockroom and one for the
+ * provider page a CAD trip opens, and a second row of tabs inside the application competed with it
+ * for the same job. The open set and the active component are still tracked in the durable session,
+ * because the per-component view state (which CAD asset is expanded) has to live somewhere stable.
  *
  * Honest degradation: a connection error shows a retry surface (not a crash), and a genuinely
  * empty library shows an empty state that names how to add parts.
  */
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from "react";
 import {
   usePartsQuery,
   useFacetsQuery,
   useDuplicates,
-  useDeletePart,
   useRestoreDeletedPart,
 } from "../api/queries";
 import { ApiError } from "../api/client";
@@ -28,23 +26,19 @@ import { useCapture } from "../lib/capture";
 import { Finder } from "../components/Finder";
 import { PartsList } from "../components/PartsList";
 import { SearchOverlay } from "../components/SearchOverlay";
-import { ConfirmDialog } from "../components/ConfirmDialog";
-import { AddPartIcon, TrashIcon } from "../components/icons";
+import { AddPartIcon } from "../components/icons";
 import {
   Button,
   EmptyState,
   ErrorState,
   LoadingState,
   RouteHeader,
-  TabStrip,
-  type TabItem,
 } from "../components/primitives";
 import {
   ComponentWorkspace,
   ComponentWorkspaceEmpty,
 } from "../components/component-workspace/ComponentWorkspace";
 import { Text, useText } from "../lib/copy";
-import { componentTabDevId } from "../lib/componentDevIds";
 import {
   closeComponentInSession,
   openComponentInSession,
@@ -55,49 +49,95 @@ import {
 } from "../lib/uiSession";
 import { COMPONENT_PICKER_WIDTH } from "../lib/libraryLayout";
 
+// The picker's narrowings, exactly as the UI session persists them.
+interface ComponentFilters {
+  query: string;
+  category: string | null;
+  completeOnly: boolean;
+  duplicatesOnly: boolean;
+}
+
+type FiltersAction =
+  | { type: "query"; value: string }
+  | { type: "category"; value: string | null }
+  | { type: "completeOnly"; value: boolean }
+  | { type: "duplicatesOnly"; value: boolean }
+  | { type: "cleared" }
+  // The search overlay scopes the picker to one category and drops every other narrowing, so the
+  // chosen row is definitely present in the list.
+  | { type: "scopedToCategory"; category: string };
+
+const NO_FILTERS: ComponentFilters = {
+  query: "",
+  category: null,
+  completeOnly: false,
+  duplicatesOnly: false,
+};
+
+function initialFilters(): ComponentFilters {
+  const persisted = readUiSession().component_filters;
+  return {
+    query: persisted.query,
+    category: persisted.category,
+    completeOnly: persisted.complete_only,
+    duplicatesOnly: persisted.duplicates_only,
+  };
+}
+
+function filtersReducer(state: ComponentFilters, action: FiltersAction): ComponentFilters {
+  switch (action.type) {
+    case "query":
+      return { ...state, query: action.value };
+    case "category":
+      return { ...state, category: action.value };
+    case "completeOnly":
+      return { ...state, completeOnly: action.value };
+    case "duplicatesOnly":
+      return { ...state, duplicatesOnly: action.value };
+    case "cleared":
+      return NO_FILTERS;
+    case "scopedToCategory":
+      return { ...NO_FILTERS, category: action.category };
+  }
+}
+
 export function ComponentsPage() {
-  const openComponentsLabel = useText("components.open-tabs-label", "Open components");
-  const [search, setSearch] = useState(() => readUiSession().component_filters.query);
-  const [category, setCategory] = useState<string | null>(
-    () => readUiSession().component_filters.category,
-  );
-  const [completeOnly, setCompleteOnly] = useState(
-    () => readUiSession().component_filters.complete_only,
-  );
-  const [duplicatesOnly, setDuplicatesOnly] = useState(
-    () => readUiSession().component_filters.duplicates_only,
-  );
+  // A toast takes a resolved string and so does its action's label, which is why these are read here
+  // rather than wrapped at a render site: there is no element to wrap.
+  const partDeleted = useText("components.toast-deleted", "Part deleted");
+  const undoDeleteLabel = useText("components.toast-undo-delete", "Undo Delete");
+  const partRestored = useText("components.toast-restored", "Part restored");
+  const restoreFailed = useText("components.toast-restore-failed", "Could not restore the part");
+  // The four narrowings are ONE thing: they are persisted as one component_filters document,
+  // cleared as a group, and rewritten as a group when the search overlay scopes the picker to a
+  // category. So they move as one transition rather than four setter calls that have to agree.
+  const [filters, dispatchFilters] = useReducer(filtersReducer, undefined, initialFilters);
+  const { query: search, category, completeOnly, duplicatesOnly } = filters;
   const [selectedId, setSelectedId] = useState<string | null>(
     () => readUiSession().selected_ids.component,
   );
   const [searchOpen, setSearchOpen] = useState(
     () => readUiSession().open_surface === "search",
   );
-  const [confirmDelete, setConfirmDelete] = useState(false);
   const [listScrollElement, setListScrollElement] =
     useState<HTMLDivElement | null>(null);
-  const selectedIdRef = useRef(selectedId);
-  selectedIdRef.current = selectedId;
 
   const session = useUiSession();
   const partsQuery = usePartsQuery({ q: search, category, completeOnly });
   const facetsQuery = useFacetsQuery();
   const duplicatesQuery = useDuplicates();
-  const deletePart = useDeletePart();
   const restoreDeletedPart = useRestoreDeletedPart();
   const { toast } = useToast();
   const { open: openAddPart } = useAddPart();
-  const { reopenPartId } = useCapture();
-  const confirmDeleteTitle = useText("components.delete-title", "Delete Part");
-  const confirmDeleteBody = useText(
-    "components.delete-body",
-    "This removes the component from the library. It can be restored from the toast that follows.",
-  );
-  const confirmDeleteLabel = useText("components.delete-confirm", "Delete");
+  const { onReopen } = useCapture();
 
   // Persist the exact primary Library view as one bounded document. This runs
   // only when a value changed, so mounting from an injected snapshot does not
   // generate a write that merely echoes what the host just restored.
+  //
+  // The SELECTION is not checkpointed here. It is written by the act that changes it
+  // (selectComponent below), because as part of this effect the auto-select further down set
+  // selectedId, which woke this effect, which re-rendered the page a third time for one action.
   useEffect(() => {
     const current = readUiSession();
     const nextSurface = searchOpen
@@ -110,14 +150,12 @@ export function ComponentsPage() {
       current.component_filters.category === category &&
       current.component_filters.complete_only === completeOnly &&
       current.component_filters.duplicates_only === duplicatesOnly &&
-      current.selected_ids.component === selectedId &&
       current.open_surface === nextSurface
     ) {
       return;
     }
     updateUiSession((snapshot) => ({
       ...snapshot,
-      selected_ids: { ...snapshot.selected_ids, component: selectedId },
       component_filters: {
         query: search,
         category,
@@ -126,81 +164,14 @@ export function ComponentsPage() {
       },
       open_surface: nextSurface,
     }));
-  }, [category, completeOnly, duplicatesOnly, search, searchOpen, selectedId]);
+  }, [category, completeOnly, duplicatesOnly, search, searchOpen]);
 
-  // Restore and continuously checkpoint the picker scroll. The stable selected
-  // part accompanies the pixel offset, so a future projection can re-anchor
-  // after insertions instead of treating the number as an identity.
-  //
-  // The restore CANNOT run against the loading placeholder. While the list query is
-  // in flight the picker body is a one-line "Loading parts..." block, and a browser
-  // clamps `scrollTop = N` against that tiny scroll height - the anchor silently
-  // became 0 and the checkpoint below then wrote that 0 back over the saved offset.
-  // So: wait for the settled list, retry while the assignment is still being clamped
-  // (virtual rows arrive over more than one frame), and refuse to checkpoint until
-  // the restore has actually landed.
-  const listContentSettled = !partsQuery.isLoading && !partsQuery.error;
-  const listRestoredRef = useRef(false);
-  useEffect(() => {
-    if (!listScrollElement || !listContentSettled) return;
-    const target = readUiSession().component_list_anchor.offset_px;
-    let frame: number | null = null;
-    let lastScrollHeight = -1;
-    const restore = () => {
-      frame = null;
-      if (listRestoredRef.current) return;
-      listScrollElement.scrollTop = target;
-      // Give up (and accept the clamped position) once the content stops growing:
-      // an anchor past the end of a now-shorter list is stale, not pending.
-      if (
-        Math.round(listScrollElement.scrollTop) >= target ||
-        listScrollElement.scrollHeight === lastScrollHeight
-      ) {
-        listRestoredRef.current = true;
-        return;
-      }
-      lastScrollHeight = listScrollElement.scrollHeight;
-      frame = requestAnimationFrame(restore);
-    };
-    restore();
-    let pending: number | null = null;
-    const checkpoint = () => {
-      pending = null;
-      if (!listRestoredRef.current) return;
-      const offset = Math.max(0, Math.round(listScrollElement.scrollTop));
-      const current = readUiSession();
-      if (
-        current.component_list_anchor.offset_px === offset &&
-        current.component_list_anchor.part_id === selectedIdRef.current
-      ) {
-        return;
-      }
-      updateUiSession((snapshot) => ({
-        ...snapshot,
-        component_list_anchor: {
-          part_id: selectedIdRef.current,
-          offset_px: offset,
-        },
-      }));
-    };
-    const onScroll = () => {
-      if (pending !== null) window.clearTimeout(pending);
-      pending = window.setTimeout(checkpoint, 40);
-    };
-    listScrollElement.addEventListener("scroll", onScroll, { passive: true });
-    return () => {
-      listScrollElement.removeEventListener("scroll", onScroll);
-      if (frame !== null) cancelAnimationFrame(frame);
-      if (pending !== null) window.clearTimeout(pending);
-      checkpoint();
-    };
-  }, [listContentSettled, listScrollElement]);
-
-  // The background capture pill asks to reopen its part: open it here so its workspace comes up.
-  useEffect(() => {
-    if (reopenPartId) openComponent(reopenPartId);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [reopenPartId]);
+  usePickerScrollAnchor(
+    listScrollElement,
+    !partsQuery.isLoading && !partsQuery.error,
+    selectedId,
+  );
+  useSearchHotkey(searchOpen, () => setSearchOpen(true));
 
   // Ids that share an MPN with another part (a real accidental duplicate). Shared
   // footprints are normal and never counted. Drives the Duplicate badges and the
@@ -217,52 +188,73 @@ export function ComponentsPage() {
     ? allParts.filter((p) => duplicateIds.has(p.id))
     : allParts;
 
-  // A tab keeps the name it was opened with even when a later search filters its component out of
-  // the list. Without this the strip would relabel itself to raw ids the moment someone typed.
-  const tabNames = useRef(new Map<string, string>());
-  for (const part of allParts) {
-    tabNames.current.set(part.id, part.display_name || part.mpn || part.id);
+  // Move the selection and checkpoint it in the same act. Both belong to the selection: keeping
+  // the checkpoint in a separate effect meant every selection cost an extra render pass.
+  function selectComponent(id: string | null) {
+    setSelectedId(id);
+    if (readUiSession().selected_ids.component === id) return;
+    updateUiSession((snapshot) => ({
+      ...snapshot,
+      selected_ids: { ...snapshot.selected_ids, component: id },
+    }));
   }
 
   function openComponent(id: string) {
     setSelectedId(id);
-    updateUiSession((snapshot) => openComponentInSession(snapshot, id));
+    updateUiSession((snapshot) => {
+      const opened = openComponentInSession(snapshot, id);
+      return { ...opened, selected_ids: { ...opened.selected_ids, component: id } };
+    });
   }
 
-  function closeComponent(id: string) {
-    const next = closeComponentInSession(readUiSession(), id);
-    updateUiSession(() => next);
-    if (next.active_component) setSelectedId(next.active_component);
-  }
+  /**
+   * The background capture pill, and the intake flow, ask to reopen a part: open it here, because
+   * this page owns the selection and the tab strip.
+   *
+   * A SUBSCRIPTION, and the effect does nothing but subscribe and hand back its unsubscribe. The
+   * capture store used to publish a latched `reopenPartId` instead, which cost one render to read
+   * and a second because reading it moved the selection, which woke the auto-select effect below -
+   * three renders for a click that knew the answer before the first one. The store now calls this
+   * inside the click, so the selection moves in the same commit as everything else that click does.
+   *
+   * The handler goes through a ref because `openComponent` is a fresh closure every render and this
+   * subscription must not be torn down and rebuilt on each one; the ref is written in a LAYOUT
+   * effect so a request delivered from a passive effect elsewhere can never run last render's copy.
+   */
+  const openComponentRef = useRef(openComponent);
+  useLayoutEffect(() => {
+    openComponentRef.current = openComponent;
+  });
+  useEffect(() => onReopen((partId) => openComponentRef.current(partId)), [onReopen]);
 
-  function handleDelete() {
-    if (!selectedId) return;
-    const deletedId = selectedId;
-    deletePart.mutate(deletedId, {
-      onSuccess: () => {
-        toast("Part deleted", "ok", {
-          label: "Undo Delete",
-          onClick: () => {
-            restoreDeletedPart.mutate(deletedId, {
-              onSuccess: () => {
-                openComponent(deletedId);
-                toast("Part restored", "ok");
-              },
-              onError: (err) =>
-                toast(
-                  err instanceof ApiError ? err.message : "Could not restore the part",
-                  "err",
-                ),
-            });
+  /**
+   * A component was deleted from its own workspace.
+   *
+   * The confirmation and the mutation belong to the workspace, which is where the component is.
+   * The AFTERMATH belongs here: the page holds the selection, and it is still mounted once that
+   * workspace has gone - which is the only place an Undo can outlive the thing it undoes.
+   */
+  function componentDeleted(id: string) {
+    setSelectedId(null);
+    updateUiSession(() => {
+      const closed = closeComponentInSession(readUiSession(), id);
+      return { ...closed, selected_ids: { ...closed.selected_ids, component: null } };
+    });
+    toast(partDeleted, "ok", {
+      label: undoDeleteLabel,
+      onClick: () => {
+        restoreDeletedPart.mutate(id, {
+          onSuccess: () => {
+            openComponent(id);
+            toast(partRestored, "ok");
           },
+          onError: (err) =>
+            toast(
+              err instanceof ApiError ? err.message : restoreFailed,
+              "err",
+            ),
         });
-        // Drop the tab and the selection; the auto-select effect picks the next part once the
-        // invalidated list refetches.
-        closeComponent(deletedId);
-        setSelectedId(null);
       },
-      onError: (err) =>
-        toast(err instanceof ApiError ? err.message : "Could not delete", "err"),
     });
   }
 
@@ -276,7 +268,7 @@ export function ComponentsPage() {
   useEffect(() => {
     if (partsFetching) return;
     if (parts.length === 0) {
-      if (selectedId !== null) setSelectedId(null);
+      if (selectedId !== null) selectComponent(null);
       return;
     }
     if (!selectedId || !parts.some((p) => p.id === selectedId)) {
@@ -300,33 +292,11 @@ export function ComponentsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allParts, partsFetching, hasSearchOrFilter]);
 
-  // Ctrl/Cmd+K (and "/" when not already typing) opens the full-screen parametric search.
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
-        e.preventDefault();
-        setSearchOpen(true);
-      } else if (
-        e.key === "/" &&
-        !searchOpen &&
-        !(e.target instanceof HTMLElement &&
-          /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName))
-      ) {
-        e.preventDefault();
-        setSearchOpen(true);
-      }
-    }
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [searchOpen]);
 
   // Open a part chosen in the search overlay: scope the picker to its category and clear the
   // narrowing filters so the row is present in the list, open it, and close the overlay.
   function openFromSearch(id: string, cat: string) {
-    setCategory(cat);
-    setCompleteOnly(false);
-    setDuplicatesOnly(false);
-    setSearch("");
+    dispatchFilters({ type: "scopedToCategory", category: cat });
     openComponent(id);
     setSearchOpen(false);
   }
@@ -337,45 +307,7 @@ export function ComponentsPage() {
     allParts.length === 0 &&
     !hasSearchOrFilter;
 
-  const openTabs: TabItem<string>[] = session.open_components.map((id) => ({
-    id,
-    label: tabNames.current.get(id) ?? id,
-  }));
-
-  if (emptyLibrary) {
-    return (
-      <div data-dev-id="components.root" className="flex min-h-0 flex-1">
-        <div
-          data-dev-id="components.empty"
-          className="flex flex-1 items-center justify-center p-6"
-        >
-          <div className="flex max-w-md flex-col items-center text-center">
-            <span className="mb-3 text-t3">
-              <AddPartIcon />
-            </span>
-            <h1 className="text-base font-semibold text-t1">
-              <Text id="components.empty-title">No Components Yet</Text>
-            </h1>
-            <p className="mt-1.5 text-sm leading-relaxed text-t3">
-              <Text id="components.empty-body">
-                Add a manufacturer part number. Stockroom will keep its KiCad, Altium, STEP,
-                source, and verification evidence together.
-              </Text>
-            </p>
-            <Button
-              variant="accent"
-              data-dev-id="components.add-parts"
-              icon={<AddPartIcon />}
-              onClick={openAddPart}
-              className="mt-4"
-            >
-              <Text id="components.add-parts">Add Parts</Text>
-            </Button>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  if (emptyLibrary) return <EmptyLibrary onAddParts={openAddPart} />;
 
   // north-star .app: rail | list | opened components, each column self-heading - no full-width
   // page header band (the active rail item + the rail's library readout carry that).
@@ -383,132 +315,38 @@ export function ComponentsPage() {
     <div data-dev-id="components.root" className="flex min-h-0 flex-1">
         {/* picker: a docked panel - an Altium title strip, then the padded body. The rail's
             right border and the workspace's left border frame this column, so it needs none. */}
-        <div
-          data-dev-id="components.picker"
-          className="flex flex-none flex-col"
-          style={{ width: COMPONENT_PICKER_WIDTH }}
-        >
-          <RouteHeader
-            data-dev-id="components.list-title"
-            right={parts.length ? parts.length.toLocaleString() : undefined}
-          >
-            <Text id="components.list-title">Components</Text>
-          </RouteHeader>
-          <div className="px-3 pt-3">
-            <Button
-              variant="soft"
-              data-dev-id="components.add-parts"
-              icon={<AddPartIcon />}
-              onClick={openAddPart}
-              className="mb-2.5 h-9 w-full justify-center"
-            >
-              <Text id="components.add-parts">Add Parts</Text>
-            </Button>
-            <Finder
-              search={search}
-              onSearch={setSearch}
-              facets={facetsQuery.data}
-              category={category}
-              onCategory={setCategory}
-              completeOnly={completeOnly}
-              onCompleteOnly={setCompleteOnly}
-              duplicatesOnly={duplicatesOnly}
-              onDuplicatesOnly={setDuplicatesOnly}
-              duplicateCount={duplicateIds.size}
-              onOpenSearch={() => setSearchOpen(true)}
-            />
-          </div>
-          <div
-            ref={setListScrollElement}
-            data-dev-id="components.list-scroll"
-            className="mt-2 min-h-0 flex-1 overflow-y-auto px-3 pb-3"
-          >
-            <PickerBody
-              isLoading={partsQuery.isLoading}
-              error={partsQuery.error}
-              parts={parts}
-              duplicateIds={duplicateIds}
-              selectedId={selectedId}
-              onSelect={openComponent}
-              scrollElement={listScrollElement}
-              onRetry={() => partsQuery.refetch()}
-              hasSearchOrFilter={hasSearchOrFilter}
-              onClearFilters={() => {
-                setSearch("");
-                setCategory(null);
-                setCompleteOnly(false);
-                setDuplicatesOnly(false);
-              }}
-            />
-          </div>
-        </div>
+        <PickerColumn
+          count={parts.length}
+          onAddParts={openAddPart}
+          filters={filters}
+          dispatchFilters={dispatchFilters}
+          facets={facetsQuery.data}
+          duplicateIds={duplicateIds}
+          onOpenSearch={() => setSearchOpen(true)}
+          isLoading={partsQuery.isLoading}
+          error={partsQuery.error}
+          parts={parts}
+          selectedId={selectedId}
+          onSelect={openComponent}
+          scrollElement={listScrollElement}
+          onScrollElement={setListScrollElement}
+          onRetry={() => partsQuery.refetch()}
+          hasSearchOrFilter={hasSearchOrFilter}
+        />
 
-        {/* opened components: a tab band on the same 34px chrome line as the rail and picker
-            headers, then the workspace itself. The column never scrolls. */}
+        {/* the opened component: no tab band above it, because there are no per-component tabs.
+            The column never scrolls; the workspace inside it owns its own three scroll regions. */}
         <div
           data-dev-id="components.detail-pane"
           className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden border-l border-line"
         >
-          <div
-            data-dev-id="components.workspace-band"
-            className="flex h-[34px] flex-none items-center gap-2 border-b border-line bg-band px-3"
-          >
-            {openTabs.length > 0 && activeComponent ? (
-              <TabStrip
-                tabs={openTabs}
-                active={activeComponent}
-                onSelect={openComponent}
-                idBase="component-browser"
-                devIdBase="component-browser"
-                devIdForTab={componentTabDevId}
-                density="compact"
-                className="min-w-0 overflow-hidden"
-                aria-label={openComponentsLabel}
-              />
-            ) : (
-              <span className="text-xs font-semibold text-t2">
-                <Text id="component-browser.band-title">Open Components</Text>
-              </span>
-            )}
-            {activeComponent ? (
-              <button
-                type="button"
-                data-dev-id="component-browser.close-tab"
-                onClick={() => closeComponent(activeComponent)}
-                className="ml-auto flex-none rounded-control px-1.5 py-0.5 text-2xs font-medium text-t3 transition-colors hover:text-t1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc"
-              >
-                <Text id="component-browser.close-tab">Close Tab</Text>
-              </button>
-            ) : null}
-            {selectedId ? (
-              <button
-                type="button"
-                data-dev-id="component-browser.delete"
-                aria-busy={deletePart.isPending}
-                disabled={deletePart.isPending}
-                onClick={() => setConfirmDelete(true)}
-                className={
-                  "flex-none rounded-control px-1.5 py-0.5 text-2xs font-medium text-err " +
-                  "transition-colors hover:brightness-125 focus-visible:outline " +
-                  "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc " +
-                  "disabled:pointer-events-none disabled:opacity-60 " +
-                  (activeComponent ? "" : "ml-auto ")
-                }
-              >
-                <span className="inline-flex items-center gap-1">
-                  <TrashIcon />
-                  {deletePart.isPending ? (
-                    <Text id="component-browser.deleting">Deleting Part</Text>
-                  ) : (
-                    <Text id="component-browser.delete">Delete Part</Text>
-                  )}
-                </span>
-              </button>
-            ) : null}
-          </div>
           <div className="min-h-0 min-w-0 flex-1 overflow-hidden">
             {activeComponent ? (
-              <ComponentWorkspace key={activeComponent} componentId={activeComponent} />
+              <ComponentWorkspace
+                key={activeComponent}
+                componentId={activeComponent}
+                onDeleted={componentDeleted}
+              />
             ) : partsQuery.isLoading ? (
               <div
                 data-dev-id="components.select-prompt"
@@ -516,9 +354,7 @@ export function ComponentsPage() {
               >
                 {/* Says what THIS pane is waiting for. It used to repeat the picker's own
                     loading line word for word, which put the same sentence on screen twice. */}
-                <LoadingState dense id="components.loading">
-                  Nothing is open yet. The component list is still loading.
-                </LoadingState>
+                <LoadingState dense id="components.loading">Nothing is open so far. The component list is still loading.</LoadingState>
               </div>
             ) : (
               <ComponentWorkspaceEmpty />
@@ -530,18 +366,50 @@ export function ComponentsPage() {
           <SearchOverlay onClose={() => setSearchOpen(false)} onOpenPart={openFromSearch} />
         ) : null}
 
-        <ConfirmDialog
-          open={confirmDelete}
-          title={confirmDeleteTitle}
-          body={confirmDeleteBody}
-          confirmLabel={confirmDeleteLabel}
-          danger
-          onCancel={() => setConfirmDelete(false)}
-          onConfirm={() => {
-            setConfirmDelete(false);
-            handleDelete();
-          }}
-        />
+    </div>
+  );
+}
+
+/**
+ * The whole route when the library holds nothing yet.
+ *
+ * It replaces the page rather than sitting inside it, which is the reason it is a component and not
+ * a branch of the page's markup: there is no picker, no workspace and no search to render beside
+ * it, so it shares no state with any of them and takes only the one action it offers. This is the
+ * ONE place Add Parts keeps its large form - adding a part genuinely is the whole screen's purpose
+ * here, where everywhere else it is a compact toolbar action.
+ */
+function EmptyLibrary({ onAddParts }: { onAddParts: () => void }) {
+  return (
+    <div data-dev-id="components.root" className="flex min-h-0 flex-1">
+      <div
+        data-dev-id="components.empty"
+        className="flex flex-1 items-center justify-center p-6"
+      >
+        <div className="flex max-w-md flex-col items-center text-center">
+          <span className="mb-3 text-t3">
+            <AddPartIcon />
+          </span>
+          <h1 className="text-base font-semibold text-t1">
+            <Text id="components.empty-title">No Components Yet</Text>
+          </h1>
+          <p className="mt-1.5 text-sm leading-relaxed text-t3">
+            <Text id="components.empty-body">
+              Add a manufacturer part number. Stockroom will keep its KiCad, Altium, STEP,
+              source, and validation evidence together.
+            </Text>
+          </p>
+          <Button
+            variant="accent"
+            data-dev-id="components.add-parts"
+            icon={<AddPartIcon />}
+            onClick={onAddParts}
+            className="mt-4"
+          >
+            <Text id="components.add-parts">Add Parts</Text>
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -577,7 +445,7 @@ function PickerBody({
   if (isLoading) {
     return (
       <LoadingState className="mt-2" id="components.list-loading">
-        Loading this library's components...
+        Loading this catalog's components...
       </LoadingState>
     );
   }
@@ -591,11 +459,11 @@ function PickerBody({
           </ErrorState>
         ) : status === 401 ? (
           <ErrorState id="components.list-unauthorized" onRetry={onRetry}>
-            This machine is not signed in to the library.
+            This machine is not signed in to the catalog.
           </ErrorState>
         ) : (
           <ErrorState id="components.list-failed" onRetry={onRetry}>
-            This library's components could not be listed.
+            This catalog's components could not be listed.
           </ErrorState>
         )}
       </div>
@@ -639,4 +507,218 @@ function PickerBody({
       scrollElement={scrollElement}
     />
   );
+}
+
+
+// The docked picker column: the title strip with Add Parts, the finder, and the scrolling list.
+// Extracted so ComponentsPage stays the page's data flow rather than also being this pane's markup.
+function PickerColumn({
+  count,
+  onAddParts,
+  filters,
+  dispatchFilters,
+  facets,
+  duplicateIds,
+  onOpenSearch,
+  isLoading,
+  error,
+  parts,
+  selectedId,
+  onSelect,
+  scrollElement,
+  onScrollElement,
+  onRetry,
+  hasSearchOrFilter,
+}: {
+  count: number;
+  onAddParts: () => void;
+  filters: ComponentFilters;
+  dispatchFilters: (action: FiltersAction) => void;
+  facets: React.ComponentProps<typeof Finder>["facets"];
+  duplicateIds: Set<string>;
+  onOpenSearch: () => void;
+  isLoading: boolean;
+  error: Error | null;
+  parts: React.ComponentProps<typeof PartsList>["parts"];
+  selectedId: string | null;
+  onSelect: (id: string) => void;
+  scrollElement: HTMLDivElement | null;
+  onScrollElement: (element: HTMLDivElement | null) => void;
+  onRetry: () => void;
+  hasSearchOrFilter: boolean;
+}) {
+  return (
+        <div
+          data-dev-id="components.picker"
+          className="flex flex-none flex-col"
+          style={{ width: COMPONENT_PICKER_WIDTH }}
+        >
+          {/* Add Parts is a compact TOOLBAR action on the title strip. It used to be a
+              full-width 36px tile above the search, which made the loudest control in the picker
+              the one nobody presses twice; the large form survives only in the empty-library
+              state, where adding a part genuinely is the whole screen's purpose. */}
+          <RouteHeader
+            data-dev-id="components.list-title"
+            right={count ? count.toLocaleString() : undefined}
+            actions={
+              <Button
+                small
+                data-dev-id="components.add-parts"
+                icon={<AddPartIcon />}
+                onClick={onAddParts}
+              >
+                <Text id="components.add-parts">Add Parts</Text>
+              </Button>
+            }
+          >
+            <Text id="components.list-title">Components</Text>
+          </RouteHeader>
+          <div className="px-3 pt-3">
+            <Finder
+              search={filters.query}
+              onSearch={(value) => dispatchFilters({ type: "query", value })}
+              facets={facets}
+              category={filters.category}
+              onCategory={(value) => dispatchFilters({ type: "category", value })}
+              completeOnly={filters.completeOnly}
+              onCompleteOnly={(value) => dispatchFilters({ type: "completeOnly", value })}
+              duplicatesOnly={filters.duplicatesOnly}
+              onDuplicatesOnly={(value) => dispatchFilters({ type: "duplicatesOnly", value })}
+              duplicateCount={duplicateIds.size}
+              onOpenSearch={onOpenSearch}
+            />
+          </div>
+          <div
+            ref={onScrollElement}
+            data-dev-id="components.list-scroll"
+            className="mt-2 min-h-0 flex-1 overflow-y-auto px-3 pb-3"
+          >
+            <PickerBody
+              isLoading={isLoading}
+              error={error}
+              parts={parts}
+              duplicateIds={duplicateIds}
+              selectedId={selectedId}
+              onSelect={onSelect}
+              scrollElement={scrollElement}
+              onRetry={onRetry}
+              hasSearchOrFilter={hasSearchOrFilter}
+              onClearFilters={() => dispatchFilters({ type: "cleared" })}
+            />
+          </div>
+    </div>
+  );
+}
+
+// Ctrl/Cmd+K (and "/" when not already typing) opens the full-screen parametric search. The opener
+// is held in a ref so the listener subscribes once per searchOpen change rather than re-attaching
+// on every render because the caller passed a fresh arrow function.
+function useSearchHotkey(searchOpen: boolean, onOpen: () => void) {
+  const openRef = useRef(onOpen);
+  useLayoutEffect(() => {
+    openRef.current = onOpen;
+  });
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        openRef.current();
+      } else if (
+        e.key === "/" &&
+        !searchOpen &&
+        !(e.target instanceof HTMLElement &&
+          /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName))
+      ) {
+        e.preventDefault();
+        openRef.current();
+      }
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [searchOpen]);
+}
+
+/**
+ * Restore and continuously checkpoint the picker scroll, as one concern rather than as three
+ * loose pieces of the page body.
+ *
+ * part accompanies the pixel offset, so a future projection can re-anchor
+ * after insertions instead of treating the number as an identity.
+ * 
+ * The restore CANNOT run against the loading placeholder. While the list query is
+ * in flight the picker body is a one-line "Loading parts..." block, and a browser
+ * clamps `scrollTop = N` against that tiny scroll height - the anchor silently
+ * became 0 and the checkpoint below then wrote that 0 back over the saved offset.
+ * So: wait for the settled list, retry while the assignment is still being clamped
+ * (virtual rows arrive over more than one frame), and refuse to checkpoint until
+ * the restore has actually landed.
+ */
+function usePickerScrollAnchor(
+  scrollElement: HTMLDivElement | null,
+  contentSettled: boolean,
+  selectedId: string | null,
+) {
+  const selectedIdRef = useRef(selectedId);
+  // Synced in a layout effect, not during render: render can be replayed or thrown away, and the
+  // persisted list anchor must never name a selection no commit ever published. Layout effects land
+  // before this commit's passive effects, so the scroll checkpoint below (and its teardown flush)
+  // still writes this render's selection.
+  useLayoutEffect(() => {
+    selectedIdRef.current = selectedId;
+  });
+  const listRestoredRef = useRef(false);
+  useEffect(() => {
+    if (!scrollElement || !contentSettled) return;
+    const target = readUiSession().component_list_anchor.offset_px;
+    let frame: number | null = null;
+    let lastScrollHeight = -1;
+    const restore = () => {
+      frame = null;
+      if (listRestoredRef.current) return;
+      scrollElement.scrollTop = target;
+      // Give up (and accept the clamped position) once the content stops growing:
+      // an anchor past the end of a now-shorter list is stale, not pending.
+      if (
+        Math.round(scrollElement.scrollTop) >= target ||
+        scrollElement.scrollHeight === lastScrollHeight
+      ) {
+        listRestoredRef.current = true;
+        return;
+      }
+      lastScrollHeight = scrollElement.scrollHeight;
+      frame = requestAnimationFrame(restore);
+    };
+    restore();
+    let pending: number | null = null;
+    const checkpoint = () => {
+      pending = null;
+      if (!listRestoredRef.current) return;
+      const offset = Math.max(0, Math.round(scrollElement.scrollTop));
+      const current = readUiSession();
+      if (
+        current.component_list_anchor.offset_px === offset &&
+        current.component_list_anchor.part_id === selectedIdRef.current
+      ) {
+        return;
+      }
+      updateUiSession((snapshot) => ({
+        ...snapshot,
+        component_list_anchor: {
+          part_id: selectedIdRef.current,
+          offset_px: offset,
+        },
+      }));
+    };
+    const onScroll = () => {
+      if (pending !== null) window.clearTimeout(pending);
+      pending = window.setTimeout(checkpoint, 40);
+    };
+    scrollElement.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      scrollElement.removeEventListener("scroll", onScroll);
+      if (frame !== null) cancelAnimationFrame(frame);
+      if (pending !== null) window.clearTimeout(pending);
+      checkpoint();
+    };
+  }, [contentSettled, scrollElement]);
 }

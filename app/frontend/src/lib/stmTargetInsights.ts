@@ -56,13 +56,6 @@ export const TARGET_COMPATIBILITY_INSIGHTS: Record<
   },
 };
 
-export const TARGET_COMPATIBILITY_ORDER: TargetCompatibilityKind[] = [
-  "identical",
-  "variant",
-  "partial",
-  "conflict",
-];
-
 export const BOARD_ACTION_LABEL: Record<TargetBoardAction, string> = {
   hardwire: "Connect Permanently",
   breakout: "Expose For Use",

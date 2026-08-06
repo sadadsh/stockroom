@@ -26,6 +26,12 @@ export interface PartSummary {
   category: string;
   mpn: string;
   manufacturer: string;
+  // The package, from the footprint the library really holds. The picker row carries it opposite
+  // the manufacturer, on the line UNDER the MPN: it qualifies the identifier rather than
+  // competing with it, and sharing the identifier's line is what left a 290px row rendering the
+  // MPN as one letter. Empty or absent means the segment is omitted, never a dangling separator.
+  // Optional across a rolling frontend/backend handoff, like `eda_readiness`.
+  package?: string;
   // Passport/data completeness. This is not a CAD-presence or trust verdict.
   is_complete: boolean;
   missing: string[];
@@ -2952,4 +2958,26 @@ export interface CompletionProgress {
   retained?: number;
   remaining: string[];
   message: string;
+}
+
+/** One EDA application the window host proved is installed on this machine. */
+export interface EdaApplication {
+  id: string;
+  name: string;
+  version: string;
+}
+
+/**
+ * What the Manage menu's three shell actions may offer for one component.
+ *
+ * `supported` is false on a host that owns no native window: nothing there can reveal a folder
+ * or start an application, so the three items are absent rather than present and broken. The
+ * EDA application names carried here are the only ones the product shows outside an explicit
+ * export / open / compatibility action.
+ */
+export interface PartShell {
+  supported: boolean;
+  component_directory: boolean;
+  export_formats: string[];
+  eda_applications: EdaApplication[];
 }

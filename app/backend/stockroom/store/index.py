@@ -135,6 +135,11 @@ class IndexRow:
     mpn: str
     manufacturer: str
     is_complete: bool
+    # The package the part is built around, read off the footprint entry the library really
+    # holds. The picker's second line is "Manufacturer . Package", and the package is the one
+    # physical fact a person scanning a list checks before anything else. Defaulted, so a row
+    # built before this column existed still constructs.
+    package: str = ""
     missing: list[str] = field(default_factory=list)
     eda_readiness: dict[str, "ToolReadiness"] = field(default_factory=dict)
 
@@ -763,10 +768,29 @@ def _row_values(rec: PartRecord, source_hash: str = "") -> tuple:
     # They are now a CONVENIENCE over `part_assets`, not the only place asset data lives.
     kicad = rec.assets_for("kicad")
     purchase_url = rec.purchase[0].url if rec.purchase and rec.purchase[0].url else ""
+    # What the picker's inline search matches on. The package and the derived key specification
+    # values are in here because that is what a person types when they are looking for a part they
+    # cannot name: "SOT-23-5", "3.3 V", "10 uF". Bounded on purpose - a whole specification table
+    # per part would turn every one-word query into a match on everything.
+    package = kicad.footprint.name if kicad.footprint else ""
+    key_specs = " ".join(
+        str(value)
+        for value in list(rec.derived.specs.values())[:24]
+        if isinstance(value, (str, int, float)) and str(value).strip()
+    )
     search_blob = " ".join(
         filter(
             None,
-            [rec.display_name, rec.mpn, rec.manufacturer, rec.description, " ".join(rec.tags), rec.category],
+            [
+                rec.display_name,
+                rec.mpn,
+                rec.manufacturer,
+                rec.description,
+                " ".join(rec.tags),
+                rec.category,
+                package,
+                key_specs,
+            ],
         )
     ).lower()
     return (
@@ -800,6 +824,7 @@ def _to_row(
         mpn=r["mpn"],
         manufacturer=r["manufacturer"],
         is_complete=bool(r["is_complete"]),
+        package=r["footprint_name"],
         missing=[m for m in r["missing"].split(",") if m],
         eda_readiness=dict(eda_readiness or {}),
     )

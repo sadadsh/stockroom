@@ -31,7 +31,7 @@ const COLLAPSED_LABEL = "w-0 overflow-hidden opacity-0";
  * collapsed nav/about 25.5px, update 16px, theme 20.5px; pinned nav/about 30.5px, update 31px.
  * A grid makes those impossible: every left-column glyph now has the same 25.5px centerline. */
 const RAIL_ROW =
-  "grid h-[34px] w-full grid-cols-[35px_minmax(0,1fr)] items-center gap-2.5 " +
+  "grid h-[27px] w-full grid-cols-[35px_minmax(0,1fr)] items-center gap-2.5 " +
   "rounded-control px-0 text-left";
 const RAIL_GLYPH = "flex h-[17px] w-[35px] items-center justify-center";
 
@@ -102,8 +102,15 @@ function readCollapsed(): boolean {
 
 export function Rail() {
   const { route, navigate } = useRouter();
-  const navLabel = useText("nav.rail-label", "Primary");
-  const themeToggleLabel = useText("nav.theme-toggle", "Toggle light or dark theme");
+  const navLabel = useText("nav.rail-label", "Main");
+  // Labelled by CONSEQUENCE, not by subject. "Theme" names the setting and leaves the person to
+  // guess which way it goes; "Use Light Theme" says what pressing it does.
+  const useLightLabel = useText("nav.theme-use-light", "Use Light Theme");
+  const useDarkLabel = useText("nav.theme-use-dark", "Use Dark Theme");
+  // One glyph serves both directions, so each direction needs its own name and its own tooltip.
+  const expandRailLabel = useText("nav.rail-expand", "Expand Rail");
+  const collapseRailLabel = useText("nav.rail-collapse", "Collapse Rail");
+  const railAboutLabel = useText("nav.about-label", "About");
   const [collapsed, setCollapsed] = useState(readCollapsed);
   // Persist only what the USER chose. This effect used to run on mount, which wrote the derived
   // value straight into the preference store - and after that first launch "never chosen" could
@@ -126,7 +133,7 @@ export function Rail() {
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
   }, []);
-  const { toggle } = useTheme();
+  const { theme, toggle } = useTheme();
   const items = railNav();
   const primary = items.filter((item) => item.group === "primary");
   const footItems = items.filter((item) => item.group === "foot");
@@ -165,7 +172,7 @@ export function Rail() {
           as one Altium workspace. Full-bleed to the rail edges via negative margins. */}
       <div
         data-dev-id="rail.wordmark"
-        className="-mx-2 -mt-4 mb-3 flex h-[34px] flex-none items-center gap-2.5 border-b border-line bg-band px-2"
+        className="-mx-2 -mt-4 mb-3 flex h-[26px] flex-none items-center gap-2.5 border-b border-line bg-band px-2"
       >
         {!collapsed ? (
           <>
@@ -174,7 +181,7 @@ export function Rail() {
             <span className={RAIL_GLYPH}>
               <Icon id="brand.wordmark" className="ico h-5 w-5 flex-none text-t1" />
             </span>
-            <span className="whitespace-nowrap text-base font-semibold tracking-[-0.01em] text-t1">
+            <span className="whitespace-nowrap text-base font-semibold text-t1">
               <Text id="nav.brand">Stockroom</Text>
             </span>
           </>
@@ -194,8 +201,8 @@ export function Rail() {
           <button
             type="button"
             data-dev-id="rail.collapse"
-            aria-label={collapsed ? "Expand Rail" : "Collapse Rail"}
-            title={collapsed ? "Expand Rail" : "Collapse Rail"}
+            aria-label={collapsed ? expandRailLabel : collapseRailLabel}
+            title={collapsed ? expandRailLabel : collapseRailLabel}
             aria-expanded={!collapsed}
             onClick={() => setCollapsedByUser((v) => !v)}
             className={
@@ -218,7 +225,7 @@ export function Rail() {
           <span
             className={
             COLLAPSED_LABEL +
-              " whitespace-nowrap text-base font-semibold tracking-[-0.01em] text-t1"
+              " whitespace-nowrap text-base font-semibold text-t1"
             }
           >
             <Text id="nav.brand">Stockroom</Text>
@@ -255,8 +262,8 @@ export function Rail() {
         <button
           type="button"
           data-dev-id="rail.about"
-          aria-label={collapsed ? "About" : undefined}
-          title={collapsed ? "About" : undefined}
+          aria-label={collapsed ? railAboutLabel : undefined}
+          title={collapsed ? railAboutLabel : undefined}
           onClick={() => setAboutOpen(true)}
           className={
             RAIL_ROW +
@@ -274,55 +281,49 @@ export function Rail() {
           data-dev-id="rail.utility"
           className="flex flex-col items-stretch gap-0.5"
         >
-          <div
-            data-dev-id="rail.update"
-            className={RAIL_ROW + " text-xs font-medium text-t2"}
-            title={updateView.detail}
-          >
-            <span
-              aria-hidden
-              className={RAIL_GLYPH}
-              style={
-                UPDATE_GLYPH_TONE[updateView.standing]
-                  ? { color: UPDATE_GLYPH_TONE[updateView.standing] }
-                  : undefined
-              }
+          {/* Shown only when there is something to DO about it. A permanent "Current" row spent a
+              rail slot every day of the year to say that nothing had happened, and trained the eye
+              to skip the one place an update would have appeared. */}
+          {updateView.standing !== "current" && updateView.standing !== "unknown" ? (
+            <div
+              data-dev-id="rail.update"
+              className={RAIL_ROW + " text-xs font-medium text-t2"}
+              title={updateView.detail}
             >
-              <Icon
-                id={
-                  updateView.standing === "current"
-                    ? "nav.up-to-date"
-                    : "nav.update"
+              <span
+                aria-hidden
+                className={RAIL_GLYPH}
+                style={
+                  UPDATE_GLYPH_TONE[updateView.standing]
+                    ? { color: UPDATE_GLYPH_TONE[updateView.standing] }
+                    : undefined
                 }
-                className="h-4 w-4 flex-none"
-              />
-            </span>
-            <span className={collapsed ? COLLAPSED_LABEL + " whitespace-nowrap" : ""}>
-              {updateView.standing === "available" ? (
-                <Text id="nav.update-ready">Update Ready</Text>
-              ) : updateView.standing === "current" ? (
-                <Text id="nav.update-current">Current</Text>
-              ) : updateView.standing === "updating" ? (
-                <Text id="nav.update-updating">Updating...</Text>
-              ) : updateView.standing === "checking" ? (
-                <Text id="nav.update-checking">Checking...</Text>
-              ) : updateView.standing === "retrying" ? (
-                <Text id="nav.update-retrying">Retrying...</Text>
-              ) : updateView.standing === "blocked" ? (
-                <Text id="nav.update-blocked">Update Blocked</Text>
-              ) : updateView.standing === "restart_required" ? (
-                <Text id="nav.update-restart">Restart Required</Text>
-              ) : (
-                <Text id="nav.update-unknown">Update Unknown</Text>
-              )}
-            </span>
-          </div>
+              >
+                <Icon id="nav.update" className="h-4 w-4 flex-none" />
+              </span>
+              <span className={collapsed ? COLLAPSED_LABEL + " whitespace-nowrap" : ""}>
+                {updateView.standing === "available" ? (
+                  <Text id="nav.update-ready">Update Available</Text>
+                ) : updateView.standing === "updating" ? (
+                  <Text id="nav.update-updating">Updating...</Text>
+                ) : updateView.standing === "checking" ? (
+                  <Text id="nav.update-checking">Checking...</Text>
+                ) : updateView.standing === "retrying" ? (
+                  <Text id="nav.update-retrying">Rerunning...</Text>
+                ) : updateView.standing === "blocked" ? (
+                  <Text id="nav.update-blocked">Update Blocked</Text>
+                ) : (
+                  <Text id="nav.update-restart">Restart Required</Text>
+                )}
+              </span>
+            </div>
+          ) : null}
           <button
             type="button"
             data-dev-id="rail.theme-toggle"
             onClick={toggle}
-            aria-label={themeToggleLabel}
-            title={themeToggleLabel}
+            aria-label={theme === "dark" ? useLightLabel : useDarkLabel}
+            title={theme === "dark" ? useLightLabel : useDarkLabel}
             className={
               RAIL_ROW +
               " text-xs font-medium text-t2 transition hover:bg-[var(--c-hover)] hover:text-t1"
@@ -338,7 +339,11 @@ export function Rail() {
                 It also earns its place - the rail peek names every other control and named this
                 one nothing. */}
             <span className={collapsed ? COLLAPSED_LABEL + " whitespace-nowrap" : ""}>
-              <Text id="nav.theme">Theme</Text>
+              {theme === "dark" ? (
+                <Text id="nav.theme-use-light">Use Light Theme</Text>
+              ) : (
+                <Text id="nav.theme-use-dark">Use Dark Theme</Text>
+              )}
             </span>
           </button>
         </div>
@@ -424,11 +429,11 @@ function AboutModal({
               ico token) is passed through so --icon-stroke keeps retuning it. Byte-identical output. */}
           <Icon id="brand.wordmark" className="ico h-6 w-6 text-t1" />
         </div>
-        <div data-dev-id="about.title" className="text-lg font-semibold tracking-[-0.02em] text-t1">
+        <div data-dev-id="about.title" className="text-lg font-semibold text-t1">
           <Text id="modal.about.title">Stockroom</Text>
         </div>
         <p data-dev-id="about.credit" className="mt-1 text-sm text-t2">
-          <Text id="modal.about.credit">Developed with love by </Text>
+          <Text id="modal.about.credit">Made with love, from </Text>
           <span className="font-medium text-t1">
             <Text id="modal.about.author">Sadad Haidari</Text>
           </span>

@@ -35,9 +35,9 @@ def _rec(**kw) -> PartRecord:
 # ------------------------------------------------- the persisted shape
 
 
-def test_the_schema_version_is_four():
-    assert SCHEMA_VERSION == 4
-    assert json.loads(_rec().dumps())["schema_version"] == 4
+def test_the_schema_version_is_five():
+    assert SCHEMA_VERSION == 5
+    assert json.loads(_rec().dumps())["schema_version"] == 5
 
 
 def test_the_top_level_keys_are_identity_derived_sources_and_assets():
