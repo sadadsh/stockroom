@@ -2,7 +2,14 @@
  * Response shapes mirrored from the backend DTOs. These are the presentation
  * contract only; the source of truth stays the PartRecord JSON + derived index
  * (stockroom.api.schemas, stockroom.model.part). Kept in lockstep with those.
+ *
+ * The two type-only imports below are the exception that proves the rule: the Design Mode save body
+ * carries a LAYOUT DOCUMENT and its validator issues, and those are frontend-owned shapes
+ * (`layout/document.ts`, `layout/validatorIssues.ts`) rather than backend DTOs. Restating them here
+ * would give the writer and the editor two definitions of one tree.
  */
+import type { LayoutDocument } from "../layout/document";
+import type { ValidatorIssue } from "../layout/validatorIssues";
 
 export type TrustVerdict = "pass" | "fail" | "unknown";
 
@@ -1703,11 +1710,24 @@ export interface DevSaveBody {
   // ["count", "total"]). The default lives in the JSX, so this is the only way the writer can hold a
   // reworded override to the same set and refuse one that dropped or invented a placeholder.
   copyPlaceholders?: Record<string, string[]>;
+  // The committed ARRANGEMENT, keyed by surface exactly as lib/layout.overrides.ts is (`workspace`
+  // today; the shell and the remaining routes become siblings in later phases). `null` commits the
+  // shipped default for that surface. The backend rebuilds the document from validated fields and
+  // rejects anything that is not one - structurally; the design validator is frontend code.
+  layout?: { workspace: LayoutDocument | null };
+  // The deviation list the commit ships with (plan 1.4). Computed here by `validateDocument` at save
+  // time and written verbatim: the backend never re-derives it, because the validator, the piece
+  // registry and the palettes all live on this side.
+  committedIssues?: { workspace: ValidatorIssue[] };
+  // Copy ids the owner typed themselves through Design Mode, so the letter-rule lint can exempt them
+  // while still binding everything the app authors (plan 1.5). Held server-side to ids that actually
+  // carry an override in the same write.
+  ownerAuthoredCopy?: string[];
 }
 
-// The write outcome: the relative source paths written, and how many token / copy / icon / element
-// overrides now persist. ok is false with a message only on an honest refuse (no source tree in a
-// frozen exe).
+// The write outcome: the relative source paths written, and how many token / copy / icon / element /
+// layout overrides now persist. ok is false with a message only on an honest refuse (no source tree
+// in a frozen exe).
 export interface DevSaveResult {
   ok: boolean;
   written: string[];
@@ -1716,6 +1736,11 @@ export interface DevSaveResult {
   icons: number;
   elements: number;
   behaviors: number;
+  // Surfaces carrying a committed arrangement, the known issues written beside them, and the
+  // owner-authored copy ids recorded. Absent from an older backend, hence optional.
+  layouts?: number;
+  committedIssues?: number;
+  ownerAuthoredCopy?: number;
 }
 
 export interface DevWorkspaceStatus {

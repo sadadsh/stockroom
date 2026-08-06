@@ -39,7 +39,14 @@
  * unknown piece and an editor that refused to move one would be refusing to edit a layout an older
  * build wrote. No region or slot is created or destroyed either - 3B moves content between the
  * regions a document already has; composing NEW regions is the composer's job (plan Phase 5).
+ *
+ * THE ONE IMPORT OUTSIDE THIS FOLDER is `components/typography.ts`, and it is a DATA table rather
+ * than a component: `TYPOGRAPHY_SCALE` is the closed set of role names, and `setPlacementStyleRole`
+ * below refuses anything that is not one of them. Naming the vocabulary at the operation is the only
+ * place a refusal can be complete - a picker that offered the right options would still let a
+ * hand-written document, an older build or a bad merge introduce a role that names nothing.
  */
+import { TYPOGRAPHY_SCALE, type TypographyRoleName } from "../components/typography";
 import {
   findRegion,
   layoutPlacements,
@@ -292,6 +299,31 @@ export function movePlacement(
  * stays the smallest description of the arrangement it is, and a placement returned to its default
  * is byte-identical to one that was never touched.
  */
+/**
+ * Swap one placement object for another, wherever in the tree it sits.
+ *
+ * By object identity, not by id: a document carrying the same placement id twice gets ONE of them
+ * edited - the one that was resolved - rather than both.
+ */
+function replacePlacement(
+  document: LayoutDocument,
+  target: PiecePlacement,
+  next: PiecePlacement,
+): LayoutDocument {
+  let done = false;
+  return rebuildRegions(document, (region) => {
+    if (done) return region;
+    let changed = false;
+    const slots = region.slots.map((slot) => {
+      if (slot.content !== target) return slot;
+      changed = true;
+      done = true;
+      return { ...slot, content: next };
+    });
+    return changed ? { ...region, slots } : region;
+  });
+}
+
 function setPlacementFlag(
   document: LayoutDocument,
   ref: PlacementRef,
@@ -306,20 +338,7 @@ function setPlacementFlag(
   if (value) next[key] = true;
   else delete next[key];
 
-  // By object identity, not by id: a document carrying the same placement id twice gets ONE of them
-  // edited - the one that was resolved - rather than both.
-  let done = false;
-  return rebuildRegions(document, (region) => {
-    if (done) return region;
-    let changed = false;
-    const slots = region.slots.map((slot) => {
-      if (slot.content !== resolved.placement) return slot;
-      changed = true;
-      done = true;
-      return { ...slot, content: next };
-    });
-    return changed ? { ...region, slots } : region;
-  });
+  return replacePlacement(document, resolved.placement, next);
 }
 
 /** Collapse or expand THIS appearance of a piece. */
@@ -485,4 +504,77 @@ export function setRegionSize(
     else next.size = nextSize;
     return next;
   });
+}
+
+/* -------------------------------------------------------------------------- */
+/*  4. a placement's text roles                                                */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * THE TWO SCOPES, and which one this operation is.
+ *
+ * Plan 1.5 gives a style edit two scopes and makes the wider one the default: "everywhere (class)"
+ * against "only here recorded as a tracked exception". The wider scope IS ALREADY BUILT AND IS NOT
+ * REBUILT HERE. A role is a class in `styles/index.css` fed by the tokens in `lib/devTokens.ts`, so
+ * editing the role everywhere is what the Design panel's Tokens rows do, and reshaping one element's
+ * box everywhere it appears is what the Box tab does against a `data-dev-role`. Both write the same
+ * override draft, both already save back to source, and a second editor over the same tokens would
+ * be a second answer to one question.
+ *
+ * What had no home is the NARROW scope: this placement, and no other appearance of the same piece.
+ * `PiecePlacement.styleRoles` is where the document holds it, and this is the only function that
+ * writes it. There is no separate ledger of exceptions, because the document IS the ledger -
+ * `validateDocument`'s provenance layer reads `styleRoles` straight back out as a
+ * `style-role-exception` info row, so an exception is tracked by virtue of existing rather than by
+ * anybody remembering to record it.
+ *
+ * A ROLE, NOT A STRING. Both the role being overridden and the role it takes must name an entry in
+ * `TYPOGRAPHY_SCALE`; anything else is a no-op returning the input document, warn-never-block style.
+ * The scale is the whole vocabulary of the type system and a role outside it resolves to no class at
+ * all, so accepting one would write a document that silently draws nothing different.
+ */
+export const STYLE_ROLE_NAMES: readonly TypographyRoleName[] = Object.keys(
+  TYPOGRAPHY_SCALE,
+) as TypographyRoleName[];
+
+/** True when this string names a role the type system defines. */
+export function isStyleRole(name: string): name is TypographyRoleName {
+  return Object.prototype.hasOwnProperty.call(TYPOGRAPHY_SCALE, name);
+}
+
+/**
+ * Give THIS appearance of a piece a different text role, or drop the exception.
+ *
+ * `becomes` of `null` clears the entry, and clearing the last entry DELETES `styleRoles` outright
+ * rather than leaving `{}` behind - the same serialisable-out rule the boolean settings follow, and
+ * the reason `validateDocument` can treat an empty object as "no exception" without either module
+ * knowing about the other.
+ *
+ * A NO-OP (the input document, by reference) when: either name is not a role, the ref names no
+ * single placement, or the placement already holds exactly what was asked for.
+ */
+export function setPlacementStyleRole(
+  document: LayoutDocument,
+  ref: PlacementRef,
+  role: string,
+  becomes: string | null,
+): LayoutDocument {
+  if (!isStyleRole(role)) return document;
+  if (becomes !== null && !isStyleRole(becomes)) return document;
+
+  const resolved = resolvePlacement(document, ref);
+  if (!resolved) return document;
+
+  const current = resolved.placement.styleRoles;
+  if ((current?.[role] ?? null) === becomes) return document;
+
+  const roles: Record<string, string> = { ...(current ?? {}) };
+  if (becomes === null) delete roles[role];
+  else roles[role] = becomes;
+
+  const next: PiecePlacement = { ...resolved.placement };
+  if (Object.keys(roles).length > 0) next.styleRoles = roles;
+  else delete next.styleRoles;
+
+  return replacePlacement(document, resolved.placement, next);
 }

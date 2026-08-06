@@ -29,6 +29,13 @@
  *     resolve through `<Text id={thatId}>{thatString}</Text>` at the render site.
  *  4. `lib/copy.overrides.ts` - the committed rewordings, which ship and are read on every render
  *     for everyone. An override that reintroduced the letter would defeat every fix in the source.
+ *     ONE EXEMPTION, and it is the owner's own (plan 1.5, the 2026-08-06 amendment): an id listed in
+ *     that module's `OWNER_AUTHORED_COPY_IDS` was typed by the OWNER through the Design Mode editor,
+ *     and the rule exists to stop this application authoring blocked words FOR them, not to overrule
+ *     them inside their own product. The exemption is keyed on the id and on nothing else, so a
+ *     rewording hand-edited into the map - or written by an agent through any other route - stays
+ *     bound. `POST /api/dev/save` is what writes the record, and it drops any id that does not carry
+ *     an override, so the record cannot become a standing exemption for a string that is not there.
  *
  * --- WHAT IS NOT READ, and why ----------------------------------------------------------------
  *
@@ -53,6 +60,15 @@
  */
 import { describe, it, expect } from "vitest";
 import { BLOCKED_TERMS, INDUSTRY_TERMS, suggestReplacement } from "./interfaceTerms";
+// The allowlist and the judgement moved to `lib/letterRule.ts` so Design Mode's copy editor can run
+// the SAME rule live on text the owner types (plan 1.5). They are imported rather than restated:
+// the allowlist is the one place this rule can be defeated wholesale, and a second copy of it in the
+// editor would be a second place to defeat it that this gate could not see.
+import { judgedText, PROPER_NAMES } from "./letterRule";
+// The owner-authored provenance record, written into `copy.overrides.ts` by POST /api/dev/save. It
+// is imported rather than parsed out of the raw text so that renaming the export breaks this gate
+// loudly instead of turning the exemption into a silently-empty set.
+import { COPY_OVERRIDES, OWNER_AUTHORED_COPY_IDS } from "./copy.overrides";
 
 const RAW = import.meta.glob("/src/**/*.{ts,tsx}", {
   query: "?raw",
@@ -61,13 +77,13 @@ const RAW = import.meta.glob("/src/**/*.{ts,tsx}", {
 }) as Record<string, string>;
 
 /**
- * ALLOWLIST, CATEGORY 1 - a proper name that is not ours to reword.
+ * ALLOWLIST, CATEGORY 1 - a proper name that is not ours to reword. Declared in `lib/letterRule.ts`
+ * and imported above; the reasoning for the single entry lives beside it there.
  *
- * Kept deliberately tiny and whole-word. `DigiKey` is a distributor's registered trade name; it
- * appears inside sentences this product authors ("no DigiKey API credential is set"), and spelling
- * a company's name differently would be a factual error, not a style choice.
+ * Named here so this file still reads as the statement of the two categories, and asserted below so
+ * the move cannot have quietly emptied it.
  */
-const PROPER_NAMES: readonly string[] = ["DigiKey"];
+void PROPER_NAMES;
 
 /**
  * ALLOWLIST, CATEGORY 2 - a standardised technical term with no synonym.
@@ -84,18 +100,6 @@ const PROPER_NAMES: readonly string[] = ["DigiKey"];
  * asset itself can carry the meaning, that is still the better answer.
  */
 const INDUSTRY_WORDS: readonly string[] = INDUSTRY_TERMS.map((t) => t.term);
-
-/**
- * Every allowed term as a whole-word, case-insensitive matcher with an optional plural `s`.
- *
- * Whole-word matters in both directions: it stops `Layer` from laundering `Layered Analysis`, and it
- * stops a bare substring match from silently blessing a longer offending word that happens to
- * contain an allowed one. Case-insensitive because an upper-case letter is the same letter - the rule
- * says so explicitly - so `symbol` in prose is exempt on the same grounds as `Symbol` on a label.
- */
-const ALLOWED = [...PROPER_NAMES, ...INDUSTRY_WORDS].map(
-  (term) => new RegExp(`\\b${term}s?\\b`, "gi"),
-);
 
 const BLOCKED = "y";
 
@@ -162,8 +166,12 @@ const ID_PAIRED_HOLDER = new RegExp(
 );
 const ID_PAIRED_STRING = /\b[A-Za-z]*(?:label|title|hint|Label|Title|Hint)\s*[:=]\s*"((?:[^"\\]|\\.)*)"/g;
 
-// The committed rewordings: `"copy.id": "the reworded text"`.
-const OVERRIDE_ENTRY = /"(?:[^"\\]|\\.)*"\s*:\s*"((?:[^"\\]|\\.)*)"/g;
+// The committed rewordings: `"copy.id": "the reworded text"`. Group 1 is the ID, group 2 the text -
+// the id is captured for ONE purpose, the owner-authored exemption below, and is never judged.
+const OVERRIDE_ENTRY = /"((?:[^"\\]|\\.)*)"\s*:\s*"((?:[^"\\]|\\.)*)"/g;
+
+const OVERRIDES_PATH = "/src/lib/copy.overrides.ts";
+const OWNER_AUTHORED: ReadonlySet<string> = new Set(OWNER_AUTHORED_COPY_IDS);
 
 interface Offence {
   readonly where: string;
@@ -178,22 +186,52 @@ function lineOf(src: string, index: number): number {
 /**
  * What the rule actually judges: the default with its data holes and its allowed terms removed.
  * A string is an offender when THIS still carries the letter.
+ *
+ * `lib/letterRule.ts` is the implementation, shared with the live editor - see the import above.
  */
-function judged(text: string): string {
-  let out = text.replace(/\{[^{}]*\}/g, " ");
-  for (const allowed of ALLOWED) out = out.replace(allowed, " ");
+const judged = judgedText;
+
+/**
+ * The committed rewordings, with the owner's own text exempted BY ID.
+ *
+ * `ownerAuthored` is a parameter rather than a module read so the two halves of the exemption can be
+ * proven separately below: the same entry is an offence when its id is absent from the record and is
+ * not one when it is present. The gate itself always passes the real record.
+ */
+function overrideOffences(
+  path: string,
+  src: string,
+  ownerAuthored: ReadonlySet<string>,
+): Offence[] {
+  const out: Offence[] = [];
+  OVERRIDE_ENTRY.lastIndex = 0;
+  for (let m = OVERRIDE_ENTRY.exec(src); m; m = OVERRIDE_ENTRY.exec(src)) {
+    const [, id, text] = m;
+    // The owner typed this one themselves through Design Mode (plan 1.5). Everything the app
+    // authors - including a rewording hand-edited into this map - has no id in the record and is
+    // judged exactly as before.
+    if (ownerAuthored.has(id)) continue;
+    if (judged(text).includes(BLOCKED)) {
+      out.push({
+        where: `${path}:${lineOf(src, m.index)}`,
+        what: "committed override",
+        text: text.trim(),
+      });
+    }
+  }
   return out;
 }
 
-function offences(path: string, raw: string): Offence[] {
+function offences(
+  path: string,
+  raw: string,
+  ownerAuthored: ReadonlySet<string> = OWNER_AUTHORED,
+): Offence[] {
   const src = path.endsWith(".tsx") ? blankComments(raw) : raw;
-  const out: Offence[] = [];
-  const shapes =
-    path === "/src/lib/copy.overrides.ts"
-      ? [{ what: "committed override", re: OVERRIDE_ENTRY }]
-      : DEFAULT_SHAPES;
+  if (path === OVERRIDES_PATH) return overrideOffences(path, src, ownerAuthored);
 
-  for (const { what, re } of shapes) {
+  const out: Offence[] = [];
+  for (const { what, re } of DEFAULT_SHAPES) {
     re.lastIndex = 0;
     for (let m = re.exec(src); m; m = re.exec(src)) {
       if (judged(m[1]).includes(BLOCKED)) {
@@ -271,6 +309,39 @@ describe("the interface-letter rule on the copy layer", () => {
     expect(found).toEqual([]);
   });
 
+  /**
+   * THE OWNER-AUTHORED EXEMPTION, both halves (plan 1.5).
+   *
+   * The same committed entry is judged twice: once with its id absent from the provenance record and
+   * once with it present. If only the first case existed the exemption could be a no-op and this
+   * would still pass; if only the second existed the rule could have been switched off wholesale for
+   * `copy.overrides.ts` and this would still pass. Together they pin exactly one behaviour.
+   *
+   * FAILS IF: the exemption stops being keyed on the id (an unlisted rewording would go unjudged), or
+   * the record stops being consulted (owner-typed text would be reported as an application offence).
+   */
+  it("exempts an owner-authored override by id, and only by id", () => {
+    const module = 'export const COPY_OVERRIDES = {\n  "detail.summary": "Summary"\n};\n';
+
+    const agentAuthored = offences(OVERRIDES_PATH, module, new Set());
+    expect(agentAuthored.map((o) => o.text)).toEqual(["Summary"]);
+    expect(agentAuthored[0]?.what).toBe("committed override");
+
+    const ownerAuthored = offences(OVERRIDES_PATH, module, new Set(["detail.summary"]));
+    expect(ownerAuthored).toEqual([]);
+
+    // Keyed on THIS id: a record naming some other rewording exempts nothing here.
+    expect(offences(OVERRIDES_PATH, module, new Set(["detail.other"]))).toEqual(agentAuthored);
+  });
+
+  it("cannot exempt a copy id that carries no committed override", () => {
+    // The record's only cap. An id with no rewording above it has nothing to exempt, so a listing for
+    // one is either stale or an attempt to pre-authorise text nobody has written. `POST /api/dev/save`
+    // drops those on the way in; this is the same claim held against the file as committed.
+    const dangling = OWNER_AUTHORED_COPY_IDS.filter((id) => COPY_OVERRIDES[id] === undefined);
+    expect(dangling).toEqual([]);
+  });
+
   it("every recorded replacement is itself clear of the letter", () => {
     // A term map that suggested an offending replacement would launder the rule it exists to serve.
     // `replacement` is the machine-usable text - what actually gets written - so it is held to the
@@ -320,5 +391,19 @@ describe("the interface-letter rule on the copy layer", () => {
     expect(INDUSTRY_TERMS.length).toBeLessThanOrEqual(4);
     const unreasoned = INDUSTRY_TERMS.filter((t) => t.why.trim().length < 40).map((t) => t.term);
     expect(unreasoned).toEqual([]);
+  });
+
+  it("shares one allowlist with the live editor, and that allowlist is not empty", () => {
+    // The judgement moved to `lib/letterRule.ts` so Design Mode can run it on text the owner types.
+    // Killing mutation: return the text unchanged from `judgedText`, or empty either allowlist
+    // category. Both would make the gate above pass by exempting everything, which is precisely the
+    // failure a shared allowlist risks - so the exemptions are asserted to still exempt, and the
+    // words around them are asserted to still be judged.
+    expect(PROPER_NAMES).toContain("DigiKey");
+    expect(judged("DigiKey")).not.toContain(BLOCKED);
+    expect(judged("Symbol")).not.toContain(BLOCKED);
+    expect(judged("{quantity} parts")).not.toContain(BLOCKED);
+    expect(judged("Apply")).toContain(BLOCKED);
+    expect(judged("Layered")).toContain(BLOCKED);
   });
 });

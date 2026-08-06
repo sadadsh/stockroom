@@ -170,6 +170,12 @@ function Surface({
           )
           .join(" ")}
       </output>
+      <output data-testid="roles">
+        {layoutPlacements(document_)
+          .filter((visit) => visit.node.styleRoles !== undefined)
+          .map((visit) => `${visit.node.id}:${JSON.stringify(visit.node.styleRoles)}`)
+          .join(" ")}
+      </output>
     </ArrangeSurfaceProvider>
   );
 }
@@ -309,8 +315,11 @@ describe("a handle answers the arrow keys", () => {
     expect(menu).not.toBeNull();
     expect(menu?.textContent).toContain("alpha");
     expect(menu?.textContent).toContain("piece.alpha");
-    // Every region of the document is offered, including the two the placement is not in.
-    const options = [...(menu?.querySelectorAll("option") ?? [])].map((node) => node.value);
+    // Every region of the document is offered, including the two the placement is not in. Scoped to
+    // the region picker rather than to the whole menu, because the menu also carries the two text
+    // role pickers and their options are a different vocabulary entirely.
+    const picker = menu?.querySelector('[data-dev-id="design.piece-move-into"]');
+    const options = [...(picker?.querySelectorAll("option") ?? [])].map((node) => node.value);
     expect(options).toEqual(["root", "left", "right"]);
   });
 });
@@ -433,6 +442,59 @@ describe("right-clicking a placement", () => {
     });
     expect(screen.getByTestId("left-order").textContent).toBe("beta");
     expect(screen.getByTestId("right-order").textContent).toBe("gamma alpha");
+  });
+
+  /**
+   * THE NARROW STYLE SCOPE (plan 1.5): "only here", written on the placement the menu was opened on
+   * and on no other. The wide scope is the Tokens rows and the Box tab and is not touched here.
+   *
+   * FAILS IF: the control writes the role on the wrong placement (the exception would reach a
+   * sibling, which is the one thing "only here" promises it does not), writes the pair the wrong way
+   * round, or leaves the entry behind when the owner picks the shipped role back. The last of those
+   * is what makes the exception UNTRACKABLE rather than merely stale: `validateDocument` derives its
+   * `style-role-exception` row from the document, so an entry that will not go is a note that will
+   * not go either.
+   */
+  it("scopes a text role to the placement the menu was opened on, and drops it again", () => {
+    render(<Surface active />);
+    fireEvent.contextMenu(screen.getByTestId("part-beta"));
+
+    // Which role is being overridden, then what it becomes here.
+    fireEvent.change(document.querySelector('[data-dev-id="design.piece-text-role"]')!, {
+      target: { value: "sectionTitle" },
+    });
+    fireEvent.change(document.querySelector('[data-dev-id="design.piece-text-role-here"]')!, {
+      target: { value: "sourceText" },
+    });
+    expect(screen.getByTestId("roles").textContent).toBe('beta:{"sectionTitle":"sourceText"}');
+
+    // A second role on the same placement joins the first rather than replacing it.
+    fireEvent.change(document.querySelector('[data-dev-id="design.piece-text-role"]')!, {
+      target: { value: "rowMetadata" },
+    });
+    // The second control shows the ABSENCE of an exception for the newly-picked role, which is what
+    // makes it readable as "what does this placement do with that role" rather than as a last edit.
+    expect(
+      document.querySelector<HTMLSelectElement>('[data-dev-id="design.piece-text-role-here"]')?.value,
+    ).toBe("");
+    fireEvent.change(document.querySelector('[data-dev-id="design.piece-text-role-here"]')!, {
+      target: { value: "machineText" },
+    });
+    expect(screen.getByTestId("roles").textContent).toBe(
+      'beta:{"sectionTitle":"sourceText","rowMetadata":"machineText"}',
+    );
+
+    // Back to what the piece ships with: the entry goes, and when the last one goes the key goes.
+    fireEvent.change(document.querySelector('[data-dev-id="design.piece-text-role-here"]')!, {
+      target: { value: "" },
+    });
+    fireEvent.change(document.querySelector('[data-dev-id="design.piece-text-role"]')!, {
+      target: { value: "sectionTitle" },
+    });
+    fireEvent.change(document.querySelector('[data-dev-id="design.piece-text-role-here"]')!, {
+      target: { value: "" },
+    });
+    expect(screen.getByTestId("roles").textContent).toBe("");
   });
 
   it("closes on Escape without changing anything", () => {

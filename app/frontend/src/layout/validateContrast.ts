@@ -268,6 +268,53 @@ export function shippedThemeTokens(): ThemeTokens[] {
   ];
 }
 
+/**
+ * The two override blocks a live token edit is held in, declared STRUCTURALLY.
+ *
+ * `lib/devModeDraft.ts` owns the real type and this is its shape, restated rather than imported: a
+ * validator that ran in the commit pipeline would otherwise pull a module of React hooks in behind
+ * it. `TokenOverrides` satisfies this, so the panel passes its slice straight through.
+ */
+export interface TokenOverrideBlocks {
+  /** Dark colours and the shared scalars, which land on `:root`. */
+  root: Readonly<Record<string, string>>;
+  /** Light colours, which land on `:root[data-theme="light"]`. */
+  light: Readonly<Record<string, string>>;
+}
+
+/**
+ * Both palettes as the screen currently has them: the shipped defaults with the live edits over them.
+ *
+ * This is the input the header promises - "IN EDIT MODE, a DRAFT" - so the issues list moves while
+ * the owner drags a swatch instead of reporting the design as it shipped. BOTH themes are resolved
+ * from one draft, because a colour edit is stored per theme and the one being looked at is not the
+ * one it can break: a token nudged in dark theme leaves the light palette at its default, and a
+ * pairing that fails there is a finding the owner has to see without switching.
+ *
+ * WHICH BLOCK EACH TOKEN READS is `lib/devModeDraft.ts`'s rule, restated: a themed token takes the
+ * light block in light theme, and an unthemed one (a radius, a type size) is shared and always takes
+ * `root`. An EMPTY override is treated as no override, which is what `useApplyDraftOverrides` does
+ * when it pushes the draft at the document - a cleared field falls back to the stylesheet, so
+ * measuring it as an unreadable value would report a row that is not on the screen.
+ */
+export function draftThemeTokens(overrides: TokenOverrideBlocks): ThemeTokens[] {
+  const themes: DevTokenTheme[] = ["dark", "light"];
+  return themes.map((theme) => {
+    const values: Record<string, string> = {};
+    for (const token of DEV_TOKENS) {
+      const block = token.themed && theme === "light" ? overrides.light : overrides.root;
+      const override = block[token.cssVar];
+      values[token.cssVar] =
+        override != null && override !== ""
+          ? override
+          : theme === "light"
+            ? token.default.light ?? token.default.dark
+            : token.default.dark;
+    }
+    return { theme, values };
+  });
+}
+
 /* -------------------------------------------------------------------------- */
 /*  the check                                                                  */
 /* -------------------------------------------------------------------------- */

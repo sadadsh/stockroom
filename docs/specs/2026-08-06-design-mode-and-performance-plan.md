@@ -51,6 +51,48 @@ everything, text too."** Two clarifications with plan-wide force:
   still cannot author a new standalone string — but existing interface text can be
   reworded where it is, backed by the copy layer. See 1.5.
 
+**Owner amendment #2 (2026-08-06): "literally everything on the front end is
+editable."** The owner's words: not a single thing the user sees should be unable to
+be edited — every UI feature of every element, text, lines, the 3D viewer's colours,
+everything — and the editor must not block the thing being edited. Five consequences
+with plan-wide force:
+
+1. **The editability universe is every computed visual property of every rendered
+   element.** Click an element, resolve it instance-vs-class exactly as today, and
+   every visual property it renders is editable. Tokens and typography roles remain
+   the PREFERRED binding — they cascade and stay consistent — but a per-role and
+   per-instance property override exists for whatever is not tokenized (spacing,
+   borders, shadows, line widths, icon sizes, radii). Tokens where they exist,
+   tracked overrides where they do not; tracked instance exceptions sit in the
+   deviation list as before. The acceptance bar: the editor never answers a click
+   with "not editable".
+2. **Drawn graphics are in scope**: the symbol and land-pattern previews' linework,
+   stroke widths, fills, the sheet, pin-number text, splitters, scrollbars, focus
+   rings, selection markers. The SVG previews render from the layer tokens
+   already, so much of this is registry extension.
+3. **The 3D scene is in scope**: materials, background, lighting tone, outline
+   colours in threeScene.ts, behind a scene-property registry parallel to the token
+   registry.
+4. **Policy guards become owner-overridable warnings**, exactly as the letter rule
+   resolved: the visual-language bounds (no blue, no amber, saturation and cast
+   caps) and the colour-is-data doctrine become DEFAULTS. An owner edit that
+   crosses a bound warns live in the issues list; at commit, owner-authored
+   provenance exempts the owner's committed values from the CI gates, and the
+   gates keep binding everything agents author.
+5. **The editor chrome detaches from the surface being edited**: a separate editor
+   window carrying the panels, message-bridged to the app, selection in the app
+   and editing in the window — and it must work in the pywebview source host the
+   owner actually runs, not only the frozen WPF host. If a real second window
+   cannot be carried cleanly there, the fallback is an edge-docked drawer that
+   never overlaps the selected element; the real window is attempted first.
+
+Sequencing: points 1-2 belong to the style slice (it must not ship as a roles-only
+panel); the 3D scene and the detached window are slices of their own inside the
+edit-mode phase. The commit pipeline landed before this amendment carrying six
+override slices through one generic payload mechanism; the property, graphics and
+scene slices extend that payload the same way the layout slice did — one recorded
+extension, not a redesign.
+
 **The standing motivation:** the owner dislikes the shipped look, and prose-driven
 visual iteration failed to converge. The builder exists so the owner never has to
 describe a design in words again. Editing-surface work therefore precedes performance
