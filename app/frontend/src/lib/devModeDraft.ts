@@ -358,6 +358,11 @@ export function useDevModeDraft(theme: Theme) {
 
   const api = useMemo(
     () => ({
+      // The two override BLOCKS, not a reader. `tokenValue` answers for the theme being looked at,
+      // which is what a panel row needs and what a validator cannot use: a colour nudged in dark
+      // theme leaves the light palette alone, and the issues list has to measure both (see
+      // `layout/validateContrast.ts`'s `draftThemeTokens`).
+      tokenOverrides: tokens,
       tokenValue,
       isTokenOverridden,
       setToken,
@@ -388,6 +393,7 @@ export function useDevModeDraft(theme: Theme) {
       resetLayoutDraft,
     }),
     [
+      tokens,
       tokenValue,
       isTokenOverridden,
       setToken,

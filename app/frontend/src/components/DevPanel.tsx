@@ -48,8 +48,10 @@ import {
   reorderSiblingsOf,
 } from "../lib/elementLayout";
 import { copyOverrideProblem, copyPlaceholders } from "../lib/copyPlaceholders";
+import { letterRuleOffences } from "../lib/letterRule";
 import { useText } from "../lib/copy";
 import { ArrangeSection } from "./design-mode/ArrangePanel";
+import { IssuesSection } from "./design-mode/IssuesPanel";
 import { Button } from "./primitives";
 // The Interface Studio is part of the product, so its own chrome comes from the shared design
 // system rather than from a private set of class strings that drift away from it.
@@ -220,16 +222,36 @@ const COPY_PROBLEM_TEXT: Record<string, string> = {
 
 function CopyEditor() {
   const dev = useDevMode();
-  if (!dev.selectedCopyId) {
+  const id = dev.selectedCopyId;
+  const defaultText = dev.selectedCopyDefault;
+  const current = id ? dev.resolveCopy(id, defaultText) : "";
+  // THE LIVE LETTER RULE (plan 1.5). `copy.letterRule.test.ts` binds what an AGENT authors, by
+  // reading source in CI; it can say nothing about a string the owner is typing into this box right
+  // now. `lib/letterRule.ts` is the same judgement over the same allowlist, called here on every
+  // keystroke - and it WARNS, never blocks: Save stays enabled below, because the rule exists to
+  // catch text written FOR the owner rather than to overrule the owner in their own product.
+  //
+  // What is deliberately NOT here: PROVENANCE. Plan 1.5 settles that an owner-authored override
+  // carries a marker at commit and the lint then exempts it while still binding agent-authored copy.
+  // That marker is a field on the committed override and belongs to the Phase 4 commit pipeline, so
+  // this surface reports what the text says and claims nothing about who typed it.
+  //
+  // This warning is the one string in the Copy editor that goes through the copy layer, against this
+  // file's header rule, because it is itself interface text subject to the rule it reports - the
+  // same exception the Arrange toggle carries in `Toolbar` above.
+  const offences = useMemo(() => letterRuleOffences(current), [current]);
+  const letterWarning = useText(
+    "design.letter-rule-warn",
+    "This text holds the letter this interface leaves out: {words}. Save is not blocked.",
+    { words: offences.join(", ") },
+  );
+  if (!id) {
     return (
       <div className="px-3.5 py-3 text-2xs text-t3">
         Click any underlined label in the app, or select an element with copy, to edit its text.
       </div>
     );
   }
-  const id = dev.selectedCopyId;
-  const defaultText = dev.selectedCopyDefault;
-  const current = dev.resolveCopy(id, defaultText);
   // Validate the WORKING text against the default's declared placeholder set, so the problem is
   // named while it is being typed rather than as a 400 after Save. The render path independently
   // falls back to the default, so a saved-anyway mistake is still not a broken screen.
@@ -271,6 +293,17 @@ function CopyEditor() {
       {problem ? (
         <div role="alert" className="mt-1 text-2xs leading-relaxed text-err-text">
           {COPY_PROBLEM_TEXT[problem]} The default is shown until this is fixed.
+        </div>
+      ) : null}
+      {offences.length > 0 ? (
+        // `status`, not `alert`: this is a warning about a rule, not a defect that breaks the render,
+        // and nothing about it stops the text being saved.
+        <div
+          data-dev-id="design.letter-rule-warn"
+          role="status"
+          className="mt-1 text-2xs leading-relaxed text-warn-text"
+        >
+          {letterWarning}
         </div>
       ) : null}
       {dev.isCopyOverridden(id) ? (
@@ -1349,6 +1382,7 @@ export function DevPanel() {
   const [showAll, setShowAll] = useState(false);
   const [catalogueOpen, setCatalogueOpen] = useState(false);
   const [arrangeOpen, setArrangeOpen] = useState(false);
+  const [issuesOpen, setIssuesOpen] = useState(false);
   const [publishOpen, setPublishOpen] = useState(false);
   const [publishMessage, setPublishMessage] = useState("Refine Stockroom interface");
   const [publishing, setPublishing] = useState(false);
@@ -1468,6 +1502,10 @@ export function DevPanel() {
           setShowAll={setShowAll}
         />
         <ArrangeSection open={arrangeOpen} setOpen={setArrangeOpen} />
+        {/* Plan 1.4: the issues list stays inspectable OUTSIDE edit mode, so it is mounted with the
+            panel and not with the arrange switch - a committed layout's known cost has to be
+            readable by somebody who is not currently dragging anything. */}
+        <IssuesSection open={issuesOpen} setOpen={setIssuesOpen} />
         <Catalogue search={search} open={catalogueOpen} setOpen={setCatalogueOpen} />
       </div>
 

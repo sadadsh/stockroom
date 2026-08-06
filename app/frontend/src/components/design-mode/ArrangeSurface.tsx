@@ -91,7 +91,9 @@ import type { LayoutDocument } from "../../layout/document";
 import {
   setPlacementCollapsed,
   setPlacementHidden,
+  setPlacementStyleRole,
   setRegionSize,
+  STYLE_ROLE_NAMES,
 } from "../../layout/editOperations";
 import type { PlacementChromeProps } from "../../layout/LayoutRenderer";
 import { WORKSPACE_PIECE_REGISTRY } from "../../layout/workspacePieces";
@@ -553,14 +555,31 @@ function DropPosition({
 /* -------------------------------------------------------------------------- */
 
 /**
- * What one placement can be told, in one surface: what it IS, whether it is drawn, and where it
- * goes.
+ * What one placement can be told, in one surface: what it IS, whether it is drawn, where it goes,
+ * and which text role it takes HERE.
  *
  * Rendered ONCE by the provider rather than once per placement, because there is one open menu at a
  * time and 25 mounted-but-closed menus would be 25 subtrees of controls in the accessibility tree.
+ *
+ * THE TEXT ROLE BLOCK IS THE NARROW SCOPE AND ONLY THE NARROW SCOPE. Plan 1.5 gives a style edit two
+ * scopes; the WIDE one - "everywhere (class)" - is already built and is not rebuilt here. Editing
+ * what a role IS, for every appearance of it, is the Design panel's Tokens rows over
+ * `lib/devTokens.ts`; reshaping one element's box wherever it appears is the Box tab against a
+ * `data-dev-role`. Both write the same override draft and both already save back to source. What had
+ * no home is "only here", and this is it: `setPlacementStyleRole` writes the placement's own
+ * `styleRoles`, and the validator reads that straight back out as a `style-role-exception` row in
+ * the Issues section, which IS the plan's tracked-exception record.
+ *
+ * THE ROLE NAMES ARE SHOWN VERBATIM, in the same monospace the region ids and the piece id above
+ * them are shown in, and for the same reason: they are a closed vocabulary (plan 1.7) rather than
+ * interface prose. `componentMpn` is the name of a row in `TYPOGRAPHY_SCALE`, a rewording of it
+ * would name nothing, and the picker's own label is what goes through the copy layer.
  */
 function PieceMenu({ state }: { state: ArrangeMenuState }) {
   const surface = useArrangeSurface();
+  // Which role the second control is about. Local to the open menu, because it is a question the
+  // owner is asking rather than anything the document holds.
+  const [role, setRole] = useState<string>(STYLE_ROLE_NAMES[0]);
   const title = useText("design.piece-settings", "Piece Settings");
   const collapseLabel = useText("design.collapse", "Collapse");
   const expandLabel = useText("design.expand", "Expand");
@@ -572,6 +591,15 @@ function PieceMenu({ state }: { state: ArrangeMenuState }) {
   const collapseNote = useText(
     "design.collapse-note",
     "Collapse draws nothing at all here: no piece states a header the renderer can draw on its own.",
+  );
+  const roleLabel = useText("design.text-role", "Text Role");
+  // "Here Alone" is the plan's "only here" scope. The plan's own phrase carries the blocked letter,
+  // so the label states the same scope in words this interface can print.
+  const roleHereLabel = useText("design.text-role-here", "Here Alone");
+  const roleNoneLabel = useText("design.text-role-none", "As Shipped");
+  const roleNote = useText(
+    "design.text-role-note",
+    "A role set here binds this one placement and is listed as an exception in Issues. Editing a role for all of them is the Tokens and Box tabs.",
   );
   if (!surface) return null;
   const seat = placementSeat(surface.layout, state.placementId);
@@ -651,6 +679,47 @@ function PieceMenu({ state }: { state: ArrangeMenuState }) {
           </option>
         ))}
       </select>
+      <div className="flex gap-1">
+        <select
+          data-dev-id="design.piece-text-role"
+          aria-label={roleLabel}
+          value={role}
+          onChange={(event) => setRole(event.target.value)}
+          className="min-w-0 flex-1 rounded-control border border-line bg-field px-1.5 py-1 font-mono text-2xs text-t1 outline-none focus:border-acc"
+        >
+          {STYLE_ROLE_NAMES.map((name) => (
+            <option key={name} value={name}>
+              {name}
+            </option>
+          ))}
+        </select>
+        <select
+          data-dev-id="design.piece-text-role-here"
+          aria-label={roleHereLabel}
+          // The empty option is the ABSENCE of an exception, which is not the same as any role: it
+          // is what the piece draws when the document says nothing, and choosing it drops the entry.
+          value={placement.styleRoles?.[role] ?? ""}
+          onChange={(event) => {
+            surface.edit(
+              setPlacementStyleRole(
+                surface.layout,
+                { placement: state.placementId },
+                role,
+                event.target.value === "" ? null : event.target.value,
+              ),
+            );
+          }}
+          className="min-w-0 flex-1 rounded-control border border-line bg-field px-1.5 py-1 font-mono text-2xs text-t1 outline-none focus:border-acc"
+        >
+          <option value="">{roleNoneLabel}</option>
+          {STYLE_ROLE_NAMES.map((name) => (
+            <option key={name} value={name}>
+              {name}
+            </option>
+          ))}
+        </select>
+      </div>
+      <p className="text-2xs leading-relaxed text-t3">{roleNote}</p>
     </div>
   );
 }

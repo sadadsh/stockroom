@@ -19,7 +19,10 @@ import {
 } from "./copyPlaceholders";
 
 const MOCK_COPY: Record<string, string> = vi.hoisted(() => ({}));
-vi.mock("./copy.overrides", () => ({ COPY_OVERRIDES: MOCK_COPY }));
+// `OWNER_AUTHORED_COPY_IDS` is the module's second export (the Phase 4 provenance record read by
+// `devModeSave`). It is stubbed empty here because this file is about the RENDER half of the
+// placeholder contract; leaving it out would make the module's other consumers see `undefined`.
+vi.mock("./copy.overrides", () => ({ COPY_OVERRIDES: MOCK_COPY, OWNER_AUTHORED_COPY_IDS: [] }));
 
 beforeEach(() => {
   resetCopyDiagnostics();

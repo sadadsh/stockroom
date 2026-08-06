@@ -192,8 +192,9 @@ describe("the layout slice of the dev mode draft", () => {
    * shipped stylesheet applies and a Save would commit that clear. Clearing the layout slice means
    * "NO WORKING EDIT" - and with a redesign already committed to source, no working edit is the
    * COMMITTED arrangement, not the shipped default. That is not an inconsistency to be fixed by
-   * inventing a third state: undoing a committed redesign is a change to source, which is the Phase 4
-   * commit pipeline's job, and Save deliberately does not carry the arrangement (see below).
+   * inventing a third state: undoing a committed redesign is a change to source, and since Phase 4
+   * that is exactly what Reset all FOLLOWED BY SAVE does - the same two steps that revert any of the
+   * five keyed slices to the shipped design. Reset alone still changes nothing on disk.
    */
   it("is cleared by Reset all alongside the other five slices", () => {
     MOCK_LAYOUT_OVERRIDES.workspace = committedRedesign();
@@ -221,25 +222,30 @@ describe("the layout slice of the dev mode draft", () => {
   });
 
   /**
-   * SAVE DOES NOT CARRY THE ARRANGEMENT (plan 1.6 / decision 4: commit ships through source in Phase
-   * 4). FAILS IF: a `layout` block is bolted onto `POST /api/dev/save`, or an arrangement edit starts
-   * flipping `dirty` - which would offer the owner a Save that silently drops their redesign.
+   * SAVE CARRIES THE ARRANGEMENT (Phase 4, plan 1.6 / decision 4: a committed redesign becomes the
+   * app). This test asserted the opposite through Phase 3, when the arrangement deliberately had no
+   * write path and a half-wired one would have silently dropped an owner's redesign. The write path
+   * now exists - `lib/devModeSave.ts` sends the layout slice and the backend writes this module - so
+   * the claim inverts with it.
+   *
+   * FAILS IF: the layout slice falls out of the save payload, or an arrangement edit stops flipping
+   * `dirty` - which would leave the owner looking at a disabled Save with a redesign in front of them.
    */
-  it("is excluded from Save and from dirty", async () => {
+  it("is carried by Save and flips dirty", async () => {
     const { api } = await import("../api/client");
     const { result } = renderHook(() => useDevMode(), { wrapper });
-
-    act(() => result.current.setLayoutDraft(workingDraft()));
     expect(result.current.dirty).toBe(false);
 
-    act(() => result.current.setCopy("test.label", "Reworded"));
+    act(() => result.current.setLayoutDraft(workingDraft()));
     expect(result.current.dirty).toBe(true);
+
     await act(async () => {
       await result.current.save();
     });
-    const sent = vi.mocked(api.devSave).mock.calls[0][0] as unknown as Record<string, unknown>;
-    expect("layout" in sent).toBe(false);
-    // And the arrangement survived the save untouched: it is simply not what Save is about.
+    const sent = vi.mocked(api.devSave).mock.calls[0][0];
+    expect(sent.layout?.workspace?.id).toBe("workspace.component.draft");
+    // The baseline moved with the write: the same document is no longer an unsaved edit.
+    expect(result.current.dirty).toBe(false);
     expect(result.current.layoutDraft?.id).toBe("workspace.component.draft");
   });
 
