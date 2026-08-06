@@ -251,6 +251,14 @@ transcribed with its own pixel-parity gate exactly as Phase 1 did the workspace.
 Phases 8–9 — **Feel:** cheap wins (lazy chunks, prefetch, keepPreviousData), then
 optimistic writes.
 
+## Follow-ups recorded, not scheduled
+
+- **No-reload tab switching in the source-run provider browser.** The source host's
+  chrome (host/window_chrome.py, 2026-08-06) runs a single WebView, so switching tabs
+  reloads the page; login survives through the persistent profile. The fix is a
+  two-WebView design in the source host. Recorded here so it is chosen deliberately,
+  not rediscovered.
+
 ## Standing constraints binding every phase
 
 Copy layer and letter rule as enforced (allowlist capped at 4; part data untouched);
