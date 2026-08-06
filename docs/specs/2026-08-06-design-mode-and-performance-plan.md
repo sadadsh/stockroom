@@ -192,9 +192,34 @@ asserted with headroom on CI-class hardware and documented as budgets, not races
 
 # Sequencing for the implementing model
 
+**Priority, stated by the owner after the plan was first written: the owner dislikes
+how the shipped interface looks.** Repeated rounds of describing changes in words and
+reviewing screenshots converged slowly and did not land on a look the owner likes.
+Design Mode exists so the owner can set the look directly, without describing it to
+anyone. Therefore the editing surface comes FIRST and the performance work follows it —
+the reverse of this plan's original order. Do not reorder back for engineering
+convenience.
+
 Phase 0 — **Baseline.** Bundle analysis, react-scan pass, interaction timings on a
-seeded large library. Numbers written into the PR description; every later phase cites
-them.
+seeded large library, and a full uishot capture of every surface in both themes as the
+visual baseline the owner will edit away from. Numbers and shots recorded; every later
+phase cites them.
+
+Phase 1 — **Specimen board, read-only** (was phase 3). The board, the coverage gate,
+Inspect landing on a specimen from a live element.
+
+Phase 2 — **Role editing + metric tokenisation** (was phase 4). The property panel,
+inline guardrails, draft profiles. This is the phase that lets the owner change the
+look themselves; everything before it exists to make it safe.
+
+Phase 3 — **Commit pipeline** (was phase 5). Source-backed commit, deviation list,
+instance-exception accounting. From here the owner's edits become shipped defaults.
+
+Phase 4 — **Cheap feel wins** (was phase 1). keepPreviousData, picker-intent prefetch,
+pdf.js + three.js lazy chunks.
+
+Phase 5 — **Optimistic writes** (was phase 2). The four families, pending-not-predicted,
+revert tests per family.
 
 Phase 1 — **Cheap feel wins.** keepPreviousData on dossier, picker-intent prefetch,
 pdf.js + three.js lazy chunks. (Small diffs, immediately perceptible.)
