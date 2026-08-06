@@ -31,8 +31,12 @@ internal static class ProviderTabLabel
     private static readonly Dictionary<string, string> DisplayNames =
         new(StringComparer.Ordinal)
         {
-            ["digikey"] = "DigiKey",
+            // Mouser leads, then DigiKey, then LCSC: the order the backend registry ranks a
+            // distributor's answer in, kept in step here so a tab never names a provider the
+            // projection does not know.
             ["mouser"] = "Mouser",
+            ["digikey"] = "DigiKey",
+            ["lcsc"] = "LCSC",
             ["ultralibrarian"] = "Ultra Librarian",
             ["samacsys"] = "SamacSys",
             ["snapmagic"] = "SnapMagic",
