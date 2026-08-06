@@ -1,0 +1,38 @@
+name: branch-source-export
+
+on:
+  push:
+    branches:
+      - stabilize/manual-provider-workflow
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - name: Create source archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rev-parse HEAD > SOURCE_COMMIT.txt
+          tar --exclude=.git --exclude=.venv --exclude=node_modules -czf "$RUNNER_TEMP/stockroom-source.tar.gz" .
+      - name: Upload source archive
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: stockroom-branch-source
+          path: ${{ runner.temp }}/stockroom-source.tar.gz
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
