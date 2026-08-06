@@ -74,8 +74,8 @@ it("states the real count of what it holds and what it would remove", async () =
   mockApi.cadInventory.mockResolvedValue(inventory());
   renderSection();
 
-  expect(await screen.findByText(/Your library holds/)).toHaveTextContent(
-    "Your library holds 184 CAD assets across 128 components",
+  expect(await screen.findByText(/The catalog holds/)).toHaveTextContent(
+    "The catalog holds 184 CAD assets across 128 components",
   );
 });
 
@@ -216,7 +216,7 @@ it("counts ASSETS, never files: a symbol is an entry inside a shared library, no
   renderSection();
 
   return waitFor(() => {
-    const line = screen.getByText(/Your library holds/);
+    const line = screen.getByText(/The catalog holds/);
     expect(line).toHaveTextContent("184 CAD assets");
     expect(line.textContent).not.toMatch(/CAD files/);
   });

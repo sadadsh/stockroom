@@ -159,4 +159,37 @@ describe("CompatUnionMap", () => {
     expect(screen.getByTestId("compat-per-part")).toBeInTheDocument();
     expect(screen.getByText("USART2_TX")).toBeInTheDocument();
   });
+
+  // The zoom behavior is a subscription: `sel.call(behavior)` installs `.zoom` listeners on the SVG
+  // node, and nothing removes them unless the effect's cleanup does. Asserting on the rendered camera
+  // would prove nothing here - React 18 drops a state update on an unmounted tree silently, so a
+  // leaked listener looks identical to a released one from the DOM side. d3 records every accepted
+  // gesture on the node itself as `__zoom`, so that is the honest witness: it moves while the
+  // listeners live and must not move once they are gone.
+  it("retires its zoom listeners on unmount, so a gesture on the discarded node is not handled", () => {
+    const { unmount } = render(
+      <CompatUnionMap
+        union={union([
+          pos({ position: "1", lqfp_side: "left" }),
+          pos({ position: "2", lqfp_side: "bottom" }),
+        ])}
+      />,
+    );
+    const svg = screen.getByTestId("compat-union-map-svg") as unknown as SVGSVGElement & {
+      __zoom?: unknown;
+    };
+    const cameraGroup = svg.querySelector("g")!;
+
+    // mounted: the wheel gesture is handled - it moves d3's node transform AND the rendered camera
+    fireEvent.wheel(svg, { deltaY: -400 });
+    const handled = svg.__zoom;
+    expect(handled).toBeDefined();
+    expect(cameraGroup.getAttribute("transform")).not.toBe("translate(0,0) scale(1)");
+
+    unmount();
+
+    // unmounted: this test still holds the node, but no listener of ours may remain on it
+    fireEvent.wheel(svg, { deltaY: -400 });
+    expect(svg.__zoom).toBe(handled);
+  });
 });

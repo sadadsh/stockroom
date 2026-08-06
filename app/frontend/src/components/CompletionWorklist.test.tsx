@@ -87,7 +87,7 @@ function twoRows(): CaptureBatchWorklist {
   });
 }
 
-const WORK_THROUGH_ALL = "Work through every listed component, one capture at a time";
+const WORK_THROUGH_ALL = "Work through each listed component, one capture at a time";
 const STOP_ADVANCING = "Stop working through the completion worklist";
 
 // Another surface holding the SAME one capture slot, so a test can reproduce the displacement the
@@ -313,7 +313,7 @@ describe("completion worklist", () => {
 
     expect(await screen.findByText("4 Still Working")).toBeInTheDocument();
     expect(
-      screen.getByText("Nothing needs you yet. This fills in as each component settles."),
+      screen.getByText("Nothing needs a person so far. This fills in as each component settles."),
     ).toBeInTheDocument();
   });
 

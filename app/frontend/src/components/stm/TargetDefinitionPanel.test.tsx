@@ -386,8 +386,14 @@ describe("TargetDefinitionPanel", () => {
     );
     expect(screen.getByText("1/2 Shared")).toBeInTheDocument();
     const legend = screen.getByTestId("target-smart-legend");
+    // The distribution bar is a GROUP of filter buttons, not an image: an img role would make its
+    // whole subtree presentational and hide the per-class buttons a keyboard user can still reach.
+    const distribution = within(legend).getByRole("group", {
+      name: "Package Position Distribution",
+    });
+    expect(distribution).toBeInTheDocument();
     expect(
-      within(legend).getByRole("img", { name: "Package Position Distribution" }),
+      within(distribution).getByRole("button", { name: "Filter Same Across All MCUs" }),
     ).toBeInTheDocument();
     expect(
       within(legend).getByRole("button", { name: "Show Same Across All MCUs" }),
@@ -446,7 +452,7 @@ describe("TargetDefinitionPanel", () => {
       within(inspector).getByRole("radio", { name: "MCUs" }),
     );
     expect(inspector).toHaveTextContent(
-      "Grouped by canonical pin name and electrical identity",
+      "Grouped per canonical pin name and electrical role",
     );
     expect(inspector).toHaveTextContent("PA0");
 

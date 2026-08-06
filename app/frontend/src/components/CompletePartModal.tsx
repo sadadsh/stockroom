@@ -9,8 +9,8 @@
  * active provider task; those bytes enter the exact same validation and atomic activation
  * pipeline.
  */
-import { useEffect, useMemo, useRef, useState } from "react";
-import { motion } from "motion/react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import * as m from "motion/react-m";
 import { useQueryClient } from "@tanstack/react-query";
 import { assetPresent, assetsFor } from "../lib/edaTarget";
 import type {
@@ -24,11 +24,12 @@ import { useCadSourceQuery } from "../api/queries";
 import { invalidatePartCadProjection } from "../api/partCadProjectionQueries";
 import { api } from "../api/client";
 import { useGuidedCapture, type GuidedStatus } from "../lib/useGuidedCapture";
-import { captureInFlight, useCapture } from "../lib/capture";
+import { useCapture } from "../lib/capture";
+import { captureInFlight } from "../lib/captureRequirements";
 import { pickHostFiles } from "../lib/hostFilePicker";
 import { useModalDismiss } from "../lib/useModalDismiss";
 import { useToast } from "../lib/toast";
-import { Text, useText } from "../lib/copy";
+import { Text, useCopyFormatter, useText } from "../lib/copy";
 import { Button } from "./primitives";
 import { Icon } from "./Icon";
 import { DownloadIcon } from "./icons";
@@ -67,7 +68,7 @@ function SegmentMeter({
     >
       <div className="flex gap-1">
         {needs.map((n) => (
-          <motion.span
+          <m.span
             key={n}
             className={"h-2 w-5 " + (received[n] ? "bg-ok" : "bg-raise2")}
             initial={false}
@@ -145,7 +146,7 @@ function CaptureGroup({
 function CaptureRow({ label, copyId, done }: { label: string; copyId: string; done: boolean }) {
   return (
     <div className="flex items-center gap-2.5 py-1" data-received={done}>
-      <motion.span
+      <m.span
         className={
           "grid h-4 w-4 flex-none place-items-center rounded-full " +
           (done ? "bg-ok text-white" : "border-[1.5px] border-line2 text-transparent")
@@ -155,7 +156,7 @@ function CaptureRow({ label, copyId, done }: { label: string; copyId: string; do
         transition={{ duration: 0.34, ease: "easeOut" }}
       >
         <CheckMark />
-      </motion.span>
+      </m.span>
       <span className={"flex-1 text-sm " + (done ? "text-t2" : "text-t1")}>
         <Text id={copyId}>{label}</Text>
       </span>
@@ -167,7 +168,7 @@ function CaptureRow({ label, copyId, done }: { label: string; copyId: string; do
       <span
         className={
           "rounded-full px-2 py-0.5 text-2xs font-medium " +
-          (done ? "bg-ok/15 text-ok" : "bg-field text-t3")
+          (done ? "bg-ok/15 text-ok-text" : "bg-field text-t3")
         }
       >
         {done ? (
@@ -195,14 +196,14 @@ function evidenceReason(evidence: CompletionEvidence | null): string {
 }
 
 const ROUTE_STATUS: Record<ProviderOutcomeStatus, { label: string; tone: string }> = {
-  activated: { label: "Activated", tone: "text-[var(--c-ok-text)]" },
-  "succeeded-retained": { label: "Retained", tone: "text-[var(--c-ok-text)]" },
+  activated: { label: "Activated", tone: "text-ok-text" },
+  "succeeded-retained": { label: "Retained", tone: "text-ok-text" },
   unavailable: { label: "Unavailable", tone: "text-t2" },
-  "requires-human": { label: "Needs Your Input", tone: "text-[var(--c-warn-text)]" },
-  blocked: { label: "Blocked", tone: "text-[var(--c-warn-text)]" },
-  failed: { label: "Failed", tone: "text-[var(--c-err-text)]" },
-  cancelled: { label: "Cancelled", tone: "text-[var(--c-warn-text)]" },
-  "not-attempted": { label: "Not Attempted", tone: "text-[var(--c-warn-text)]" },
+  "requires-human": { label: "Needs Your Input", tone: "text-warn-text" },
+  blocked: { label: "Blocked", tone: "text-warn-text" },
+  failed: { label: "Failed", tone: "text-err-text" },
+  cancelled: { label: "Cancelled", tone: "text-warn-text" },
+  "not-attempted": { label: "Not Attempted", tone: "text-warn-text" },
 };
 
 function routeStatus(outcome: ProviderOutcome): { label: string; tone: string } {
@@ -281,23 +282,33 @@ function ProviderRouteOutcomes({
           </div>
           <p
             className={
-              "mt-1 text-2xs leading-snug " + (usable ? "text-t2" : "text-[var(--c-warn-text)]")
+              "mt-1 text-2xs leading-snug " + (usable ? "text-t2" : "text-warn-text")
             }
           >
-            {usable
-              ? "Part Ready. One provider supplied a complete verified CAD package."
-              : "Provider Attempt Incomplete. This part still needs files."}
+            {usable ? (
+              <Text id="complete.source-results-usable">
+                Part Prepared. One provider supplied a complete verified CAD package.
+              </Text>
+            ) : (
+              <Text id="complete.source-results-incomplete">
+                Provider Attempt Incomplete. This part still needs files.
+              </Text>
+            )}
           </p>
         </div>
         <span
           className={
             "flex-none rounded-full px-2 py-0.5 text-2xs font-semibold " +
             (usable
-              ? "bg-ok/15 text-[var(--c-ok-text)]"
-              : "bg-warn/15 text-[var(--c-warn-text)]")
+              ? "bg-ok/15 text-ok-text"
+              : "bg-warn/15 text-warn-text")
           }
         >
-          {usable ? "Ready" : "Incomplete"}
+          {usable ? (
+            <Text id="complete.source-results-status-usable">Prepared</Text>
+          ) : (
+            <Text id="complete.source-results-status-incomplete">Incomplete</Text>
+          )}
         </span>
       </div>
       <div className="mt-2 flex flex-col divide-y divide-line">
@@ -404,7 +415,6 @@ export function CompletePartModal({
   const hasDatasheet = !!(detail.datasheet?.source_url || detail.datasheet?.file);
 
   const cadSource = useCadSourceQuery(detail.id, true);
-  const queryClient = useQueryClient();
   const cadNeeds = useMemo<Requirement[]>(() => cadSource.data?.needs ?? [], [cadSource.data]);
   const download = useGuidedCapture(detail.id, cadNeeds, detail.derived.display_name);
   const capture = useCapture();
@@ -423,12 +433,24 @@ export function CompletePartModal({
     ),
   };
   const reqToastRef = useRef(reqToast);
-  reqToastRef.current = reqToast;
+  // Synced in a layout effect, not during render: render can be replayed or thrown away, and a ref
+  // written there would carry a value from a tree that never committed. Layout effects run before
+  // every passive effect of this commit, so the received-watch effect below still reads this
+  // render's map.
+  useLayoutEffect(() => {
+    reqToastRef.current = reqToast;
+  });
   // The dialog and Close accessible names live in attributes, so they resolve through useText.
   const dialogLabel = useText("modal.completePart.aria", "Complete this part");
   const closeLabel = useText("modal.completePart.close", "Close");
-  // Rendered as a computed value rather than as JSX children, so it resolves its override here.
-  const needsSubline = useText("modal.completePart.cad-subline", NEEDS_SUBLINE);
+  // A toast takes a resolved string and is written from a callback, where a hook cannot run, so
+  // every message this window can raise resolves here. The counted ones carry a whole sentence per
+  // number agreement rather than a stitched noun, so a rewording keeps the grammar it was written
+  // with. A backend diagnostic (`error.message`) is data and is passed through untouched.
+  const startFailed = useText(
+    "modal.completePart.toast-start-failed",
+    "Could not start source collection.",
+  );
   const needs: Requirement[] = download.needs;
   // Canonical per-part readback is the only rendered completion authority. The capture store
   // retains live progress and provider diagnostics, never a terminal shadow of library truth.
@@ -470,97 +492,11 @@ export function CompletePartModal({
     }
     autoStartHandled.current = true;
     void download.start().catch((error) =>
-      toast(error instanceof Error ? error.message : "Could not start source collection.", "err"),
+      toast(error instanceof Error ? error.message : startFailed, "err"),
     );
-  }, [autoStart, cadSource.data, hasExactIdentity, cadBusy, download, toast]);
-  // Only a route waiting for human input opens the embedded provider page and can be finished or
-  // skipped by the person.
-  const [captureElapsed, setCaptureElapsed] = useState(0);
-  const [selectedFilesBusy, setSelectedFilesBusy] = useState(false);
-  useEffect(() => {
-    if (!captureBusy) {
-      setCaptureElapsed(0);
-      return;
-    }
-    const startedAt = Date.now();
-    setCaptureElapsed(0);
-    const timer = window.setInterval(() => {
-      setCaptureElapsed(Math.max(0, Math.floor((Date.now() - startedAt) / 1000)));
-    }, 1_000);
-    return () => window.clearInterval(timer);
-  }, [captureBusy]);
-  // "Keep Working" only makes sense while a capture is actually in flight through the host.
-  const canBackground = captureBusy;
-  const canSelectDownloadedFiles =
-    capture.active.partId === detail.id &&
-    captureBusy &&
-    Boolean(
-      capture.active.workflowItemId &&
-        capture.active.vendor &&
-        capture.active.url &&
-        capture.active.routeToken,
-    );
-  const canShowProvider =
-    capture.active.partId === detail.id &&
-    !isDone &&
-    Boolean(capture.active.workflowItemId);
+  }, [autoStart, cadSource.data, hasExactIdentity, cadBusy, download, toast, startFailed]);
 
-  async function showProvider() {
-    try {
-      await capture.showProvider();
-    } catch (error) {
-      toast(error instanceof Error ? error.message : "Could not show the provider page.", "err");
-    }
-  }
 
-  async function addFiles() {
-    setSelectedFilesBusy(true);
-    try {
-      const paths = await pickHostFiles("cad-recovery");
-      if (paths.length === 0) return;
-      const vendor = capture.active.vendor;
-      const detailUrl = capture.active.url;
-      const workflowItemId = capture.active.workflowItemId;
-      const routeToken = capture.active.routeToken;
-      if (
-        canSelectDownloadedFiles &&
-        vendor &&
-        detailUrl &&
-        workflowItemId &&
-        routeToken
-      ) {
-        const result = await api.attachSelectedCaptureFiles({
-          partId: detail.id,
-          workflowItemId,
-          paths,
-          vendor,
-          detailUrl,
-          routeToken,
-        });
-        toast(
-          `Stockroom added ${result.queued_files} selected ${result.queued_files === 1 ? "file" : "files"} to this provider task.`,
-          "ok",
-        );
-      } else {
-        const result = await api.addPartFiles({ partId: detail.id, paths });
-        await invalidatePartCadProjection(queryClient, detail.id);
-        const attached = result.attached.length;
-        const suffix = result.ignored.length
-          ? ` ${result.ignored.length} unrelated or unreadable ${result.ignored.length === 1 ? "item was" : "items were"} ignored.`
-          : "";
-        toast(
-          result.complete
-            ? `Component complete. Stockroom attached ${attached} ${attached === 1 ? "CAD role" : "CAD roles"}.${suffix}`
-            : `Stockroom attached ${attached} ${attached === 1 ? "CAD role" : "CAD roles"}; ${result.remaining.length} still needed.${suffix}`,
-          attached ? "ok" : "err",
-        );
-      }
-    } catch (error) {
-      toast(error instanceof Error ? error.message : "Could not add the selected files.", "err");
-    } finally {
-      setSelectedFilesBusy(false);
-    }
-  }
 
   // Closing the window while a capture is still in flight must not lose it: hand it to the
   // background pill instead of dropping it. Every close path (Escape, backdrop, the X, Done)
@@ -602,67 +538,13 @@ export function CompletePartModal({
     prevReceived.current = { ...rec };
   }, [download.received, toast]);
 
-  const kicadRows = KICAD_ROWS.filter((r) => needs.includes(r.req));
-  const sharedRows = SHARED_ROWS.filter((r) => needs.includes(r.req));
-  const altiumRows = ALTIUM_ROWS.filter((r) => needs.includes(r.req));
 
   const requirements = useMemo(
     () =>
-      [
-        {
-          key: "symbol",
-          label: "Symbol",
-          copyId: "modal.completePart.row-symbol",
-          kind: "asset" as const,
-          present: hasSymbol,
-        },
-        {
-          key: "footprint",
-          label: "Footprint",
-          copyId: "modal.completePart.row-footprint",
-          kind: "asset" as const,
-          present: hasFootprint,
-        },
-        {
-          key: "model",
-          label: "3D Model",
-          copyId: "modal.completePart.row-model",
-          kind: "cad-only" as const,
-          present: hasModel,
-        },
-        {
-          key: "datasheet",
-          label: "Datasheet",
-          copyId: "modal.completePart.row-datasheet",
-          kind: "url" as const,
-          present: hasDatasheet,
-        },
-        {
-          key: "mpn",
-          label: "Part Number",
-          copyId: "modal.completePart.row-mpn",
-          kind: "text" as const,
-          present: !!detail.mpn,
-        },
-        {
-          key: "manufacturer",
-          label: "Manufacturer",
-          copyId: "modal.completePart.row-manufacturer",
-          kind: "text" as const,
-          present: !!detail.manufacturer,
-        },
-        {
-          key: "description",
-          label: "Value / Description",
-          copyId: "modal.completePart.row-description",
-          kind: "text" as const,
-          present: !!detail.derived.description,
-        },
-        // When the FILES section is shown it owns the whole asset story (symbol, footprint,
-        // and 3D model), so drop those from DETAILS to avoid the same asset word reading
-        // "Added" here and "Needed" in FILES at once. DETAILS then stays metadata-only.
-      ].filter(
-        (r) => !(showCad && (r.key === "model" || r.key === "symbol" || r.key === "footprint")),
+      detailRequirements(
+        detail,
+        { hasSymbol, hasFootprint, hasModel, hasDatasheet },
+        showCad,
       ),
     [detail, hasSymbol, hasFootprint, hasModel, hasDatasheet, showCad],
   );
@@ -679,6 +561,169 @@ export function CompletePartModal({
     : 0;
   const doneCount = requirements.filter((r) => r.present).length + cadDone;
   const total = requirements.length + cadTotal;
+
+  return (
+    <div
+      style={{ zIndex: modalZ }}
+      className="fixed inset-0 flex items-start justify-center overflow-y-auto bg-black/55 p-4 pt-[7vh]"
+      role="presentation"
+      // Dismiss on the PRESS, and only when the press lands on the scrim itself: the guard every
+      // sibling modal uses. Closing on `click` meant a text-selection drag that began inside the
+      // window and released on the scrim counted as a backdrop click and discarded what was typed.
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) handleClose();
+      }}
+    >
+      <m.div
+        ref={dialogRef}
+        tabIndex={-1}
+        data-dev-id="complete.root"
+        className="w-full max-w-[560px] overflow-hidden rounded-card border border-line2 bg-popover shadow-pop focus:outline-none"
+        role="dialog"
+        aria-modal="true"
+        aria-label={dialogLabel}
+        initial={{ opacity: 0, y: 10, scale: 0.985 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: 0.2, ease: "easeOut" }}
+      >
+        <div
+          data-dev-id="complete.header"
+          className="flex items-start justify-between gap-3 border-b border-line bg-band px-5 py-3"
+        >
+          <div className="min-w-0">
+            <div className="truncate text-sm font-semibold leading-tight text-t1">
+              {detail.derived.display_name}
+            </div>
+            <div className="mt-0.5 text-xs text-t3">
+              <Text id="modal.completePart.subtitle">Open the provider, sign in if it asks, and download. Stockroom captures the download and validates it.</Text>
+            </div>
+          </div>
+          <div className="flex flex-none items-center gap-3">
+            <span className="tnum whitespace-nowrap font-mono text-xs text-t2">
+              {doneCount} / {total}
+            </span>
+            <button
+              type="button"
+              onClick={handleClose}
+              aria-label={closeLabel}
+              className="grid h-7 w-7 place-items-center rounded-control text-t3 hover:bg-raise2 hover:text-t1"
+            >
+              <Icon id="modal.close" className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        </div>
+
+        <div className="max-h-[70vh] overflow-y-auto px-5 py-4">
+          {showCad ? (
+            <ProviderFilesSection
+              partId={detail.id}
+              hasExactIdentity={hasExactIdentity}
+              needs={needs}
+              download={download}
+              isDone={isDone}
+              completionEvidence={completionEvidence}
+              verifiedDigest={verifiedDigest}
+              captureBusy={captureBusy}
+              anotherCaptureBusy={anotherCaptureBusy}
+              cadBusy={cadBusy}
+              providerPageActive={providerPageActive}
+              onClose={onClose}
+            />
+          ) : null}
+
+          <section>
+            <Eyebrow>
+              <Text id="complete.details-eyebrow">Details</Text>
+            </Eyebrow>
+            <div data-dev-id="complete.requirements" className="flex flex-col divide-y divide-line">
+              {requirements.map((req) => (
+                <Requirement key={req.key} req={req} busy={busy} onEditField={onEditField} />
+              ))}
+            </div>
+          </section>
+        </div>
+
+        <div className="flex justify-end border-t border-line px-5 py-3.5">
+          <Button data-dev-id="complete.done" variant="accent" small onClick={handleClose}>
+            <Text id="modal.completePart.done">Done</Text>
+          </Button>
+        </div>
+      </m.div>
+    </div>
+  );
+}
+
+
+/**
+ * The FILES region: one card that says what the provider trip is for, what has landed, what the
+ * last run reported, and the four moves available right now.
+ *
+ * It is a component because everything about the trip is local to it. The seconds counter and the
+ * file-selection gate are two pieces of state nothing outside this card renders or reads; the two
+ * host calls behind Add Files, and the twelve sentences their outcomes can produce, belong to the
+ * one button that makes them; and the completion title and subline are four readings of one
+ * evidence record that only this card shows. The window around it keeps what the WINDOW needs -
+ * the counter in its header, and whether closing has a capture to hand off.
+ *
+ * Nothing here may claim completion on its own (VA-001): the title, the settle glyph and the tone
+ * all follow the backend's digest-bound evidence, never an empty `needs` projection.
+ */
+function ProviderFilesSection({
+  partId,
+  hasExactIdentity,
+  needs,
+  download,
+  isDone,
+  completionEvidence,
+  verifiedDigest,
+  captureBusy,
+  anotherCaptureBusy,
+  cadBusy,
+  providerPageActive,
+  onClose,
+}: {
+  partId: string;
+  hasExactIdentity: boolean;
+  needs: Requirement[];
+  download: ReturnType<typeof useGuidedCapture>;
+  isDone: boolean;
+  completionEvidence: CompletionEvidence | null;
+  /** The reverified manifest digest, or null when no verified evidence exists. */
+  verifiedDigest: string | null;
+  captureBusy: boolean;
+  anotherCaptureBusy: boolean;
+  cadBusy: boolean;
+  providerPageActive: boolean;
+  /** Keep Working hands the capture to the background pill and leaves the window. */
+  onClose: () => void;
+}) {
+  // Read off the evidence rather than taken as two more props, so the digest and the claim it
+  // supports cannot be handed down disagreeing with each other.
+  const completionVerified = verifiedDigest !== null;
+  const completionNotRequired = completionEvidence?.state === "not-required";
+  // Rendered as a computed value rather than as JSX children, so it resolves its override here.
+  const needsSubline = useText("modal.completePart.cad-subline", NEEDS_SUBLINE);
+  // How long the trip has been out. Only a route waiting for human input opens the embedded
+  // provider page, so this counter belongs to the live band and to nothing else.
+  const [captureElapsed, setCaptureElapsed] = useState(0);
+  useEffect(() => {
+    if (!captureBusy) {
+      setCaptureElapsed(0);
+      return;
+    }
+    const startedAt = Date.now();
+    setCaptureElapsed(0);
+    const timer = window.setInterval(() => {
+      setCaptureElapsed(Math.max(0, Math.floor((Date.now() - startedAt) / 1000)));
+    }, 1_000);
+    return () => window.clearInterval(timer);
+  }, [captureBusy]);
+
+
+  const kicadRows = KICAD_ROWS.filter((r) => needs.includes(r.req));
+  const sharedRows = SHARED_ROWS.filter((r) => needs.includes(r.req));
+  const altiumRows = ALTIUM_ROWS.filter((r) => needs.includes(r.req));
+
   const completionTitle = completionVerified
     ? "Files Reverified"
     : completionNotRequired
@@ -702,279 +747,396 @@ export function CompletePartModal({
     Boolean(download.message) && (!isDone || download.providerOutcomes.length > 0);
 
   const statusTone = isDone
-    ? "text-[var(--c-ok-text)]"
+    ? "text-ok-text"
     : download.status === "error"
-      ? "text-[var(--c-err-text)]"
+      ? "text-err-text"
       : download.status === "timed-out"
-        ? "text-[var(--c-warn-text)]"
+        ? "text-warn-text"
         : "text-t3";
 
   return (
-    <div
-      style={{ zIndex: modalZ }}
-      className="fixed inset-0 flex items-start justify-center overflow-y-auto bg-black/55 p-4 pt-[7vh]"
-      role="presentation"
-      // Dismiss on the PRESS, and only when the press lands on the scrim itself: the guard every
-      // sibling modal uses. Closing on `click` meant a text-selection drag that began inside the
-      // window and released on the scrim counted as a backdrop click and discarded what was typed.
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget) handleClose();
-      }}
-    >
-      <motion.div
-        ref={dialogRef}
-        tabIndex={-1}
-        data-dev-id="complete.root"
-        className="w-full max-w-[560px] overflow-hidden rounded-card border border-line2 bg-popover shadow-pop focus:outline-none"
-        role="dialog"
-        aria-modal="true"
-        aria-label={dialogLabel}
-        initial={{ opacity: 0, y: 10, scale: 0.985 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        transition={{ duration: 0.2, ease: "easeOut" }}
+    <section className="mb-5" data-dev-id="complete.cad">
+      <Eyebrow>
+        <Text id="complete.files-eyebrow">Files</Text>
+      </Eyebrow>
+      <div
+        data-completion-evidence={completionEvidence?.state ?? "missing"}
+        className={
+          "rounded-control border p-4 shadow-file transition-colors " +
+          (isDone ? "border-ok/40 bg-ok/[0.07]" : "border-line2 bg-raise")
+        }
       >
-        <div
-          data-dev-id="complete.header"
-          className="flex items-start justify-between gap-3 border-b border-line bg-band px-5 py-3"
-        >
-          <div className="min-w-0">
-            <div className="truncate text-sm font-semibold leading-tight text-t1">
-              {detail.derived.display_name}
-            </div>
-            <div className="mt-0.5 text-xs text-t3">
-              <Text id="modal.completePart.subtitle">
-                You open the provider, sign in if it asks, and download. Stockroom captures what
-                you download and validates it.
-              </Text>
-            </div>
-          </div>
-          <div className="flex flex-none items-center gap-3">
-            <span className="tnum whitespace-nowrap font-mono text-xs text-t2">
-              {doneCount} / {total}
-            </span>
-            <button
-              type="button"
-              onClick={handleClose}
-              aria-label={closeLabel}
-              className="grid h-7 w-7 place-items-center rounded-control text-t3 hover:bg-raise2 hover:text-t1"
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex min-w-0 items-start gap-2.5">
+            <span
+              className={
+                "mt-0.5 grid h-7 w-7 flex-none place-items-center rounded-control " +
+                (isDone ? "bg-ok/20 text-ok-text" : "bg-raise2 text-t1")
+              }
             >
-              <Icon id="modal.close" className="h-3.5 w-3.5" />
-            </button>
-          </div>
-        </div>
-
-        <div className="max-h-[70vh] overflow-y-auto px-5 py-4">
-          {showCad ? (
-            <section className="mb-5" data-dev-id="complete.cad">
-              <Eyebrow>
-                <Text id="complete.files-eyebrow">Files</Text>
-              </Eyebrow>
-              <div
-                data-completion-evidence={completionEvidence?.state ?? "missing"}
-                className={
-                  "rounded-control border p-4 shadow-file transition-colors " +
-                  (isDone ? "border-ok/40 bg-ok/[0.07]" : "border-line2 bg-raise")
-                }
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex min-w-0 items-start gap-2.5">
-                    <span
-                      className={
-                        "mt-0.5 grid h-7 w-7 flex-none place-items-center rounded-control " +
-                        (isDone ? "bg-ok/20 text-ok" : "bg-raise2 text-t1")
-                      }
-                    >
-                      {isDone ? <CheckMark /> : <DownloadIcon className="h-3.5 w-3.5" />}
-                    </span>
-                    <div className="min-w-0">
-                      <div className="text-sm font-semibold text-t1">
-                        {completionVerified ? (
-                          <Text id="modal.completePart.cad-verified-title">
-                            {completionTitle}
-                          </Text>
-                        ) : completionNotRequired ? (
-                          <Text id="modal.completePart.cad-not-required-title">
-                            {completionTitle}
-                          </Text>
-                        ) : download.status === "error" && needs.length === 0 ? (
-                          <Text id="modal.completePart.cad-unverified-title">
-                            {completionTitle}
-                          </Text>
-                        ) : (
-                        <Text id="modal.completePart.cad-title">Files From The Provider</Text>
-                        )}
-                      </div>
-                      <div className="mt-0.5 text-2xs leading-snug text-t2">
-                        {completionSubline}
-                      </div>
-                    </div>
-                  </div>
-                  {needs.length > 0 ? (
-                    <SegmentMeter needs={needs} received={download.received} done={isDone} />
-                  ) : null}
-                </div>
-
-                {needs.length > 0 ? (
-                  <div data-dev-id="complete.cad-checklist" className="mt-3.5 flex flex-col gap-3">
-                    {kicadRows.length > 0 ? (
-                      <CaptureGroup
-                        tool="KiCad"
-                        copyId="modal.completePart.group-kicad"
-                        rows={kicadRows}
-                        received={download.received}
-                      />
-                    ) : null}
-                    {sharedRows.length > 0 ? (
-                      <CaptureGroup
-                        tool="Shared"
-                        copyId="modal.completePart.group-shared"
-                        rows={sharedRows}
-                        received={download.received}
-                        note="Used by KiCad and Altium"
-                      />
-                    ) : null}
-                    {altiumRows.length > 0 ? (
-                      <CaptureGroup
-                        tool="Altium"
-                        copyId="modal.completePart.group-altium"
-                        rows={altiumRows}
-                        received={download.received}
-                      />
-                    ) : null}
-                  </div>
-                ) : null}
-
-                {showDownloadMessage ? (
-                  <p className={"mt-3 text-xs " + statusTone}>{download.message}</p>
-                ) : null}
-
-                <ProviderRouteOutcomes outcomes={download.providerOutcomes} usable={isDone} />
-
-                {captureBusy ? (
-                  <div
-                    className="mt-3 rounded-control border border-line bg-field px-3 py-2"
-                    data-dev-id="complete.cad-live-status"
-                    role="status"
-                    aria-live="polite"
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="text-xs font-semibold text-t1">
-                        {providerPageActive ? "Provider Page Is Ready" : "Processing Downloaded Files"}
-                      </span>
-                      <span className="tnum font-mono text-2xs text-t3">
-                        {captureElapsed < 1 ? "Starting" : `${captureElapsed}s`}
-                      </span>
-                    </div>
-                    <p className="mt-1 text-2xs leading-snug text-t2">
-                      {providerPageActive ? (
-                        <Text id="modal.completePart.provider-page-live">
-                          The provider page is open. Sign in if it asks, choose the formats you
-                          need, and download. Stockroom captures what you download and validates
-                          it; use the permanent Stockroom and Provider controls above the page to
-                          switch without losing it.
-                        </Text>
-                      ) : (
-                        <Text id="modal.completePart.provider-page-processing">
-                          Stockroom received the download and is validating, converting, and
-                          attaching its KiCad, Altium, and STEP files as one provider set. You do
-                          not need to find or import the downloads manually.
-                        </Text>
-                      )}
-                    </p>
-                  </div>
-                ) : null}
-
-                <div
-                  data-dev-id="complete.cad-actions"
-                  className="mt-3 flex flex-wrap items-center gap-2"
-                >
-                  {hasExactIdentity ? (
-                    <Button
-                      variant={isDone ? "default" : "accent"}
-                      small
-                      icon={<DownloadIcon className="h-3.5 w-3.5" />}
-                      disabled={cadBusy}
-                      title={
-                        anotherCaptureBusy
-                          ? `Finish the active completion for ${capture.active.partName || "the current part"} first.`
-                          : undefined
-                      }
-                      onClick={() =>
-                        void download
-                          .start()
-                          .catch((error) =>
-                            toast(error instanceof Error ? error.message : "Could not start completion.", "err"),
-                          )
-                      }
-                    >
-                      {anotherCaptureBusy ? (
-                        "Another Part Is Running"
-                      ) : isDone ? (
-                        "Refresh Sources"
-                      ) : (
-                        <Text id={cadButtonId(download.status)}>{cadLabel(download.status)}</Text>
-                      )}
-                    </Button>
-                  ) : needs.length > 0 ? (
-                    <p className="text-xs text-[var(--c-warn-text)]">
-                      <Text id="complete.identity-required">
-                        Add the manufacturer and exact part number before collecting files.
-                      </Text>
-                    </p>
-                  ) : null}
-                  {hasExactIdentity ? (
-                    <Button
-                      variant="default"
-                      small
-                      disabled={selectedFilesBusy || anotherCaptureBusy}
-                      onClick={() => void addFiles()}
-                    >
-                      {selectedFilesBusy ? "Processing Files..." : "Add Files"}
-                    </Button>
-                  ) : null}
-                  {canShowProvider ? (
-                    <Button variant="default" small onClick={() => void showProvider()}>
-                      <Text id="complete.show-provider">Show Provider</Text>
-                    </Button>
-                  ) : null}
-                  {canBackground ? (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        download.keepWorking();
-                        onClose();
-                      }}
-                      className="ml-auto rounded-control px-2.5 py-1 text-xs font-medium text-t2 hover:bg-raise2 hover:text-t1"
-                    >
-                      <Text id="modal.completePart.keep-working">Keep Working</Text>
-                    </button>
-                  ) : null}
-                </div>
+              {isDone ? <CheckMark /> : <DownloadIcon className="h-3.5 w-3.5" />}
+            </span>
+            <div className="min-w-0">
+              <div className="text-sm font-semibold text-t1">
+                {completionVerified ? (
+                  <Text id="modal.completePart.cad-verified-title">
+                    {completionTitle}
+                  </Text>
+                ) : completionNotRequired ? (
+                  <Text id="modal.completePart.cad-not-required-title">
+                    {completionTitle}
+                  </Text>
+                ) : download.status === "error" && needs.length === 0 ? (
+                  <Text id="modal.completePart.cad-unverified-title">
+                    {completionTitle}
+                  </Text>
+                ) : (
+                <Text id="modal.completePart.cad-title">Files From The Provider</Text>
+                )}
               </div>
-            </section>
-          ) : null}
-
-          <section>
-            <Eyebrow>
-              <Text id="complete.details-eyebrow">Details</Text>
-            </Eyebrow>
-            <div data-dev-id="complete.requirements" className="flex flex-col divide-y divide-line">
-              {requirements.map((req) => (
-                <Requirement key={req.key} req={req} busy={busy} onEditField={onEditField} />
-              ))}
+              <div className="mt-0.5 text-2xs leading-snug text-t2">
+                {completionSubline}
+              </div>
             </div>
-          </section>
+          </div>
+          {needs.length > 0 ? (
+            <SegmentMeter needs={needs} received={download.received} done={isDone} />
+          ) : null}
         </div>
 
-        <div className="flex justify-end border-t border-line px-5 py-3.5">
-          <Button data-dev-id="complete.done" variant="accent" small onClick={handleClose}>
-            <Text id="modal.completePart.done">Done</Text>
-          </Button>
-        </div>
-      </motion.div>
+        {needs.length > 0 ? (
+          <div data-dev-id="complete.cad-checklist" className="mt-3.5 flex flex-col gap-3">
+            {kicadRows.length > 0 ? (
+              <CaptureGroup
+                tool="KiCad"
+                copyId="modal.completePart.group-kicad"
+                rows={kicadRows}
+                received={download.received}
+              />
+            ) : null}
+            {sharedRows.length > 0 ? (
+              <CaptureGroup
+                tool="Shared"
+                copyId="modal.completePart.group-shared"
+                rows={sharedRows}
+                received={download.received}
+                note="Used by KiCad and Altium"
+              />
+            ) : null}
+            {altiumRows.length > 0 ? (
+              <CaptureGroup
+                tool="Altium"
+                copyId="modal.completePart.group-altium"
+                rows={altiumRows}
+                received={download.received}
+              />
+            ) : null}
+          </div>
+        ) : null}
+
+        {showDownloadMessage ? (
+          <p className={"mt-3 text-xs " + statusTone}>{download.message}</p>
+        ) : null}
+
+        <ProviderRouteOutcomes outcomes={download.providerOutcomes} usable={isDone} />
+
+        {captureBusy ? (
+          <div
+            className="mt-3 rounded-control border border-line bg-field px-3 py-2"
+            data-dev-id="complete.cad-live-status"
+            role="status"
+            aria-live="polite"
+          >
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-xs font-semibold text-t1">
+                {providerPageActive ? (
+                  <Text id="modal.completePart.live-provider-open">
+                    Provider Page Is Prepared
+                  </Text>
+                ) : (
+                  <Text id="modal.completePart.live-processing">
+                    Processing Downloaded Files
+                  </Text>
+                )}
+              </span>
+              <span className="tnum font-mono text-2xs text-t3">
+                {captureElapsed < 1 ? (
+                  <Text id="modal.completePart.live-starting">Starting</Text>
+                ) : (
+                  `${captureElapsed}s`
+                )}
+              </span>
+            </div>
+            <p className="mt-1 text-2xs leading-snug text-t2">
+              {providerPageActive ? (
+                <Text id="modal.completePart.provider-page-live">The provider page is open. Sign in if it asks, choose the formats this part needs, and download. Stockroom captures the download and validates it; use the permanent Stockroom and Provider controls above the page to switch without losing it.</Text>
+              ) : (
+                <Text id="modal.completePart.provider-page-processing">Stockroom received the download and is validating, converting, and attaching its KiCad, Altium, and STEP files as one provider set. No one needs to find or import the downloads.</Text>
+              )}
+            </p>
+          </div>
+        ) : null}
+
+        <CompletionActions
+          partId={partId}
+          hasExactIdentity={hasExactIdentity}
+          needs={needs}
+          download={download}
+          isDone={isDone}
+          captureBusy={captureBusy}
+          anotherCaptureBusy={anotherCaptureBusy}
+          cadBusy={cadBusy}
+          onClose={onClose}
+        />
+      </div>
+    </section>
+  );
+}
+
+/**
+ * The four moves available on the FILES card: start (or refresh) the trip, add files that were
+ * downloaded by hand, come back to the provider page, and leave without dropping the capture.
+ *
+ * A component because everything behind these buttons is theirs alone. The file-selection gate is
+ * one boolean nothing else on the card renders or reads; the two host calls behind Add Files, and
+ * the twelve sentences their outcomes can produce, exist for one control; and which of the four
+ * are offered at all is a question about the capture slot, not about the evidence the card above
+ * is showing.
+ */
+function CompletionActions({
+  partId,
+  hasExactIdentity,
+  needs,
+  download,
+  isDone,
+  captureBusy,
+  anotherCaptureBusy,
+  cadBusy,
+  onClose,
+}: {
+  partId: string;
+  hasExactIdentity: boolean;
+  needs: Requirement[];
+  download: ReturnType<typeof useGuidedCapture>;
+  isDone: boolean;
+  captureBusy: boolean;
+  anotherCaptureBusy: boolean;
+  cadBusy: boolean;
+  /** Keep Working hands the capture to the background pill and leaves the window. */
+  onClose: () => void;
+}) {
+  const capture = useCapture();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const [selectedFilesBusy, setSelectedFilesBusy] = useState(false);
+  // A toast takes a resolved string and is written from a callback, where a hook cannot run, so
+  // every message this card can raise resolves here. The counted ones carry a whole sentence per
+  // number agreement rather than a stitched noun, so a rewording keeps the grammar it was written
+  // with. A backend diagnostic (`error.message`) is data and is passed through untouched.
+  const showProviderFailed = useText(
+    "modal.completePart.toast-show-provider-failed",
+    "Could not show the provider page.",
+  );
+  const completionFailed = useText(
+    "modal.completePart.toast-completion-failed",
+    "Could not start completion.",
+  );
+  const addFilesFailed = useText(
+    "modal.completePart.toast-add-files-failed",
+    "Could not add the selected files.",
+  );
+  const queuedOne = useCopyFormatter(
+    "modal.completePart.toast-queued-one",
+    "Stockroom added {count} selected file to this provider task.",
+  );
+  const queuedMany = useCopyFormatter(
+    "modal.completePart.toast-queued-many",
+    "Stockroom added {count} selected files to this provider task.",
+  );
+  const attachedDoneOne = useCopyFormatter(
+    "modal.completePart.toast-attached-done-one",
+    "Component complete. Stockroom attached {count} CAD role.{suffix}",
+  );
+  const attachedDoneMany = useCopyFormatter(
+    "modal.completePart.toast-attached-done-many",
+    "Component complete. Stockroom attached {count} CAD roles.{suffix}",
+  );
+  const attachedLeftOne = useCopyFormatter(
+    "modal.completePart.toast-attached-left-one",
+    "Stockroom attached {count} CAD role; {remaining} still needed.{suffix}",
+  );
+  const attachedLeftMany = useCopyFormatter(
+    "modal.completePart.toast-attached-left-many",
+    "Stockroom attached {count} CAD roles; {remaining} still needed.{suffix}",
+  );
+  // The clause that gets appended when a selection held things this part cannot use. It rides into
+  // the sentences above through `{suffix}`, but it is authored prose in its own right, so it holds
+  // its own ids rather than being the one phrase in that toast nobody can reword.
+  const ignoredOne = useCopyFormatter(
+    "modal.completePart.toast-ignored-one",
+    " {count} unrelated or unreadable item was ignored.",
+  );
+  const ignoredMany = useCopyFormatter(
+    "modal.completePart.toast-ignored-many",
+    " {count} unrelated or unreadable items were ignored.",
+  );
+  // The tooltip that names the part holding the one capture slot, and the stand-in for a part the
+  // slot has not named yet. Both live in an attribute, so both resolve as strings.
+  const anotherRunningTitle = useCopyFormatter(
+    "modal.completePart.another-running-title",
+    "Finish the active completion for {name} first.",
+  );
+  const currentPartName = useText("modal.completePart.current-part", "the current part");
+  // "Keep Working" only makes sense while a capture is actually in flight through the host.
+  const canBackground = captureBusy;
+  const canSelectDownloadedFiles =
+    capture.active.partId === partId &&
+    captureBusy &&
+    Boolean(
+      capture.active.workflowItemId &&
+        capture.active.vendor &&
+        capture.active.url &&
+        capture.active.routeToken,
+    );
+  const canShowProvider =
+    capture.active.partId === partId &&
+    !isDone &&
+    Boolean(capture.active.workflowItemId);
+
+  async function showProvider() {
+    try {
+      await capture.showProvider();
+    } catch (error) {
+      toast(error instanceof Error ? error.message : showProviderFailed, "err");
+    }
+  }
+
+  async function addFiles() {
+    setSelectedFilesBusy(true);
+    try {
+      const paths = await pickHostFiles("cad-recovery");
+      if (paths.length === 0) return;
+      const vendor = capture.active.vendor;
+      const detailUrl = capture.active.url;
+      const workflowItemId = capture.active.workflowItemId;
+      const routeToken = capture.active.routeToken;
+      if (
+        canSelectDownloadedFiles &&
+        vendor &&
+        detailUrl &&
+        workflowItemId &&
+        routeToken
+      ) {
+        const result = await api.attachSelectedCaptureFiles({
+          partId,
+          workflowItemId,
+          paths,
+          vendor,
+          detailUrl,
+          routeToken,
+        });
+        const queued = result.queued_files === 1 ? queuedOne : queuedMany;
+        toast(queued({ count: result.queued_files }), "ok");
+      } else {
+        const result = await api.addPartFiles({ partId, paths });
+        await invalidatePartCadProjection(queryClient, partId);
+        const attached = result.attached.length;
+        const ignored = result.ignored.length;
+        const suffix = ignored
+          ? (ignored === 1 ? ignoredOne : ignoredMany)({ count: ignored })
+          : "";
+        const sentence = result.complete
+          ? attached === 1
+            ? attachedDoneOne({ count: attached, suffix })
+            : attachedDoneMany({ count: attached, suffix })
+          : attached === 1
+            ? attachedLeftOne({ count: attached, remaining: result.remaining.length, suffix })
+            : attachedLeftMany({ count: attached, remaining: result.remaining.length, suffix });
+        toast(sentence, attached ? "ok" : "err");
+      }
+    } catch (error) {
+      toast(error instanceof Error ? error.message : addFilesFailed, "err");
+    } finally {
+      setSelectedFilesBusy(false);
+    }
+  }
+
+  return (
+    <div
+      data-dev-id="complete.cad-actions"
+      className="mt-3 flex flex-wrap items-center gap-2"
+    >
+      {hasExactIdentity ? (
+        <Button
+          variant={isDone ? "default" : "accent"}
+          small
+          icon={<DownloadIcon className="h-3.5 w-3.5" />}
+          disabled={cadBusy}
+          title={
+            anotherCaptureBusy
+              ? anotherRunningTitle({
+                  name: capture.active.partName || currentPartName,
+                })
+              : undefined
+          }
+          onClick={() =>
+            void download
+              .start()
+              .catch((error) =>
+                toast(error instanceof Error ? error.message : completionFailed, "err"),
+              )
+          }
+        >
+          {anotherCaptureBusy ? (
+            <Text id="complete.cad-another-running">Another Part Is Running</Text>
+          ) : isDone ? (
+            <Text id="complete.cad-refresh-sources">Refresh Sources</Text>
+          ) : (
+            <Text id={cadButtonId(download.status)}>{cadLabel(download.status)}</Text>
+          )}
+        </Button>
+      ) : needs.length > 0 ? (
+        <p className="text-xs text-warn-text">
+          <Text id="complete.identity-required">
+            Add the manufacturer and exact part number before collecting files.
+          </Text>
+        </p>
+      ) : null}
+      {hasExactIdentity ? (
+        <Button
+          variant="default"
+          small
+          disabled={selectedFilesBusy || anotherCaptureBusy}
+          onClick={() => void addFiles()}
+        >
+          {selectedFilesBusy ? (
+            <Text id="modal.completePart.add-files-busy">Processing Files...</Text>
+          ) : (
+            <Text id="modal.completePart.add-files">Add Files</Text>
+          )}
+        </Button>
+      ) : null}
+      {canShowProvider ? (
+        <Button variant="default" small onClick={() => void showProvider()}>
+          <Text id="complete.show-provider">Show Provider</Text>
+        </Button>
+      ) : null}
+      {canBackground ? (
+        <button
+          type="button"
+          onClick={() => {
+            download.keepWorking();
+            onClose();
+          }}
+          className="ml-auto rounded-control px-2.5 py-1 text-xs font-medium text-t2 hover:bg-raise2 hover:text-t1"
+        >
+          <Text id="modal.completePart.keep-working">Keep Working</Text>
+        </button>
+      ) : null}
     </div>
   );
 }
+
 
 type Req = {
   key: string;
@@ -983,6 +1145,81 @@ type Req = {
   kind: "asset" | "cad-only" | "url" | "text";
   present: boolean;
 };
+
+
+/**
+ * The DETAILS checklist: the metadata rows this window can show and edit, in reading order.
+ *
+ * A pure builder rather than markup, because the window counts these rows in its header as well as
+ * rendering them, and one list computed once is the only way those two can agree.
+ */
+function detailRequirements(
+  detail: PartDetail,
+  present: {
+    hasSymbol: boolean;
+    hasFootprint: boolean;
+    hasModel: boolean;
+    hasDatasheet: boolean;
+  },
+  showCad: boolean,
+): Req[] {
+  return [
+    {
+      key: "symbol",
+      label: "Symbol",
+      copyId: "modal.completePart.row-symbol",
+      kind: "asset" as const,
+      present: present.hasSymbol,
+    },
+    {
+      key: "footprint",
+      label: "Footprint",
+      copyId: "modal.completePart.row-footprint",
+      kind: "asset" as const,
+      present: present.hasFootprint,
+    },
+    {
+      key: "model",
+      label: "3D Model",
+      copyId: "modal.completePart.row-model",
+      kind: "cad-only" as const,
+      present: present.hasModel,
+    },
+    {
+      key: "datasheet",
+      label: "Datasheet",
+      copyId: "modal.completePart.row-datasheet",
+      kind: "url" as const,
+      present: present.hasDatasheet,
+    },
+    {
+      key: "mpn",
+      label: "Part Number",
+      copyId: "modal.completePart.row-mpn",
+      kind: "text" as const,
+      present: !!detail.mpn,
+    },
+    {
+      key: "manufacturer",
+      label: "Manufacturer",
+      copyId: "modal.completePart.row-manufacturer",
+      kind: "text" as const,
+      present: !!detail.manufacturer,
+    },
+    {
+      key: "description",
+      label: "Value / Description",
+      copyId: "modal.completePart.row-description",
+      kind: "text" as const,
+      present: !!detail.derived.description,
+    },
+    // When the FILES section is shown it owns the whole asset story (symbol, footprint,
+    // and 3D model), so drop those from DETAILS to avoid the same asset word reading
+    // "Added" here and "Needed" in FILES at once. DETAILS then stays metadata-only.
+  ].filter(
+    (r) => !(showCad && (r.key === "model" || r.key === "symbol" || r.key === "footprint")),
+  );
+}
 
 function Requirement({
   req,
@@ -996,6 +1233,9 @@ function Requirement({
   const [open, setOpen] = useState(false);
   const [text, setText] = useState("");
   const editable = !!onEditField && (req.kind === "url" || req.kind === "text");
+  // The accessible name of a control whose visible label is the bare verb, so the name is where the
+  // object of that verb is stated. The requirement's own label in the hole is registry vocabulary.
+  const addName = useCopyFormatter("modal.completePart.req-add-aria", "Add {field}");
 
   function applyValue(field: string) {
     if (!text.trim()) return;
@@ -1034,7 +1274,7 @@ function Requirement({
           <button
             type="button"
             onClick={() => setOpen((v) => !v)}
-            aria-label={open ? undefined : `Add ${req.label}`}
+            aria-label={open ? undefined : addName({ field: req.label })}
             className="rounded-control border border-line2 px-2.5 py-1 text-xs font-semibold text-t2 hover:border-acc hover:text-t1"
           >
             {open ? (

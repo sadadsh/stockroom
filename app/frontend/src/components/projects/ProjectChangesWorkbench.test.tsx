@@ -2,7 +2,11 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { api } from "../../api/client";
-import type { ProjectCollaboration, ProjectWorkspace } from "../../api/types";
+import type {
+  ProjectCollaboration,
+  ProjectReviewCandidate,
+  ProjectWorkspace,
+} from "../../api/types";
 import { ToastProvider } from "../../lib/toast";
 import { ProjectChangesWorkbench } from "./ProjectChangesWorkbench";
 
@@ -112,6 +116,50 @@ function renderWorkbench() {
     </QueryClientProvider>,
   );
 }
+
+function candidate(branch: string, commit: string): ProjectReviewCandidate {
+  return {
+    branch,
+    commit,
+    base_branch: "main",
+    base_commit: "0123456789abcdef",
+    fork_commit: "0123456789abcdef",
+    changed_paths: ["Power.kicad_pcb"],
+    commit_count: 1,
+    ready: true,
+    blocked_reason: "",
+    events: [],
+  };
+}
+
+describe("ProjectChangesWorkbench review queue", () => {
+  it("rests on the first review and follows the one clicked", async () => {
+    // The review shown is resolved from the chosen commit during render, with the head of
+    // the queue standing in until one is chosen. An effect used to copy that fallback into
+    // the choice as well, which rendered nothing the fallback did not already render.
+    mockApi.projectReviews.mockResolvedValue({
+      base_branch: "main",
+      candidates: [
+        candidate("work/sadad/power-board", "aaaaaaaaaaaa1111"),
+        candidate("work/nadia/power-board", "bbbbbbbbbbbb2222"),
+      ],
+    });
+    mockApi.projectReviewEvidence.mockRejectedValue(new Error("no evidence in test"));
+    const user = userEvent.setup();
+    renderWorkbench();
+
+    expect(await screen.findByRole("heading", { level: 3 })).toHaveTextContent(
+      "work/sadad/power-board",
+    );
+
+    await user.click(
+      screen.getByRole("button", { name: /work\/nadia\/power-board/ }),
+    );
+    expect(screen.getByRole("heading", { level: 3 })).toHaveTextContent(
+      "work/nadia/power-board",
+    );
+  });
+});
 
 describe("ProjectChangesWorkbench work session", () => {
   it("seeds every lock-required file, then lets the last one be unchecked", async () => {

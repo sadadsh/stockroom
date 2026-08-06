@@ -66,7 +66,7 @@ beforeEach(() => {
 it("names what adoption would cover, rather than promising a benefit in the abstract", async () => {
   mockApi.getLibraryLfs.mockResolvedValue(lfs());
   renderSection();
-  expect(await screen.findByTestId("lfs-state")).toHaveTextContent("Stored In Git History");
+  expect(await screen.findByTestId("lfs-state")).toHaveTextContent("Stored In Git Commits");
   const covers = screen.getByTestId("lfs-covers");
   expect(covers).toHaveTextContent("*.PcbLib");
   expect(covers).toHaveTextContent("*.step");

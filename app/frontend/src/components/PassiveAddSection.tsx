@@ -57,10 +57,13 @@ export function PassiveAddSection({
   // footprint. The pickers are revealed pre-filled with what the plan already knew.
   const [manual, setManual] = useState(false);
   const [packages, setPackages] = useState<string[]>([]);
-  const [kind, setKind] = useState(plan.kind);
-  const [pkg, setPkg] = useState(plan.package);
-  const [value, setValue] = useState(plan.value);
-  const [tolerance, setTolerance] = useState(plan.tolerance);
+  // SEEDS, not mirrors, and the lazy initialiser says so: captured once, never re-synced, the same
+  // contract as `distributorPn` above. A later plan is a different part, and IngestPage remounts
+  // this branch on it (`key={lookedUpInput}`) rather than overwriting what someone has typed.
+  const [kind, setKind] = useState(() => plan.kind);
+  const [pkg, setPkg] = useState(() => plan.package);
+  const [value, setValue] = useState(() => plan.value);
+  const [tolerance, setTolerance] = useState(() => plan.tolerance);
   const facets = useFacetsQuery();
   const add = usePassiveAdd();
   const ran = useRef(false);
@@ -77,7 +80,7 @@ export function PassiveAddSection({
     "Required. Paste the datasheet link if it was not pulled.",
   );
   const distPnPlaceholder = useText("ingest.distpn-placeholder", "Optional");
-  const distPnHint = useText("ingest.distpn-hint", "The order number, if you have it.");
+  const distPnHint = useText("ingest.distpn-hint", "The order number, if it is at hand.");
 
   const categories = Object.keys(facets.data?.by_category ?? {}).sort();
   const manufacturers = Object.keys(facets.data?.by_manufacturer ?? {}).sort();
@@ -186,18 +189,14 @@ export function PassiveAddSection({
           <Text id="ingest.passive-badge">Passive</Text>
         </Badge>
         <span>
-          <Text id="ingest.passive-msg">
-            No files needed. It uses KiCad's built-in symbol, footprint and 3D model.
-          </Text>
+          <Text id="ingest.passive-msg">No files needed. It uses KiCad's built-in schematic asset, footprint and 3D model.</Text>
         </span>
       </div>
 
       {manual ? (
         <div className="flex flex-col gap-3 rounded-card border border-line2 bg-raise2 p-4">
           <p className="text-xs text-t3">
-            <Text id="ingest.manual-hint">
-              We could not match a stock footprint automatically. Choose the kind and package and it still adds with no files. Then preview again.
-            </Text>
+            <Text id="ingest.manual-hint">No automatic match found a stock footprint. Choose the kind and package and it still adds with no files. Then preview again.</Text>
           </p>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <SelectField
@@ -258,7 +257,7 @@ export function PassiveAddSection({
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <ComboField
-              label="Category"
+              label="Class"
               copyId="ingest.field-category"
               value={category}
               onChange={setCategory}
@@ -294,7 +293,7 @@ export function PassiveAddSection({
 
           <div className="flex flex-col gap-1">
             <span className="text-xs text-t3">
-              <Text id="ingest.buy-link">Buy Link</Text>
+              <Text id="ingest.buy-link">Purchase Link</Text>
             </span>
             <span className="truncate rounded-control border border-line2 bg-field px-3 py-2 text-sm text-t2">
               {rec.purchase[0]?.url}

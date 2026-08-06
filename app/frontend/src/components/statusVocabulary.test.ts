@@ -5,11 +5,20 @@
  * `devIds.parity.test.ts` uses and for the same reason: `node:fs` breaks `tsc -b`, which
  * type-checks this file too.
  *
- * THE VOCABULARY. Nine words, closed: Ready / Needs Review / Missing / Failed / Not Required /
- * Validated / Downloaded / Available / Unknown. The point of closing the set is that a word never
- * means two things on one screen. "Complete" is the word this gate exists to keep out: it has
- * previously meant non-empty text fields in one band, attached CAD files in a chip 12px away, and
- * placeability in Settings - one part, three verdicts, one word.
+ * THE VOCABULARY. Five words, closed: Ready / Needs Review / Missing / Failed / Not Required. The
+ * point of closing the set is that a word never means two things on one screen. "Complete" is the
+ * word this gate exists to keep out: it has previously meant non-empty text fields in one band,
+ * attached CAD files in a chip 12px away, and placeability in Settings - one part, three verdicts,
+ * one word.
+ *
+ * `Validated`, `Downloaded`, `Available` and `Unknown` were once listed here as a sixth through
+ * ninth word. They are real words on the opened component and they belong to OTHER closed sets with
+ * other subjects: `CadAssetStatus` (asserted below) says what a CAD asset is, and `CoverageStatus`
+ * in `ProviderCoverageMatrix.tsx` says what a provider has. Neither is a `WorkspaceStatus`, so
+ * nothing could produce those four as one, and `statusTone` had four entries no caller could reach.
+ * The two assertions that now close this set are what keep such a word from being re-added: one
+ * reads the union out of the module and holds it to the list spelled below, and the other holds
+ * every word in the list to being something `REPRESENTATION_STATUS_LABEL` can actually produce.
  */
 import { describe, expect, it } from "vitest";
 import {
@@ -35,43 +44,62 @@ function withoutComments(text: string): string {
   return text.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|\s)\/\/.*$/gm, "");
 }
 
-/** The closed set, spelled here so the gate fails if the module quietly grows a tenth word. */
+/** The closed set, spelled here so the gate fails if the module quietly grows a sixth word. */
 const VOCABULARY: readonly WorkspaceStatus[] = [
   "Ready",
   "Needs Review",
   "Missing",
   "Failed",
   "Not Required",
-  "Validated",
-  "Downloaded",
-  "Available",
-  "Unknown",
 ];
+
+/**
+ * The union as the MODULE declares it, read out of its source.
+ *
+ * A `type` leaves nothing behind at runtime, so the words are lifted from the declaration the same
+ * way the job lifecycle below is lifted from its map. Without this, the list above could be trimmed
+ * while the union kept a word - which is the state this whole file exists to make impossible.
+ */
+const DECLARED: readonly string[] = (() => {
+  const raw = RAW["/src/components/component-workspace/workspaceStatus.ts"];
+  const union = /export type WorkspaceStatus =[\s\S]*?;/.exec(raw ?? "")?.[0] ?? "";
+  return [...union.matchAll(/"([^"]+)"/g)].map((m) => m[1]);
+})();
 
 describe("the status vocabulary is closed and consistent", () => {
   it("scans a non-trivial amount of source (the glob is wired)", () => {
     expect(SOURCE.length).toBeGreaterThan(50);
   });
 
+  it("declares exactly the words listed here, and no more", () => {
+    // Reads the union out of the module, so trimming the list above without trimming the type -
+    // or growing the type without saying so here - fails rather than passing quietly.
+    expect(DECLARED.length).toBeGreaterThan(0);
+    expect([...DECLARED].sort()).toEqual([...VOCABULARY].sort());
+  });
+
   it("gives every word in the set a tone, and no word two tones", () => {
     for (const word of VOCABULARY) {
       expect(typeof statusTone(word)).toBe("string");
     }
-    // The three "it is fine" words are all the ok tone, and the two "act on this" words are not.
-    expect(statusTone("Ready")).toBe(statusTone("Validated"));
-    expect(statusTone("Ready")).toBe(statusTone("Downloaded"));
+    expect(statusTone("Ready")).toBe("ok");
     expect(statusTone("Failed")).toBe("err");
     expect(statusTone("Missing")).toBe("warn");
     expect(statusTone("Needs Review")).toBe("warn");
-    // "Not Required" and "Available" are facts, not verdicts, so neither is coloured as one.
+    // "Not Required" is a fact, not a verdict, so it is not coloured as one.
     expect(statusTone("Not Required")).toBe("neutral");
-    expect(statusTone("Available")).toBe("neutral");
   });
 
-  it("maps every representation status onto a word from the set, and nothing else", () => {
+  it("maps every representation status onto a word from the set, and every word onto a status", () => {
     const labels = Object.values(REPRESENTATION_STATUS_LABEL);
     expect(labels.length).toBeGreaterThan(0);
     for (const label of labels) expect(VOCABULARY).toContain(label);
+    // BOTH directions. One direction alone lets the set keep a word nothing can produce, which is
+    // how `Downloaded` and `Unknown` survived here for as long as they did: a tone entry and a
+    // line in a list are not a code path, and a badge that can never be rendered is not a status.
+    // The only producer of a `WorkspaceStatus` in this codebase is the map above, so its range IS
+    // the vocabulary; a word that wants in has to arrive with something that emits it.
+    expect([...VOCABULARY].sort()).toEqual([...new Set(labels)].sort());
   });
 
   it("never lets a second word mean what a vocabulary word already means", () => {

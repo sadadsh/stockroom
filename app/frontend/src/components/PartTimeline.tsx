@@ -81,21 +81,21 @@ export function PartTimeline({ partId }: { partId: string }) {
   if (historyQ.isLoading) {
     return (
       <Message>
-        <Text id="timeline.loading">Loading history...</Text>
+        <Text id="timeline.loading">Loading timeline...</Text>
       </Message>
     );
   }
   if (historyQ.isError) {
     return (
       <Message tone="err">
-        <Text id="timeline.load-failed">Could not load this part's history.</Text>
+        <Text id="timeline.load-failed">Could not load this part's timeline.</Text>
       </Message>
     );
   }
   if (commits.length === 0) {
     return (
       <Message>
-        <Text id="timeline.empty">No history yet. This part has not been committed.</Text>
+        <Text id="timeline.empty">No timeline so far. This part has not been committed.</Text>
       </Message>
     );
   }
@@ -184,7 +184,7 @@ function CommitDiff({
   }
   if (error || !fields) {
     return (
-      <p className="text-xs text-err">
+      <p className="text-xs text-err-text">
         <Text id="timeline.diff-failed">Could not load the changes for this commit.</Text>
       </p>
     );
@@ -245,7 +245,7 @@ function Message({
 }) {
   return (
     <Card className="mx-auto w-full max-w-[980px] px-3 py-2.5">
-      <span className={"text-xs " + (tone === "err" ? "text-err" : "text-t2")}>
+      <span className={"text-xs " + (tone === "err" ? "text-err-text" : "text-t2")}>
         {children}
       </span>
     </Card>

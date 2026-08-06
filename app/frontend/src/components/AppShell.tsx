@@ -56,14 +56,16 @@ function ShellStatusBar() {
     >
       {route !== "components" ? (
         <span className="text-t2">
-          {route === "projects"
-            ? "Projects"
-            : route === "stm"
-              ? "STM Viewer"
-              : "Settings"}
+          {route === "projects" ? (
+            <Text id="shell.status.section-projects">Projects</Text>
+          ) : route === "stm" ? (
+            <Text id="shell.status.section-stm">STM Viewer</Text>
+          ) : (
+            <Text id="shell.status.section-settings">Settings</Text>
+          )}
         </span>
       ) : facets.isError ? (
-        <span className="text-err">
+        <span className="text-err-text">
           <Text id="shell.status.load-failed">Could Not Load Components</Text>
         </span>
       ) : total == null ? (
@@ -76,7 +78,7 @@ function ShellStatusBar() {
               the left, so stating it again here said nothing twice. What survives is the number
               that is not on screen anywhere else and that someone can act on. */}
           <span className="text-t2">
-            <Text id="shell.status.ready">Ready</Text>
+            <Text id="shell.status.ready">Prepared</Text>
           </span>
           {incomplete > 0 ? (
             <>
@@ -113,7 +115,7 @@ function LibraryStatus() {
   const onboarding = useOnboarding();
   // The accessible name is a sentence with a slot, so it can be reworded without a call site
   // deciding where the library's name goes.
-  const libraryLabel = useCopyFormatter("shell.status.library-label", "Library: {name}");
+  const libraryLabel = useCopyFormatter("shell.status.library-label", "Catalog: {name}");
   const active = onboarding.data?.libraries.find((library) => library.active);
   if (!active) return null;
   return (
@@ -122,7 +124,7 @@ function LibraryStatus() {
       aria-label={libraryLabel({ name: active.name })}
       className="inline-flex min-w-0 items-center gap-1 text-t2"
     >
-      <span><Text id="shell.status.library">Library</Text>:</span>
+      <span><Text id="shell.status.library">Catalog</Text>:</span>
       <span className="max-w-[220px] truncate font-semibold text-t1">{active.name}</span>
     </span>
   );

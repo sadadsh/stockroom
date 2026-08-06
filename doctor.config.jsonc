@@ -1,0 +1,249 @@
+{
+  "$schema": "https://react.doctor/schema/config.json",
+
+  // React Doctor configuration for the Stockroom frontend.
+  //
+  // POLICY, and it is the point of the file: NOTHING here is disabled repository-wide. Every entry
+  // is an `ignore.overrides` block naming the exact files whose mechanism was read and verified, so
+  // each rule keeps running - and keeps reporting - on every other file in the project. Several of
+  // these rules have already caught real defects here (`prefer-html-dialog` found an unmanaged
+  // dialog in `ProjectPicker`; `no-static-element-interactions` found three modal scrims that were
+  // exposing themselves as controls; `js-*` drove twelve genuine rewrites where the data is large),
+  // which is exactly why none of them may be switched off wholesale.
+  //
+  // Each entry states the MECHANISM that makes the rule's premise false at those files - the code
+  // that already does the thing the rule assumes is absent, or the type that bounds the collection
+  // the rule assumes is unbounded. "False positive" is not a reason and does not appear.
+  //
+  // KNOWN COARSENESS, recorded rather than hidden: `ignore.overrides` scopes by FILE, and for
+  // `query-mutation-missing-invalidation` the mechanism is a property of each individual hook, not
+  // of the module. See that entry.
+
+  "ignore": {
+    "overrides": [
+      {
+        // `src/lib/useModalDismiss.ts` IS the mechanism this rule's premise assumes absent. It is a
+        // modal STACK, not a per-modal hook: Escape answered by the top layer only, a Tab focus
+        // trap on the top layer only, focus restored to the control that opened each layer, and an
+        // ascending z-index so paint order follows nesting rather than mount order. Every one of
+        // these seven files calls it. `<dialog>.showModal()` would supply a subset of that and take
+        // away the stack, which is the part this app needs - it nests modals.
+        //
+        // Scoped to these seven files, never to the rule, because this rule found a real defect
+        // here: `ProjectPicker` was rendering a dialog that had joined no stack at all. A blanket
+        // disable would have hidden it.
+        "files": [
+          "src/components/ConfirmDialog.tsx",
+          "src/components/ProductPhoto.tsx",
+          "src/components/Rail.tsx",
+          "src/components/modalParts.tsx",
+          "src/components/projects/ProjectPicker.tsx",
+          "src/components/stm/BenchPartModal.tsx",
+          "src/components/stm/PinoutMap.tsx"
+        ],
+        "rules": ["react-doctor/prefer-html-dialog"]
+      },
+
+      {
+        // Each `<label>` wraps `AdaptiveChoice`, which renders a REAL control that names itself
+        // from the same `label` prop the visible text is rendered from: a `<select aria-label>` in
+        // the dropdown preset, `<input aria-label>` in the searchable one, `<div role="radiogroup"
+        // aria-label>` in the segmented one, and `<fieldset><legend>` in the radio one. The control
+        // is therefore correctly named in every preset; it simply sits deeper than this rule's
+        // depth-2 walk of the label's children, which is the exception the rule's own page
+        // documents. The dropdown preset additionally nests a genuine `<select>` inside the
+        // `<label>`, so implicit association holds there too.
+        "files": [
+          "src/components/formFields.tsx",
+          "src/components/projects/ProjectBomWorkbench.tsx",
+          "src/components/projects/ProjectDesignWorkbench.tsx",
+          "src/components/stm/BenchStepper.tsx"
+        ],
+        "rules": ["react-doctor/label-has-associated-control"]
+      },
+
+      {
+        // The flagged object literals are not static: every VALUE is a `useText(...)` call. The
+        // hoist this rule asks for would place React hooks at module scope, which is illegal - the
+        // literals are written this way precisely because hooks cannot be called conditionally or
+        // inside a loop, so one arm per union member is resolved unconditionally at the top of the
+        // component. The detector reads the literal's shape and cannot see that its members are
+        // hook calls.
+        "files": [
+          "src/components/CompletePartModal.tsx",
+          "src/components/RunningVersionIndicator.tsx",
+          "src/components/component-workspace/CompleteComponentSheet.tsx",
+          "src/components/projects/ProjectAssemblyWorkbench.tsx",
+          "src/components/stm/BenchStepper.tsx"
+        ],
+        "rules": ["react-doctor/prefer-module-scope-static-value"]
+      },
+
+      {
+        // A name-only detector: it matches the identifier `VITE_API_TOKEN`, not a value or a flow.
+        // The read is gated behind `import.meta.env.DEV`, which Vite substitutes as a literal
+        // `false` in a production build, so rollup ELIMINATES the branch rather than skipping it
+        // and no token can reach the bundle - which matters here because the built SPA is committed
+        // to this repository as `app/frontend-dist`. `src/lib/runtime.test.ts` proves both halves.
+        // The production host never used this path: it injects a per-launch token at window level,
+        // outside JavaScript source.
+        "files": ["src/lib/runtime.ts"],
+        "rules": ["react-doctor/public-env-secret-name"]
+      },
+
+      {
+        // The fix this rule asks for was applied here once and MEASURED as a regression. A routed
+        // copy string is usually a real control's label, so this span sits inside a real
+        // `<button>`; adding `role="button"` to it put two controls with the same accessible name
+        // in the tree for every labelled control in the application (`ConfirmDialog.test.tsx` found
+        // two buttons named Cancel with the role on). The element is already focusable and answers
+        // Enter and Space, so the keyboard gap the rule exists to close is closed; what remains is
+        // a role the element cannot legally carry in this position.
+        "files": ["src/lib/copy.tsx"],
+        "rules": ["react-doctor/no-static-element-interactions"]
+      },
+
+      {
+        // The race is guarded and tested. The effect holds a `cancelled` flag for "this closure is
+        // gone" alongside a generation ref for "another capture owns the slot", and both are
+        // checked after the await. The detector cannot correlate the guard because the await and
+        // the check sit inside a nested async function rather than in the effect body it walks.
+        "files": ["src/lib/capture.tsx"],
+        "rules": ["react-doctor/no-set-state-after-await-in-effect"]
+      },
+
+      {
+        // The row carries no identity of its own, so there is no key to use instead. A KiCad
+        // graphic is a bare shape and two identical shapes in one symbol are genuinely
+        // indistinguishable; a table heading is a `ReactNode` in a fixed, never-reordered list; a
+        // revision event is already keyed by `kind:at:index` and the index only disambiguates two
+        // events recorded at the same instant. None of these lists is filtered, reordered, or holds
+        // state, which are the three conditions that make an index key unsafe.
+        "files": [
+          "src/components/component-workspace/ProvenanceHistory.tsx",
+          "src/components/component-workspace/SymbolPreview.tsx",
+          "src/components/productState.tsx"
+        ],
+        "rules": ["react-doctor/no-array-index-as-key"]
+      },
+
+      {
+        // The four names the heuristic matches are not a stack of mutually-exclusive variant flags.
+        // `isLoading` and `isError` are TanStack Query result flags passed straight through
+        // alongside the `data` they describe; they are async state, not presentation, and they are
+        // not exclusive with anything. `showViews` and `showShading` are independent per-host
+        // capability toggles, each documented at the prop with the measurement that motivated it.
+        // The one axis in this component that IS variant-shaped is already an enum rather than
+        // booleans - `controls: "bar" | "panel" | "none"` - so the remedy the rule names has been
+        // applied where it applies. Renaming the query flags to dodge the prefix heuristic would
+        // change nothing about the design.
+        "files": ["src/components/Glb3DView.tsx"],
+        "rules": ["react-doctor/no-many-boolean-props"]
+      },
+
+      {
+        // `CaptureProvider` renders ONE line of JSX - `<CaptureContext.Provider>` - at the end of a
+        // 555-line body that is fifteen `useCallback`s and the effects that drive a durable capture
+        // workflow. The remedy this rule names, "extract logical sections into focused components",
+        // describes nothing that exists here: there are no sections of markup to extract, and
+        // cutting a coherent provider into fragments to satisfy a line count would leave the same
+        // callbacks in more files with the wiring between them made implicit.
+        //
+        // This is the ONLY file exempted from this rule. The seven other components it flags are
+        // left reporting: for them the rule is asking a fair question that this pass is not
+        // authorised to answer, since splitting them is a design change needing the owner's
+        // sign-off rather than a defect fix.
+        "files": ["src/lib/capture.tsx"],
+        "rules": ["react-doctor/no-giant-component"]
+      },
+
+      {
+        // Mutations that change nothing the cache holds, in three shapes, each already documented
+        // at its hook in source:
+        //
+        //   POST-as-computation - `useStmCompatUnion`, `useStmTargetDefinition`,
+        //   `useStmSocketSolution`, `useStmAfCheck`, `useDiscoverProjects`. The response is an
+        //   ephemeral computed result the caller holds in React state, not a stored resource; there
+        //   is no query key for it to invalidate.
+        //
+        //   Shell launches - `useRevealPartFiles`, `useOpenPartIn`, `useOpenProjectDocument`. These
+        //   ask the host to open a file browser or another application. Nothing server-side
+        //   changes, so an invalidation would refetch the dossier to observe a change that cannot
+        //   have happened.
+        //
+        //   Job control - `useRunCompletion`, `useStopJob`. These only START or STOP a job; the
+        //   run's own SSE stream invalidates the coverage query when it finishes, which is the only
+        //   moment the data has actually moved.
+        //
+        //   `useAltiumSetup` writes machine preferences and opens the generated `.db` read-only.
+        //
+        // COARSENESS, stated rather than hidden: this override is file-scoped but the mechanism is
+        // per-hook, and these two modules also hold every mutation that DOES invalidate correctly.
+        // So a future non-invalidating mutation added to either file will not be reported. The
+        // per-hook comments in source are the compensating control; narrowing this further needs a
+        // line-scoped mechanism the config format does not offer.
+        "files": ["src/api/queries.ts", "src/api/stmQueries.ts"],
+        "rules": ["react-doctor/query-mutation-missing-invalidation"]
+      },
+
+      {
+        // The five `js-*` performance rules are all "Evidence-required risk" whose required
+        // evidence is, in their own words, "source code, runtime behavior, measurement", and whose
+        // fix prompts say to keep the readable chain unless profiling identifies it as material.
+        // No production profile identifies any of these as hot, and at every one of these sites the
+        // collection is bounded by its own domain rather than by input:
+        //
+        //   capture.tsx / captureRequirements.ts - the `Requirement` union, exactly five members
+        //   edaTarget.ts                          - asset kinds, bounded by the `EdaAssets` keys
+        //   classTokens.ts                        - the design tokens named by one className
+        //   copyPlaceholders.ts                   - the placeholders in one copy string
+        //   pinoutRows.tsx                        - the column union of one pinout, and the array's
+        //                                           ORDER is the output contract, so a Set would
+        //                                           have to be carried beside it, not instead of it
+        //   manageActions.tsx                     - installed EDA applications, two or three
+        //   client.ts                             - the validation errors of one failed request
+        //   componentIdentity.ts                  - the fragments of one identity line
+        //   offerFacts.ts                         - one part's distributor offers
+        //   stmTargetVisuals.ts                   - one position's per-target rows
+        //   FootprintPreview.tsx                  - one footprint's pads, and the same chain builds
+        //                                           one React element per pad, which dominates it
+        //   cadEvidence.ts                        - one footprint's pads / one symbol's pins
+        //   datasheetWorkflow.ts                  - one part's documents
+        //   specificationRows.ts                  - one part's specification groups
+        //   candidateFromResult.ts                - the conflicting keys of one enrichment result
+        //   CadAssetsColumn.tsx                   - a `.find()` for two or three keys over one
+        //                                           part's specification rows
+        //
+        // Scoped to these files, never to the rules, because twelve sites in these same families
+        // WERE rewritten in earlier passes where the data is genuinely large. That split is the
+        // reason these rules stay on everywhere else.
+        "files": [
+          "src/api/client.ts",
+          "src/components/component-workspace/CadAssetsColumn.tsx",
+          "src/components/component-workspace/FootprintPreview.tsx",
+          "src/components/component-workspace/cadEvidence.ts",
+          "src/components/component-workspace/componentIdentity.ts",
+          "src/components/component-workspace/datasheetWorkflow.ts",
+          "src/components/component-workspace/manageActions.tsx",
+          "src/components/component-workspace/offerFacts.ts",
+          "src/components/component-workspace/pinoutRows.tsx",
+          "src/components/component-workspace/specificationRows.ts",
+          "src/lib/candidateFromResult.ts",
+          "src/lib/capture.tsx",
+          "src/lib/captureRequirements.ts",
+          "src/lib/classTokens.ts",
+          "src/lib/copyPlaceholders.ts",
+          "src/lib/edaTarget.ts",
+          "src/lib/stmTargetVisuals.ts"
+        ],
+        "rules": [
+          "react-doctor/js-cache-property-access",
+          "react-doctor/js-combine-iterations",
+          "react-doctor/js-flatmap-filter",
+          "react-doctor/js-index-maps",
+          "react-doctor/js-set-map-lookups"
+        ]
+      }
+    ]
+  }
+}

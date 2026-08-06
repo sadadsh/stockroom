@@ -99,7 +99,7 @@ describe("AltiumDbLibSection", () => {
 
     expect(await screen.findByText("3")).toBeInTheDocument();
     expect(screen.getByText("88")).toBeInTheDocument();
-    expect(screen.getByText(/parts ready to place/)).toBeInTheDocument();
+    expect(screen.getByText(/parts prepared to place/)).toBeInTheDocument();
     expect(screen.getByText("Main")).toBeInTheDocument();
     expect(screen.getByTitle(STATUS.dblib)).toBeInTheDocument();
     expect(
@@ -107,7 +107,7 @@ describe("AltiumDbLibSection", () => {
     ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Rebuild DbLib/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Set Up In Altium/ })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /View Library/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /View Catalog/ })).toBeInTheDocument();
   });
 
   it("regenerates and reports how many parts landed", async () => {
@@ -127,10 +127,10 @@ describe("AltiumDbLibSection", () => {
     renderSection();
 
     await screen.findByText("3");
-    await userEvent.click(screen.getByRole("button", { name: /View Library/ }));
+    await userEvent.click(screen.getByRole("button", { name: /View Catalog/ }));
 
     expect(
-      await screen.findByRole("dialog", { name: "Altium Database Library" }),
+      await screen.findByRole("dialog", { name: "Altium Database Catalog" }),
     ).toBeInTheDocument();
   });
 
@@ -142,10 +142,10 @@ describe("AltiumDbLibSection", () => {
     await userEvent.click(screen.getByRole("button", { name: /Setup Guide/ }));
 
     expect(
-      await screen.findByText(/without opening Altium until you choose the setup action/i),
+      await screen.findByText(/without opening Altium until the setup action is chosen/i),
     ).toBeInTheDocument();
     expect(screen.getByText("Explicit Install And Verification")).toBeInTheDocument();
-    expect(screen.getByText(/Opening Stockroom, switching libraries, and rebuilding the DbLib never launch Altium/i)).toBeInTheDocument();
+    expect(screen.getByText(/Opening Stockroom, switching catalogs, and rebuilding the DbLib never launch Altium/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Set Up In Altium/ })).toBeInTheDocument();
     expect(screen.queryByText(/right-click the library/i)).not.toBeInTheDocument();
   });
@@ -197,7 +197,7 @@ describe("AltiumDbLibSection", () => {
     mockApi.altiumOdbcStatus.mockResolvedValue(odbc(null));
     renderSection();
 
-    expect(await screen.findByText(/cannot be verified/i)).toBeInTheDocument();
+    expect(await screen.findByText(/cannot be validated/i)).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /Download Driver/ })).toBeNull();
   });
 
@@ -213,7 +213,7 @@ describe("AltiumDbLibSection", () => {
     // the four steps, with the real mechanics named
     expect(dialog).toHaveTextContent(/Explicit Install And Verification/);
     expect(dialog).toHaveTextContent(/never launch Altium/i);
-    expect(dialog).toHaveTextContent(/shared STEP stays linked in KiCad/i);
+    expect(dialog).toHaveTextContent(/shared STEP remains linked in KiCad/i);
     expect(dialog).not.toHaveTextContent(/Installed tab/);
     // the LIVE library path is in the guide (not a placeholder)
     expect(dialog).toHaveTextContent(STATUS.dblib);
@@ -262,7 +262,7 @@ describe("AltiumDbLibSection", () => {
   it("says nothing about the data source once it is built", async () => {
     mockApi.altiumStatus.mockResolvedValue(STATUS);
     renderSection();
-    await screen.findByText(/parts ready to place/);
+    await screen.findByText(/parts prepared to place/);
     expect(screen.queryByTestId("altium-datasource-missing")).toBeNull();
   });
 });

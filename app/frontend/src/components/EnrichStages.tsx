@@ -7,7 +7,7 @@
  * the line beneath names the current phase and its live message. The rail deliberately dwells
  * on Rendering: that is the multi-second browser settle past the bot wall, and that is true.
  */
-import { motion } from "motion/react";
+import * as m from "motion/react-m";
 import type { JobProgress } from "../lib/useJob";
 import { Text, useText } from "../lib/copy";
 
@@ -53,6 +53,10 @@ export function EnrichStages({
   // fall back to a plain-language hint for the reached phase.
   const hintKey = pct < STAGES[0].pct ? "queued" : activeKey;
   const stagesAria = useText("enrich.stages-aria", "Enriching from the distributor");
+  // The stand-in name and line for a phase the tables above do not describe. Resolved here rather
+  // than written into the JSX so a rewording reaches the fallback as well as the named phases.
+  const stageFallback = useText("enrich.stage-fallback", "Working");
+  const hintFallback = useText("enrich.hint-fallback", "Working");
 
   return (
     <div className={`flex flex-col gap-2 ${className}`}>
@@ -70,7 +74,7 @@ export function EnrichStages({
               {done ? (
                 <div className="h-full w-full bg-acc" />
               ) : isActive ? (
-                <motion.div
+                <m.div
                   className="h-full w-1/2 bg-acc"
                   animate={{ x: ["-60%", "220%"] }}
                   transition={{ duration: 1.15, repeat: Infinity, ease: "easeInOut" }}
@@ -82,11 +86,13 @@ export function EnrichStages({
       </div>
       <span className="text-xs text-t2">
         <span className="font-medium text-t1">
-          <Text id={`enrich.stage-${activeKey}`}>{STAGES[activeIndex]?.label ?? "Working"}</Text>
+          <Text id={`enrich.stage-${activeKey}`}>
+            {STAGES[activeIndex]?.label ?? stageFallback}
+          </Text>
         </span>
         <span className="text-t3"> · </span>
         {progress?.message || (
-          <Text id={`enrich.hint-${hintKey}`}>{STAGE_HINT[hintKey] ?? "Working"}</Text>
+          <Text id={`enrich.hint-${hintKey}`}>{STAGE_HINT[hintKey] ?? hintFallback}</Text>
         )}
       </span>
     </div>

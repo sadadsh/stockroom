@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   useOpenProjectDocument,
   useProjectPlacementGeometry,
@@ -25,8 +25,11 @@ export function ProjectDesignWorkbench({
   collaboration: ProjectCollaboration | undefined;
 }) {
   const geometry = useProjectPlacementGeometry(workspace.project.id);
-  const [selectedDocumentId, setSelectedDocumentId] = useState(
-    workspace.documents.find((document) => document.kind === "pcb")?.document_id ??
+  // The opening choice is read once, on mount: React discards every later result, so an
+  // eager call here only re-scanned the document list on every render.
+  const [chosenDocumentId, setChosenDocumentId] = useState(
+    () =>
+      workspace.documents.find((document) => document.kind === "pcb")?.document_id ??
       workspace.documents[0]?.document_id ??
       "",
   );
@@ -40,14 +43,14 @@ export function ProjectDesignWorkbench({
   const claimLabel = useText("projects.overview.file-claim", "Claim Needed");
   const missingLabel = useText("projects.overview.file-missing", "Missing");
 
-  useEffect(() => {
-    if (
-      selectedDocumentId &&
-      !workspace.documents.some((document) => document.document_id === selectedDocumentId)
-    ) {
-      setSelectedDocumentId(workspace.documents[0]?.document_id ?? "");
-    }
-  }, [selectedDocumentId, workspace.documents]);
+  // A chosen file that the project no longer offers falls back to the first one DURING
+  // render. Writing the fallback back into state took an extra render to settle, which
+  // showed the empty inspector for a frame; the settled choice is the same either way.
+  const selectedDocumentId =
+    chosenDocumentId &&
+    !workspace.documents.some((document) => document.document_id === chosenDocumentId)
+      ? workspace.documents[0]?.document_id ?? ""
+      : chosenDocumentId;
 
   const selectedDocument =
     workspace.documents.find((document) => document.document_id === selectedDocumentId) ?? null;
@@ -59,7 +62,7 @@ export function ProjectDesignWorkbench({
         sameDocumentPath(placement.board, selectedDocument.path),
     ) ?? null;
   const selectDocument = (documentId: string) => {
-    setSelectedDocumentId(documentId);
+    setChosenDocumentId(documentId);
     setSelectedReference("");
   };
   return (
@@ -116,7 +119,7 @@ export function ProjectDesignWorkbench({
                   ) : null}
                 </span>
                 {!document.exists ? (
-                  <span className="flex-none text-2xs font-medium text-err">
+                  <span className="flex-none text-2xs font-medium text-err-text">
                     {missingLabel}
                   </span>
                 ) : document.lock_required ? (
@@ -147,7 +150,7 @@ export function ProjectDesignWorkbench({
               (document) =>
                 document.kind === "pcb" && sameDocumentPath(document.path, board),
             );
-            if (boardDocument) setSelectedDocumentId(boardDocument.document_id);
+            if (boardDocument) setChosenDocumentId(boardDocument.document_id);
           }}
           onSideChange={() => setSelectedReference("")}
           onSelectReference={(reference, board) => {
@@ -156,7 +159,7 @@ export function ProjectDesignWorkbench({
               (document) =>
                 document.kind === "pcb" && sameDocumentPath(document.path, board),
             );
-            if (boardDocument) setSelectedDocumentId(boardDocument.document_id);
+            if (boardDocument) setChosenDocumentId(boardDocument.document_id);
           }}
           className="h-full !rounded-none !border-0"
         />
@@ -257,15 +260,15 @@ function DocumentInspector({
 }) {
   const openDocument = useOpenProjectDocument(workspace.project.id);
   const { toast } = useToast();
-  const typeLabel = useText("projects.overview.field.type", "Type");
+  const typeLabel = useText("projects.overview.field.type", "Kind");
   const pathLabel = useText("projects.overview.field.path", "Path");
   const editorLabel = useText("projects.overview.field.editor", "Editor");
   const runtimeLabel = useText("projects.overview.field.runtime", "Runtime");
   const pcbType = useText("projects.document-type.pcb", "PCB");
   const schematicType = useText("projects.document-type.schematic", "Schematic");
   const projectType = useText("projects.document-type.project", "Project");
-  const readyLabel = useText("projects.runtime.ready", "Ready");
-  const busyLabel = useText("projects.runtime.busy", "Busy");
+  const readyLabel = useText("projects.runtime.ready", "Free");
+  const busyLabel = useText("projects.runtime.busy", "In Use");
   const notInstalledLabel = useText("projects.runtime.not-installed", "Not Installed");
   const blockedLabel = useText("projects.runtime.blocked", "Blocked");
   const notDetectedLabel = useText("projects.runtime.not-detected", "Not Detected");
@@ -353,9 +356,7 @@ function DocumentInspector({
       </Button>
       <p className="mt-4 text-xs leading-5 text-t3">
         {document.lock_required ? (
-          <Text id="projects.overview.claim">
-            Claim this file in Activity before editing.
-          </Text>
+          <Text id="projects.overview.claim">Claim this file in Recent Work before editing.</Text>
         ) : (
           <Text id="projects.overview.shared">
             This file is available to open without a claim.
@@ -371,13 +372,13 @@ function RepositorySummary({
 }: {
   collaboration: ProjectCollaboration | undefined;
 }) {
-  const syncedLabel = useText("projects.git.synced", "Synced");
+  const syncedLabel = useText("projects.git.synced", "Aligned");
   const localChangesLabel = useText("projects.git.local-changes", "Local Changes");
   const behindLabel = useText("projects.git.behind", "Behind");
   const aheadLabel = useText("projects.git.ahead", "Ahead");
   const noCommitLabel = useText("projects.git.no-commit", "No commit");
   const sharedLabel = useText("projects.git.shared", "Shared");
-  const localOnlyLabel = useText("projects.git.local-only", "Local only");
+  const localOnlyLabel = useText("projects.git.local-only", "Local, not shared");
   const repo = collaboration?.repository;
   if (!repo) {
     return (

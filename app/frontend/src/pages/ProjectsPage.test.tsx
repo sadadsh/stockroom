@@ -525,7 +525,7 @@ describe("ProjectsPage shared workspace", () => {
     await user.click(screen.getByRole("button", { name: "Link Project" }));
     const dialog = screen.getByRole("dialog", { name: "Link Project" });
     await user.type(
-      within(dialog).getByPlaceholderText("Project or repository folder"),
+      within(dialog).getByPlaceholderText("Project or Git checkout folder"),
       "C:\\Projects\\Power",
     );
     await user.click(within(dialog).getByRole("button", { name: "Find Projects" }));
@@ -548,13 +548,13 @@ describe("ProjectsPage shared workspace", () => {
     renderPage();
 
     expect(await screen.findByRole("heading", { name: "Power Board" })).toBeInTheDocument();
-    expect(toolNames()).toEqual(["Overview", "BOM", "Build", "Activity"]);
+    expect(toolNames()).toEqual(["Overview", "BOM", "Build", "Recent Work"]);
     expect(screen.getAllByText("KiCad").length).toBeGreaterThan(0);
     expect(screen.getByRole("region", { name: "PCB view" })).toBeInTheDocument();
 
     await user.click(screen.getByRole("option", { name: /Control Board/ }));
     expect(await screen.findByRole("heading", { name: "Control Board" })).toBeInTheDocument();
-    expect(toolNames()).toEqual(["Overview", "BOM", "Build", "Activity"]);
+    expect(toolNames()).toEqual(["Overview", "BOM", "Build", "Recent Work"]);
     expect(screen.getAllByText("Altium Designer").length).toBeGreaterThan(0);
     expect(screen.getByRole("region", { name: "PCB view" })).toBeInTheDocument();
   });
@@ -833,7 +833,7 @@ describe("ProjectsPage shared workspace", () => {
 
     const failure = await screen.findByText("This project could not be opened.");
     expect(failure.closest('[data-product-state="error"]')).not.toBeNull();
-    expect(screen.getByRole("button", { name: "Try Again" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Rerun" })).toBeInTheDocument();
     // `workspace.error.message` used to be rendered verbatim, which put a filesystem errno in
     // front of the person.
     expect(screen.queryByText(/EBUSY/)).toBeNull();
@@ -1021,16 +1021,16 @@ describe("ProjectsPage shared workspace", () => {
     renderPage();
     await screen.findByRole("heading", { name: "Power Board" });
 
-    await user.click(screen.getByRole("tab", { name: "Activity" }));
+    await user.click(screen.getByRole("tab", { name: "Recent Work" }));
 
     expect(
-      await screen.findByRole("heading", { name: "Remote Repository" }),
+      await screen.findByRole("heading", { name: "Git Remote" }),
     ).toBeInTheDocument();
-    expect(screen.getByText("Local Only")).toBeInTheDocument();
-    expect(screen.getByText("Shared Repository")).toBeInTheDocument();
+    expect(screen.getByText("Local, Not Shared")).toBeInTheDocument();
+    expect(screen.getByText("Shared Git Remote")).toBeInTheDocument();
     expect(
       screen.getByText(
-        "Connect the repository both engineers use for protected work and review.",
+        "Connect the Git remote both engineers use for protected work and review.",
       ),
     ).toBeInTheDocument();
     expect(screen.getByText("Branch").closest("dl")?.className)
@@ -1040,10 +1040,10 @@ describe("ProjectsPage shared workspace", () => {
     expect(mockApi.projectReviews).not.toHaveBeenCalled();
 
     await user.type(
-      screen.getByLabelText("Repository URL"),
+      screen.getByLabelText("Git Remote URL"),
       "git@github.com:team/power-board.git",
     );
-    await user.click(screen.getByRole("button", { name: "Connect Repository" }));
+    await user.click(screen.getByRole("button", { name: "Connect Git Remote" }));
 
     expect(mockApi.connectProjectRemote).toHaveBeenCalledWith(
       "kicad-project",
@@ -1052,15 +1052,15 @@ describe("ProjectsPage shared workspace", () => {
     expect(
       await screen.findByRole("button", { name: "Start Work" }),
     ).toBeInTheDocument();
-    expect(screen.getByText("No shared work yet")).toBeInTheDocument();
+    expect(screen.getByText("No shared work so far")).toBeInTheDocument();
     await waitFor(() => expect(mockApi.projectReviews).toHaveBeenCalled());
 
     await user.click(screen.getByRole("option", { name: /Control Board/ }));
     await screen.findByRole("heading", { name: "Control Board" });
-    await user.click(screen.getByRole("tab", { name: "Activity" }));
-    const altiumUrl = await screen.findByLabelText("Repository URL");
+    await user.click(screen.getByRole("tab", { name: "Recent Work" }));
+    const altiumUrl = await screen.findByLabelText("Git Remote URL");
     await user.type(altiumUrl, "https://github.com/team/control-board.git");
-    await user.click(screen.getByRole("button", { name: "Connect Repository" }));
+    await user.click(screen.getByRole("button", { name: "Connect Git Remote" }));
     expect(mockApi.connectProjectRemote).toHaveBeenLastCalledWith(
       "altium-project",
       "https://github.com/team/control-board.git",
@@ -1078,14 +1078,14 @@ describe("ProjectsPage shared workspace", () => {
 
     renderPage();
     await screen.findByRole("heading", { name: "Power Board" });
-    await user.click(screen.getByRole("tab", { name: "Activity" }));
+    await user.click(screen.getByRole("tab", { name: "Recent Work" }));
 
     expect(
       await screen.findByText(
         "The saved work session's shared branch is no longer available. Your active work remains preserved. Restore that branch, or share and finish the current session before starting another.",
       ),
     ).toBeInTheDocument();
-    expect(screen.getByText("No shared work yet")).toBeInTheDocument();
+    expect(screen.getByText("No shared work so far")).toBeInTheDocument();
     expect(screen.queryByText(/refs\/remotes/)).not.toBeInTheDocument();
   });
 
@@ -1181,7 +1181,7 @@ describe("ProjectsPage shared workspace", () => {
     renderPage();
     await screen.findByRole("heading", { name: "Power Board" });
 
-    await user.click(screen.getByRole("tab", { name: "Activity" }));
+    await user.click(screen.getByRole("tab", { name: "Recent Work" }));
 
     const review = await screen.findByRole("complementary", {
       name: "Review evidence",
@@ -1215,11 +1215,11 @@ describe("ProjectsPage shared workspace", () => {
     );
     renderPage();
     await screen.findByRole("heading", { name: "Power Board" });
-    await user.click(screen.getByRole("tab", { name: "Activity" }));
+    await user.click(screen.getByRole("tab", { name: "Recent Work" }));
 
-    const input = await screen.findByLabelText("Repository URL");
+    const input = await screen.findByLabelText("Git Remote URL");
     await user.type(input, "ftp://example.com/power-board.git");
-    await user.click(screen.getByRole("button", { name: "Connect Repository" }));
+    await user.click(screen.getByRole("button", { name: "Connect Git Remote" }));
 
     expect(
       await screen.findAllByText("use a secure HTTPS or SSH repository URL"),
@@ -1236,16 +1236,16 @@ describe("ProjectsPage shared workspace", () => {
     });
     renderPage();
     await screen.findByRole("heading", { name: "Power Board" });
-    await user.click(screen.getByRole("tab", { name: "Activity" }));
+    await user.click(screen.getByRole("tab", { name: "Recent Work" }));
 
-    expect(await screen.findByText("Local Repository")).toBeInTheDocument();
+    expect(await screen.findByText("Local Git Checkout")).toBeInTheDocument();
     expect(screen.getByText("Git Is Not Initialized")).toBeInTheDocument();
     expect(
       screen.getByText(
-        "Initialize Git in this project folder before connecting the shared repository.",
+        "Initialize Git in this project folder before connecting the shared Git remote.",
       ),
     ).toBeInTheDocument();
-    expect(screen.queryByLabelText("Repository URL")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Git Remote URL")).not.toBeInTheDocument();
     expect(mockApi.projectReviews).not.toHaveBeenCalled();
   });
 
@@ -1270,7 +1270,7 @@ describe("ProjectsPage shared workspace", () => {
     expect(
       await screen.findByText("A valid editor license is required to read placement data."),
     ).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Try Again" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Rerun" })).toBeInTheDocument();
   });
 
   it("keeps a native PCB visible when only the placement overlay is blocked", async () => {
@@ -1338,7 +1338,7 @@ describe("ProjectsPage shared workspace", () => {
     await user.click(screen.getByRole("tab", { name: "Build" }));
 
     expect(await screen.findByText("Git Required")).toBeInTheDocument();
-    expect(screen.getByText(/before starting a physical build/)).toBeInTheDocument();
+    expect(screen.getByText(/before starting a hardware build/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Start Build" })).not.toBeInTheDocument();
   });
 

@@ -9,11 +9,11 @@ import { Dot, type BadgeTone } from "./primitives";
 
 const STANDING_TONE = {
   checking: "text-t3",
-  current: "text-ok",
+  current: "text-ok-text",
   available: "text-warn",
   updating: "text-acc",
   retrying: "text-warn",
-  blocked: "text-err",
+  blocked: "text-err-text",
   restart_required: "text-warn",
   unknown: "text-t3",
 } as const;
@@ -64,7 +64,7 @@ export function RunningVersionIndicator({
     current: useText("update.standing.current", "Current"),
     available: useText("update.standing.available", "Update Available"),
     updating: useText("update.standing.updating", "Updating…"),
-    retrying: useText("update.standing.retrying", "Retrying…"),
+    retrying: useText("update.standing.retrying", "Rerunning…"),
     blocked: useText("update.standing.blocked", "Blocked"),
     restart_required: useText("update.standing.restart-required", "Restart Required"),
     unknown: useText("update.standing.unknown", "Unknown"),

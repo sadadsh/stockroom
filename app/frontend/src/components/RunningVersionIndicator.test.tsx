@@ -98,7 +98,7 @@ describe("RunningVersionIndicator", () => {
         buildVersion={BUILD}
       />,
     );
-    expect(screen.getByRole("status")).toHaveTextContent("abcdef1Retrying…");
+    expect(screen.getByRole("status")).toHaveTextContent("abcdef1Rerunning…");
     expect(screen.queryByText("Current")).not.toBeInTheDocument();
   });
 
@@ -148,7 +148,7 @@ describe("RunningVersionIndicator", () => {
       />,
     );
     expect(container.querySelector(".bg-err")).not.toBeNull();
-    expect(screen.getByText("Blocked")).toHaveClass("text-err");
+    expect(screen.getByText("Blocked")).toHaveClass("text-err-text");
 
     rerender(
       <RunningVersionIndicator

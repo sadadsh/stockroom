@@ -6,7 +6,7 @@
  * and a missing kicad-cli are surfaced verbatim, never faked green, and the Mouser
  * key is only ever shown as a last-4 hint.
  */
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { ApiError, api } from "../api/client";
 import type { SetLibraryBody, SettingsPatch, WiringReport } from "../api/types";
 import { useJob } from "../lib/useJob";
@@ -17,7 +17,8 @@ import { DerivationSection } from "../components/DerivationSection";
 import { CadClearSection } from "../components/CadClearSection";
 import { LibraryHealthSection } from "../components/LibraryHealthSection";
 import { LibrarySyncSection } from "../components/LibrarySyncSection";
-import { RescanSection, lastChecked } from "../components/RescanSection";
+import { RescanSection } from "../components/RescanSection";
+import { lastChecked } from "../components/rescanState";
 import {
   useDoSync,
   useConnectLibraryRemote,
@@ -49,7 +50,7 @@ import {
   LoadingState,
   RouteHeader,
 } from "../components/primitives";
-import { Text, useText } from "../lib/copy";
+import { Text, useCopyFormatter, useText } from "../lib/copy";
 import { Icon } from "../components/Icon";
 import {
   shortRevision,
@@ -146,25 +147,26 @@ interface SetupStep {
 }
 
 export function SettingsPage() {
-  // The page-level reads that feed the Machine Setup band, the nav dots, and the
-  // collapsed-header summaries. Every one is a cached query a section also uses, so
-  // this adds no extra request load.
+  // The page-level reads that feed the Machine Setup band and the nav dots. Every one is a cached
+  // query a section also uses, so this adds no extra request load. Each group panel below resolves
+  // the rest of what it needs from the same cached keys.
   const settingsQ = useSettings();
   const odbc = useOdbcStatus();
   const syncQ = useSyncStatus();
   const { query: updateQ, view: updateStanding } = useUpdateStanding();
-  const librariesQ = useOnboarding();
-  // The three Library disclosures that used to state NOTHING on their collapsed row, so the only
-  // way to learn any of them was to open all three. Same cached queries their sections already
-  // use, so this costs one fetch each and makes opening the section instant rather than slower.
   const coverageQ = useLibraryCoverage();
-  const derivationQ = useLibraryDerivation();
-  const cadQ = useCadInventory();
   const doctorQ = useDoctorScan();
-  const lfsQ = useLibraryLfs();
-  const rescanQ = useRescanState();
-  const { theme } = useTheme();
   const navAria = useText("settings.nav.aria", "Settings Sections");
+  // A toast takes a resolved string, so every sentence one of them says is read here. The paths and
+  // credential names inside the holes are values off the machine and are not ours to reword.
+  const devCredsLoaded = useCopyFormatter(
+    "settings.dev-creds.toast-loaded",
+    "Loaded dev creds: {names}.",
+  );
+  const devCredsAbsent = useCopyFormatter(
+    "settings.dev-creds.toast-absent",
+    "No dev-creds.json at {path}. Place it there from another machine to load credentials in one stroke.",
+  );
 
   const [group, setGroup] = useState<GroupId>("general");
   const settingsContentRef = useRef<HTMLDivElement | null>(null);
@@ -182,19 +184,25 @@ export function SettingsPage() {
   const loadDev = useLoadDevCreds();
   const { toast } = useToast();
   const fireDevLoad = useRef<() => void>(() => {});
-  fireDevLoad.current = () => {
-    if (loadDev.isPending) return;
-    loadDev.mutate(undefined, {
-      onSuccess: (res) =>
-        toast(
-          res.loaded.length
-            ? `Loaded dev creds: ${res.loaded.join(", ")}.`
-            : `No dev-creds.json at ${res.config_path}. Copy it there from another machine to load keys in one keystroke.`,
-          res.loaded.length ? "ok" : "neutral",
-        ),
-      onError: (e) => toast(errMsg(e), "err"),
-    });
-  };
+  // Installed in a layout effect, not during render: render can be replayed or thrown away, and the
+  // ref would then hold a closure over a tree that never committed. The listener below is registered
+  // in a passive effect, which runs after every layout effect, so the hotkey can never fire before
+  // the real handler is in place.
+  useLayoutEffect(() => {
+    fireDevLoad.current = () => {
+      if (loadDev.isPending) return;
+      loadDev.mutate(undefined, {
+        onSuccess: (res) =>
+          toast(
+            res.loaded.length
+              ? devCredsLoaded({ names: res.loaded.join(", ") })
+              : devCredsAbsent({ path: res.config_path }),
+            res.loaded.length ? "ok" : "neutral",
+          ),
+        onError: (e) => toast(errMsg(e), "err"),
+      });
+    };
+  });
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.ctrlKey && e.altKey && (e.key === "k" || e.key === "K")) {
@@ -246,9 +254,9 @@ export function SettingsPage() {
     }
     steps.push({
       id: "key",
-      label: "Add A Distributor Key",
+      label: "Add A Distributor Credential",
       labelId: "settings.machine.step-key",
-      metLabel: "Distributor Key Saved",
+      metLabel: "Distributor Credential Saved",
       metLabelId: "settings.machine.step-key-met",
       met: s.mouser_api_key_set || s.digikey_client_secret_set,
       group: "sources",
@@ -267,7 +275,7 @@ export function SettingsPage() {
   const headerAttention = useText("settings.machine.header-attention", "{count} need attention", {
     count: unmet.length,
   });
-  const headerReady = useText("settings.machine.header-ready", "Machine ready");
+  const headerReady = useText("settings.machine.header-ready", "Machine prepared");
 
   // -- per-group attention dots (mirror the unmet steps + an available update) --
   const groupAttention: Record<GroupId, "warn" | "neutral" | null> = {
@@ -291,91 +299,6 @@ export function SettingsPage() {
         : null,
   };
 
-  // -- collapsed-header summaries (live, from the same cached queries) ----------
-  const sync = syncQ.data;
-  const syncSummary = !sync ? null : !sync.has_remote ? (
-    <Text id="settings.summary.no-remote">No Remote</Text>
-  ) : sync.behind > 0 ? (
-    <Badge tone="warn">{`Behind ${sync.behind}`}</Badge>
-  ) : sync.ahead > 0 ? (
-    <Badge tone="neutral">{`Ahead ${sync.ahead}`}</Badge>
-  ) : (
-    <Text id="settings.summary.up-to-date">Up To Date</Text>
-  );
-  // Library Completion: the count IS the answer to the owner's central question, so it is shown
-  // whatever the state; the tone is what changes. A gap some source can fill is warn, a library
-  // with nothing outstanding is calm text.
-  const cov = coverageQ.data;
-  const completionSummary = !cov ? null : cov.complete >= cov.total ? (
-    <Text id="settings.summary.all-complete">All Complete</Text>
-  ) : (
-    <Badge tone="warn">{`${cov.complete} of ${cov.total} Complete`}</Badge>
-  );
-  // Presentation Data: which ruleset built what is on screen, and whether anything is behind it.
-  // A stale count is the actionable half, so it wins the row when there is one.
-  const der = derivationQ.data;
-  const derivationSummary = !der ? null : der.stale > 0 ? (
-    <Badge tone="warn">{`${der.stale} Stale`}</Badge>
-  ) : (
-    <span>{der.ruleset}</span>
-  );
-  // Clear CAD Files: how much a clear would actually remove. `None` is a real, useful state - it
-  // says the destructive action would do nothing, which is worth knowing before opening it.
-  const cad = cadQ.data;
-  const cadSummary = !cad ? null : cad.cleared > 0 ? (
-    <span>{`${cad.cleared} ${cad.cleared === 1 ? "File" : "Files"}`}</span>
-  ) : (
-    <Text id="settings.summary.no-cad">None</Text>
-  );
-  // Library Health: how much needs a hand. Everything the scan reports is work, so they add up
-  // into one number rather than three the row has no space to distinguish.
-  const doc = doctorQ.data;
-  const healthSummary = !doc
-    ? null
-    : (() => {
-        const outstanding = doc.fixable.length + doc.manual.length + doc.uncommitted.length;
-        return outstanding > 0 ? (
-          <Badge tone="warn">{`${outstanding} To Fix`}</Badge>
-        ) : (
-          <Text id="settings.summary.healthy">Healthy</Text>
-        );
-      })();
-  // Library Sync: what this library carries to whoever clones it. LFS being OFF is the state that
-  // decides everything else in the section, so it wins; a legacy blob is the one warning that
-  // cannot be fixed from here (it needs a history rewrite this project forbids).
-  const lfs = lfsQ.data;
-  const librarySyncSummary = !lfs ? null : !lfs.installed || !lfs.enabled ? (
-    <Text id="settings.summary.no-lfs">Not Using LFS</Text>
-  ) : lfs.legacy_blobs > 0 ? (
-    <Badge tone="warn">{`${lfs.legacy_blobs} Legacy`}</Badge>
-  ) : // "0 In LFS" reads as a quantity when the thing being said is a STATE: LFS is wired and
-  // holds nothing yet. Seen rendering exactly that against the real library, 2026-07-27.
-  // Its siblings say "None" and "Healthy"; a zero dressed as a count is data vomit.
-  lfs.objects === 0 ? (
-    <Text id="settings.summary.lfs-empty">Nothing In LFS</Text>
-  ) : (
-    <span>{`${lfs.objects} In LFS`}</span>
-  );
-  // Procurement Rescan: when prices and stock were last refreshed. Through the section's own
-  // `lastChecked`, so the collapsed row and the open body can never disagree about the date.
-  const rescanState = rescanQ.data;
-  const rescanSummary = !rescanState
-    ? null
-    : (() => {
-        const { checkedAt, total } = lastChecked(rescanState);
-        if (total === 0) return <Text id="settings.summary.never-rescanned">Never Run</Text>;
-        return checkedAt ? (
-          <span>
-            {new Date(checkedAt).toLocaleDateString(undefined, {
-              year: "numeric",
-              month: "short",
-              day: "numeric",
-            })}
-          </span>
-        ) : (
-          <span>{`${total} Checked`}</span>
-        );
-      })();
 
   const activeMeta = SETTINGS_GROUPS.find((item) => item.id === group) ?? SETTINGS_GROUPS[0];
 
@@ -414,7 +337,7 @@ export function SettingsPage() {
           />
           <GroupNavButton
             id="library"
-            label="Library"
+            label="Catalog"
             labelId="settings.nav.library"
             active={group}
             onSelect={selectGroup}
@@ -464,256 +387,15 @@ export function SettingsPage() {
             className="grid min-h-0 flex-1 auto-rows-max grid-cols-1 gap-3 overflow-y-auto p-3 @3xl:grid-cols-2"
           >
             {group === "general" ? (
-              <>
-                <SettingsDisclosure
-                  title="Appearance"
-                  titleId="settings.appearance.title"
-                  hint="Choose how Stockroom renders on this machine. The choice is saved immediately."
-                  hintId="settings.appearance.hint"
-                  summary={
-                    theme === "light" ? (
-                      <Text id="settings.summary.light">Light</Text>
-                    ) : (
-                      <Text id="settings.summary.dark">Dark</Text>
-                    )
-                  }
-                  className="@3xl:col-span-2"
-                  data-dev-id="settings.appearance"
-                >
-                  <AppearanceSection />
-                </SettingsDisclosure>
-                <SettingsDisclosure
-                  title="Automatic Updates"
-                  titleId="settings.update.title"
-                  hint="Stockroom checks its verified application branch every two minutes and adopts a healthy update automatically without closing this window."
-                  hintId="settings.update.hint"
-                  summary={
-                    updateStanding.standing === "available" ? (
-                      <Badge tone="warn">
-                        <Text id="settings.summary.update-available">Update Ready</Text>
-                      </Badge>
-                    ) : updateStanding.standing === "current" ? (
-                      <Text id="settings.summary.up-to-date-app">Current</Text>
-                    ) : updateStanding.standing === "updating" ? (
-                      <Text id="settings.summary.update-updating">Updating...</Text>
-                    ) : updateStanding.standing === "checking" ? (
-                      <Text id="settings.summary.update-checking">Checking...</Text>
-                    ) : updateStanding.standing === "retrying" ? (
-                      <Text id="settings.summary.update-retrying">Retrying...</Text>
-                    ) : updateStanding.standing === "blocked" ? (
-                      <Text id="settings.summary.update-blocked">Update Blocked</Text>
-                    ) : updateStanding.standing === "restart_required" ? (
-                      <Badge tone="warn">
-                        <Text id="settings.summary.update-restart">Restart Required</Text>
-                      </Badge>
-                    ) : (
-                      <Text id="settings.summary.update-unknown">Update Unknown</Text>
-                    )
-                  }
-                  className="@3xl:col-span-2"
-                  data-dev-id="settings.update"
-                >
-                  <UpdateSection />
-                </SettingsDisclosure>
-              </>
+              <GeneralGroup />
             ) : group === "library" ? (
-              <>
-                <SettingsDisclosure
-                  title="Library Repositories"
-                  titleId="settings.profiles.title"
-                  hint="Each library is a separate Git repository. Switching libraries never changes Stockroom's application repository."
-                  hintId="settings.profiles.hint"
-                  summary={
-                    librariesQ.data ? (
-                      <span>
-                        {librariesQ.data.libraries.find((library) => library.active)?.name ??
-                          "Current Library"}
-                      </span>
-                    ) : null
-                  }
-                  data-dev-id="settings.profiles"
-                >
-                  <LibraryRepositoriesSection />
-                </SettingsDisclosure>
-                <SettingsDisclosure
-                  title="Share Library Changes"
-                  titleId="settings.sync.title"
-                  hint="Pull collaborators' component changes and push yours. This affects library data, not the Stockroom application."
-                  hintId="settings.sync.hint"
-                  summary={syncSummary}
-                  data-dev-id="settings.sync"
-                >
-                  <SyncSection />
-                </SettingsDisclosure>
-                <SettingsDisclosure
-                  title="GitHub Access"
-                  titleId="settings.github.title"
-                  hint="Sign in with the Windows user's GitHub account. Git Credential Manager stores access outside Stockroom and GitHub repository permissions control collaboration."
-                  hintId="settings.github.hint"
-                  summary={
-                    s ? (
-                      githubConnected ? (
-                        <Text id="settings.summary.github-connected">Connected</Text>
-                      ) : (
-                        <Badge tone="neutral">
-                          <Text id="settings.summary.github-off">Not Connected</Text>
-                        </Badge>
-                      )
-                    ) : null
-                  }
-                  className="@3xl:col-span-2"
-                  data-dev-id="settings.github"
-                >
-                  <GitHubSection />
-                </SettingsDisclosure>
-              </>
+              <LibraryGroup />
             ) : group === "eda" ? (
-              <>
-                <SettingsDisclosure
-                  title="KiCad Integration"
-                  titleId="settings.kicad.title"
-                  hint="Stockroom wires the active library repository into KiCad automatically. Manual paths are advanced recovery controls."
-                  hintId="settings.kicad.hint"
-                  summary={
-                    s ? (
-                      s.kicad_wired ? (
-                        <Text id="settings.summary.kicad-wired">Ready</Text>
-                      ) : (
-                        <Badge tone="warn">
-                          <Text id="settings.summary.kicad-unwired">Needs Attention</Text>
-                        </Badge>
-                      )
-                    ) : null
-                  }
-                  data-dev-id="settings.kicad"
-                >
-                  <KiCadSection />
-                </SettingsDisclosure>
-                <SettingsDisclosure
-                  title="Altium Integration"
-                  titleId="settings.altium.title"
-                  hint="The database library follows the active library repository. The SQLite ODBC driver is the one machine-level prerequisite."
-                  hintId="settings.altium.hint"
-                  summary={
-                    odbcInstalled === true ? (
-                      <Text id="settings.summary.odbc-ok">Ready</Text>
-                    ) : odbcInstalled === false ? (
-                      <Badge tone="warn">
-                        <Text id="settings.summary.odbc-missing">Driver Missing</Text>
-                      </Badge>
-                    ) : null
-                  }
-                  data-dev-id="settings.altium"
-                >
-                  <AltiumDbLibSection />
-                </SettingsDisclosure>
-                <SettingsDisclosure
-                  title="STM32CubeMX Data"
-                  titleId="settings.cubemx.title"
-                  hint="Choose the local CubeMX data folder once. Stockroom remembers it and builds the searchable MCU index on demand."
-                  hintId="settings.cubemx.hint"
-                  summary={
-                    s?.stm_cubemx_source ? (
-                      <Text id="settings.summary.cubemx-ready">Configured</Text>
-                    ) : (
-                      <Badge tone="neutral">
-                        <Text id="settings.summary.cubemx-optional">Optional</Text>
-                      </Badge>
-                    )
-                  }
-                  className="@3xl:col-span-2"
-                  data-dev-id="settings.cubemx"
-                >
-                  <CubeMxSection />
-                </SettingsDisclosure>
-              </>
+              <EdaGroup />
             ) : group === "sources" ? (
-              <>
-                <SettingsDisclosure
-                  title="Distributor APIs"
-                  titleId="settings.distributor.title"
-                  hint="Optional API credentials improve exact part lookup. Stockroom still works without them."
-                  hintId="settings.distributor.hint"
-                  summary={
-                    s ? (
-                      s.mouser_api_key_set || s.digikey_client_secret_set ? (
-                        <Text id="settings.summary.key-set">Configured</Text>
-                      ) : (
-                        <Badge tone="neutral">
-                          <Text id="settings.summary.key-off">Optional</Text>
-                        </Badge>
-                      )
-                    ) : null
-                  }
-                  data-dev-id="settings.distributor"
-                >
-                  <DistributorSection />
-                </SettingsDisclosure>
-                <SettingsDisclosure
-                  title="Refresh Procurement Data"
-                  titleId="settings.rescan.title"
-                  hint="Update price, stock, and lifecycle data. Recent parts are skipped unless you request a full refresh."
-                  hintId="settings.rescan.hint"
-                  summary={rescanSummary}
-                  data-dev-id="settings.rescan"
-                >
-                  <RescanSection />
-                </SettingsDisclosure>
-              </>
+              <SourcesGroup />
             ) : (
-              <>
-                <SettingsDisclosure
-                  title="Component Completeness"
-                  titleId="settings.completion.title"
-                  hint="Find parts missing required Symbol, Footprint, or 3D representations and fill supported gaps."
-                  hintId="settings.completion.hint"
-                  summary={completionSummary}
-                  data-dev-id="settings.completion"
-                >
-                  <LibraryCompletionSection />
-                </SettingsDisclosure>
-                <SettingsDisclosure
-                  title="Rebuild Presentation Data"
-                  titleId="settings.derivation.title"
-                  hint="Recompute display names, descriptions, categories, and specifications from stored evidence. No network access is used."
-                  hintId="settings.derivation.hint"
-                  summary={derivationSummary}
-                  data-dev-id="settings.derivation"
-                >
-                  <DerivationSection />
-                </SettingsDisclosure>
-                <SettingsDisclosure
-                  title="Repair Library"
-                  titleId="settings.health.title"
-                  hint="Check records, files, and Git state. Safe repairs are listed before they run; missing source files are never invented."
-                  hintId="settings.health.hint"
-                  summary={healthSummary}
-                  data-dev-id="settings.health"
-                >
-                  <LibraryHealthSection />
-                </SettingsDisclosure>
-                <SettingsDisclosure
-                  title="Binary Storage"
-                  titleId="settings.librarysync.title"
-                  hint="Control which large CAD files travel through Git LFS and which machine-generated files stay local."
-                  hintId="settings.librarysync.hint"
-                  summary={librarySyncSummary}
-                  data-dev-id="settings.librarysync"
-                >
-                  <LibrarySyncSection />
-                </SettingsDisclosure>
-                <SettingsDisclosure
-                  title="Reset Captured CAD"
-                  titleId="settings.cad-clear.title"
-                  hint="Destructive recovery: remove captured symbols, footprints, and 3D models while preserving parts, specifications, datasheets, and source evidence."
-                  hintId="settings.cad-clear.hint"
-                  summary={cadSummary}
-                  className="@3xl:col-span-2 border-err/40"
-                  data-dev-id="settings.cad-clear"
-                >
-                  <CadClearSection />
-                </SettingsDisclosure>
-              </>
+              <MaintenanceGroup />
             )}
           </div>
         </section>
@@ -794,7 +476,7 @@ function MachineSetupBand({
         </span>
         <div className="min-w-0 flex-1">
           <Eyebrow className="mb-0.5">
-            <Text id="settings.delivery.title">Application Delivery</Text>
+            <Text id="settings.delivery.title">Application Updates</Text>
           </Eyebrow>
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-sm font-semibold text-t1">
@@ -806,7 +488,7 @@ function MachineSetupBand({
               </Badge>
             ) : updateStanding === "retrying" ? (
               <Badge tone="warn">
-                <Text id="settings.delivery.retrying">Retrying</Text>
+                <Text id="settings.delivery.retrying">Rerunning</Text>
               </Badge>
             ) : updateStanding === "blocked" ? (
               <Badge tone="err">
@@ -824,10 +506,10 @@ function MachineSetupBand({
               <Badge tone="warn">
                 {updateBehind > 0 ? (
                   <Text id="settings.delivery.commits-ready" values={{ count: updateBehind }}>
-                    {"{count} Commits Ready"}
+                    {"{count} Commits Available"}
                   </Text>
                 ) : (
-                  <Text id="settings.delivery.update-ready">Update Ready</Text>
+                  <Text id="settings.delivery.update-ready">Update Available</Text>
                 )}
               </Badge>
             ) : updateStanding === "current" ? (
@@ -841,9 +523,7 @@ function MachineSetupBand({
             )}
           </div>
           <p className="mt-1 text-xs text-t3">
-            <Text id="settings.delivery.lede">
-              Install Stockroom.exe once. It follows the verified application revision automatically, checks every two minutes, and keeps this window open while adopting updates.
-            </Text>
+            <Text id="settings.delivery.lede">Install Stockroom.exe once. It follows the validated application revision on its own, checks at two-minute intervals, and keeps this window open while adopting updates.</Text>
           </p>
         </div>
         <div className="flex flex-none flex-col items-end gap-1.5">
@@ -875,7 +555,7 @@ function MachineSetupBand({
               </p>
             ) : unmet.length === 0 ? (
               <p className="text-sm font-semibold text-t1">
-                <Text id="settings.machine.ready">This Machine Is Ready</Text>
+                <Text id="settings.machine.ready">This Machine Is Prepared</Text>
               </p>
             ) : (
               <p className="text-sm font-semibold text-t1">
@@ -895,7 +575,7 @@ function MachineSetupBand({
                 id="settings.machine.ready-count"
                 values={{ ready: steps.length - unmet.length, total: steps.length }}
               >
-                {"{ready} of {total} ready"}
+                {"{ready} of {total} prepared"}
               </Text>
             </span>
           ) : null}
@@ -934,12 +614,14 @@ function MachineSetupBand({
   );
 }
 
+// The two theme choices, allocated once: nothing here reads state or props.
+const THEME_OPTIONS: { value: Theme; label: string; id: string }[] = [
+  { value: "dark", label: "Dark", id: "settings.appearance.dark" },
+  { value: "light", label: "Light", id: "settings.appearance.light" },
+];
+
 function AppearanceSection() {
   const { theme, setTheme } = useTheme();
-  const options: { value: Theme; label: string; id: string }[] = [
-    { value: "dark", label: "Dark", id: "settings.appearance.dark" },
-    { value: "light", label: "Light", id: "settings.appearance.light" },
-  ];
   return (
     <>
       <div className="flex items-center justify-between">
@@ -950,7 +632,7 @@ function AppearanceSection() {
           className="inline-flex rounded-card border border-line2 p-0.5"
           data-dev-id="settings.appearance-theme"
         >
-          {options.map((o) => (
+          {THEME_OPTIONS.map((o) => (
             <button
               key={o.value}
               type="button"
@@ -977,9 +659,13 @@ function LibraryRepositoriesSection() {
   const [mode, setMode] = useState<SetLibraryBody["mode"]>("create");
   const [path, setPath] = useState("");
   const [url, setUrl] = useState("");
-  const cloneUrlLabel = useText("settings.library.clone-url", "Git Repository URL");
-  const openFolderLabel = useText("settings.library.open-folder", "Existing Library Folder");
-  const newFolderLabel = useText("settings.library.new-folder", "New Library Folder");
+  const cloneUrlLabel = useText("settings.library.clone-url", "Git Remote URL");
+  const openFolderLabel = useText("settings.library.open-folder", "Existing Catalog Folder");
+  const newFolderLabel = useText("settings.library.new-folder", "New Catalog Folder");
+  const catalogReady = useCopyFormatter(
+    "settings.library.toast-ready",
+    "Catalog prepared at {root}.",
+  );
 
   function apply(body: SetLibraryBody) {
     if (setLibrary.isPending) return;
@@ -987,7 +673,7 @@ function LibraryRepositoriesSection() {
       onSuccess: (result) => {
         setPath("");
         setUrl("");
-        toast(`Library ready at ${result.libraries_root}.`, "ok");
+        toast(catalogReady({ root: result.libraries_root }), "ok");
       },
       onError: (error) => toast(errMsg(error), "err"),
     });
@@ -997,7 +683,7 @@ function LibraryRepositoriesSection() {
     <>
       {libraries.isLoading ? (
         <LoadingState dense id="settings.libraries-loading">
-          Loading this machine's libraries...
+          Loading this machine's catalogs...
         </LoadingState>
       ) : libraries.isError ? (
         <ErrorState dense id="settings.libraries-failed" onRetry={() => libraries.refetch()}>
@@ -1035,7 +721,7 @@ function LibraryRepositoriesSection() {
                     onClick={() => apply({ mode: "open", path: library.path })}
                     disabled={setLibrary.isPending}
                   >
-                    <Text id="settings.profiles.activate">Switch Library</Text>
+                    <Text id="settings.profiles.activate">Switch Catalog</Text>
                   </Button>
                 ) : null}
               </div>
@@ -1056,7 +742,13 @@ function LibraryRepositoriesSection() {
               variant={mode === choice ? "accent" : "default"}
               onClick={() => setMode(choice)}
             >
-              {choice === "create" ? "Create New" : choice === "open" ? "Open Existing" : "Clone From Git"}
+              {choice === "create" ? (
+                <Text id="settings.library.mode-create">Create New</Text>
+              ) : choice === "open" ? (
+                <Text id="settings.library.mode-open">Open Existing</Text>
+              ) : (
+                <Text id="settings.library.mode-clone">Clone From Git</Text>
+              )}
             </Button>
           ))}
         </div>
@@ -1086,12 +778,10 @@ function LibraryRepositoriesSection() {
           }
           disabled={!path.trim() || (mode === "clone" && !url.trim()) || setLibrary.isPending}
         >
-          <Text id="settings.profiles.create">Set Up Library Repository</Text>
+          <Text id="settings.profiles.create">Set Up Catalog Git Remote</Text>
         </Button>
         <p className="text-xs text-t3">
-          <Text id="settings.library.create-note">
-            Creating a library initializes its own Git repository. Stockroom source and other libraries are never added to it.
-          </Text>
+          <Text id="settings.library.create-note">Creating a catalog initializes its own Git checkout. Stockroom source and other catalogs are never added to it.</Text>
         </p>
       </div>
     </>
@@ -1108,9 +798,39 @@ function SyncSection() {
   // real address; the aria-label is the field's actual name.
   const remotePlaceholder = useText(
     "settings.sync.remote-placeholder",
-    "https://github.com/you/library.git",
+    "https://github.com/team/catalog.git",
   );
-  const remoteAria = useText("settings.sync.remote-aria", "Library GitHub Repository URL");
+  const remoteAria = useText("settings.sync.remote-aria", "Catalog GitHub Remote URL");
+  // One sentence per sync outcome, each read here because a toast has no element to wrap.
+  const syncDiverged = useText(
+    "settings.sync.toast-diverged",
+    "Sharing failed: the components have diverged from the remote.",
+  );
+  const syncOffline = useText(
+    "settings.sync.toast-offline",
+    "Sharing failed: the remote is unreachable.",
+  );
+  const syncDenied = useText(
+    "settings.sync.toast-denied",
+    "Sharing failed: GitHub denied this Windows account. Accept the git remote invitation or ask its owner for write access, then sign in again.",
+  );
+  const syncNoRemote = useText(
+    "settings.sync.toast-no-remote",
+    "No remote is configured for these components.",
+  );
+  const syncConverged = useText(
+    "settings.sync.toast-converged",
+    "Both devices' catalog changes converged.",
+  );
+  // The three outcomes the last line can report, as whole sentences rather than a stitched verb:
+  // an override has to be able to reword the sentence, which a spliced-in word would not allow.
+  const syncPulled = useText("settings.sync.toast-pulled", "Pulled from the remote.");
+  const syncPushed = useText("settings.sync.toast-pushed", "Pulled from and pushed to the remote.");
+  const syncCurrent = useText("settings.sync.toast-current", "Nothing to pull or push.");
+  const remoteConnected = useText(
+    "settings.sync.toast-remote-connected",
+    "Catalog git remote connected. The next share publishes its current timeline.",
+  );
 
   function onSync() {
     sync.mutate(undefined, {
@@ -1118,33 +838,26 @@ function SyncSection() {
         // Divergence and offline are FAILURES, surfaced verbatim and never faked
         // green; no-remote is informational; only a real pull/push/clean is ok.
         if (r.state === "diverged") {
-          toast("Sync failed: the components have diverged from the remote.", "err");
+          toast(syncDiverged, "err");
           return;
         }
         if (r.state === "offline") {
-          toast("Sync failed: the remote is unreachable.", "err");
+          toast(syncOffline, "err");
           return;
         }
         if (r.state === "denied") {
-          toast(
-            "Sync failed: GitHub denied this Windows user's account. Accept the repository invitation or ask its owner for write access, then sign in again.",
-            "err",
-          );
+          toast(syncDenied, "err");
           return;
         }
         if (r.state === "no_remote") {
-          toast("No remote is configured for these components.", "neutral");
+          toast(syncNoRemote, "neutral");
           return;
         }
         if (r.converged) {
-          toast("Both devices' library changes converged.", "ok");
+          toast(syncConverged, "ok");
           return;
         }
-        const parts: string[] = [];
-        if (r.pulled) parts.push("pulled");
-        if (r.pushed) parts.push("pushed");
-        const what = parts.length ? parts.join(" and ") : "up to date";
-        toast(`Sync ${what}.`, "ok");
+        toast(r.pushed ? syncPushed : r.pulled ? syncPulled : syncCurrent, "ok");
       },
       onError: (e) => toast(errMsg(e), "err"),
     });
@@ -1154,7 +867,7 @@ function SyncSection() {
     <>
       {status.isLoading ? (
         <LoadingState dense id="settings.sync-loading">
-          Checking how this library compares with its remote...
+          Checking how this catalog compares with its remote...
         </LoadingState>
       ) : status.isError ? (
         <ErrorState dense id="settings.sync-failed" onRetry={() => status.refetch()}>
@@ -1174,11 +887,15 @@ function SyncSection() {
               status.data.has_remote ? (
                 <span className="tnum font-mono">
                   <span className={status.data.ahead > 0 ? statusTone("ahead").text : undefined}>
-                    {status.data.ahead} ahead
+                    <Text id="settings.sync.ahead-count" values={{ count: status.data.ahead }}>
+                      {"{count} ahead"}
+                    </Text>
                   </span>
                   {", "}
                   <span className={status.data.behind > 0 ? statusTone("behind").text : undefined}>
-                    {status.data.behind} behind
+                    <Text id="settings.sync.behind-count" values={{ count: status.data.behind }}>
+                      {"{count} behind"}
+                    </Text>
                   </span>
                 </span>
               ) : (
@@ -1188,39 +905,41 @@ function SyncSection() {
           />
           {status.data.working_copy ? (
             <StatusRow
-              label="Working Copy"
+              label="Working Tree"
               labelId="settings.sync.working-copy"
               value={
                 <span
                   className={
                     status.data.working_copy.mode === "rival_application_checkout"
-                      ? "text-err"
+                      ? "text-err-text"
                       : status.data.working_copy.mode === "embedded"
-                        ? "text-ok"
+                        ? "text-ok-text"
                         : undefined
                   }
                   title={status.data.working_copy.detail}
                 >
-                  {status.data.working_copy.mode === "embedded"
-                    ? "One Managed Checkout"
-                    : status.data.working_copy.mode === "rival_application_checkout"
-                      ? "Rival App Checkout Detected"
-                      : "Separate Library Checkout"}
+                  {status.data.working_copy.mode === "embedded" ? (
+                    <Text id="settings.sync.checkout-managed">One Managed Checkout</Text>
+                  ) : status.data.working_copy.mode === "rival_application_checkout" ? (
+                    <Text id="settings.sync.checkout-rival">Rival App Checkout Detected</Text>
+                  ) : (
+                    <Text id="settings.sync.checkout-separate">Separate Catalog Checkout</Text>
+                  )}
                 </span>
               }
             />
           ) : null}
           {status.data.checkout_inventory ? (
             <StatusRow
-              label="Checkout Inventory"
+              label="Checkout Contents"
               labelId="settings.sync.checkout-inventory"
               value={
                 <span
                   className={
                     status.data.checkout_inventory.rival_count > 0
-                      ? "text-err"
+                      ? "text-err-text"
                       : status.data.checkout_inventory.state === "complete"
-                        ? "text-ok"
+                        ? "text-ok-text"
                         : undefined
                   }
                   title={status.data.checkout_inventory.checkouts
@@ -1230,15 +949,24 @@ function SyncSection() {
                     )
                     .join("\n")}
                 >
-                  {status.data.checkout_inventory.state === "scanning"
-                    ? "Scanning This Computer"
-                    : status.data.checkout_inventory.rival_count > 0
-                      ? `${status.data.checkout_inventory.rival_count} Rival Checkout${
-                          status.data.checkout_inventory.rival_count === 1 ? "" : "s"
-                        } Detected`
-                      : status.data.checkout_inventory.state === "complete"
-                        ? "Canonical Checkout Only"
-                        : "Inventory Incomplete"}
+                  {status.data.checkout_inventory.state === "scanning" ? (
+                    <Text id="settings.sync.inventory-scanning">Scanning This Computer</Text>
+                  ) : status.data.checkout_inventory.rival_count === 1 ? (
+                    <Text id="settings.sync.inventory-rival-one" values={{ count: 1 }}>
+                      {"{count} Rival Checkout Detected"}
+                    </Text>
+                  ) : status.data.checkout_inventory.rival_count > 1 ? (
+                    <Text
+                      id="settings.sync.inventory-rival-many"
+                      values={{ count: status.data.checkout_inventory.rival_count }}
+                    >
+                      {"{count} Rival Checkouts Detected"}
+                    </Text>
+                  ) : status.data.checkout_inventory.state === "complete" ? (
+                    <Text id="settings.sync.inventory-canonical">Canonical Checkout Alone</Text>
+                  ) : (
+                    <Text id="settings.sync.inventory-incomplete">Scan Incomplete</Text>
+                  )}
                 </span>
               }
             />
@@ -1248,26 +976,28 @@ function SyncSection() {
             labelId="settings.sync.automatic-convergence"
             value={
               !status.data.last_sync ? (
-                "Waiting For First Check"
+                <Text id="settings.sync.last-waiting">Waiting For First Check</Text>
               ) : (
                 <span
                   className={
                     ["diverged", "denied"].includes(status.data.last_sync.state)
-                      ? "text-err"
+                      ? "text-err-text"
                       : status.data.last_sync.state === "offline"
                         ? "text-warn"
-                        : "text-ok"
+                        : "text-ok-text"
                   }
                   title={status.data.last_sync.detail}
                 >
-                  {status.data.last_sync.state === "converged"
-                    ? "Devices Converged"
-                    : status.data.last_sync.state === "synced"
-                      ? "Current"
-                      : status.data.last_sync.state
-                          .split("_")
-                          .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-                          .join(" ")}
+                  {status.data.last_sync.state === "converged" ? (
+                    <Text id="settings.sync.last-converged">Devices Converged</Text>
+                  ) : status.data.last_sync.state === "synced" ? (
+                    <Text id="settings.sync.last-current">Current</Text>
+                  ) : (
+                    status.data.last_sync.state
+                      .split("_")
+                      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+                      .join(" ")
+                  )}
                 </span>
               )
             }
@@ -1288,14 +1018,14 @@ function SyncSection() {
               connectRemote.mutate(remoteUrl.trim(), {
                 onSuccess: () => {
                   setRemoteUrl("");
-                  toast("Library repository connected. Sync will publish its current history.", "ok");
+                  toast(remoteConnected, "ok");
                 },
                 onError: (error) => toast(errMsg(error), "err"),
               })
             }
             disabled={!remoteUrl.trim() || connectRemote.isPending}
           >
-            <Text id="settings.sync.connect-remote">Connect Library Repository</Text>
+            <Text id="settings.sync.connect-remote">Connect Catalog Git Remote</Text>
           </Button>
         </div>
       ) : null}
@@ -1307,9 +1037,9 @@ function SyncSection() {
           data-dev-id="settings.sync-action"
         >
           {sync.isPending ? (
-            "Syncing..."
+            <Text id="settings.sync.action-busy">Sharing...</Text>
           ) : (
-            <Text id="settings.sync.action">Pull And Push Library</Text>
+            <Text id="settings.sync.action">Pull And Push Catalog</Text>
           )}
         </Button>
         {sync.data ? (
@@ -1336,6 +1066,8 @@ function KiCadSection() {
     "KiCad settings applied. The components are wired.",
   );
   const toastApplied = useText("settings.kicad.toast-applied", "KiCad settings applied.");
+  // The job carries its own failure detail when it has one; this is the sentence for when it does not.
+  const wireFailed = useText("settings.kicad.wire-failed", "Wiring failed.");
 
   async function onWire() {
     setWiring(true);
@@ -1393,7 +1125,7 @@ function KiCadSection() {
       ) : sys.data ? (
         <>
           <StatusRow
-            label="Config Directory"
+            label="Config Folder"
             labelId="settings.kicad.config-dir"
             value={sys.data.kicad_config_dir}
           />
@@ -1422,8 +1154,8 @@ function KiCadSection() {
               settings.isLoading ? (
                 "Loading..."
               ) : settings.data?.kicad_wired ? (
-                <span className="text-ok">
-                  <Text id="settings.kicad.wired">Wired to the active library</Text>
+                <span className="text-ok-text">
+                  <Text id="settings.kicad.wired">Wired to the active catalog</Text>
                 </span>
               ) : (
                 <span className="text-warn">
@@ -1442,7 +1174,7 @@ function KiCadSection() {
           <div>
             <Button onClick={onWire} disabled={wireBusy} data-dev-id="settings.kicad-wire">
               {wireBusy ? (
-                "Wiring..."
+                <Text id="settings.kicad.wire-busy">Wiring...</Text>
               ) : (
                 <Text id="settings.kicad.wire">Recheck And Wire KiCad</Text>
               )}
@@ -1452,7 +1184,7 @@ function KiCadSection() {
             <p className="text-xs text-t3">{wireJob.progress.message}...</p>
           ) : null}
           {wireJob.status === "error" ? (
-            <p className="text-sm text-err">{wireJob.error ?? "Wiring failed."}</p>
+            <p className="text-sm text-err-text">{wireJob.error ?? wireFailed}</p>
           ) : null}
           {wireReport ? (
             <div className="flex flex-col gap-1.5 rounded-control border border-line bg-raise2 p-3 text-xs">
@@ -1472,7 +1204,7 @@ function KiCadSection() {
                   </span>
                 </div>
               ) : (
-                <div className="flex items-center gap-2 text-ok">
+                <div className="flex items-center gap-2 text-ok-text">
                   <Dot tone="ok" />
                   <span>
                     <Text id="settings.kicad.wired-set">KiCad is wired and set.</Text>
@@ -1487,7 +1219,7 @@ function KiCadSection() {
       <div className="mt-3.5 flex flex-col gap-2.5" data-dev-id="settings.kicad-overrides">
         <div className="flex flex-wrap items-center gap-2.5">
           <label htmlFor="kicad-config-override" className="w-52 flex-none text-xs text-t3">
-            <Text id="settings.kicad.config-label">Config Directory Override</Text>
+            <Text id="settings.kicad.config-label">Config Folder Override</Text>
           </label>
           <input
             id="kicad-config-override"
@@ -1512,7 +1244,7 @@ function KiCadSection() {
         <div>
           <Button onClick={onSave} disabled={!dirty || save.isPending}>
             {save.isPending ? (
-              "Applying..."
+              <Text id="settings.kicad.save-overrides-busy">Committing...</Text>
             ) : (
               <Text id="settings.kicad.save-overrides">Save Paths And Rewire</Text>
             )}
@@ -1613,13 +1345,23 @@ function DistributorSection() {
   const { toast } = useToast();
   const [keyInput, setKeyInput] = useState("");
   const isSet = settings.data?.mouser_api_key_set ?? false;
-  const keyPlaceholderNew = useText("settings.distributor.key-placeholder", "Paste a key");
+  const keyPlaceholderNew = useText("settings.distributor.key-placeholder", "Paste a credential");
   const keyPlaceholderReplace = useText(
     "settings.distributor.key-placeholder-replace",
-    "Paste a new key to replace it",
+    "Paste a new credential to replace it",
   );
-  const toastSaved = useText("settings.distributor.toast-saved", "Mouser key saved.");
-  const toastCleared = useText("settings.distributor.toast-cleared", "Mouser key cleared.");
+  const toastSaved = useText("settings.distributor.toast-saved", "Mouser credential saved.");
+  const toastCleared = useText("settings.distributor.toast-cleared", "Mouser credential cleared.");
+  // `VendorLogin` renders these as plain strings, so they are resolved here and handed down.
+  const digikeyTitle = useText("settings.distributor.digikey-title", "DigiKey API Credentials");
+  const digikeySaveLabel = useText(
+    "settings.distributor.digikey-save",
+    "Save DigiKey API Credentials",
+  );
+  const digikeySaved = useText(
+    "settings.distributor.digikey-toast-saved",
+    "DigiKey API credentials saved.",
+  );
 
   function onSave() {
     const key = keyInput.trim();
@@ -1654,7 +1396,7 @@ function DistributorSection() {
   return (
     <>
       <StatusRow
-        label="Mouser API Key"
+        label="Mouser API Credential"
         labelId="settings.distributor.key-label"
         value={
           settings.isLoading
@@ -1669,7 +1411,7 @@ function DistributorSection() {
         data-dev-id="settings.distributor-key"
       >
         <label htmlFor="mouser-key" className="sr-only">
-          <Text id="settings.distributor.key-field-label">Mouser API Key</Text>
+          <Text id="settings.distributor.key-field-label">Mouser API Credential</Text>
         </label>
         <input
           id="mouser-key"
@@ -1684,19 +1426,19 @@ function DistributorSection() {
           className={INPUT_CLS}
         />
         <Button onClick={onSave} disabled={!keyInput.trim() || save.isPending}>
-          <Text id="settings.distributor.save-key">Save Mouser Key</Text>
+          <Text id="settings.distributor.save-key">Save Mouser Credential</Text>
         </Button>
         {isSet ? (
           <Button variant="danger" onClick={onClear} disabled={save.isPending}>
-            <Text id="settings.distributor.clear">Remove Mouser Key</Text>
+            <Text id="settings.distributor.clear">Remove Mouser Credential</Text>
           </Button>
         ) : null}
       </div>
       <VendorLogin
-        title="DigiKey API Creds"
+        title={digikeyTitle}
         identifierLabel="DigiKey API Client ID"
         secretLabel="DigiKey API Client Secret"
-        saveLabel="Save DigiKey API Creds"
+        saveLabel={digikeySaveLabel}
         savedIdentifier={settings.data?.digikey_client_id ?? ""}
         secretSet={settings.data?.digikey_client_secret_set ?? false}
         secretHint={settings.data?.digikey_client_secret_hint ?? ""}
@@ -1705,7 +1447,7 @@ function DistributorSection() {
           const patch: SettingsPatch = { digikey_client_id: clientId };
           if (secret) patch.digikey_client_secret = secret;
           save.mutate(patch, {
-            onSuccess: () => toast("DigiKey API creds saved.", "ok"),
+            onSuccess: () => toast(digikeySaved, "ok"),
             onError: (e) => toast(errMsg(e), "err"),
           });
         }}
@@ -1745,6 +1487,18 @@ function VendorLogin({
   const [identifier, setIdentifier] = useState(savedIdentifier);
   const [secret, setSecret] = useState("");
   const [edited, setEdited] = useState(false);
+  // The hint in the hole is the secret's last characters, which is a value; the sentence is ours.
+  const secretSaved = useCopyFormatter(
+    "settings.vendor-login.secret-saved",
+    "Saved (ending {hint})",
+  );
+  const secretUnsaved = useText("settings.vendor-login.secret-unsaved", "Not saved");
+  // The in-field hint of a credential that is already stored: the field is blank on purpose, so the
+  // hint is what says the stored value is intact and what typing here would do to it.
+  const replaceHint = useText(
+    "settings.vendor-login.secret-replace",
+    "Paste a new value to replace it",
+  );
   // Prefill the saved identifier once it arrives, unless the user has started editing.
   useEffect(() => {
     if (!edited) setIdentifier(savedIdentifier);
@@ -1758,7 +1512,7 @@ function VendorLogin({
       <div className="mb-2 flex items-center justify-between gap-4">
         <span className="text-sm font-medium text-t1">{title}</span>
         <span className="flex-none text-xs text-t3">
-          {secretSet ? `Saved (ending ${secretHint})` : "Not saved"}
+          {secretSet ? secretSaved({ hint: secretHint }) : secretUnsaved}
         </span>
       </div>
       <div className="flex flex-wrap items-center gap-2.5">
@@ -1788,7 +1542,7 @@ function VendorLogin({
           aria-label={secretLabel}
           value={secret}
           onChange={(e) => setSecret(e.target.value)}
-          placeholder={secretSet ? "Paste a new value to replace it" : secretLabel}
+          placeholder={secretSet ? replaceHint : secretLabel}
           className={INPUT_CLS}
         />
         <Button
@@ -1812,7 +1566,7 @@ function GitHubSection() {
   const { toast } = useToast();
   const toastConnected = useText(
     "settings.github.toast-connected",
-    "GitHub sign-in complete. Repository permissions now control library sharing.",
+    "GitHub sign-in complete. Git remote permissions now control catalog sharing.",
   );
   const accounts = status.data?.github_auth.accounts ?? [];
   const pending = loginJob.status === "running";
@@ -1838,11 +1592,13 @@ function GitHubSection() {
         label="Connection"
         labelId="settings.github.connection"
         value={
-          status.isLoading
-            ? "Loading..."
-            : accounts.length
-              ? accounts.join(", ")
-              : "Not connected"
+          status.isLoading ? (
+            <Text id="settings.github.connection-loading">Loading...</Text>
+          ) : accounts.length ? (
+            accounts.join(", ")
+          ) : (
+            <Text id="settings.github.connection-none">Not connected</Text>
+          )
         }
       />
       <div
@@ -1850,14 +1606,14 @@ function GitHubSection() {
         data-dev-id="settings.github-token"
       >
         <Button onClick={() => void onSignIn()} disabled={pending}>
-          <Text id="settings.github.connect">
-            {pending ? "Waiting For GitHub" : "Sign In With GitHub"}
-          </Text>
+          {pending ? (
+            <Text id="settings.github.connect-waiting">Waiting For GitHub</Text>
+          ) : (
+            <Text id="settings.github.connect">Sign In With GitHub</Text>
+          )}
         </Button>
         <p className="text-xs text-t3">
-          <Text id="settings.github.no-secrets">
-            Stockroom never receives or stores your GitHub password or personal access token.
-          </Text>
+          <Text id="settings.github.no-secrets">Stockroom never receives or stores a GitHub password or personal access token.</Text>
         </p>
       </div>
     </>
@@ -1883,7 +1639,7 @@ function UpdateSection() {
       ) : (
         <>
           <StatusRow
-            label="Delivery"
+            label="Updates"
             labelId="settings.update.delivery"
             value={
               check.data?.automatic_apply ? (
@@ -1925,7 +1681,7 @@ function UpdateSection() {
                   </Text>
                 </span>
               ) : standing.standing === "current" ? (
-                <span className="text-ok">
+                <span className="text-ok-text">
                   <Text id="settings.update.status-current">Current</Text>
                 </span>
               ) : standing.standing === "available" ? (
@@ -1935,33 +1691,29 @@ function UpdateSection() {
                       id="settings.update.status-behind"
                       values={{ count: check.data.behind, revision: shortRevision(targetRevision) }}
                     >
-                      {"{count} commits ready to install at {revision}"}
+                      {"{count} commits available to install at {revision}"}
                     </Text>
                   ) : targetRevision ? (
                     <Text
                       id="settings.update.status-revision-ready"
                       values={{ revision: shortRevision(targetRevision) }}
                     >
-                      {"Revision {revision} is ready to install"}
+                      {"Revision {revision} is available to install"}
                     </Text>
                   ) : (
-                    <Text id="settings.update.status-ready">Update ready to install</Text>
+                    <Text id="settings.update.status-ready">Update available to install</Text>
                   )}
                 </span>
               ) : standing.standing === "updating" ? (
                 <span className="text-acc">
-                  <Text id="settings.update.status-updating">
-                    Adopting the verified release automatically...
-                  </Text>
+                  <Text id="settings.update.status-updating">Automatic adoption of the validated release...</Text>
                 </span>
               ) : standing.standing === "retrying" ? (
                 <span className="text-warn">
-                  <Text id="settings.update.status-retrying">
-                    Remote check incomplete; retrying automatically...
-                  </Text>
+                  <Text id="settings.update.status-retrying">Remote check incomplete; automatic reruns continue...</Text>
                 </span>
               ) : standing.standing === "blocked" ? (
-                <span className="text-err">
+                <span className="text-err-text">
                   <Text id="settings.update.status-blocked">
                     Automatic convergence needs attention
                   </Text>
@@ -1994,7 +1746,7 @@ function UpdateSection() {
                     </Text>
                   ) : (
                     <Text id="settings.update.status-unverified">
-                      Latest remote revision could not be verified
+                      Latest remote revision could not be validated
                     </Text>
                   )}
                 </span>
@@ -2012,9 +1764,7 @@ function UpdateSection() {
         </>
       )}
       <p className="mt-3 text-xs leading-relaxed text-t3">
-        <Text id="settings.update.lede">
-          Every installation follows the same verified remote revision automatically. New releases are staged beside the running app, health-checked, and adopted without closing this window; a failed release rolls back to the last healthy backend.
-        </Text>
+        <Text id="settings.update.lede">Each installation follows the same validated remote revision on its own. New releases are staged beside the running app, health-checked, and adopted without closing this window; a failed release rolls back to the last sound backend.</Text>
       </p>
       <div className="mt-3.5 flex flex-wrap items-center gap-2">
         <a
@@ -2026,6 +1776,390 @@ function UpdateSection() {
           <Text id="settings.update.download">Download Stockroom.exe</Text>
         </a>
       </div>
+    </>
+  );
+}
+
+// The General group's disclosures. Each group panel resolves its own cached queries (the same keys
+// the page header already reads, so no extra request) and computes its own collapsed-row summaries,
+// which keeps SettingsPage itself the page frame rather than the sum of all five panels.
+function GeneralGroup() {
+  const { theme } = useTheme();
+  const { view: updateStanding } = useUpdateStanding();
+  return (
+    <>
+        <SettingsDisclosure
+          title="Appearance"
+          titleId="settings.appearance.title"
+          hint="Choose how Stockroom renders on this machine. The choice is saved at once."
+          hintId="settings.appearance.hint"
+          summary={
+            theme === "light" ? (
+              <Text id="settings.summary.light">Light</Text>
+            ) : (
+              <Text id="settings.summary.dark">Dark</Text>
+            )
+          }
+          className="@3xl:col-span-2"
+          data-dev-id="settings.appearance"
+        >
+          <AppearanceSection />
+        </SettingsDisclosure>
+        <SettingsDisclosure
+          title="Automatic Updates"
+          titleId="settings.update.title"
+          hint="Stockroom checks its validated application branch at two-minute intervals and adopts a sound update on its own, without closing this window."
+          hintId="settings.update.hint"
+          summary={
+            updateStanding.standing === "available" ? (
+              <Badge tone="warn">
+                <Text id="settings.summary.update-available">Update Available</Text>
+              </Badge>
+            ) : updateStanding.standing === "current" ? (
+              <Text id="settings.summary.up-to-date-app">Current</Text>
+            ) : updateStanding.standing === "updating" ? (
+              <Text id="settings.summary.update-updating">Updating...</Text>
+            ) : updateStanding.standing === "checking" ? (
+              <Text id="settings.summary.update-checking">Checking...</Text>
+            ) : updateStanding.standing === "retrying" ? (
+              <Text id="settings.summary.update-retrying">Rerunning...</Text>
+            ) : updateStanding.standing === "blocked" ? (
+              <Text id="settings.summary.update-blocked">Update Blocked</Text>
+            ) : updateStanding.standing === "restart_required" ? (
+              <Badge tone="warn">
+                <Text id="settings.summary.update-restart">Restart Required</Text>
+              </Badge>
+            ) : (
+              <Text id="settings.summary.update-unknown">Update Unknown</Text>
+            )
+          }
+          className="@3xl:col-span-2"
+          data-dev-id="settings.update"
+        >
+          <UpdateSection />
+        </SettingsDisclosure>
+    </>
+  );
+}
+
+
+function LibraryGroup() {
+  const settingsQ = useSettings();
+  const syncQ = useSyncStatus();
+  const librariesQ = useOnboarding();
+  const s = settingsQ.data;
+  const sync = syncQ.data;
+  const githubAccounts = sync?.github_auth.accounts ?? [];
+  // A legacy app-owned token may still exist on an upgraded machine. It remains a temporary
+  // compatibility signal, but the UI creates no new tokens and GCM is the durable authority.
+  const githubConnected = githubAccounts.length > 0 || Boolean(s?.github_token_set);
+  const syncSummary = !sync ? null : !sync.has_remote ? (
+    <Text id="settings.summary.no-remote">No Remote</Text>
+  ) : sync.behind > 0 ? (
+    <Badge tone="warn">{`Behind ${sync.behind}`}</Badge>
+  ) : sync.ahead > 0 ? (
+    <Badge tone="neutral">{`Ahead ${sync.ahead}`}</Badge>
+  ) : (
+    <Text id="settings.summary.up-to-date">Up To Date</Text>
+  );
+  return (
+    <>
+        <SettingsDisclosure
+          title="Catalog Checkouts"
+          titleId="settings.profiles.title"
+          hint="Each catalog is a separate Git checkout. Switching catalogs never changes Stockroom's application checkout."
+          hintId="settings.profiles.hint"
+          summary={
+            librariesQ.data ? (
+              <span>
+                {librariesQ.data.libraries.find((library) => library.active)?.name ?? (
+                  <Text id="settings.profiles.summary-fallback">Active Catalog</Text>
+                )}
+              </span>
+            ) : null
+          }
+          data-dev-id="settings.profiles"
+        >
+          <LibraryRepositoriesSection />
+        </SettingsDisclosure>
+        <SettingsDisclosure
+          title="Share Catalog Changes"
+          titleId="settings.sync.title"
+          hint="Pull collaborators' component changes and push local ones. This affects catalog data, not the Stockroom application."
+          hintId="settings.sync.hint"
+          summary={syncSummary}
+          data-dev-id="settings.sync"
+        >
+          <SyncSection />
+        </SettingsDisclosure>
+        <SettingsDisclosure
+          title="GitHub Access"
+          titleId="settings.github.title"
+          hint="Sign in with the Windows user's GitHub account. Git Credential Manager stores access outside Stockroom and GitHub remote permissions control collaboration."
+          hintId="settings.github.hint"
+          summary={
+            s ? (
+              githubConnected ? (
+                <Text id="settings.summary.github-connected">Connected</Text>
+              ) : (
+                <Badge tone="neutral">
+                  <Text id="settings.summary.github-off">Not Connected</Text>
+                </Badge>
+              )
+            ) : null
+          }
+          className="@3xl:col-span-2"
+          data-dev-id="settings.github"
+        >
+          <GitHubSection />
+        </SettingsDisclosure>
+    </>
+  );
+}
+
+
+function EdaGroup() {
+  const settingsQ = useSettings();
+  const odbc = useOdbcStatus();
+  const s = settingsQ.data;
+  const odbcInstalled = odbc.data?.installed;
+  return (
+    <>
+        <SettingsDisclosure
+          title="KiCad Integration"
+          titleId="settings.kicad.title"
+          hint="Stockroom wires the active catalog checkout into KiCad on its own. Manual paths are advanced repair controls."
+          hintId="settings.kicad.hint"
+          summary={
+            s ? (
+              s.kicad_wired ? (
+                <Text id="settings.summary.kicad-wired">Prepared</Text>
+              ) : (
+                <Badge tone="warn">
+                  <Text id="settings.summary.kicad-unwired">Needs Attention</Text>
+                </Badge>
+              )
+            ) : null
+          }
+          data-dev-id="settings.kicad"
+        >
+          <KiCadSection />
+        </SettingsDisclosure>
+        <SettingsDisclosure
+          title="Altium Integration"
+          titleId="settings.altium.title"
+          hint="The database catalog follows the active catalog checkout. The SQLite ODBC driver is the one machine-level prerequisite."
+          hintId="settings.altium.hint"
+          summary={
+            odbcInstalled === true ? (
+              <Text id="settings.summary.odbc-ok">Prepared</Text>
+            ) : odbcInstalled === false ? (
+              <Badge tone="warn">
+                <Text id="settings.summary.odbc-missing">Driver Missing</Text>
+              </Badge>
+            ) : null
+          }
+          data-dev-id="settings.altium"
+        >
+          <AltiumDbLibSection />
+        </SettingsDisclosure>
+        <SettingsDisclosure
+          title="STM32CubeMX Data"
+          titleId="settings.cubemx.title"
+          hint="Choose the local CubeMX data folder once. Stockroom remembers it and builds the searchable MCU index on demand."
+          hintId="settings.cubemx.hint"
+          summary={
+            s?.stm_cubemx_source ? (
+              <Text id="settings.summary.cubemx-ready">Configured</Text>
+            ) : (
+              <Badge tone="neutral">
+                <Text id="settings.summary.cubemx-optional">Optional</Text>
+              </Badge>
+            )
+          }
+          className="@3xl:col-span-2"
+          data-dev-id="settings.cubemx"
+        >
+          <CubeMxSection />
+        </SettingsDisclosure>
+    </>
+  );
+}
+
+
+function SourcesGroup() {
+  const s = useSettings().data;
+  // Procurement Rescan: when prices and stock were last refreshed. Through the same shared
+  // `lastChecked`, so the collapsed row and the open body can never disagree about the date.
+  const rescanState = useRescanState().data;
+  const rescanSummary = !rescanState
+    ? null
+    : (() => {
+        const { checkedAt, total } = lastChecked(rescanState);
+        if (total === 0) return <Text id="settings.summary.never-rescanned">Never Run</Text>;
+        return checkedAt ? (
+          <span>
+            {new Date(checkedAt).toLocaleDateString(undefined, {
+              year: "numeric",
+              month: "short",
+              day: "numeric",
+            })}
+          </span>
+        ) : (
+          <span>{`${total} Checked`}</span>
+        );
+      })();
+  return (
+    <>
+        <SettingsDisclosure
+          title="Distributor APIs"
+          titleId="settings.distributor.title"
+          hint="Optional API credentials improve exact part lookup. Stockroom still works without them."
+          hintId="settings.distributor.hint"
+          summary={
+            s ? (
+              s.mouser_api_key_set || s.digikey_client_secret_set ? (
+                <Text id="settings.summary.key-set">Configured</Text>
+              ) : (
+                <Badge tone="neutral">
+                  <Text id="settings.summary.key-off">Optional</Text>
+                </Badge>
+              )
+            ) : null
+          }
+          data-dev-id="settings.distributor"
+        >
+          <DistributorSection />
+        </SettingsDisclosure>
+        <SettingsDisclosure
+          title="Refresh Procurement Data"
+          titleId="settings.rescan.title"
+          hint="Update price, stock, and life-stage data. Recent parts are skipped unless a full refresh is requested."
+          hintId="settings.rescan.hint"
+          summary={rescanSummary}
+          data-dev-id="settings.rescan"
+        >
+          <RescanSection />
+        </SettingsDisclosure>
+    </>
+  );
+}
+
+
+function MaintenanceGroup() {
+  const coverageQ = useLibraryCoverage();
+  const derivationQ = useLibraryDerivation();
+  const cadQ = useCadInventory();
+  const doctorQ = useDoctorScan();
+  const lfsQ = useLibraryLfs();
+  // Library Completion: the count IS the answer to the owner's central question, so it is shown
+  // whatever the state; the tone is what changes. A gap some source can fill is warn, a library
+  // with nothing outstanding is calm text.
+  const cov = coverageQ.data;
+  const completionSummary = !cov ? null : cov.complete >= cov.total ? (
+    <Text id="settings.summary.all-complete">All Complete</Text>
+  ) : (
+    <Badge tone="warn">{`${cov.complete} of ${cov.total} Complete`}</Badge>
+  );
+  // Presentation Data: which ruleset built what is on screen, and whether anything is behind it.
+  // A stale count is the actionable half, so it wins the row when there is one.
+  const der = derivationQ.data;
+  const derivationSummary = !der ? null : der.stale > 0 ? (
+    <Badge tone="warn">{`${der.stale} Stale`}</Badge>
+  ) : (
+    <span>{der.ruleset}</span>
+  );
+  // Clear CAD Files: how much a clear would actually remove. `None` is a real, useful state - it
+  // says the destructive action would do nothing, which is worth knowing before opening it.
+  const cad = cadQ.data;
+  const cadSummary = !cad ? null : cad.cleared > 0 ? (
+    <span>{`${cad.cleared} ${cad.cleared === 1 ? "File" : "Files"}`}</span>
+  ) : (
+    <Text id="settings.summary.no-cad">None</Text>
+  );
+  // Library Health: how much needs a hand. Everything the scan reports is work, so they add up
+  // into one number rather than three the row has no space to distinguish.
+  const doc = doctorQ.data;
+  const healthSummary = !doc
+    ? null
+    : (() => {
+        const outstanding = doc.fixable.length + doc.manual.length + doc.uncommitted.length;
+        return outstanding > 0 ? (
+          <Badge tone="warn">{`${outstanding} To Fix`}</Badge>
+        ) : (
+          <Text id="settings.summary.healthy">Sound</Text>
+        );
+      })();
+  // Library Sync: what this library carries to whoever clones it. LFS being OFF is the state that
+  // decides everything else in the section, so it wins; a legacy blob is the one warning that
+  // cannot be fixed from here (it needs a history rewrite this project forbids).
+  const lfs = lfsQ.data;
+  const librarySyncSummary = !lfs ? null : !lfs.installed || !lfs.enabled ? (
+    <Text id="settings.summary.no-lfs">Not Using LFS</Text>
+  ) : lfs.legacy_blobs > 0 ? (
+    <Badge tone="warn">{`${lfs.legacy_blobs} Legacy`}</Badge>
+  ) : // "0 In LFS" reads as a quantity when the thing being said is a STATE: LFS is wired and
+  // holds nothing yet. Seen rendering exactly that against the real library, 2026-07-27.
+  // Its siblings say "None" and "Healthy"; a zero dressed as a count is data vomit.
+  lfs.objects === 0 ? (
+    <Text id="settings.summary.lfs-empty">Nothing In LFS</Text>
+  ) : (
+    <span>{`${lfs.objects} In LFS`}</span>
+  );
+
+  return (
+    <>
+        <SettingsDisclosure
+          title="Component Completeness"
+          titleId="settings.completion.title"
+          hint="Find parts missing a required schematic, footprint, or 3D representation and fill supported gaps."
+          hintId="settings.completion.hint"
+          summary={completionSummary}
+          data-dev-id="settings.completion"
+        >
+          <LibraryCompletionSection />
+        </SettingsDisclosure>
+        <SettingsDisclosure
+          title="Rebuild Presentation Data"
+          titleId="settings.derivation.title"
+          hint="Recompute shown names, descriptions, classes, and specifications from stored evidence. No network access is used."
+          hintId="settings.derivation.hint"
+          summary={derivationSummary}
+          data-dev-id="settings.derivation"
+        >
+          <DerivationSection />
+        </SettingsDisclosure>
+        <SettingsDisclosure
+          title="Repair Catalog"
+          titleId="settings.health.title"
+          hint="Check records, files, and Git state. Safe repairs are listed before the run; missing source files are never invented."
+          hintId="settings.health.hint"
+          summary={healthSummary}
+          data-dev-id="settings.health"
+        >
+          <LibraryHealthSection />
+        </SettingsDisclosure>
+        <SettingsDisclosure
+          title="Large File Storage"
+          titleId="settings.librarysync.title"
+          hint="Control which large CAD files travel through Git LFS and which machine-generated files remain local."
+          hintId="settings.librarysync.hint"
+          summary={librarySyncSummary}
+          data-dev-id="settings.librarysync"
+        >
+          <LibrarySyncSection />
+        </SettingsDisclosure>
+        <SettingsDisclosure
+          title="Reset Captured CAD"
+          titleId="settings.cad-clear.title"
+          hint="Destructive repair: remove captured schematic assets, footprints, and 3D models while preserving parts, specifications, datasheets, and source evidence."
+          hintId="settings.cad-clear.hint"
+          summary={cadSummary}
+          className="@3xl:col-span-2 border-err/40"
+          data-dev-id="settings.cad-clear"
+        >
+          <CadClearSection />
+        </SettingsDisclosure>
     </>
   );
 }

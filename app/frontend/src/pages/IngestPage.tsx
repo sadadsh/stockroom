@@ -8,7 +8,12 @@
  * during that task use the same identity and cross-EDA gates as intercepted downloads.
  */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
-import type { EnrichmentResult, PartDetail, StagingCandidate } from "../api/types";
+import type {
+  EnrichmentResult,
+  PartDetail,
+  SourcedField,
+  StagingCandidate,
+} from "../api/types";
 import { useEnrichLookup, useSettings } from "../api/queries";
 import { useCapture } from "../lib/capture";
 import { useAddPart } from "../lib/addPart";
@@ -28,7 +33,8 @@ import { BulkImportSection } from "../components/BulkImportSection";
 import { CandidateCard } from "../components/CandidateCard";
 import { EnrichStages } from "../components/EnrichStages";
 import { PassiveAddSection } from "../components/PassiveAddSection";
-import { PhotoTrigger, productPhotoUrl } from "../components/ProductPhoto";
+import { PhotoTrigger } from "../components/ProductPhoto";
+import { productPhotoUrl } from "../components/partPhotos";
 import { PulledDepth } from "../components/PulledDepth";
 import {
   discardIntakeDraft,
@@ -134,11 +140,6 @@ export function IngestPage() {
   const lastCommittedPart = useRef<PartDetail | null>(null);
   // Copy layer: strings that fire from callbacks/attributes resolve here (stable hook order);
   // everything visible below is a <Text> so the whole window is dev-mode editable.
-  const inputAria = useText("ingest.input-aria", "Product link or part number");
-  const inputPlaceholder = useText(
-    "ingest.input-placeholder",
-    "https://www.mouser.com/ProductDetail/... or ERJ-P03F1101V",
-  );
   const toastNothing = useText(
     "ingest.toast-nothing",
     "Nothing came back. The page might have blocked the fetch, or the link is not a product page.",
@@ -324,69 +325,14 @@ export function IngestPage() {
   return (
     <div data-dev-id="ingest.root" className="flex flex-col gap-5">
       {/* One network-first entry: exact identity before any CAD acquisition. */}
-      <div data-dev-id="ingest.hero">
-        <Eyebrow className="mb-2">
-          <Text id="ingest.source-eyebrow">Source</Text>
-        </Eyebrow>
-        <div className="flex items-center gap-2.5">
-          <input
-            data-dev-id="ingest.input"
-            aria-label={inputAria}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") lookUp();
-            }}
-            placeholder={inputPlaceholder}
-            disabled={looking}
-            className="h-[34px] min-w-0 flex-1 rounded-control border border-line2 bg-field px-3 text-sm text-t1 outline-none transition-colors focus:border-acc disabled:opacity-50"
-          />
-          <Button
-            data-dev-id="ingest.lookup"
-            variant="accent"
-            onClick={lookUp}
-            disabled={looking || !input.trim()}
-            className="flex-none px-4"
-          >
-            {looking ? (
-              <Text id="ingest.lookup-busy">Looking Up...</Text>
-            ) : (
-              <Text id="ingest.lookup-label">Look Up</Text>
-            )}
-          </Button>
-        </div>
-        <p className="mt-2 text-xs text-t3">
-          <Text id="ingest.hero-hint">
-            An MPN or distributor link retains available metadata, datasheet, provenance, and source
-            disagreements. Qualified passives need no provider download.
-          </Text>
-        </p>
-        {looking ? (
-          <div data-dev-id="ingest.stages" className="mt-3.5">
-            <EnrichStages progress={enrich.progress} />
-          </div>
-        ) : !result ? (
-          <>
-            {/* The only non-passive path: identity first, then one coherent network set. */}
-            <div
-              data-dev-id="ingest.path"
-              className="mt-3.5 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-control border border-line bg-raise px-3 py-2.5"
-            >
-              <PathStep n={1}>
-                <Text id="ingest.path-pull">Resolve Identity + Data</Text>
-              </PathStep>
-              <PathArrow />
-              <PathStep n={2}>
-                <Text id="ingest.path-add">Add Once</Text>
-              </PathStep>
-              <PathArrow />
-              <PathStep n={3}>
-                <Text id="ingest.path-capture">Collect One KiCad + Altium + STEP Package</Text>
-              </PathStep>
-            </div>
-          </>
-        ) : null}
-      </div>
+      <LookupHero
+        input={input}
+        onInput={setInput}
+        onLookUp={lookUp}
+        looking={looking}
+        progress={enrich.progress}
+        showPath={!result}
+      />
 
       {result && plan ? (
         <Card data-dev-id="ingest.passive" className="px-4 py-4">
@@ -405,45 +351,7 @@ export function IngestPage() {
       ) : null}
 
       {blockedFetch ? (
-        <Card data-dev-id="ingest.blocked" className="px-4 py-4">
-          <div className="flex flex-col gap-3">
-            <span className="text-sm text-warn">
-              {blockedKeyVendor === "mouser" ? (
-                <Text id="ingest.blocked-mouser-key">
-                  Nothing was pulled, and no Mouser API key is set. Mouser blocks the page fetch, so
-                  the key is what resolves a Mouser link reliably. Add one in Settings under
-                  Sourcing, then look this up again.
-                </Text>
-              ) : blockedKeyVendor === "digikey" ? (
-                <Text id="ingest.blocked-digikey-key">
-                  Nothing was pulled, and no DigiKey API key is set. DigiKey blocks the page fetch,
-                  so the key is what resolves a DigiKey link reliably. Add one in Settings under
-                  Sourcing, then look this up again.
-                </Text>
-              ) : (
-                <>
-                  {isUrl(lookedUpInput) ? (
-                    <Text id="ingest.blocked-msg">
-                      Nothing was pulled. The page might have blocked the fetch, or the link is not
-                      a product page. Use the exact manufacturer part number or a different product
-                      link.
-                    </Text>
-                  ) : (
-                    <>
-                      <Text id="ingest.blocked-exact">
-                        No exact manufacturer and part-number match was proven for
-                      </Text>{" "}
-                      <span className="font-mono text-t1">{lookedUpInput}</span>
-                      <Text id="ingest.blocked-exact-suffix">
-                        . Stockroom rejected near matches and will not add a blank replacement.
-                      </Text>
-                    </>
-                  )}
-                </>
-              )}
-            </span>
-          </div>
-        </Card>
+        <BlockedFetchCard vendor={blockedKeyVendor} lookedUpInput={lookedUpInput} />
       ) : null}
 
       {staged && staged.length > 0 ? (
@@ -468,32 +376,7 @@ export function IngestPage() {
         </div>
       ) : null}
 
-      {nonPassive ? (
-        <Card data-dev-id="ingest.nonpassive" className="px-4 py-4">
-          <div className="flex flex-col gap-3">
-            <div className="flex items-center gap-2 text-sm text-t2">
-              <Badge tone="neutral">
-                <Text id="ingest.needs-files">Automatic Source Ladder</Text>
-              </Badge>
-              <span>
-                <Text id="ingest.needs-msg">
-                  Add it once; Stockroom reuses verified evidence, searches eligible providers in
-                  trust order, retains fallbacks, and activates one same-download KiCad + Altium +
-                  STEP package.
-                </Text>
-              </span>
-            </div>
-            <PulledSummary result={result} />
-            <p className="text-xs text-t3">
-              <Text id="ingest.network-only">
-                The same STEP is linked in KiCad and embedded in the Altium footprint. Identity-only
-                sources may contribute data but never active CAD; a visible provider window pauses
-                only for an account or security gate, or an explicit download choice.
-              </Text>
-            </p>
-          </div>
-        </Card>
-      ) : null}
+      {nonPassive ? <NonPassiveCard result={result} /> : null}
 
       {/* The many-at-once lane, below the one-at-a-time lane it complements: the single-part
           flow stays the focal point of the page, and a whole sourcing document lands here. */}
@@ -502,8 +385,171 @@ export function IngestPage() {
   );
 }
 
+
+// The page's one network-first entry: the link/MPN field, the Look Up action, and either the
+// live enrichment stages or the three-step path the flow is about to take.
+function LookupHero({
+  input,
+  onInput,
+  onLookUp,
+  looking,
+  progress,
+  showPath,
+}: {
+  input: string;
+  onInput: (value: string) => void;
+  onLookUp: () => void;
+  looking: boolean;
+  progress: React.ComponentProps<typeof EnrichStages>["progress"];
+  showPath: boolean;
+}) {
+  const inputAria = useText("ingest.input-aria", "Product link or part number");
+  const inputPlaceholder = useText(
+    "ingest.input-placeholder",
+    "https://www.mouser.com/ProductDetail/... or ERJ-P03F1101V",
+  );
+  return (
+    <div data-dev-id="ingest.hero">
+      <Eyebrow className="mb-2">
+        <Text id="ingest.source-eyebrow">Source</Text>
+      </Eyebrow>
+      <div className="flex items-center gap-2.5">
+        <input
+          data-dev-id="ingest.input"
+          aria-label={inputAria}
+          value={input}
+          onChange={(e) => onInput(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") onLookUp();
+          }}
+          placeholder={inputPlaceholder}
+          disabled={looking}
+          className="h-[34px] min-w-0 flex-1 rounded-control border border-line2 bg-field px-3 text-sm text-t1 outline-none transition-colors focus:border-acc disabled:opacity-50"
+        />
+        <Button
+          data-dev-id="ingest.lookup"
+          variant="accent"
+          onClick={onLookUp}
+          disabled={looking || !input.trim()}
+          className="flex-none px-4"
+        >
+          {looking ? (
+            <Text id="ingest.lookup-busy">Looking Up...</Text>
+          ) : (
+            <Text id="ingest.lookup-label">Look Up</Text>
+          )}
+        </Button>
+      </div>
+      <p className="mt-2 text-xs text-t3">
+        <Text id="ingest.hero-hint">
+          An MPN or distributor link retains available metadata, datasheet, provenance, and source
+          disagreements. Qualified passives need no provider download.
+        </Text>
+      </p>
+      {looking ? (
+        <div data-dev-id="ingest.stages" className="mt-3.5">
+          <EnrichStages progress={progress} />
+        </div>
+      ) : showPath ? (
+        <>
+          {/* The only non-passive path: identity first, then one coherent network set. */}
+          <div
+            data-dev-id="ingest.path"
+            className="mt-3.5 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-control border border-line bg-raise px-3 py-2.5"
+          >
+            <PathStep n={1}>
+              <Text id="ingest.path-pull">Resolve Identification + Data</Text>
+            </PathStep>
+            <PathArrow />
+            <PathStep n={2}>
+              <Text id="ingest.path-add">Add Once</Text>
+            </PathStep>
+            <PathArrow />
+            <PathStep n={3}>
+              <Text id="ingest.path-capture">Collect One KiCad + Altium + STEP Package</Text>
+            </PathStep>
+          </div>
+        </>
+      ) : null}
+    </div>
+  );
+}
+
+// Why a look up came back with nothing: a missing distributor credential the page fetch needs,
+// or an input that proved no exact manufacturer + part-number match.
+function BlockedFetchCard({
+  vendor,
+  lookedUpInput,
+}: {
+  vendor: string | null;
+  lookedUpInput: string;
+}) {
+  return (
+    <Card data-dev-id="ingest.blocked" className="px-4 py-4">
+      <div className="flex flex-col gap-3">
+        <span className="text-sm text-warn">
+          {vendor === "mouser" ? (
+            <Text id="ingest.blocked-mouser-key">Nothing was pulled, and no Mouser API credential is set. Mouser blocks the page fetch, so the credential is what makes a Mouser link resolve. Add one in Settings under Sourcing, then look this up again.</Text>
+          ) : vendor === "digikey" ? (
+            <Text id="ingest.blocked-digikey-key">Nothing was pulled, and no DigiKey API credential is set. DigiKey blocks the page fetch, so the credential is what makes a DigiKey link resolve. Add one in Settings under Sourcing, then look this up again.</Text>
+          ) : (
+            <>
+              {isUrl(lookedUpInput) ? (
+                <Text id="ingest.blocked-msg">
+                  Nothing was pulled. The page might have blocked the fetch, or the link is not
+                  a product page. Use the exact manufacturer part number or a different product
+                  link.
+                </Text>
+              ) : (
+                <>
+                  <Text id="ingest.blocked-exact">
+                    No exact manufacturer and part-number match was proven for
+                  </Text>{" "}
+                  <span className="font-mono text-t1">{lookedUpInput}</span>
+                  <Text id="ingest.blocked-exact-suffix">
+                    . Stockroom rejected near matches and will not add a blank replacement.
+                  </Text>
+                </>
+              )}
+            </>
+          )}
+        </span>
+      </div>
+    </Card>
+  );
+}
+
+// What happens next for a part that needs real CAD assets, plus everything the pull returned.
+function NonPassiveCard({ result }: { result: EnrichmentResult }) {
+  return (
+    <Card data-dev-id="ingest.nonpassive" className="px-4 py-4">
+      <div className="flex flex-col gap-3">
+        <div className="flex items-center gap-2 text-sm text-t2">
+          <Badge tone="neutral">
+            <Text id="ingest.needs-files">Automatic Source Ladder</Text>
+          </Badge>
+          <span>
+            <Text id="ingest.needs-msg">
+              Add it once; Stockroom reuses validated evidence, searches eligible providers in
+              trust order, retains fallbacks, and activates one same-download KiCad + Altium +
+              STEP package.
+            </Text>
+          </span>
+        </div>
+        <PulledSummary result={result} />
+        <p className="text-xs text-t3">
+          <Text id="ingest.network-only">The same STEP is linked in KiCad and embedded in the Altium footprint. Identification-alone sources can contribute data but never active CAD; a visible provider window pauses just for an account gate, a protection challenge, or an explicit download choice.</Text>
+        </p>
+      </div>
+    </Card>
+  );
+}
+// A detached copy of one spec/alternate/conflict value for the draft. Every caller passes a value
+// that came off the wire as JSON, so there is no Date, Map, function, NaN, or Infinity for a
+// re-serializing clone to have rewritten - structuredClone copies the same shape without the
+// stringify/parse round trip.
 function jsonValue(value: unknown): JsonValue {
-  return JSON.parse(JSON.stringify(value)) as JsonValue;
+  return structuredClone(value) as JsonValue;
 }
 
 function networkInput(value: string): IntakeDraftNetworkInput {
@@ -692,19 +738,15 @@ function PulledSummary({ result }: { result: EnrichmentResult }) {
 function PulledSpecTable({ result }: { result: EnrichmentResult }) {
   const pulledSpecsLabel = useText("ingest.pulled-specs-label", "Pulled Specs");
   const conflicts = result.spec_conflicts ?? {};
-  const specRows = Object.entries(result.specs)
-    .filter(
-      ([k, v]) =>
-        !SPEC_HIDDEN_KEYS.has(k) &&
-        k !== "product_url" &&
-        v != null &&
-        String(v.value ?? "").trim() !== "",
-    )
-    .map(([k, v]) => ({
-      key: k,
-      value: String(v?.value ?? ""),
-      conflict: conflicts[k],
-    }));
+  // one pass: a shown key is selected and projected together, rather than walking the spec bag
+  // once to drop the hidden/empty keys and again to build the rows
+  const specRows: { key: string; value: string; conflict: SourcedField[] | undefined }[] = [];
+  for (const [k, v] of Object.entries(result.specs)) {
+    if (SPEC_HIDDEN_KEYS.has(k) || k === "product_url" || v == null) continue;
+    const value = String(v.value ?? "");
+    if (value.trim() === "") continue;
+    specRows.push({ key: k, value, conflict: conflicts[k] });
+  }
   const datasheet = sv(result.datasheet_url);
   if (specRows.length === 0 && !datasheet) return null;
   return (
@@ -743,8 +785,13 @@ function PulledSpecTable({ result }: { result: EnrichmentResult }) {
               <span className="text-t3">{r.key}</span>
               {r.conflict && r.conflict.length > 1 ? (
                 <span className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-t1">
+                  {/* A conflict list never records a value it already holds, so the value is the
+                      entry's id. */}
                   {r.conflict.map((s, i) => (
-                    <span key={i} className="inline-flex items-baseline gap-1">
+                    <span
+                      key={`${s.source}|${String(s.value ?? "")}`}
+                      className="inline-flex items-baseline gap-1"
+                    >
                       {i > 0 ? (
                         <span aria-hidden="true" className="text-t3">
                           ·

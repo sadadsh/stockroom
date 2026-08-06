@@ -10,7 +10,7 @@
 import { useState } from "react";
 import { Button, Card, Eyebrow } from "./primitives";
 import { useCompleteOnboarding, useSetLibrary } from "../api/queries";
-import { Text, useText } from "../lib/copy";
+import { Text, useCopyFormatter, useText } from "../lib/copy";
 import { useToast } from "../lib/toast";
 import { ApiError } from "../api/client";
 import type { OnboardingStatus, SetLibraryBody } from "../api/types";
@@ -40,11 +40,23 @@ export function OnboardingGate({ status }: { status: OnboardingStatus }) {
   // wording is editable. The doubled backslashes are the literal characters the field shows.
   const openPathPlaceholder = useText(
     "onboarding.open-path-placeholder",
-    "C:\\\\Users\\\\you\\\\stockroom-components",
+    "C:\\\\Users\\\\name\\\\stockroom-components",
   );
   const cloneUrlPlaceholder = useText(
     "onboarding.clone-url-placeholder",
-    "https://github.com/you/stockroom-components.git",
+    "https://github.com/team/stockroom-components.git",
+  );
+  // The mutation callbacks below run outside render, so the sentences they toast are resolved here.
+  // The checkout path is DATA and rides in through a placeholder rather than being concatenated;
+  // an ApiError's own message is a backend diagnostic and is toasted exactly as it arrived.
+  const continueFailed = useText("onboarding.toast-continue-failed", "Could not continue");
+  const libraryPrepared = useCopyFormatter(
+    "onboarding.toast-prepared",
+    "Components prepared at {root}",
+  );
+  const setupFailed = useText(
+    "onboarding.toast-setup-failed",
+    "Could not set up the components",
   );
 
   // Each mode has its own required field: open needs a path, clone needs a URL; create
@@ -57,8 +69,7 @@ export function OnboardingGate({ status }: { status: OnboardingStatus }) {
 
   function continueWithDefault() {
     complete.mutate(undefined, {
-      onError: (e) =>
-        toast(e instanceof ApiError ? e.message : "Could not continue", "err"),
+      onError: (e) => toast(e instanceof ApiError ? e.message : continueFailed, "err"),
     });
   }
 
@@ -71,9 +82,8 @@ export function OnboardingGate({ status }: { status: OnboardingStatus }) {
           ? { mode, path: path.trim() || undefined }
           : { mode, url: url.trim(), dest: dest.trim() || undefined };
     setLibrary.mutate(body, {
-      onSuccess: (s) => toast(`Components ready at ${s.libraries_root}`, "ok"),
-      onError: (e) =>
-        toast(e instanceof ApiError ? e.message : "Could not set up your components", "err"),
+      onSuccess: (s) => toast(libraryPrepared({ root: s.libraries_root }), "ok"),
+      onError: (e) => toast(e instanceof ApiError ? e.message : setupFailed, "err"),
     });
   }
 
@@ -87,10 +97,7 @@ export function OnboardingGate({ status }: { status: OnboardingStatus }) {
           <Text id="onboarding.title">Set Up Your Components</Text>
         </h1>
         <p className="mt-2 text-sm text-t2">
-          <Text id="onboarding.lede">
-            Your components live in a git repository with one JSON record per part and their shared
-            library assets. Tell Stockroom where that repository lives to get started.
-          </Text>
+          <Text id="onboarding.lede">The components live in a Git checkout with one JSON record per part and their shared catalog assets. Tell Stockroom where that checkout lives to get started.</Text>
         </p>
 
         <div className="mt-5 grid grid-cols-3 gap-2">
@@ -184,7 +191,11 @@ export function OnboardingGate({ status }: { status: OnboardingStatus }) {
             <Text id="onboarding.continue-default">Continue with the Default</Text>
           </button>
           <Button variant="accent" onClick={submit} disabled={!canSubmit}>
-            {busy ? "Working..." : "Set Up Components"}
+            {busy ? (
+              <Text id="onboarding.submit-busy">Working...</Text>
+            ) : (
+              <Text id="onboarding.submit">Set Up Components</Text>
+            )}
           </Button>
         </div>
 

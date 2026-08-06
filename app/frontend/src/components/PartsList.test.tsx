@@ -2,7 +2,8 @@ import { useState } from "react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { PartSummary } from "../api/types";
-import { partAttention, PartsList } from "./PartsList";
+import { PartsList } from "./PartsList";
+import { partAttention } from "./partAttention";
 
 const FIXTURE_VIEWPORT_HEIGHT = 640;
 // Count budget for a measured 640px list viewport: ~14 visible mixed-height items plus eight
@@ -360,8 +361,11 @@ describe("PartsList virtualization", () => {
     render(<StatefulHarness fixture={fixture} onSelect={onSelect} />);
 
     const first = screen.getByRole("button", { name: /Part 0000/ });
-    expect(first).toHaveAttribute("aria-setsize", "1000");
-    expect(first).toHaveAttribute("aria-posinset", "1");
+    // Deliberately NOT aria-setsize / aria-posinset: `role="button"` ignores both, so asserting
+    // them asserted a promise the accessibility tree never saw. Conveying "row N of M" for the
+    // virtualized list needs real listbox semantics on the picker, tracked separately.
+    expect(first).not.toHaveAttribute("aria-setsize");
+    expect(first).not.toHaveAttribute("aria-posinset");
     first.focus();
 
     await userEvent.keyboard("{ArrowDown}");

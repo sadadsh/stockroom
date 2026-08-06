@@ -7,6 +7,7 @@ import { Badge, Button, EmptyState, ErrorState, LoadingState, RouteHeader } from
 import { useToast } from "../../lib/toast";
 import { Text, useText } from "../../lib/copy";
 import { pickHostFolder } from "../../lib/hostFolderPicker";
+import { useModalDismiss } from "../../lib/useModalDismiss";
 
 const INPUT =
   "h-9 w-full rounded-control border border-line bg-field px-3 text-sm text-t1 outline-none " +
@@ -209,7 +210,7 @@ export function ProjectPicker({
                         <span aria-hidden className="text-line2">
                           ·
                         </span>
-                        <span className={project.has_git ? "text-2xs text-ok" : "text-2xs text-warn"}>
+                        <span className={project.has_git ? "text-2xs text-ok-text" : "text-2xs text-warn"}>
                           {project.has_git ? gitLabel : localLabel}
                         </span>
                       </span>
@@ -238,6 +239,13 @@ function LinkProjectDialog({
   onClose: () => void;
   onLinked: (id: string) => void;
 }) {
+  // The stack, not a hand-rolled overlay. This window declared `role="dialog" aria-modal` while
+  // answering no Escape, trapping no Tab, restoring no focus on close, and pinning itself at a
+  // fixed z-[90] - so it could open behind a modal that raised it and let a keyboard user walk
+  // straight out of it into the inert page behind the scrim. Every sibling window here already
+  // goes through `useModalDismiss`; this one now does too.
+  const { ref: dialogRef, zIndex } = useModalDismiss(true, onClose);
+  const folderInputRef = useRef<HTMLInputElement>(null);
   const [folder, setFolder] = useState("");
   const [choice, setChoice] = useState<DiscoveredProject | null>(null);
   const discover = useDiscoverProjects();
@@ -247,7 +255,7 @@ function LinkProjectDialog({
   const closeLabel = useText("projects.picker.dialog-close", "Close");
   const folderPlaceholder = useText(
     "projects.picker.folder-placeholder",
-    "Project or repository folder",
+    "Project or Git checkout folder",
   );
   const detectedLabel = useText("projects.picker.detected-aria", "Detected projects");
   const linkFailed = useText("projects.picker.toast-link-failed", "Could not link project");
@@ -256,6 +264,12 @@ function LinkProjectDialog({
   const boardsLabel = useText("projects.boards", "boards");
   const schematicLabel = useText("projects.schematic", "schematic");
   const schematicsLabel = useText("projects.schematics", "schematics");
+
+  // Declared AFTER useModalDismiss so it runs after the hook's own focus move: the field the
+  // window exists to fill keeps the focus it had through `autoFocus`, rather than the dialog frame.
+  useEffect(() => {
+    folderInputRef.current?.focus();
+  }, []);
 
   useEffect(() => {
     if (results.length === 1) {
@@ -307,17 +321,20 @@ function LinkProjectDialog({
 
   return (
     <div
-      className="fixed inset-0 z-[90] flex items-center justify-center bg-scrim p-5"
+      style={{ zIndex }}
+      className="fixed inset-0 flex items-center justify-center bg-scrim p-5"
       role="presentation"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}
     >
       <section
+        ref={dialogRef}
+        tabIndex={-1}
         role="dialog"
         aria-modal="true"
         aria-labelledby="link-project-title"
-        className="w-full max-w-[620px] rounded-card border border-line bg-surface shadow-pop"
+        className="w-full max-w-[620px] rounded-card border border-line bg-surface shadow-pop outline-none"
       >
         <header className="flex h-[44px] items-center border-b border-line bg-band px-4">
           <h2 id="link-project-title" className="text-sm font-semibold text-t1">
@@ -334,13 +351,11 @@ function LinkProjectDialog({
         </header>
         <div className="p-5">
           <p className="mb-4 max-w-[520px] text-sm leading-6 text-t2">
-            <Text id="projects.picker.dialog-detail">
-              Choose a project folder or repository to find KiCad and Altium projects.
-            </Text>
+            <Text id="projects.picker.dialog-detail">Choose a project folder or Git checkout to find KiCad and Altium projects.</Text>
           </p>
           <div className="flex gap-2">
             <input
-              autoFocus
+              ref={folderInputRef}
               value={folder}
               onChange={(event) => setFolder(event.target.value)}
               onKeyDown={(event) => {

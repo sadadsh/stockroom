@@ -49,7 +49,7 @@ export function CadVariantSection({
         tone="error"
         action={
           <Button type="button" small onClick={() => void inventory.refetch()}>
-            <Text id="detail.cad-variants.retry">Try Again</Text>
+            <Text id="detail.cad-variants.retry">Rerun</Text>
           </Button>
         }
       />
@@ -98,7 +98,7 @@ function VariantState({
           <div className={EYEBROW_DENSE}>
             <Text id="cad.variant.state-title">CAD Variants</Text>
           </div>
-          <p className={`mt-1 text-2xs ${tone === "error" ? "text-err" : "text-t2"}`}>
+          <p className={`mt-1 text-2xs ${tone === "error" ? "text-err-text" : "text-t2"}`}>
             {message}
           </p>
         </div>

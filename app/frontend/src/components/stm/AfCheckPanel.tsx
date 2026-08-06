@@ -1,32 +1,16 @@
 /**
- * AfCheckPanel + buildAssignments: verify a set's proposed reconcile assignments for AF conflicts
- * (COMPAT reconcile support), extracted from CompatibilityWorkbench so the Bench redesign stays
- * readable. The held assignment is derived from the union in React state and posted to the pure
+ * AfCheckPanel: verify a set's proposed reconcile assignments for AF conflicts (COMPAT reconcile
+ * support), extracted from CompatibilityWorkbench so the Bench redesign stays readable. The held
+ * assignment (./afAssignments) is derived from the union in React state and posted to the pure
  * af-check read; nothing is persisted or written back (CONTEXT decision 8).
  */
 import { useEffect, useMemo, useState } from "react";
 import { useStmAfCheck } from "../../api/stmQueries";
 import { ApiError } from "../../api/client";
-import type { AfCheckBody, UnionDTO } from "../../api/types";
+import type { UnionDTO } from "../../api/types";
 import { Badge, Button, Card, Eyebrow } from "../primitives";
 import { Text, useText } from "../../lib/copy";
-
-// The per-ref assignment the union's reconcile proposes: for each part, the position -> { signal,
-// af_index } swaps that make it carry the union's required signals. Derived purely from the union
-// result already in React state, never persisted (CONTEXT decision 8) - the input to an af-check.
-export function buildAssignments(union: UnionDTO): Record<string, AfCheckBody["assignment"]> {
-  const byRef: Record<string, AfCheckBody["assignment"]> = {};
-  for (const pos of union.positions) {
-    if (!pos.reconcile?.swappable) continue;
-    for (const swap of pos.reconcile.swaps) {
-      (byRef[swap.ref] ??= {})[pos.position] = {
-        signal: swap.target_signal,
-        af_index: swap.via_af_index,
-      };
-    }
-  }
-  return byRef;
-}
+import { buildAssignments } from "./afAssignments";
 
 // AfCheckPanel: verify a part's proposed reconcile assignment for conflicts (COMPAT reconcile
 // support). The held assignment is derived from the union in state and posted to the pure af-check
@@ -94,14 +78,17 @@ export function AfCheckPanel({ union }: { union: UnionDTO }) {
 
       {afCheck.isSuccess ? (
         conflicts.length === 0 ? (
-          <p className="text-xs text-ok" data-testid="af-check-clean">
+          <p className="text-xs text-ok-text" data-testid="af-check-clean">
             <Text id="stm.af.check.clean">No conflicts for this assignment.</Text>
           </p>
         ) : (
           <ul className="flex flex-col gap-1.5" data-testid="af-check-conflicts">
-            {conflicts.map((c, i) => (
+            {/* af_conflicts emits at most one conflict per assigned position and one per
+                (peripheral, signal) double claim, and each message names that position or pair, so
+                the message is the conflict's id. */}
+            {conflicts.map((c) => (
               <li
-                key={`${c.kind}-${i}`}
+                key={c.message}
                 className="flex flex-col gap-0.5 rounded-control bg-raise2 px-3 py-2"
               >
                 <div className="flex items-center gap-2">
@@ -122,7 +109,7 @@ export function AfCheckPanel({ union }: { union: UnionDTO }) {
           <Text id="stm.af.check.not-built">Build the index to check for conflicts.</Text>
         </p>
       ) : afCheck.isError ? (
-        <p className="text-xs text-err">
+        <p className="text-xs text-err-text">
           <Text id="stm.af.check.failed">Could not check the assignment.</Text>
         </p>
       ) : (

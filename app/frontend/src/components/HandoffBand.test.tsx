@@ -8,7 +8,8 @@
  */
 import { describe, expect, it } from "vitest";
 import { render, screen } from "@testing-library/react";
-import { BAND_ORDER, HandoffBand, handoffFields } from "./HandoffBand";
+import { HandoffBand } from "./HandoffBand";
+import { BAND_ORDER, handoffFields } from "./handoffFields";
 import { EDA_DATA_FIELDS } from "../lib/edaRegistry.generated";
 import type { DeepPartial } from "fishery";
 import type { PartDetail } from "../api/types";
@@ -101,7 +102,7 @@ describe("HandoffBand", () => {
     // Category reaches Altium alone, so it is badged. MPN reaches both, so badging it would be
     // eight identical badges saying nothing.
     const category = document.querySelector(devIdSelector(instanceDevId("detail.handoff-field", "category")))!;
-    expect(category.textContent).toContain("Altium Designer only");
+    expect(category.textContent).toContain("Altium Designer alone");
     const mpn = document.querySelector(devIdSelector(instanceDevId("detail.handoff-field", "mpn")))!;
     expect(mpn.textContent).not.toContain("Altium Designer");
     expect(mpn.textContent).not.toContain("KiCad");

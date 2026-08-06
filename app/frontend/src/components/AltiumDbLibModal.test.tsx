@@ -70,11 +70,15 @@ describe("AltiumDbLibModal - copy + icon adoption", () => {
     vi.spyOn(api, "altiumStatus").mockResolvedValue(STATUS);
     const { container } = render(<AltiumDbLibModal open onClose={() => {}} />, { wrapper });
 
-    expect(await screen.findByText("Altium Database Library")).toBeInTheDocument();
+    expect(await screen.findByText("Altium Database Catalog")).toBeInTheDocument();
     expect(await screen.findByText("Needs Files")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /attach/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
-    expect(container.querySelectorAll("svg")).toHaveLength(1);
+    // TWO: the modal's own close glyph, plus the warning triangle the `Needs Files` status draws
+    // beside itself. The warning tier is a NEUTRAL now (see styles/index.css), so the triangle is
+    // what marks a warning rather than the colour - which is why a status can no longer be counted
+    // as carrying no glyph.
+    expect(container.querySelectorAll("svg")).toHaveLength(2);
 
     // Off dev mode a <Text> is a bare string with no wrapper: no editable copy targets exist.
     expect(container.querySelector("[data-copy-id]")).toBeNull();
@@ -83,7 +87,7 @@ describe("AltiumDbLibModal - copy + icon adoption", () => {
   it("wraps every label as an editable data-copy-id target in dev mode", async () => {
     vi.spyOn(api, "altiumStatus").mockResolvedValue(STATUS);
     const { container } = render(<AltiumDbLibModal open onClose={() => {}} />, { wrapper });
-    await screen.findByText("Altium Database Library");
+    await screen.findByText("Altium Database Catalog");
 
     toggleDevMode();
 
@@ -103,7 +107,7 @@ describe("AltiumDbLibModal - copy + icon adoption", () => {
   it("keeps the Close button's accessible name resolved through useText", async () => {
     vi.spyOn(api, "altiumStatus").mockResolvedValue(STATUS);
     render(<AltiumDbLibModal open onClose={() => {}} />, { wrapper });
-    await screen.findByText("Altium Database Library");
+    await screen.findByText("Altium Database Catalog");
 
     // useText(modal.altium.close, "Close") resolves the label whether or not dev mode is on.
     expect(screen.getByRole("button", { name: "Close" })).toBeInTheDocument();

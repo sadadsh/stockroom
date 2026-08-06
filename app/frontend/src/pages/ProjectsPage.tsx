@@ -27,33 +27,45 @@ import {
 } from "../components/primitives";
 import { Text, useText } from "../lib/copy";
 import { readUiSession, updateUiSession } from "../lib/uiSession";
+import type { ProjectSummary } from "../api/types";
 
 type ProjectTool = "overview" | "bom" | "build" | "activity";
+
+// One stable identity for "no projects yet", so `summaries` does not become a brand-new array on
+// every render while the query is still loading - which re-ran the selection effect below on every
+// single render rather than when the project list actually changed.
+const NO_PROJECTS: ProjectSummary[] = [];
 
 export function ProjectsPage() {
   const projects = useProjects();
   const [selectedId, setSelectedId] = useState<string | null>(
     () => readUiSession().selected_ids.project,
   );
-  const summaries = projects.data ?? [];
+  const summaries = projects.data ?? NO_PROJECTS;
 
-  useEffect(() => {
-    if (readUiSession().selected_ids.project === selectedId) return;
+  // Selecting a project both moves the selection and checkpoints it in the persisted UI session.
+  // Both belong to the act of selecting: as a separate effect watching selectedId, the checkpoint
+  // re-rendered the page once more after every selection, including the auto-select below.
+  const selectProject = (id: string | null) => {
+    setSelectedId(id);
+    if (readUiSession().selected_ids.project === id) return;
     updateUiSession((snapshot) => ({
       ...snapshot,
-      selected_ids: { ...snapshot.selected_ids, project: selectedId },
+      selected_ids: { ...snapshot.selected_ids, project: id },
     }));
-  }, [selectedId]);
+  };
 
   useEffect(() => {
     if (projects.isFetching) return;
     if (!summaries.length) {
-      if (selectedId) setSelectedId(null);
+      if (selectedId) selectProject(null);
       return;
     }
     if (!selectedId || !summaries.some((project) => project.id === selectedId)) {
-      setSelectedId(summaries[0].id);
+      selectProject(summaries[0].id);
     }
+    // selectProject is re-created per render but reads only its argument and the live session.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [summaries, selectedId, projects.isFetching]);
 
   return (
@@ -63,7 +75,7 @@ export function ProjectsPage() {
         selectedId={selectedId}
         loading={projects.isLoading}
         error={projects.error}
-        onSelect={setSelectedId}
+        onSelect={selectProject}
         onRetry={() => projects.refetch()}
       />
       <main className="min-h-0 min-w-0 flex-1 overflow-hidden border-l border-line">
@@ -94,7 +106,7 @@ function SelectedProject({ projectId }: { projectId: string }) {
   const overviewLabel = useText("projects.tab.overview", "Overview");
   const bomLabel = useText("projects.tab.bom", "BOM");
   const buildLabel = useText("projects.tab.build", "Build");
-  const activityLabel = useText("projects.tab.activity", "Activity");
+  const activityLabel = useText("projects.tab.activity", "Recent Work");
   const toolsLabel = useText("projects.tabs.aria", "Project views");
   const cleanLabel = useText("projects.git.clean", "clean");
   const changedLabel = useText("projects.git.changed", "changed");
@@ -176,11 +188,11 @@ function SelectedProject({ projectId }: { projectId: string }) {
             </span>
           ) : (
             <span className="whitespace-nowrap text-2xs text-warn">
-              <Text id="projects.no-repository">No Git repository</Text>
+              <Text id="projects.no-repository">No Git checkout</Text>
             </span>
           )}
           {session ? (
-            <span className="min-w-0 truncate text-2xs text-ok">
+            <span className="min-w-0 truncate text-2xs text-ok-text">
               {session.owner} {workingLabel}
             </span>
           ) : null}
@@ -232,8 +244,8 @@ function RuntimeBadge({
   status: string;
   available: boolean;
 }) {
-  const readyLabel = useText("projects.editor-ready", "Ready");
-  const busyLabel = useText("projects.editor-busy", "Busy");
+  const readyLabel = useText("projects.editor-ready", "Free");
+  const busyLabel = useText("projects.editor-busy", "In Use");
   const neededLabel = useText("projects.editor-needed", "Needed");
   const blockedLabel = useText("projects.editor-blocked", "Blocked");
 

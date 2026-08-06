@@ -2,13 +2,8 @@ import { describe, expect, it, vi, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createElement, type ReactNode } from "react";
-import {
-  CompatibilityWorkbench,
-  benchExport,
-  benchSets,
-  packageKind,
-  packagesForScope,
-} from "./CompatibilityWorkbench";
+import { CompatibilityWorkbench } from "./CompatibilityWorkbench";
+import { benchExport, benchSets, packageKind, packagesForScope } from "./benchModel";
 import { api, ApiError } from "../../api/client";
 import type {
   FamiliesResponse,
@@ -980,7 +975,7 @@ describe("CompatibilityWorkbench (the Bench)", () => {
     await screen.findByTestId("target-package-map-svg");
 
     fireEvent.click(screen.getByText("Export"));
-    fireEvent.click(screen.getByRole("menuitem", { name: /Physical Positions/ }));
+    fireEvent.click(screen.getByRole("menuitem", { name: /Package Positions/ }));
     expect(createUrl).toHaveBeenCalledTimes(1);
     expect(click).toHaveBeenCalledTimes(1);
     vi.unstubAllGlobals();

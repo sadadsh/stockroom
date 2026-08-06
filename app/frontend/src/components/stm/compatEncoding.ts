@@ -5,8 +5,8 @@
  *
  * The tone map is frozen by CONTEXT: shared -> ok, divergent -> warn, partial -> neutral. An
  * un-swappable / blocking fact reads err. The SVG union map cannot mount the Dot span, so it paints
- * a small classification dot with TONE_VAR (the exact CSS-var tokens the Dot primitive uses), never
- * a filled pad background (VIZ-02 "color is data": the dot is the one place status color runs).
+ * its classification dot from unionClassificationHue instead, never a filled pad background
+ * (VIZ-02 "color is data": the dot is the one place status color runs).
  */
 import type { UnionPositionDTO } from "../../api/types";
 import type { BadgeTone } from "../primitives";
@@ -26,16 +26,6 @@ export const CLASSIFICATION_LABEL: Record<Classification, string> = {
   shared: "Shared",
   divergent: "Divergent",
   partial: "Partial",
-};
-
-// The Badge/Dot tones as CSS-var fills, for the SVG map's classification dot only (the Dot span
-// cannot render inside an <svg>). These are the exact tokens the Dot primitive paints with
-// (bg-ok = --c-ok, bg-warn = --c-warn, bg-t3 = --c-t3, bg-err = --c-err), kept in lockstep.
-export const TONE_VAR: Record<BadgeTone, string> = {
-  ok: "var(--c-ok)",
-  warn: "var(--c-warn)",
-  err: "var(--c-err)",
-  neutral: "var(--c-t3)",
 };
 
 export function classificationTone(c: Classification): BadgeTone {

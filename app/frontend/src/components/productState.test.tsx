@@ -102,7 +102,7 @@ describe("each product state renders itself, and says which one it is", () => {
     // A failure a person did not ask for has to announce itself.
     expect(block).toHaveAttribute("role", "alert");
 
-    const retries = within(block).getAllByRole("button", { name: "Try Again" });
+    const retries = within(block).getAllByRole("button", { name: "Rerun" });
     expect(retries).toHaveLength(1);
     await userEvent.click(retries[0]);
     expect(onRetry).toHaveBeenCalledTimes(1);
@@ -117,7 +117,7 @@ describe("each product state renders itself, and says which one it is", () => {
 
   it("renders the retry action on its own, and says so while it is running", () => {
     const { rerender } = provide(<RetryAction onRetry={() => {}} />);
-    expect(screen.getByRole("button", { name: "Try Again" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Rerun" })).toBeEnabled();
 
     rerender(
       <ThemeProvider>
@@ -126,7 +126,7 @@ describe("each product state renders itself, and says which one it is", () => {
         </DevModeProvider>
       </ThemeProvider>,
     );
-    const running = screen.getByRole("button", { name: "Retrying" });
+    const running = screen.getByRole("button", { name: "Rerunning" });
     expect(running).toBeDisabled();
     expect(running).toHaveAttribute("aria-busy", "true");
   });

@@ -93,14 +93,18 @@ export function EnrichPanel({
             disabled={running}
             onClick={() => enrich.runPart(mpn, category)}
           >
-            {running ? "Looking Up..." : "Enrich From Distributor"}
+            {running ? (
+              <Text id="enrich.lookup-busy">Looking Up...</Text>
+            ) : (
+              <Text id="enrich.lookup">Enrich From Distributor</Text>
+            )}
           </Button>
         </div>
 
         {running ? <EnrichStages progress={enrich.progress} className="mt-3.5" /> : null}
 
         {enrich.status === "error" ? (
-          <div className="mt-3 text-xs text-err">
+          <div className="mt-3 text-xs text-err-text">
             Lookup failed. {enrich.error ?? "Unknown error."}
           </div>
         ) : null}
@@ -165,11 +169,11 @@ function CandidateRow({
           </Badge>
           {already ? (
             <span className="flex-none text-xs text-t3">
-              <Text id="enrich.already-set">Already Set</Text>
+              <Text id="enrich.already-set">In Force</Text>
             </span>
           ) : (
             <Button small disabled={busy} onClick={() => onApply(value)}>
-              <Text id="enrich.apply">Apply</Text>
+              <Text id="enrich.apply">Commit</Text>
             </Button>
           )}
         </>
@@ -207,11 +211,11 @@ function PinoutRow({
       </Badge>
       {already ? (
         <span className="flex-none text-xs text-t3">
-          <Text id="enrich.already-set">Already Set</Text>
+          <Text id="enrich.already-set">In Force</Text>
         </span>
       ) : (
         <Button small disabled={busy} onClick={() => onApply(sourced)}>
-          <Text id="enrich.apply-pinout">Apply Pinout</Text>
+          <Text id="enrich.apply-pinout">Commit Pinout</Text>
         </Button>
       )}
     </div>

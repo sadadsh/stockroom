@@ -36,7 +36,7 @@ import {
   useCompletionState,
 } from "../lib/completionStore";
 import { useToast } from "../lib/toast";
-import { Text } from "../lib/copy";
+import { Text, useCopyFormatter, useText } from "../lib/copy";
 import { Badge, Button, Dot } from "./primitives";
 
 // The matrix axes, read off the requirement vocabulary the backend speaks (`<tool>_<kind>`).
@@ -71,6 +71,34 @@ export function LibraryCompletionSection() {
   const coverage = useLibraryCoverage();
   const run = useCompletionState();
   const { toast } = useToast();
+  // A toast is written from inside a callback, where a hook cannot run, so every sentence one can
+  // carry is resolved here during render. The counted form gets one id per number agreement, so a
+  // rewording owns the whole sentence rather than a noun stitched onto a number.
+  const runFailed = useText("library.completion.toast-run-failed", "The run failed.");
+  const durableFinished = useText(
+    "library.completion.toast-durable-finished",
+    "The durable completion run finished. Coverage was refreshed.",
+  );
+  const durableFailed = useText(
+    "library.completion.toast-durable-failed",
+    "The durable run failed. Rerun is available without repeating completed work.",
+  );
+  const durableCancelled = useText(
+    "library.completion.toast-durable-cancelled",
+    "The durable run was cancelled.",
+  );
+  const filedOne = useCopyFormatter(
+    "library.completion.toast-filed-one",
+    "Filed files for {count} component.",
+  );
+  const filedMany = useCopyFormatter(
+    "library.completion.toast-filed-many",
+    "Filed files for {count} components.",
+  );
+  const filedNothing = useText(
+    "library.completion.toast-filed-nothing",
+    "Nothing new could be filed.",
+  );
 
   useEffect(() => {
     void reconnectCompletion();
@@ -79,32 +107,27 @@ export function LibraryCompletionSection() {
   async function onRun() {
     const final = await startCompletion({});
     if (final.status === "error") {
-      toast(final.error ?? "The run failed.", "err");
+      toast(final.error ?? runFailed, "err");
       return;
     }
     if (final.transport === "durable") {
       if (final.status === "done") {
-        toast("The durable completion run finished. Coverage was refreshed.", "ok");
+        toast(durableFinished, "ok");
         coverage.refetch();
       } else if (final.status === "failed") {
-        toast(
-          "The durable run failed. Retry is available without repeating completed work.",
-          "err",
-        );
+        toast(durableFailed, "err");
       } else if (final.status === "cancelled") {
-        toast("The durable run was cancelled.", "neutral");
+        toast(durableCancelled, "neutral");
         coverage.refetch();
       }
       return;
     }
     const counts = final.result?.counts ?? {};
     const filled = (counts.completed ?? 0) + (counts.improved ?? 0);
-    toast(
-      filled
-        ? `Filed files for ${filled} ${filled === 1 ? "component" : "components"}.`
-        : "Nothing new could be filed.",
-      filled ? "ok" : "neutral",
-    );
+    const filedMessage = filled
+      ? (filled === 1 ? filedOne : filedMany)({ count: filled })
+      : filedNothing;
+    toast(filedMessage, filled ? "ok" : "neutral");
     coverage.refetch();
   }
 
@@ -112,11 +135,11 @@ export function LibraryCompletionSection() {
     <>
       {coverage.isLoading ? (
         <p className="py-1 text-sm text-t3">
-          <Text id="library.completion.loading">Counting what your components have...</Text>
+          <Text id="library.completion.loading">Counting what the components have...</Text>
         </p>
       ) : coverage.isError ? (
-        <p className="py-1 text-sm text-err">
-          <Text id="library.completion.error">Could not read your library.</Text>
+        <p className="py-1 text-sm text-err-text">
+          <Text id="library.completion.error">Could not read the catalog.</Text>
         </p>
       ) : coverage.data ? (
         <CoverageBody
@@ -135,7 +158,7 @@ export function LibraryCompletionSection() {
       {run.transport !== "durable" && run.status === "running" ? <LiveRun /> : null}
       {run.transport !== "durable" && run.status === "done" && run.result ? <RunReport /> : null}
       {run.transport !== "durable" && run.status === "error" && run.error ? (
-        <p className="mt-3 text-sm text-err">{run.error}</p>
+        <p className="mt-3 text-sm text-err-text">{run.error}</p>
       ) : null}
     </>
   );
@@ -158,21 +181,50 @@ function CoverageBody({
     unsourced,
   } = data;
   const allDone = total > 0 && complete === total;
+  // The two counted sentences get one id per number agreement, so a rewording owns the whole
+  // sentence rather than a noun stitched onto a number.
+  const gapOne = useCopyFormatter(
+    "library.completion.gap-one",
+    "{count} component has a gap a source ladder can attempt, {estimate}. It reuses validated evidence and works the eligible sources in order, opening each provider page in turn. Stopping and resuming repeats no settled work.",
+  );
+  const gapMany = useCopyFormatter(
+    "library.completion.gap-many",
+    "{count} components have gaps a source ladder can attempt, {estimate}. It reuses validated evidence and works the eligible sources in order, opening each provider page in turn. Stopping and resuming repeats no settled work.",
+  );
+  const unsourcedOne = useCopyFormatter(
+    "library.completion.unsourced-one",
+    "{count} component needs a file that no eligible source can provide so far.",
+  );
+  const unsourcedMany = useCopyFormatter(
+    "library.completion.unsourced-many",
+    "{count} components need files that no eligible source can provide so far.",
+  );
+  // The count keeps its own emphasis here, so the sentence begins after it rather than carrying it.
+  const assistanceOne = useText(
+    "library.completion.assistance-one",
+    "component has a gap that needs one Get Files run. Stockroom opens the provider page for each one; a person signs in where the provider asks, chooses the needed formats and downloads them, and Stockroom captures and validates each file before moving to the next source.",
+  );
+  const assistanceMany = useText(
+    "library.completion.assistance-many",
+    "components have gaps that need one Get Files run. Stockroom opens the provider page for each one; a person signs in where the provider asks, chooses the needed formats and downloads them, and Stockroom captures and validates each file before moving to the next source.",
+  );
 
   return (
     <div className="flex flex-col gap-4">
       <p className="text-base text-t2">
         {total === 0 ? (
-          "Your library has no components yet."
+          <Text id="library.completion.no-components">
+            The catalog has no components so far.
+          </Text>
         ) : allDone ? (
-          <>All {total} components have every file they need.</>
+          <Text id="library.completion.all-complete" values={{ total }}>
+            {"All {total} components hold each needed file."}
+          </Text>
         ) : (
           <>
             <span className="tnum font-medium text-t1">{complete}</span> of{" "}
             <span className="tnum">{total}</span>{" "}
-            <Text id="library.completion.have-every-file">
-              components have every file they need.
-            </Text>
+            <Text id="library.completion.have-every-file">components hold each needed file.</Text>
           </>
         )}
       </p>
@@ -189,25 +241,29 @@ function CoverageBody({
           onClick={onRun}
           disabled={running || (needsFiles === 0 && needsAssistance === 0)}
         >
-          {running ? "Filling Gaps" : "Fill Supported CAD Gaps"}
+          {running ? (
+            <Text id="library.completion.fill-running">Filling Gaps</Text>
+          ) : (
+            <Text id="library.completion.fill">Fill Supported CAD Gaps</Text>
+          )}
         </Button>
         <p className="text-sm text-t2">
           {needsFiles > 0 ? (
-            <>
-              {needsFiles} {needsFiles === 1 ? "component has a gap" : "components have gaps"} a
-              source ladder can try, {estimate(needsFiles)}. It reuses verified evidence and works
-              the eligible sources in order, opening each provider page for you. You can stop it
-              and resume without repeating settled work.
-            </>
+            (needsFiles === 1 ? gapOne : gapMany)({
+              count: needsFiles,
+              estimate: estimate(needsFiles),
+            })
           ) : total === 0 ? (
-            "Add a component first."
+            <Text id="library.completion.add-first">Add a component first.</Text>
           ) : needsAssistance > 0 ? (
-            <>
-              Every remaining gap needs a provider route. The run still settles what it can and
-              then names the component and provider for each one that needs you.
-            </>
+            <Text id="library.completion.assistance-only">
+              Each remaining gap needs a provider route. The run still settles what it can and then
+              names the component and provider for each one that needs a person.
+            </Text>
           ) : (
-            "No registered source can supply what is still missing here."
+            <Text id="library.completion.nothing-reachable">
+              No registered source can provide what is still missing here.
+            </Text>
           )}
         </p>
       </div>
@@ -215,20 +271,13 @@ function CoverageBody({
       {needsAssistance > 0 ? (
         <p className="border-l-2 border-acc pl-3 text-sm text-t2">
           <span className="tnum text-t1">{needsAssistance}</span>{" "}
-          {needsAssistance === 1
-            ? "component has a gap that needs"
-            : "components have gaps that need"}{" "}
-          one Get Files run. Stockroom opens the provider page for each one; you sign in if the
-          provider asks, choose the formats you need, and download, and Stockroom captures and
-          validates each file before moving to the next source.
+          {needsAssistance === 1 ? assistanceOne : assistanceMany}
         </p>
       ) : null}
 
       {unsourced > 0 ? (
-        <p className="border-l-2 border-line pl-3 text-sm text-t2">
-          <span className="tnum text-t2">{unsourced}</span>{" "}
-          {unsourced === 1 ? "component needs a file" : "components need files"} that neither an
-          eligible source can supply yet.
+        <p className="tnum border-l-2 border-line pl-3 text-sm text-t2">
+          {(unsourced === 1 ? unsourcedOne : unsourcedMany)({ count: unsourced })}
         </p>
       ) : null}
     </div>
@@ -251,9 +300,7 @@ function CoverageMatrix({ data }: { data: LibraryCoverage }) {
     <div className="overflow-x-auto">
       <table className="w-full min-w-[26rem] border-collapse text-sm">
         <caption className="sr-only">
-          <Text id="library.completion.matrix-caption">
-            Components holding each file, by EDA tool and asset kind
-          </Text>
+          <Text id="library.completion.matrix-caption">Components holding each file, per EDA tool and asset kind</Text>
         </caption>
         <thead>
           <tr>
@@ -375,7 +422,13 @@ function DurableRun() {
   if (!batch) {
     return (
       <div className="mt-4 flex items-center justify-between gap-3 border-t border-line pt-3">
-        <p className="text-sm text-t2">{run.error ?? "Connecting to the durable run..."}</p>
+        <p className="text-sm text-t2">
+          {run.error ?? (
+            <Text id="library.completion.durable-connecting">
+              Connecting to the durable run...
+            </Text>
+          )}
+        </p>
         {run.error ? (
           <Button small onClick={() => void reconnectCompletion()}>
             <Text id="library.completion.durable-reconnect">Reconnect</Text>
@@ -426,23 +479,40 @@ function DurableRun() {
           </Badge>
           <span className="text-sm text-t2">
             <span className="tnum">{settled}</span>
-            <span className="text-t3"> of {batch.total_items} settled</span>
+            <span className="text-t3">
+              {" "}
+              <Text id="library.completion.durable-settled" values={{ total: batch.total_items }}>
+                {"of {total} settled"}
+              </Text>
+            </span>
           </span>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {batch.actions.can_pause ? (
             <Button small onClick={() => void pauseCompletion()} disabled={pending !== null}>
-              {pending === "pause" ? "Pausing" : "Pause"}
+              {pending === "pause" ? (
+                <Text id="library.completion.durable-pause-pending">Pausing</Text>
+              ) : (
+                <Text id="library.completion.durable-pause">Pause</Text>
+              )}
             </Button>
           ) : null}
           {batch.actions.can_resume ? (
             <Button small onClick={() => void resumeCompletion()} disabled={pending !== null}>
-              {pending === "resume" ? "Resuming" : "Resume"}
+              {pending === "resume" ? (
+                <Text id="library.completion.durable-resume-pending">Resuming</Text>
+              ) : (
+                <Text id="library.completion.durable-resume">Resume</Text>
+              )}
             </Button>
           ) : null}
           {batch.actions.can_retry ? (
             <Button small onClick={() => void retryCompletion()} disabled={pending !== null}>
-              {pending === "retry" ? "Retrying" : "Retry"}
+              {pending === "retry" ? (
+                <Text id="library.completion.durable-retry-pending">Rerunning</Text>
+              ) : (
+                <Text id="library.completion.durable-retry">Rerun</Text>
+              )}
             </Button>
           ) : null}
           {batch.actions.can_cancel ? (
@@ -452,7 +522,11 @@ function DurableRun() {
               onClick={() => void cancelCompletion()}
               disabled={pending !== null}
             >
-              {pending === "cancel" ? "Cancelling" : "Cancel"}
+              {pending === "cancel" ? (
+                <Text id="library.completion.durable-cancel-pending">Cancelling</Text>
+              ) : (
+                <Text id="library.completion.durable-cancel">Cancel</Text>
+              )}
             </Button>
           ) : null}
           {run.status === "error" ? (
@@ -464,10 +538,34 @@ function DurableRun() {
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        {completed > 0 ? <Badge tone="ok">{completed} Completed</Badge> : null}
-        {failed > 0 ? <Badge tone="err">{failed} Failed</Badge> : null}
-        {blocked > 0 ? <Badge tone="warn">{blocked} Blocked</Badge> : null}
-        {cancelled > 0 ? <Badge tone="neutral">{cancelled} Cancelled</Badge> : null}
+        {completed > 0 ? (
+          <Badge tone="ok">
+            <Text id="library.completion.durable-completed" values={{ count: completed }}>
+              {"{count} Completed"}
+            </Text>
+          </Badge>
+        ) : null}
+        {failed > 0 ? (
+          <Badge tone="err">
+            <Text id="library.completion.durable-failed" values={{ count: failed }}>
+              {"{count} Failed"}
+            </Text>
+          </Badge>
+        ) : null}
+        {blocked > 0 ? (
+          <Badge tone="warn">
+            <Text id="library.completion.durable-blocked" values={{ count: blocked }}>
+              {"{count} Blocked"}
+            </Text>
+          </Badge>
+        ) : null}
+        {cancelled > 0 ? (
+          <Badge tone="neutral">
+            <Text id="library.completion.durable-cancelled-count" values={{ count: cancelled }}>
+              {"{count} Cancelled"}
+            </Text>
+          </Badge>
+        ) : null}
       </div>
 
       {batch.status === "completed" ? (
@@ -477,10 +575,7 @@ function DurableRun() {
         </p>
       ) : batch.status === "failed" ? (
         <p className="text-sm text-t3">
-          <Text id="library.completion.durable-failed-note">
-            Retry requeues only failed stages. Completed stages and their terminal evidence are
-            preserved.
-          </Text>
+          <Text id="library.completion.durable-failed-note">Rerun requeues just the failed stages. Completed stages and their terminal evidence are preserved.</Text>
         </p>
       ) : batch.status === "blocked" ? (
         <p className="text-sm text-t3">
@@ -488,7 +583,7 @@ function DurableRun() {
         </p>
       ) : null}
 
-      {run.error ? <p className="text-sm text-err">{run.error}</p> : null}
+      {run.error ? <p className="text-sm text-err-text">{run.error}</p> : null}
       {run.workflowLog.length ? (
         <ul className="max-h-40 overflow-y-auto text-xs">
           {run.workflowLog.slice(0, 40).map((event) => (
@@ -544,30 +639,62 @@ function LiveRun() {
                 <span className="font-mono text-xs text-t1">{frame.mpn || frame.part_id}</span>
               </>
             ) : (
-              "Starting..."
+              <Text id="library.completion.live-starting">Starting...</Text>
             )}
           </p>
         </div>
         <Button small onClick={() => void stopCompletion()} disabled={run.stopping}>
-          {run.stopping ? "Stopping" : "Stop"}
+          {run.stopping ? (
+            <Text id="library.completion.live-stop-pending">Stopping</Text>
+          ) : (
+            <Text id="library.completion.live-stop">Stop</Text>
+          )}
         </Button>
       </div>
       {run.live.processed > 0 ? (
         <div data-testid="completion-live-summary" className="flex flex-wrap items-center gap-2">
-          <Badge tone="neutral">{run.live.processed} Processed</Badge>
-          {liveFilled > 0 ? <Badge tone="ok">{liveFilled} Filed</Badge> : null}
-          {run.live.retained > 0 ? (
-            <Badge tone="neutral">{run.live.retained} Supplementary Retained</Badge>
+          <Badge tone="neutral">
+            <Text id="library.completion.live-processed" values={{ count: run.live.processed }}>
+              {"{count} Processed"}
+            </Text>
+          </Badge>
+          {liveFilled > 0 ? (
+            <Badge tone="ok">
+              <Text id="library.completion.live-filed" values={{ count: liveFilled }}>
+                {"{count} Filed"}
+              </Text>
+            </Badge>
           ) : null}
-          {liveDeferred > 0 ? <Badge tone="warn">{liveDeferred} To Retry</Badge> : null}
-          {liveStuck > 0 ? <Badge tone="neutral">{liveStuck} No Source</Badge> : null}
+          {run.live.retained > 0 ? (
+            <Badge tone="neutral">
+              <Text id="library.completion.live-retained" values={{ count: run.live.retained }}>
+                {"{count} Additional Retained"}
+              </Text>
+            </Badge>
+          ) : null}
+          {liveDeferred > 0 ? (
+            <Badge tone="warn">
+              <Text id="library.completion.live-deferred" values={{ count: liveDeferred }}>
+                {"{count} To Rerun"}
+              </Text>
+            </Badge>
+          ) : null}
+          {liveStuck > 0 ? (
+            <Badge tone="neutral">
+              <Text id="library.completion.live-stuck" values={{ count: liveStuck }}>
+                {"{count} No Source"}
+              </Text>
+            </Badge>
+          ) : null}
         </div>
       ) : null}
       {run.log.length ? (
         <ul className="max-h-40 overflow-y-auto text-xs">
-          {run.log.slice(0, 40).map((entry, i) => (
+          {/* One entry per part in the run, so the part IS the row's identity. The position was
+              not: the log grows while the run is live and the list is sliced to the first 40. */}
+          {run.log.slice(0, 40).map((entry) => (
             <li
-              key={`${entry.part_id}-${i}`}
+              key={entry.part_id}
               className="flex items-center gap-2 border-t border-line py-1 first:border-t-0"
             >
               <Dot tone={statusTone(entry.status)} />
@@ -630,6 +757,16 @@ function describe(status: string, satisfied: string[], retained = 0): string {
 
 function RunReport() {
   const { result } = useCompletionState();
+  // Resolved before the early return below, and before the row loop, because the two sentences a
+  // row can carry are written inside a `.map()` callback where a hook cannot run.
+  const notesAndRemaining = useCopyFormatter(
+    "library.completion.item-notes-remaining",
+    "{notes}. Still needs {remaining}",
+  );
+  const remainingOnly = useCopyFormatter(
+    "library.completion.item-remaining",
+    "still needs {remaining}",
+  );
   if (!result) return null;
   const counts = result.counts ?? {};
   const filled = (counts.completed ?? 0) + (counts.improved ?? 0);
@@ -649,16 +786,42 @@ function RunReport() {
   return (
     <div className="mt-4 flex flex-col gap-2 border-t border-line pt-3">
       <div className="flex flex-wrap items-center gap-2">
-        <Badge tone={filled ? "ok" : "neutral"}>{filled} Filed</Badge>
-        {retained > 0 ? <Badge tone="neutral">{retained} Supplementary Retained</Badge> : null}
-        {deferred > 0 ? <Badge tone="warn">{deferred} To Retry</Badge> : null}
-        {stuck > 0 ? <Badge tone="neutral">{stuck} No Source</Badge> : null}
+        <Badge tone={filled ? "ok" : "neutral"}>
+          <Text id="library.completion.report-filed" values={{ count: filled }}>
+            {"{count} Filed"}
+          </Text>
+        </Badge>
+        {retained > 0 ? (
+          <Badge tone="neutral">
+            <Text id="library.completion.report-retained" values={{ count: retained }}>
+              {"{count} Additional Retained"}
+            </Text>
+          </Badge>
+        ) : null}
+        {deferred > 0 ? (
+          <Badge tone="warn">
+            <Text id="library.completion.report-deferred" values={{ count: deferred }}>
+              {"{count} To Rerun"}
+            </Text>
+          </Badge>
+        ) : null}
+        {stuck > 0 ? (
+          <Badge tone="neutral">
+            <Text id="library.completion.report-stuck" values={{ count: stuck }}>
+              {"{count} No Source"}
+            </Text>
+          </Badge>
+        ) : null}
       </div>
       {result.stopped ? (
         <p className="text-sm text-t2">
-          {result.stop_reason
-            ? result.stop_reason
-            : "Stopped. Run it again to carry on from where it left off."}
+          {result.stop_reason ? (
+            result.stop_reason
+          ) : (
+            <Text id="library.completion.stopped">
+              Stopped. Run it again to resume from where it left off.
+            </Text>
+          )}
         </p>
       ) : null}
       {deferred > 0 && !result.stop_reason ? (
@@ -684,10 +847,13 @@ function RunReport() {
                 {item.status === "error"
                   ? item.error
                   : item.notes?.length
-                    ? `${item.notes.join("; ")}. Still needs ${item.remaining
-                        .map((r) => KIND_WORD[r] ?? r)
-                        .join(", ")}`
-                    : `still needs ${item.remaining.map((r) => KIND_WORD[r] ?? r).join(", ")}`}
+                    ? notesAndRemaining({
+                        notes: item.notes.join("; "),
+                        remaining: item.remaining.map((r) => KIND_WORD[r] ?? r).join(", "),
+                      })
+                    : remainingOnly({
+                        remaining: item.remaining.map((r) => KIND_WORD[r] ?? r).join(", "),
+                      })}
               </span>
             </li>
           ))}

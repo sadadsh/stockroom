@@ -1,6 +1,7 @@
 import { render, fireEvent } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import { Icon, sanitizeIconBody } from "./Icon";
+import { Icon } from "./Icon";
+import { sanitizeIconBody } from "./iconResolve";
 import { ThemeProvider } from "../lib/theme";
 import { DevModeProvider, useDevMode } from "../lib/devMode";
 import { ICON_BY_ID } from "../lib/iconRegistry";

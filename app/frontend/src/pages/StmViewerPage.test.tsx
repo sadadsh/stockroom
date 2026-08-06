@@ -208,7 +208,7 @@ describe("StmViewerPage", () => {
     wrap(<StmViewerPage />);
 
     // FamilyPicker (the scope column renders first; "STM32F4" also appears in the matrix Series cell)
-    expect(screen.getByText("Families")).toBeInTheDocument();
+    expect(screen.getByText("Series")).toBeInTheDocument();
     expect(screen.getAllByText("STM32F4").length).toBeGreaterThanOrEqual(1);
     // SpecMatrixTable
     expect(screen.getByText("Part")).toBeInTheDocument();
@@ -232,7 +232,7 @@ describe("StmViewerPage", () => {
     // person cannot act on.
     const failure = screen.getByText("Stockroom is not answering on this machine.");
     expect(failure.closest('[data-product-state="error"]')).not.toBeNull();
-    expect(screen.getByRole("button", { name: "Try Again" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Rerun" })).toBeInTheDocument();
     expect(screen.queryByText(/connection refused/)).toBeNull();
   });
 
@@ -300,7 +300,7 @@ describe("StmViewerPage", () => {
       expect(call[0] === null || typeof call[0] === "string").toBe(true);
     }
     // the second pad shows the power pin's supply facts
-    expect(screen.getByText("Supply")).toBeInTheDocument();
+    expect(screen.getByText("Power Domain")).toBeInTheDocument();
     expect(mockPinout.mock.calls.length).toBeGreaterThanOrEqual(callsAfterPart);
   });
 });

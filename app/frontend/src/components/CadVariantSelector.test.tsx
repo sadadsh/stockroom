@@ -193,7 +193,7 @@ describe("CadVariantSelector", () => {
       ),
     ).not.toBeInTheDocument();
     expect(
-      screen.getByText(/same-provider, same-download KiCad and Altium pair are reverified/i),
+      screen.getByText(/same-provider, same-download KiCad and Altium pair are revalidated/i),
     ).toBeInTheDocument();
   });
 
@@ -230,7 +230,7 @@ describe("CadVariantSelector", () => {
     );
 
     expect(screen.getByText(/No activatable pair is retained/i)).toBeInTheDocument();
-    expect(screen.getAllByText("Stored Only")).toHaveLength(2);
+    expect(screen.getAllByText("Stored, Not Active")).toHaveLength(2);
     expect(screen.getAllByText(/selection is not pair-active/i)).toHaveLength(2);
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
     expect(screen.queryByText("Active In Pair")).not.toBeInTheDocument();
@@ -268,7 +268,7 @@ describe("CadVariantSelector", () => {
     );
 
     const retained = screen.getByRole("region", {
-      name: "Supplementary Retained Artifacts",
+      name: "Additional Retained Artifacts",
     });
     const traceParts = within(retained).getByRole("article", {
       name: "DigiKey · TraceParts retained originals",

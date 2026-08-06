@@ -62,7 +62,7 @@ export function Finder({
   const advancedLabel = useText("components.advanced-search-label", "Advanced Search");
   const clearLabel = useText("components.clear-filters", "Clear Filters");
   const summary = useCopyFormatter("components.filter-summary", "Showing: {filters}");
-  const completeText = useText("components.filter-complete-label", "Complete Only");
+  const completeText = useText("components.filter-complete-label", "Just Complete");
   const duplicatesText = useText("components.filter-duplicates-label", "Duplicates");
   const activeSummary = [
     category ?? null,
@@ -167,7 +167,7 @@ export function Finder({
                 checked={completeOnly}
                 onChange={(e) => onCompleteOnly(e.target.checked)}
               />
-              <Text id="components.filter-complete-label">Complete Only</Text>
+              <Text id="components.filter-complete-label">Just Complete</Text>
             </label>
           </div>
 
@@ -199,7 +199,7 @@ export function Finder({
           ) : null}
 
           <div className="mb-2 mt-3 text-2xs font-semibold text-t3">
-            <Text id="components.filter-category">Category</Text>
+            <Text id="components.filter-category">Class</Text>
           </div>
           <div data-dev-id="components.filter-categories" className="max-h-64 overflow-y-auto">
             <FacetRow
@@ -219,7 +219,7 @@ export function Finder({
             ))}
             {categories.length === 0 ? (
               <div className="px-1.5 py-2 text-xs text-t3">
-                <Text id="components.filter-no-categories">No categories so far</Text>
+                <Text id="components.filter-no-categories">No classes so far</Text>
               </div>
             ) : null}
           </div>

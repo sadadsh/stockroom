@@ -238,7 +238,7 @@ describe("ComponentsPage", () => {
       const view = wrap(<ComponentsPage />);
 
       // The list is still in flight: nothing may be written into the placeholder.
-      expect(await screen.findByText("Loading this library's components...")).toBeInTheDocument();
+      expect(await screen.findByText("Loading this catalog's components...")).toBeInTheDocument();
       expect(writes).toEqual([]);
 
       scrollCeiling = 400;
@@ -273,7 +273,7 @@ describe("ComponentsPage", () => {
     );
 
     const view = wrap(<ComponentsPage />);
-    expect(await screen.findByText("Loading this library's components...")).toBeInTheDocument();
+    expect(await screen.findByText("Loading this catalog's components...")).toBeInTheDocument();
     view.unmount();
 
     expect(readUiSession().component_list_anchor).toEqual({
@@ -557,7 +557,7 @@ describe("ComponentsPage", () => {
     // it announces itself, and its message is a written sentence rather than `error.message`.
     const failure = await screen.findByText("Stockroom is not answering on this machine.");
     expect(failure.closest('[data-product-state="error"]')).not.toBeNull();
-    expect(screen.getByRole("button", { name: "Try Again" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Rerun" })).toBeInTheDocument();
   });
 });
 
@@ -729,5 +729,38 @@ describe("opening a component", () => {
     ).filter((element) => !element.closest('[role="dialog"]'));
     expect(scrollers).toHaveLength(3);
     expect(scrollers.every((element) => element.hasAttribute("data-workspace-scroll"))).toBe(true);
+  });
+
+  // The search hotkey is a document-level subscription. A page that leaves it attached after
+  // unmount keeps answering Ctrl+K against a tree that is gone, so the teardown is asserted
+  // directly: every keydown listener the page added is handed back on unmount.
+  it("removes its global search hotkey listener when it unmounts", async () => {
+    mockApi.listParts.mockResolvedValue({ parts: [SUMMARY], count: 1 });
+    mockApi.facets.mockResolvedValue(FACETS);
+    mockApi.partDossier.mockResolvedValue(
+      workspaceFor("lm358", "LM358", "Dual Operational Amplifier"),
+    );
+    mockApi.getDuplicates.mockResolvedValue({ by_mpn: [], by_footprint: [] });
+
+    const added = vi.spyOn(document, "addEventListener");
+    const removed = vi.spyOn(document, "removeEventListener");
+    const { unmount } = wrap(<ComponentsPage />);
+    await screen.findByText("LM358");
+
+    const attached = added.mock.calls
+      .filter(([type]) => type === "keydown")
+      .map(([, handler]) => handler);
+    expect(attached.length).toBeGreaterThan(0);
+
+    unmount();
+
+    const detached = removed.mock.calls
+      .filter(([type]) => type === "keydown")
+      .map(([, handler]) => handler);
+    for (const handler of attached) {
+      expect(detached).toContain(handler);
+    }
+    added.mockRestore();
+    removed.mockRestore();
   });
 });

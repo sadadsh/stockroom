@@ -125,7 +125,7 @@ describe("RescanSection", () => {
     await user.click(await screen.findByRole("button", { name: /Refresh Prices & Stock/ }));
 
     expect(
-      await screen.findByText(/already running\. Showing its live progress\./),
+      await screen.findByText(/is now running\. Showing its live progress\./),
     ).toBeInTheDocument();
   });
 

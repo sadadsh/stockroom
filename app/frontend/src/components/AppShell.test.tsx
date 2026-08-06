@@ -121,7 +121,7 @@ describe("AppShell status bar", () => {
     // screen. The identity returns the moment the standing is something a person can act on
     // (see the cases below), and otherwise lives in About and in developer mode.
     renderShell();
-    await screen.findByText("Ready");
+    await screen.findByText("Prepared");
     expect(screen.queryByRole("status")).toBeNull();
   });
 
@@ -173,7 +173,7 @@ describe("AppShell status bar", () => {
     } as never);
     renderShell();
     const status = await screen.findByRole("status", {
-      name: `running revision ${SHORT_REVISION}, Retrying…`,
+      name: `running revision ${SHORT_REVISION}, Rerunning…`,
     });
     expect(status).toBeInTheDocument();
     expect(status).not.toHaveTextContent("Current");
@@ -197,7 +197,7 @@ describe("AppShell status bar", () => {
     renderShell();
     // The library's SIZE is the count beside the picker's own title; the status bar states the
     // condition it is in instead of repeating the number.
-    expect(await screen.findByText("Ready")).toBeTruthy();
+    expect(await screen.findByText("Prepared")).toBeTruthy();
     expect(screen.queryByText("Components Loaded")).toBeNull();
   });
 
@@ -210,10 +210,10 @@ describe("AppShell status bar", () => {
     } as never);
     renderShell();
 
-    expect(await screen.findByText("Ready")).toBeTruthy();
-    const library = await screen.findByLabelText("Library: Stockroom Library");
+    expect(await screen.findByText("Prepared")).toBeTruthy();
+    const library = await screen.findByLabelText("Catalog: Stockroom Library");
     expect(library).toHaveClass("text-t2");
-    expect(library.textContent).toContain("Library:");
+    expect(library.textContent).toContain("Catalog:");
     expect(library.querySelector(".text-t1")).toHaveTextContent("Stockroom Library");
   });
 
@@ -228,7 +228,7 @@ describe("AppShell status bar", () => {
       incomplete: 0,
     } as never);
     renderShell();
-    expect(await screen.findByText("Ready")).toBeTruthy();
+    expect(await screen.findByText("Prepared")).toBeTruthy();
     expect(screen.queryByText(/1 Components/)).toBeNull();
   });
 
@@ -261,7 +261,7 @@ describe("AppShell status bar", () => {
 
   it("does not expose the retired profile switcher", async () => {
     renderShell();
-    expect(await screen.findByLabelText("Library: Stockroom Library")).toBeInTheDocument();
+    expect(await screen.findByLabelText("Catalog: Stockroom Library")).toBeInTheDocument();
     expect(screen.queryByText("Profile:")).toBeNull();
     expect(screen.queryByTestId("shell.profile-menu")).toBeNull();
   });

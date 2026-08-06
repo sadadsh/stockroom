@@ -213,7 +213,7 @@ describe("CadVariantSection", () => {
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveTextContent("The retained CAD variants could not be read.");
     expect(alert).not.toHaveTextContent("evidence store is unavailable");
-    await userEvent.click(screen.getByRole("button", { name: "Try Again" }));
+    await userEvent.click(screen.getByRole("button", { name: "Rerun" }));
     expect(await screen.findByText("4 Retained")).toBeInTheDocument();
   });
 });

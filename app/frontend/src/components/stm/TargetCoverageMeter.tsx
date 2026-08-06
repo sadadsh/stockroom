@@ -1,3 +1,4 @@
+import { useCopyFormatter } from "../../lib/copy";
 import { formatPercent } from "../../lib/stmTargetInsights";
 
 export function TargetCoverageMeter({
@@ -13,12 +14,15 @@ export function TargetCoverageMeter({
   label: string;
   compact?: boolean;
 }) {
+  // The meter's accessible name: the bar itself says nothing to a screen reader, so this is the
+  // whole reading of it. The label in the hole is the caller's; the joining word is ours.
+  const meterName = useCopyFormatter("stm.target.coverage.aria", "{label}: {value} of {total}");
   const safeTotal = Math.max(0, total);
   const safeValue = Math.max(0, Math.min(value, safeTotal));
   const width = safeTotal ? (safeValue / safeTotal) * 100 : 0;
 
   return (
-    <div aria-label={`${label}: ${safeValue} of ${safeTotal}`}>
+    <div aria-label={meterName({ label, value: safeValue, total: safeTotal })}>
       <div className="flex items-baseline justify-between gap-2">
         <span className={`${compact ? "text-2xs" : "text-xs"} text-t2`}>
           {label}

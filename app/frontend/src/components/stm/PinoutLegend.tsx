@@ -43,7 +43,7 @@ export function PinoutLegend({ pinout, highlight, onToggleHighlight }: LegendPro
   const resetLabel = useText("stm.pinout.legend.reset", "Reset");
   const debugLabel = useText("stm.pinout.legend.debug-access", "Debug access");
   const oscillatorLabel = useText("stm.pinout.legend.oscillator", "Oscillator");
-  const supplyLabel = useCopyFormatter("stm.pinout.legend.supply", "{domain} supply");
+  const supplyLabel = useCopyFormatter("stm.pinout.legend.supply", "{domain} rail");
 
   const counts = useMemo(() => {
     const by: Record<string, number> = {};
@@ -80,7 +80,7 @@ export function PinoutLegend({ pinout, highlight, onToggleHighlight }: LegendPro
       {/* Fill = category (the one saturated channel), a live filtering lens when a part is loaded */}
       <section>
         <Eyebrow className="mb-1.5">
-          <Text id="stm.pinout.legend.category">Category</Text>
+          <Text id="stm.pinout.legend.category">Class</Text>
         </Eyebrow>
         <div className="grid grid-cols-2 gap-x-3 gap-y-0.5">
           {PIN_CATEGORIES.map((cat) => {
@@ -120,7 +120,7 @@ export function PinoutLegend({ pinout, highlight, onToggleHighlight }: LegendPro
         </div>
         {pins && onToggleHighlight ? (
           <p className="mt-1 text-2xs text-t3">
-            <Text id="stm.pinout.legend.category-hint">Click a category to spotlight its pins.</Text>
+            <Text id="stm.pinout.legend.category-hint">Click a class to spotlight its pins.</Text>
           </p>
         ) : null}
       </section>

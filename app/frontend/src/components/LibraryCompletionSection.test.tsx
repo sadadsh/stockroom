@@ -144,7 +144,7 @@ describe("coverage", () => {
   it("says how many components hold every file they need", async () => {
     vi.spyOn(api, "libraryCoverage").mockResolvedValue(coverage());
     renderSection();
-    expect(await screen.findByText(/components have every file they need/i)).toBeInTheDocument();
+    expect(await screen.findByText(/components hold each needed file/i)).toBeInTheDocument();
     // 92 appears in the headline AND in the KiCad symbol cell, which is correct: the sentence
     // and the matrix are two readings of the same fact.
     expect(screen.getAllByText("92").length).toBeGreaterThan(0);
@@ -184,9 +184,9 @@ describe("coverage", () => {
     // "can be filled" would be a promise the run cannot keep: 19 of those have no catalogue
     // entry and will find nothing. The copy says what is TRIED, not what is guaranteed.
     expect(
-      await screen.findByText(/47 components have gaps a source ladder can try/i),
+      await screen.findByText(/47 components have gaps a source ladder can attempt/i),
     ).toBeInTheDocument();
-    expect(screen.getByText(/opening each provider page for you/i)).toBeInTheDocument();
+    expect(screen.getByText(/opening each provider page in turn/i)).toBeInTheDocument();
     expect(screen.getByText(/about 7 minutes/i)).toBeInTheDocument();
   });
 
@@ -202,7 +202,7 @@ describe("coverage", () => {
     vi.spyOn(api, "libraryCoverage").mockResolvedValue(coverage());
     renderSection();
     expect(
-      await screen.findByText(/neither an eligible source can supply/i),
+      await screen.findByText(/no eligible source can provide so far/i),
     ).toBeInTheDocument();
   });
 
@@ -226,7 +226,7 @@ describe("coverage", () => {
     ).toBeInTheDocument();
     expect(screen.getByText(/opens the provider page for each one/i)).toBeInTheDocument();
     expect(
-      screen.getByText(/you sign in if the provider asks, choose the formats you need/i),
+      screen.getByText(/a person signs in where the provider asks, chooses the needed formats/i),
     ).toBeInTheDocument();
     expect(screen.getAllByText("Provider")).toHaveLength(2);
     expect(screen.queryByText("No Source")).not.toBeInTheDocument();
@@ -246,7 +246,7 @@ describe("coverage", () => {
     renderSection();
 
     expect(await screen.findByRole("button", { name: "Fill Supported CAD Gaps" })).toBeEnabled();
-    expect(screen.getByText(/Every remaining gap needs a provider route/i)).toBeInTheDocument();
+    expect(screen.getByText(/Each remaining gap needs a provider route/i)).toBeInTheDocument();
   });
 
   it("disables the action when there is genuinely nothing to do", async () => {
@@ -255,7 +255,7 @@ describe("coverage", () => {
     );
     renderSection();
     expect(
-      await screen.findByText(/All 158 components have every file they need/i),
+      await screen.findByText(/All 158 components hold each needed file/i),
     ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Fill Supported CAD Gaps" })).toBeDisabled();
   });
@@ -265,13 +265,13 @@ describe("coverage", () => {
       coverage({ total: 0, complete: 0, needs_files: 0, unsourced: 0, by_requirement: {} }),
     );
     renderSection();
-    expect(await screen.findByText(/no components yet/i)).toBeInTheDocument();
+    expect(await screen.findByText(/has no components so far/i)).toBeInTheDocument();
   });
 
   it("reports a read failure instead of rendering a confident zero", async () => {
     vi.spyOn(api, "libraryCoverage").mockRejectedValue(new Error("nope"));
     renderSection();
-    expect(await screen.findByText(/Could not read your library/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Could not read the catalog/i)).toBeInTheDocument();
   });
 });
 
@@ -442,7 +442,7 @@ describe("running", () => {
     expect(
       await screen.findByText(/this status does not infer which files changed/i),
     ).toBeInTheDocument();
-    expect(screen.queryByText(/Supplementary Retained/i)).toBeNull();
+    expect(screen.queryByText(/Additional Retained/i)).toBeNull();
   });
 
   it("starts one bounded run over every component that needs files, never part by part", async () => {
@@ -627,7 +627,7 @@ describe("durable completion", () => {
     expect(screen.getByText("125 Failed")).toBeInTheDocument();
     expect(screen.getByText("100 Blocked")).toBeInTheDocument();
     expect(screen.getByText("33 Cancelled")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Retry" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Rerun" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "Cancel" })).toBeEnabled();
     expect(screen.queryByRole("button", { name: "Pause" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Resume" })).toBeNull();
@@ -753,7 +753,7 @@ describe("durable completion", () => {
     ).toBeInTheDocument();
     expect(screen.queryByText(/\d+ Filed/)).toBeNull();
 
-    await userEvent.click(await screen.findByRole("button", { name: "Retry" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Rerun" }));
     expect(api.workflowRetry).toHaveBeenCalledWith("batch-1");
     expect(await screen.findByText(/The durable workflow completed/i)).toBeInTheDocument();
     expect(api.workflowEvents).toHaveBeenLastCalledWith("batch-1", 5, 200);

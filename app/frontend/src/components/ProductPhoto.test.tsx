@@ -8,7 +8,9 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { ApiError, api } from "../api/client";
-import { PhotoCard, PhotoTrigger, ProductPhoto, partPhotos, productPhotoUrl } from "./ProductPhoto";
+import { PhotoCard, PhotoTrigger, ProductPhoto } from "./ProductPhoto";
+import { productPhotoUrl } from "./partPhotos";
+import { partPhotos } from "./partPhotos";
 
 vi.mock("../api/client", async (importActual) => {
   const actual = await importActual<typeof import("../api/client")>();
@@ -79,6 +81,30 @@ describe("ProductPhoto", () => {
       expect(screen.queryByRole("img")).toBeNull();
       expect(screen.getByText("glyph")).toBeInTheDocument();
     });
+  });
+
+  it("starts the next part's photo on the direct lane, never on the failed one", async () => {
+    const other = "https://mm.digikey.com/Images/other.jpg";
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const { rerender } = render(
+      <QueryClientProvider client={qc}>
+        <ProductPhoto url={URL_} alt="part photo" />
+      </QueryClientProvider>,
+    );
+    // this part's CDN refuses the hotlink, so it is now on the proxy lane
+    fireEvent.error(screen.getByRole("img", { name: "part photo" }));
+    await waitFor(() => expect(mockApi.productImage).toHaveBeenCalledWith(URL_));
+    mockApi.productImage.mockClear();
+
+    // A DIFFERENT photo is a different question: it gets the direct <img> first, with no proxy
+    // request at all. The lane verdict belongs to the url that earned it and must not be inherited.
+    rerender(
+      <QueryClientProvider client={qc}>
+        <ProductPhoto url={other} alt="part photo" />
+      </QueryClientProvider>,
+    );
+    expect(screen.getByRole("img", { name: "part photo" })).toHaveAttribute("src", other);
+    expect(mockApi.productImage).not.toHaveBeenCalled();
   });
 
   it("renders the fallback (not a broken img) when there is no url", () => {

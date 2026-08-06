@@ -124,7 +124,7 @@ describe("IconButton compact is quiet at rest", () => {
     const button = screen.getByRole("button");
     expect(button.getAttribute("data-revealed")).toBe("false");
     expect(button.className).toContain("border-transparent");
-    expect(button.className).not.toContain("text-err");
+    expect(button.className).not.toContain("text-err-text");
   });
 
   it("takes on its tone the moment it is focused", async () => {
@@ -135,7 +135,7 @@ describe("IconButton compact is quiet at rest", () => {
     await user.tab();
     const button = screen.getByRole("button");
     expect(button.getAttribute("data-revealed")).toBe("true");
-    expect(button.className).toContain("text-err");
+    expect(button.className).toContain("text-err-text");
   });
 
   it("is already wearing its tone while pending, without needing a pointer", () => {
@@ -151,6 +151,6 @@ describe("IconButton compact is quiet at rest", () => {
     );
     const button = screen.getByRole("button");
     expect(button.getAttribute("data-revealed")).toBe("true");
-    expect(button.className).toContain("text-err");
+    expect(button.className).toContain("text-err-text");
   });
 });

@@ -89,9 +89,12 @@ export function StmViewerPage() {
   // The family / line multi-select applied client-side over the fetched rows (the server narrowed
   // to at most one family; everything finer is client-side, decision 3).
   const rows = useMemo(() => {
+    // one Set per selection, so a wide matrix does not re-scan the family/line lists per row
+    const families = new Set(scope.families);
+    const lines = new Set(scope.mcus);
     let r = mcus.data?.mcus ?? [];
-    if (scope.families.length) r = r.filter((row) => scope.families.includes(row.series));
-    if (scope.mcus.length) r = r.filter((row) => scope.mcus.includes(row.line));
+    if (families.size) r = r.filter((row) => families.has(row.series));
+    if (lines.size) r = r.filter((row) => lines.has(row.line));
     return r;
   }, [mcus.data, scope.families, scope.mcus]);
 
@@ -187,19 +190,22 @@ function PinoutRegion({
 }) {
   const [view, setView] = useState<"map" | "table">("map");
   const viewAria = useText("stm.viewer.pinout-view-aria", "Pinout view");
-  // The legend's category lens: highlighted buckets dim every other pad on the map. Reset when
-  // the part changes (the lens describes the previous part's pins).
-  const [highlight, setHighlight] = useState<ReadonlySet<string>>(new Set());
-  useEffect(() => {
-    setHighlight(new Set());
-  }, [activePart]);
-  const toggleHighlight = (key: string) =>
-    setHighlight((cur) => {
-      const next = new Set(cur);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
+  // The legend's category lens: highlighted buckets dim every other pad on the map. The lens
+  // describes ONE part's pins, so it is stored WITH the part it was picked on and read back only
+  // for that part - a new part shows no lens on its first render, where a reset effect would have
+  // drawn the previous part's lens once before clearing it. The map/table choice deliberately
+  // survives a part change, so this stays a partial reset rather than a keyed remount.
+  const [lens, setLens] = useState<{ part: string | null; keys: ReadonlySet<string> }>({
+    part: activePart,
+    keys: EMPTY_HIGHLIGHT,
+  });
+  const highlight = lens.part === activePart ? lens.keys : EMPTY_HIGHLIGHT;
+  const toggleHighlight = (key: string) => {
+    const next = new Set(highlight);
+    if (next.has(key)) next.delete(key);
+    else next.add(key);
+    setLens({ part: activePart, keys: next });
+  };
 
   return (
     <div data-dev-id="stm.pinout" className="flex min-h-0 flex-1 flex-col">
@@ -285,6 +291,9 @@ function PinoutRegion({
     </div>
   );
 }
+
+// The no-lens value, kept module-level so "no highlight" is one stable identity.
+const EMPTY_HIGHLIGHT: ReadonlySet<string> = new Set<string>();
 
 const PINOUT_VIEWS = [
   { id: "map", label: "Map", copyId: "stm.viewer.view.map" },
@@ -380,7 +389,7 @@ function MatrixError({ error, onRetry }: { error: Error; onRetry: () => void }) 
   if (status === 401) {
     return (
       <ErrorState className="mt-4" id="stm.matrix-unauthorized" onRetry={onRetry}>
-        This machine is not signed in to the library.
+        This machine is not signed in to the catalog.
       </ErrorState>
     );
   }
