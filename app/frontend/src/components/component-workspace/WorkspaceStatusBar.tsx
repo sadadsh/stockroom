@@ -7,6 +7,7 @@
  * read. No counts are repeated between the two, and no commit hash appears in either.
  */
 import type { ComponentDossier } from "../../api/dossierTypes";
+import { useWorkspaceRender } from "../../layout/workspaceRenderContext";
 import { Text } from "../../lib/copy";
 import { formatCount, formatTimestamp } from "../../lib/formatValue";
 import { StatusText } from "../primitives";
@@ -16,6 +17,21 @@ import { latestCheck } from "./offerFacts";
 
 /** What the bar is saying about work in flight. Exactly one of these is true at a time. */
 export type WorkspaceActivity = "idle" | "refreshing" | "saving" | "deleting";
+
+/**
+ * The bar as a placed piece.
+ *
+ * A thin binding rather than a rewrite: the activity is still decided by `ComponentWorkspace`, which
+ * is the one module that knows which mutation is in flight, and this only carries the answer from
+ * the workspace context to the component that draws it.
+ */
+export function WorkspaceStatusBarPart() {
+  const workspace = useWorkspaceRender();
+  if (!workspace) return null;
+  return (
+    <WorkspaceStatusBar dossier={workspace.dossier} activity={workspace.status.activity} />
+  );
+}
 
 export function WorkspaceStatusBar({
   dossier,

@@ -25,14 +25,29 @@
  * in production, amber for partial and not-recommended, red for obsolete and failed, gray for
  * unknown - and never on blue, which in a grayscale application would be the only hue on screen
  * that encoded nothing.
+ *
+ * THE ORDER IS THE DOCUMENT'S NOW (plan Phase 1), and each collapsible section's `fill[id] ||
+ * showEmpty` is a NAMED CONDITION the document lists and this column answers. The reveal preference
+ * stays exactly where it was - read once, on mount, inside the column - because it is a workstation
+ * habit rather than shared state, and another tab's write must not change the column under someone
+ * mid-read. What the column answers for its own subtree is only that preference; whether each
+ * section HAS content is answered once at workspace level, because the column band needs the same
+ * answer to decide its widths.
  */
-import { useState, type MutableRefObject } from "react";
+import { createContext, useContext, useMemo, useState } from "react";
 import type { ComponentDossier, Staleness } from "../../api/dossierTypes";
 import { Text, useCopyFormatter, useText } from "../../lib/copy";
 import { useDevMode } from "../../lib/devMode";
 import { formatCount, formatPrice, formatTimestamp } from "../../lib/formatValue";
+import { LayoutRuntimeScope, type RegionChromeProps } from "../../layout/LayoutRenderer";
+import { WORKSPACE_CONDITION } from "../../layout/defaultWorkspaceLayout";
+import { useWorkspaceRender } from "../../layout/workspaceRenderContext";
 import { Button, StatusText } from "../primitives";
-import { WorkspaceColumn } from "./WorkspaceColumns";
+import {
+  WorkspaceColumnFrame,
+  WorkspaceColumnScroller,
+  WorkspaceColumnTitleStrip,
+} from "./WorkspaceColumns";
 import { latestCheck } from "./offerFacts";
 import { OffersSection } from "./OffersSection";
 import { ProvenanceHistory } from "./ProvenanceHistory";
@@ -54,95 +69,123 @@ const STALENESS_TONE: Record<Staleness, "ok" | "warn" | "err" | "neutral"> = {
   unknown: "neutral",
 };
 
-export function SourcingColumn({
-  dossier,
-  onViewOffers,
-  onViewProvenance,
-  onOpenDocument,
-  onRefresh,
-  refreshing,
-  scrollRef,
-}: {
-  dossier: ComponentDossier;
-  onViewOffers: () => void;
-  onViewProvenance: () => void;
-  /** Open a stored or referenced document in the viewer, addressed by its derived id. */
-  onOpenDocument: (id: string) => void;
-  onRefresh: () => void;
-  refreshing: boolean;
-  scrollRef: MutableRefObject<HTMLDivElement | null>;
-}) {
-  const { supplySummary, distributorOffers, documents, relatedParts, provenance } = dossier;
-  const { enabled: developerMode } = useDevMode();
-  // Read once, on mount. Re-reading per render would let another tab's write change the column
-  // under someone mid-read, and this is a preference, not shared state.
-  const [showEmpty, setShowEmpty] = useState(readShowEmptySections);
+/** Whether the blank sections are on screen, and the one control that changes that. */
+interface SourcingReveal {
+  showing: boolean;
+  toggle: () => void;
+}
 
-  const fill = sourcingSectionFill(dossier, developerMode);
-  const empty = emptySourcingSections(fill);
-  // A section is drawn when it HAS something, or when the reveal is on. The order below is the
-  // fixed order either way: revealing puts each hidden section back where it belongs rather than
-  // appending the empty ones in a block at the end.
-  const shown = (id: keyof typeof fill) => fill[id] || showEmpty;
+const SourcingRevealContext = createContext<SourcingReveal>({
+  showing: false,
+  toggle: () => {},
+});
 
+/** The column's frame. */
+export function SourcingColumnChrome({ children }: RegionChromeProps) {
   return (
-    <WorkspaceColumn
-      id="sourcing"
-      devId="component-browser.column-sourcing"
+    <WorkspaceColumnFrame id="sourcing" devId="component-browser.column-sourcing">
+      {children}
+    </WorkspaceColumnFrame>
+  );
+}
+
+export function SourcingTitleStripPart() {
+  const workspace = useWorkspaceRender();
+  if (!workspace) return null;
+  const { offerCount } = workspace.dossier.supplySummary;
+  return (
+    <WorkspaceColumnTitleStrip
       title={<Text id="component-browser.column-sourcing">Sourcing and Resources</Text>}
-      meta={supplySummary.offerCount > 0 ? formatCount(supplySummary.offerCount) : undefined}
+      meta={offerCount > 0 ? formatCount(offerCount) : undefined}
+    />
+  );
+}
+
+/**
+ * The column's one scroller, and the reveal preference that decides how much is in it.
+ *
+ * Read once, on mount. Re-reading per render would let another tab's write change the column under
+ * someone mid-read, and this is a preference, not shared state. The toggle it belongs to is a
+ * placement of its own at the bottom of the column, so the state is handed down through the
+ * document's runtime rather than through a prop.
+ */
+export function SourcingBodyChrome({ children }: RegionChromeProps) {
+  const workspace = useWorkspaceRender();
+  const [showEmpty, setShowEmpty] = useState(readShowEmptySections);
+  const conditions = useMemo(
+    () => ({ [WORKSPACE_CONDITION.sourcingShowEmpty]: showEmpty }),
+    [showEmpty],
+  );
+  const reveal = useMemo<SourcingReveal>(
+    () => ({
+      showing: showEmpty,
+      toggle: () => {
+        const next = !showEmpty;
+        setShowEmpty(next);
+        writeShowEmptySections(next);
+      },
+    }),
+    [showEmpty],
+  );
+  if (!workspace) return null;
+  return (
+    <WorkspaceColumnScroller
+      id="sourcing"
       scrollRef={(node) => {
-        scrollRef.current = node;
+        workspace.sourcing.scrollRef.current = node;
       }}
     >
-      <LifecycleSection dossier={dossier} />
+      <SourcingRevealContext.Provider value={reveal}>
+        <LayoutRuntimeScope conditions={conditions}>{children}</LayoutRuntimeScope>
+      </SourcingRevealContext.Provider>
+    </WorkspaceColumnScroller>
+  );
+}
 
-      {shown("offers") ? (
-        <OffersSection
-          offers={distributorOffers}
-          failures={supplySummary.failures}
-          onRefresh={onRefresh}
-          refreshing={refreshing}
-        />
-      ) : null}
+export function SourcingOffersPart() {
+  const workspace = useWorkspaceRender();
+  if (!workspace) return null;
+  const { dossier, sourcing } = workspace;
+  return (
+    <OffersSection
+      offers={dossier.distributorOffers}
+      failures={dossier.supplySummary.failures}
+      onRefresh={sourcing.onRefresh}
+      refreshing={sourcing.refreshing}
+    />
+  );
+}
 
-      {shown("pricing") ? (
-        <PricingSection dossier={dossier} onViewOffers={onViewOffers} />
-      ) : null}
+export function SourcingDocumentsPart() {
+  const workspace = useWorkspaceRender();
+  if (!workspace) return null;
+  const { dossier, sourcing } = workspace;
+  return (
+    <DocumentsSection
+      documents={dossier.documents.items}
+      preferredReason={dossier.documents.preferredDatasheetReason}
+      onOpenDocument={sourcing.onOpenDocument}
+    />
+  );
+}
 
-      {shown("documents") ? (
-        <DocumentsSection
-          documents={documents.items}
-          preferredReason={documents.preferredDatasheetReason}
-          onOpenDocument={onOpenDocument}
-        />
-      ) : null}
+export function SourcingRelatedPart() {
+  const workspace = useWorkspaceRender();
+  if (!workspace) return null;
+  return <RelatedPartsSection parts={workspace.dossier.relatedParts} />;
+}
 
-      {shown("related") ? <RelatedPartsSection parts={relatedParts} /> : null}
-
-      {shown("provenance") ? (
-        <ProvenanceHistory
-          provenance={provenance}
-          revisions={dossier.revisions}
-          diagnostics={dossier.diagnostics}
-          onViewProvenance={onViewProvenance}
-        />
-      ) : null}
-
-      {/* LAST, under everything it accounts for, and absent when there is nothing to reveal: a
-          control that would show zero sections is a dead click path. When the reveal is off, the
-          provenance section it hides takes `View Data Provenance` with it - which is why that
-          action also has a permanent home in Manage > View Data Provenance... */}
-      <EmptySectionsToggle
-        hidden={empty.length}
-        showing={showEmpty}
-        onToggle={() => {
-          const next = !showEmpty;
-          setShowEmpty(next);
-          writeShowEmptySections(next);
-        }}
-      />
-    </WorkspaceColumn>
+export function SourcingProvenancePart() {
+  const workspace = useWorkspaceRender();
+  if (!workspace) return null;
+  const { dossier, sourcing } = workspace;
+  return (
+    <ProvenanceHistory
+      provenance={dossier.provenance}
+      revisions={dossier.revisions}
+      diagnostics={dossier.diagnostics}
+      onViewProvenance={sourcing.onViewProvenance}
+    />
   );
 }
 
@@ -151,18 +194,17 @@ export function SourcingColumn({
  *
  * It states the COUNT, so it is an answer as well as an action: `Show 5 Empty Sections` on a part
  * nobody has sourced says exactly how much of the column is silent, which is the direct form the
- * quality vocabulary uses everywhere else ("3 Required Values Missing", never "3 / 8"). With
- * nothing hidden it does not render at all.
+ * quality vocabulary uses everywhere else ("3 Required Values Missing", never "3 / 8").
+ *
+ * LAST, under everything it accounts for, and absent when there is nothing to reveal: a control
+ * that would show zero sections is a dead click path. When the reveal is off, the provenance
+ * section it hides takes `View Data Provenance` with it - which is why that action also has a
+ * permanent home in Manage > View Data Provenance...
  */
-function EmptySectionsToggle({
-  hidden,
-  showing,
-  onToggle,
-}: {
-  hidden: number;
-  showing: boolean;
-  onToggle: () => void;
-}) {
+export function SourcingEmptySectionsPart() {
+  const workspace = useWorkspaceRender();
+  const { enabled: developerMode } = useDevMode();
+  const reveal = useContext(SourcingRevealContext);
   const showLabel = useCopyFormatter(
     "component-browser.show-empty-sections",
     "Show {count} Blank Sections",
@@ -171,6 +213,10 @@ function EmptySectionsToggle({
     "component-browser.hide-empty-sections",
     "Hide {count} Blank Sections",
   );
+  if (!workspace) return null;
+  const hidden = emptySourcingSections(
+    sourcingSectionFill(workspace.dossier, developerMode),
+  ).length;
   if (hidden === 0) return null;
   const count = formatCount(hidden);
   return (
@@ -178,10 +224,10 @@ function EmptySectionsToggle({
       <Button
         small
         data-dev-id="component-browser.empty-sections"
-        aria-expanded={showing}
-        onClick={onToggle}
+        aria-expanded={reveal.showing}
+        onClick={reveal.toggle}
       >
-        {showing ? hideLabel({ count }) : showLabel({ count })}
+        {reveal.showing ? hideLabel({ count }) : showLabel({ count })}
       </Button>
     </div>
   );
@@ -195,9 +241,12 @@ function EmptySectionsToggle({
  * manufacturer marking a part NRND while a distributor still lists it as active is exactly the
  * disagreement a person needs to see rather than have resolved for them.
  */
-function LifecycleSection({ dossier }: { dossier: ComponentDossier }) {
-  const { supplySummary } = dossier;
+export function SourcingLifecyclePart() {
+  const workspace = useWorkspaceRender();
   const unknown = useText("component-browser.value-unknown", "Unknown");
+  if (!workspace) return null;
+  const dossier: ComponentDossier = workspace.dossier;
+  const { supplySummary } = dossier;
   const lifecycle = supplySummary.lifecycle || dossier.identity.lifecycle || "";
   const lastChecked = latestCheck(dossier.distributorOffers);
   const checkedStamp = lastChecked ? formatTimestamp(lastChecked) : null;
@@ -273,16 +322,12 @@ function LifecycleSection({ dossier }: { dossier: ComponentDossier }) {
  * anyone can act on. The ladder itself stays one click away: a column is the wrong shape for eight
  * quantity breaks per distributor, and the full sheet is the right one.
  */
-function PricingSection({
-  dossier,
-  onViewOffers,
-}: {
-  dossier: ComponentDossier;
-  onViewOffers: () => void;
-}) {
-  const { supplySummary, distributorOffers } = dossier;
+export function SourcingPricingPart() {
+  const workspace = useWorkspaceRender();
   const unknown = useText("component-browser.value-unknown", "Unknown");
   const fromText = useCopyFormatter("component-browser.price-from", "from {provider}");
+  if (!workspace) return null;
+  const { supplySummary, distributorOffers } = workspace.dossier;
   const best = distributorOffers.find(
     (offer) => offer.provider === supplySummary.bestUnitPriceProvider,
   );
@@ -297,7 +342,11 @@ function PricingSection({
       title={<Text id="component-browser.pricing-title">Pricing and Lead Time</Text>}
       action={
         breakCount > 0 ? (
-          <Button small data-dev-id="component-browser.offers-all" onClick={onViewOffers}>
+          <Button
+            small
+            data-dev-id="component-browser.offers-all"
+            onClick={workspace.sourcing.onViewOffers}
+          >
             <Text id="component-browser.offers-all">View Price Breaks</Text>
           </Button>
         ) : undefined
