@@ -33,15 +33,20 @@ def test_surface_registry_contains_only_live_frontend_surfaces():
     choices = UISHOT["_SURFACE_CHOICES"]
     all_surfaces = UISHOT["_ALL_SURFACES"]
 
+    # Projects and the STM viewer joined on 2026-08-06: both rail destinations render real
+    # content in the seeded library (the Phase 0 audit found neither route was photographable
+    # at all), so the registry naming them IS the live set, and this mirror moved with it.
     assert choices == (
         "components",
         "search",
         "part-vendor-data",
         "ingest",
+        "projects",
+        "stm",
         "settings",
         "all",
     )
-    assert all_surfaces == ("components", "search", "settings")
+    assert all_surfaces == ("components", "search", "projects", "stm", "settings")
 
 
 def test_help_advertises_only_live_ui_surfaces():
@@ -52,7 +57,10 @@ def test_help_advertises_only_live_ui_surfaces():
         text=True,
     )
 
-    assert "{components,search,part-vendor-data,ingest,settings,all}" in result.stdout
+    assert (
+        "{components,search,part-vendor-data,ingest,projects,stm,settings,all}"
+        in result.stdout
+    )
     for surface in UISHOT["_SURFACE_CHOICES"]:
         assert surface in result.stdout
 
