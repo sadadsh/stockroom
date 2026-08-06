@@ -1,6 +1,9 @@
 import { statusTone, type StatusTone } from "./statusTone";
 
-const KNOWN_TOKENS = ["--c-ok", "--c-warn", "--c-err", "--c-acc", "--c-t3"];
+// `--c-acc` is deliberately absent: no status tone spends the accent any more. See the module
+// comment in statusTone.ts - `ahead` and `update-available` used to, and the accent was the amber
+// that also painted the selected row, the active tab and every `Missing`.
+const KNOWN_TOKENS = ["--c-ok", "--c-warn", "--c-err", "--c-t3"];
 
 function assertTokenBacked(t: StatusTone) {
   // every tone references a design token, never a raw hex literal that bypasses theming

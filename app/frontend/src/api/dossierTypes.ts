@@ -10,9 +10,6 @@
 // for offers, documents and relationships, and the projection decides which provider filled
 // them in.
 
-// Bump in step with DOSSIER_SCHEMA_VERSION so a stale client degrades honestly.
-export const DOSSIER_SCHEMA_VERSION = 2;
-
 /**
  * What we know about ONE specification. Six named situations, never collapsed into "unknown".
  *
@@ -789,31 +786,6 @@ export interface ComponentProvidersView {
   completeProviders: string[];
   /** Already ranked by the backend. Rendered in the given order, never re-sorted here. */
   rows: ProviderCoverageRow[];
-}
-
-/**
- * One row's coverage of a registered tool, read by key.
- *
- * The tool columns are named for the registry keys the backend sends in `tools`, so a third tool
- * arrives as data rather than as a new field. The lookup is here, once, so no call site invents
- * its own cast.
- */
-export function providerToolCoverage(
-  row: ProviderCoverageRow,
-  tool: string,
-): ProviderToolCoverage | null {
-  const cell = (row as unknown as Record<string, unknown>)[tool];
-  return cell && typeof cell === "object" && "summary" in (cell as object)
-    ? (cell as ProviderToolCoverage)
-    : null;
-}
-
-/** One row's coverage of one artifact, read by key, for the same reason. */
-export function providerArtifactCoverage(
-  row: ProviderCoverageRow,
-  artifact: CoverageArtifact,
-): ProviderArtifactCoverage {
-  return row[artifact];
 }
 
 /* -------------------------------------------------------------------------- */

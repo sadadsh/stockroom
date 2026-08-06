@@ -146,9 +146,14 @@ function ballGridLayout(
   h: number,
   margin: number,
 ): PinMapLayout {
-  const placed = pins
-    .map((p) => ({ p, r: bgaRowIndex(p.bga_row ?? ""), c: (p.bga_col ?? 0) - 1 }))
-    .filter((e) => e.r >= 0 && e.c >= 0);
+  // One pass: resolve each ball's cell and keep only the ones that land on the grid. A ball with
+  // an unreadable row letter or no column (r or c below zero) is not placed, exactly as before.
+  const placed: { p: PinGeometryInput; r: number; c: number }[] = [];
+  for (const p of pins) {
+    const r = bgaRowIndex(p.bga_row ?? "");
+    const c = (p.bga_col ?? 0) - 1;
+    if (r >= 0 && c >= 0) placed.push({ p, r, c });
+  }
   if (placed.length === 0) return EMPTY;
 
   const maxRow = Math.max(...placed.map((e) => e.r));

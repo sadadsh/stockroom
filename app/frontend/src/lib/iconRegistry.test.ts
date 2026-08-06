@@ -59,6 +59,18 @@ describe("iconRegistry", () => {
     expect(regrouped.sort()).toEqual(ICON_REGISTRY.map((entry) => entry.id).sort());
   });
 
+  it("keeps each category's ids in registry order, under keys in category order", () => {
+    // The glyph picker renders these lists as they come, so inventory order is the contract - a
+    // grouping that merely holds the right SET of ids would reshuffle the catalogue.
+    expect(Object.keys(ICON_IDS_BY_CATEGORY)).toEqual(ICON_CATEGORIES);
+    for (const category of ICON_CATEGORIES) {
+      const inRegistryOrder = ICON_REGISTRY.filter((entry) => entry.category === category).map(
+        (entry) => entry.id,
+      );
+      expect(ICON_IDS_BY_CATEGORY[category], category).toEqual(inRegistryOrder);
+    }
+  });
+
   it("gives every entry a non-empty body and viewBox", () => {
     for (const entry of ICON_REGISTRY) {
       expect(entry.body.length, entry.id).toBeGreaterThan(0);

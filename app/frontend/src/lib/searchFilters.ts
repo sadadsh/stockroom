@@ -433,11 +433,16 @@ export function deriveColumns(
   maxCols = 5,
 ): SpecColumn[] {
   const cat = category ?? "";
-  const scored = facets
-    .filter((f) => f.kind === "range" || (f.options?.length ?? 0) > 1)
-    .map((f) => ({ f, score: _columnScore(f, cat) }))
-    .filter((s) => s.score > -Infinity)
-    .sort((a, b) => (b.score - a.score) || (b.f.count - a.f.count));
+  // Scored in ONE pass: a single-valued option is dropped before it is scored (so the score is
+  // computed exactly once per surviving facet, as before), then the commercial keys the score
+  // rejects outright drop out. The sort then ranks what is left.
+  const scored: { f: ParametricFacet; score: number }[] = [];
+  for (const f of facets) {
+    if (f.kind !== "range" && (f.options?.length ?? 0) <= 1) continue;
+    const score = _columnScore(f, cat);
+    if (score > -Infinity) scored.push({ f, score });
+  }
+  scored.sort((a, b) => (b.score - a.score) || (b.f.count - a.f.count));
   let cols: SpecColumn[] = scored.map(({ f }) => {
     const r = resolveSpec(f.key, cat);
     return {

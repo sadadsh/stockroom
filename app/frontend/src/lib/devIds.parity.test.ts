@@ -226,11 +226,11 @@ const KNOWN_PROP_PASSED: readonly string[] = [
   // a literal at the call site because `candidateDevId()` builds the instance id from the same
   // constant - two spellings of one id is exactly how the two halves would drift apart.
   "ingest.candidate",
-  // component-workspace/CadAssetModule.tsx LayerToggle: the symbol drawing's three switches and
-  // the land pattern's nine, plus its ruler, share one toggle shell, so each id arrives as a
-  // `devId` string prop. Spelled out in full at each call site - an interpolated
-  // `asset-layer-${name}` would be invisible to this gate and to grep, and these are exactly the
-  // controls a dev-mode inspection has to be able to name one at a time.
+  // component-workspace/CadAssetModule.tsx: the symbol drawing's three switches and the land
+  // pattern's nine are rows in the visibility panel `AssetOptions.tsx` renders, so each id arrives
+  // as a `devId` string on an `AssetOption`. Spelled out in full at each call site - an
+  // interpolated `asset-layer-${name}` would be invisible to this gate and to grep, and these are
+  // exactly the controls a dev-mode inspection has to be able to name one at a time.
   "component-browser.asset-layer-pin-name",
   "component-browser.asset-layer-pin-number",
   "component-browser.asset-layer-electrical",
@@ -243,8 +243,11 @@ const KNOWN_PROP_PASSED: readonly string[] = [
   "component-browser.asset-layer-numbers",
   "component-browser.asset-layer-origin",
   "component-browser.asset-layer-dimensions",
-  "component-browser.asset-measure",
-]; // 79
+  // The two visibility buttons: one shell (`AssetOptionsButton`) opened per preview, so which
+  // preview a button belongs to arrives as a `devId` prop rather than as two copies of the shell.
+  "component-browser.asset-options-symbol",
+  "component-browser.asset-options-footprint",
+]; // 80
 
 describe("devIds catalogue <-> code parity (IDSYS-02)", () => {
   const catalogueIds = new Set(DEV_IDS.map((e) => e.id));

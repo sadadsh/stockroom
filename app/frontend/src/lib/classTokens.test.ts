@@ -6,8 +6,11 @@ import { DEV_TOKEN_BY_VAR } from "./devTokens";
 // className, so these tests pin the entry count, the resolver's dedupe/ignore behaviour,
 // and the invariant that every mapped cssVar is a real DEV_TOKEN.
 describe("classTokens resolver", () => {
-  it("has exactly 53 className -> cssVar entries", () => {
-    expect(Object.keys(CLASS_TO_VAR)).toHaveLength(53);
+  it("has exactly 62 className -> cssVar entries", () => {
+    // 53 before the status TEXT strengths landed. `--c-ok-text` / `--c-warn-text` / `--c-err-text`
+    // back real utilities now (a status WORD wears them, at the 4.5:1 bar), so the inspector has to
+    // be able to name them from a className like every other colour token.
+    expect(Object.keys(CLASS_TO_VAR)).toHaveLength(62);
   });
 
   it("resolves known classes in order, deduped, ignoring unknowns", () => {

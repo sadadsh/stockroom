@@ -156,6 +156,24 @@ describe("deriveColumns", () => {
     expect(cols[0]).toMatchObject({ numeric: true, unit: "Ω" });
     expect(cols[3]).toMatchObject({ key: "Package", numeric: false });
   });
+  it("drops a facet carrying no options and breaks a score tie on how many parts carry it", () => {
+    // Unregistered keys all land in the tail ("Other"): a numeric one leads the categorical ones,
+    // and two categorical ones scoring the same are ordered by coverage, not by arrival.
+    const novel: ParametricFacet[] = [
+      { key: "Novel Choice Z", label: "Novel Choice Z", kind: "options", count: 5,
+        options: [{ value: "a", count: 3 }, { value: "b", count: 2 }] },
+      { key: "Novel Choice A", label: "Novel Choice A", kind: "options", count: 40,
+        options: [{ value: "a", count: 20 }, { value: "b", count: 20 }] },
+      { key: "Novel Span", label: "Novel Span", kind: "range", count: 2, min: 0, max: 1 },
+      { key: "Novel Choice Empty", label: "Novel Choice Empty", kind: "options", count: 99, options: null },
+    ];
+    expect(deriveColumns(novel, "Resistors", 5).map((c) => c.key)).toEqual([
+      "Novel Span",
+      "Novel Choice A",
+      "Novel Choice Z",
+    ]);
+  });
+
   it("honours the column cap", () => {
     expect(deriveColumns(FACETS, "Resistors", 2).map((c) => c.key)).toEqual([
       "Resistance",

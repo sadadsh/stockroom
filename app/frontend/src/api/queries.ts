@@ -643,9 +643,15 @@ export function useCadSourceQuery(id: string | null, enabled: boolean) {
 
 // A mutation rebuilds the derived index server-side, so after any write we
 // invalidate the list, the facets, and the affected detail to read-after-write.
+//
+// Returned through `useCallback` so it has a STABLE identity: `useQueryClient` hands back the same
+// client for the life of a provider, so nothing here can go stale. That stability is what lets the
+// one effect-driven caller (`useRefreshSourcing`) list this in its dependencies honestly instead of
+// omitting it and explaining why - an omission that only stayed correct while the closure kept
+// reading nothing but `qc`.
 function useInvalidateAfterWrite() {
   const qc = useQueryClient();
-  return (id: string) => {
+  return useCallback((id: string) => {
     qc.invalidateQueries({ queryKey: ["parts"] });
     qc.invalidateQueries({ queryKey: ["facets"] });
     qc.invalidateQueries({ queryKey: ["duplicates"] });
@@ -656,7 +662,7 @@ function useInvalidateAfterWrite() {
     qc.invalidateQueries({ queryKey: ["altium-models-pending"] });
     // a write commits, so the part's git timeline (M6k) gained an entry
     qc.invalidateQueries({ queryKey: ["part-history", id] });
-  };
+  }, [qc]);
 }
 
 export function useEditField() {
@@ -793,9 +799,7 @@ export function useRefreshSourcing(id: string) {
   const done = job.status === "done";
   useEffect(() => {
     if (done) invalidate(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- invalidate is a fresh
-    // closure every render; done/id are the real triggers.
-  }, [done, id]);
+  }, [done, id, invalidate]);
   return { ...job, run };
 }
 
