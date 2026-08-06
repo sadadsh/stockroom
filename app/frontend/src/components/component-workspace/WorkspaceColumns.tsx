@@ -9,8 +9,23 @@
  *
  * The splitters are a real pointer drag AND a real keyboard control, because a separator that only
  * responds to a mouse is a separator half the people using it cannot move.
+ *
+ * WHAT THE BAND NOW READS FROM THE LAYOUT DOCUMENT (plan Phase 1). The slot ORDER, the number of
+ * columns, and every splitter - which two slots each handle sits between, how far a key press moves
+ * it, and how wide the grab area is against the drawn rule - come from the region the document
+ * describes. What has deliberately NOT moved is the pixel maths: `lib/workspaceColumns` still owns
+ * `resolveColumnWidths`, `moveSplitter`, the floors and the stored fractions, under exactly the
+ * storage key it always used. The document says where the boundaries ARE; that module says what
+ * happens when one is dragged, and one of the two owning both would be a second answer to the same
+ * question.
+ *
+ * The drawn rule stays a 1px `w-px` class rather than an inline width read off `lineThickness`. The
+ * document records the thickness because the grab area is derived from it - a 9px handle straddling
+ * a 1px line is 4px of negative margin either side - and a thicker rule is not something anything
+ * can ask for until the style panel exists in Phase 3.
  */
 import {
+  Fragment,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -26,7 +41,6 @@ import {
   moveSplitter,
   readColumnFractions,
   resolveColumnWidths,
-  SPLITTER_KEY_STEP,
   SPLITTER_NEIGHBOURS,
   writeColumnFractions,
   type StoredColumnFractions,
@@ -34,32 +48,61 @@ import {
   type WorkspaceColumnWidths,
   type WorkspaceSplitterId,
 } from "../../lib/workspaceColumns";
+import type { LayoutRegion, LayoutSlot, SplitterSpec } from "../../layout/document";
+import {
+  DEFAULT_WORKSPACE_LAYOUT,
+  WORKSPACE_COLUMN_REGION,
+} from "../../layout/defaultWorkspaceLayout";
+import { findRegion } from "../../layout/document";
+import { WORKSPACE_REGION } from "../../layout/workspacePieces";
 
 /** The width the band assumes before it has been measured. Replaced on the first layout pass. */
 const ASSUMED_TOTAL = 1366;
 
-export interface WorkspaceColumnsProps {
-  cad: ReactNode;
-  specifications: ReactNode;
-  sourcing: ReactNode;
-  /**
-   * Nothing has been sourced for this component at all, so the sourcing column can only draw five
-   * lifecycle rows however much room it is given.
-   *
-   * It narrows to what that content needs and the surplus goes to the other two columns. It does not
-   * collapse, does not hide and does not lose its title strip - see `WORKSPACE_SOURCING_SPARSE_MIN`
-   * for the measurement and for why a collapsed strip was the wrong answer. A stored splitter
-   * position overrides this entirely.
-   */
-  sparseSourcing?: boolean;
+/** The band region of the shipped document: the slot order and the splitters, as data. */
+const COLUMN_BAND_REGION: LayoutRegion | null = findRegion(
+  DEFAULT_WORKSPACE_LAYOUT,
+  WORKSPACE_REGION.columnBand,
+);
+
+/**
+ * Which of the three geometry columns a slot holds.
+ *
+ * Read off the REGION the slot contains rather than off the slot's own id, so the mapping is the
+ * one `WORKSPACE_COLUMN_REGION` already states and there is no second table of slot names to keep
+ * in step with the document.
+ */
+function columnOfSlot(slot: LayoutSlot): WorkspaceColumnId | null {
+  const content = slot.content;
+  if (!content || content.kind !== "region") return null;
+  const entry = (Object.entries(WORKSPACE_COLUMN_REGION) as [WorkspaceColumnId, string][]).find(
+    ([, regionId]) => regionId === content.id,
+  );
+  return entry?.[0] ?? null;
 }
 
-export function WorkspaceColumns({
-  cad,
-  specifications,
-  sourcing,
+/** One of the band's slots, with whatever the renderer produced for it. */
+export interface BandSlotContent {
+  slot: LayoutSlot;
+  content: ReactNode;
+}
+
+/**
+ * The band, drawn from a region.
+ *
+ * Every column is a `flex-none` box at a computed WIDTH except the one the document marks `grow`,
+ * which takes the remainder with a MINIMUM instead - the asymmetry the sourcing column has always
+ * had, now stated by the document rather than by the position of a variable in this file.
+ */
+export function WorkspaceColumnBand({
+  region,
+  slots,
   sparseSourcing = false,
-}: WorkspaceColumnsProps) {
+}: {
+  region: LayoutRegion;
+  slots: readonly BandSlotContent[];
+  sparseSourcing?: boolean;
+}) {
   const bandRef = useRef<HTMLDivElement>(null);
   const [total, setTotal] = useState(ASSUMED_TOTAL);
   const [widths, setWidths] = useState<WorkspaceColumnWidths>(() =>
@@ -132,6 +175,8 @@ export function WorkspaceColumns({
     [commit, sparseSourcing],
   );
 
+  const splitters = region.splitters ?? [];
+
   return (
     <div
       ref={bandRef}
@@ -146,34 +191,83 @@ export function WorkspaceColumns({
         className="flex min-h-0 flex-1"
         style={{ minWidth: columnsMinTotal(sparseSourcing) }}
       >
-        <div className="flex min-h-0 flex-none flex-col" style={{ width: widths.cad }}>
-          {cad}
-        </div>
-        <ColumnSplitter
-          splitter="cad-specifications"
-          widths={widths}
-          total={total}
-          sparseSourcing={sparseSourcing}
-          onDrag={drag}
-        />
-        <div
-          className="flex min-h-0 flex-none flex-col"
-          style={{ width: widths.specifications }}
-        >
-          {specifications}
-        </div>
-        <ColumnSplitter
-          splitter="specifications-sourcing"
-          widths={widths}
-          total={total}
-          sparseSourcing={sparseSourcing}
-          onDrag={drag}
-        />
-        <div className="flex min-h-0 flex-1 flex-col" style={{ minWidth: widths.sourcing }}>
-          {sourcing}
-        </div>
+        {slots.map(({ slot, content }) => {
+          const column = columnOfSlot(slot);
+          if (!column) return null;
+          const size = slot.content?.kind === "region" ? slot.content.size : undefined;
+          // The handle that sits AFTER this slot, which is the one whose left neighbour it is.
+          const after = splitters.find((splitter) => splitter.between[0] === slot.id);
+          return (
+            <Fragment key={slot.id}>
+              {size?.grow ? (
+                <div
+                  className="flex min-h-0 flex-1 flex-col"
+                  style={{ minWidth: widths[column] }}
+                >
+                  {content}
+                </div>
+              ) : (
+                <div
+                  className="flex min-h-0 flex-none flex-col"
+                  style={{ width: widths[column] }}
+                >
+                  {content}
+                </div>
+              )}
+              {after ? (
+                <ColumnSplitter
+                  spec={after}
+                  widths={widths}
+                  total={total}
+                  sparseSourcing={sparseSourcing}
+                  onDrag={drag}
+                />
+              ) : null}
+            </Fragment>
+          );
+        })}
       </div>
     </div>
+  );
+}
+
+/**
+ * The band, addressed by its three named columns.
+ *
+ * The shape the workspace has always been written against, kept because it is the honest signature
+ * for "here are the three columns" - it names them rather than making a caller assemble slots. It
+ * resolves the slot order and the splitters from the document, so a caller cannot get the order
+ * wrong and the two ways in cannot draw different bands.
+ */
+export function WorkspaceColumns({
+  cad,
+  specifications,
+  sourcing,
+  sparseSourcing = false,
+}: {
+  cad: ReactNode;
+  specifications: ReactNode;
+  sourcing: ReactNode;
+  /**
+   * Nothing has been sourced for this component at all, so the sourcing column can only draw five
+   * lifecycle rows however much room it is given.
+   *
+   * It narrows to what that content needs and the surplus goes to the other two columns. It does not
+   * collapse, does not hide and does not lose its title strip - see `WORKSPACE_SOURCING_SPARSE_MIN`
+   * for the measurement and for why a collapsed strip was the wrong answer. A stored splitter
+   * position overrides this entirely.
+   */
+  sparseSourcing?: boolean;
+}) {
+  const region = COLUMN_BAND_REGION;
+  if (!region) return null;
+  const byColumn: Record<WorkspaceColumnId, ReactNode> = { cad, specifications, sourcing };
+  const slots: BandSlotContent[] = region.slots.map((slot) => {
+    const column = columnOfSlot(slot);
+    return { slot, content: column ? byColumn[column] : null };
+  });
+  return (
+    <WorkspaceColumnBand region={region} slots={slots} sparseSourcing={sparseSourcing} />
   );
 }
 
@@ -191,24 +285,29 @@ const SPLITTER_COPY: Record<WorkspaceSplitterId, { id: string; label: string }> 
 /**
  * One 1px separator.
  *
- * The LINE is 1px. The grab area is not: an 8px transparent hit region straddles it so the handle
+ * The LINE is 1px. The grab area is not: a 9px transparent hit region straddles it so the handle
  * can actually be caught with a pointer, which is what a desktop splitter does and what a literal
  * 1px target does not. Nothing about the line moves on hover except its colour - a divider that
  * thickens under the pointer shifts both columns beside it.
+ *
+ * Both numbers come from the document's own splitter spec, and the negative margin either side is
+ * derived from the two rather than typed: the transparent padding is exactly the difference between
+ * the grab area and the rule it straddles, halved.
  */
 function ColumnSplitter({
-  splitter,
+  spec,
   widths,
   total,
   sparseSourcing,
   onDrag,
 }: {
-  splitter: WorkspaceSplitterId;
+  spec: SplitterSpec;
   widths: WorkspaceColumnWidths;
   total: number;
   sparseSourcing: boolean;
   onDrag: (splitter: WorkspaceSplitterId, delta: number) => void;
 }) {
+  const splitter = spec.id as WorkspaceSplitterId;
   const copy = SPLITTER_COPY[splitter];
   const label = useText(copy.id, copy.label);
   const [dragging, setDragging] = useState(false);
@@ -239,6 +338,8 @@ function ColumnSplitter({
   const min = columnMinimums(sparseSourcing);
   const lowest = min[left];
   const highest = Math.max(lowest, widths[left] + widths[right] - min[right]);
+  const grab = spec.grabWidth;
+  const padding = -(grab - spec.lineThickness) / 2;
 
   return (
     <div
@@ -259,7 +360,7 @@ function ColumnSplitter({
         setDragging(true);
       }}
       onKeyDown={(event) => {
-        const step = event.shiftKey ? SPLITTER_KEY_STEP * 4 : SPLITTER_KEY_STEP;
+        const step = event.shiftKey ? spec.keyStep * 4 : spec.keyStep;
         if (event.key === "ArrowLeft") onDrag(splitter, -step);
         else if (event.key === "ArrowRight") onDrag(splitter, step);
         else return;
@@ -270,9 +371,9 @@ function ColumnSplitter({
         "focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 " +
         "focus-visible:outline-focus"
       }
-      // The rendered rule is the 1px border; the 7px of transparent padding either side is the
-      // grab area and paints nothing.
-      style={{ width: 9, marginLeft: -4, marginRight: -4 }}
+      // The rendered rule is the 1px border; the transparent padding either side is the grab area
+      // and paints nothing.
+      style={{ width: grab, marginLeft: padding, marginRight: padding }}
     >
       <span
         aria-hidden
@@ -286,38 +387,20 @@ function ColumnSplitter({
 }
 
 /**
- * One column: a 24px title strip, then a body that owns its own scrollbar.
+ * A column's frame: the bordered box that owns the whole column and clips it.
  *
- * The title strip is not a badge shelf. It carries the column's name at panel-title weight and, at
- * most, one right-aligned muted count or state - so `Specifications 42` reads as a heading with a
- * number, not as a heading with a control beside it.
+ * Split out of the old single `WorkspaceColumn` component so a column can be COMPOSED from the
+ * document - a title strip, an optional toolbar and a scroller are three placements now, not three
+ * props - while the element each of them draws stays in one place. `first:border-l-0` is why the
+ * three read as one contiguous surface rather than as three panels with a gap.
  */
-export function WorkspaceColumn({
+export function WorkspaceColumnFrame({
   id,
   devId,
-  title,
-  meta,
-  action,
-  toolbar,
-  scrollRef,
   children,
 }: {
   id: WorkspaceColumnId;
   devId: string;
-  title: ReactNode;
-  /** The optional right-side count or state. 10px, muted, never badge-styled. */
-  meta?: ReactNode;
-  /**
-   * At most ONE compact command button on the title line, between the name and the count.
-   *
-   * A column whose single action is a full toolbar row spends a whole row of vertical space on one
-   * button; the layout has always drawn this as `CAD Assets [Compare Sources]`. It is one button,
-   * not a shelf: a second one belongs in the toolbar or in a menu.
-   */
-  action?: ReactNode;
-  /** A compact control row directly under the title strip, inside the column's own chrome. */
-  toolbar?: ReactNode;
-  scrollRef?: (node: HTMLDivElement | null) => void;
   children: ReactNode;
 }) {
   return (
@@ -326,21 +409,58 @@ export function WorkspaceColumn({
       data-workspace-column={id}
       className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden border-l border-line first:border-l-0"
     >
-      <header className="flex h-[24px] flex-none items-center gap-2 border-b border-line bg-band px-2">
-        <span className="ui-panel-title min-w-0 truncate">{title}</span>
-        {action != null ? <span className="flex-none">{action}</span> : null}
-        {meta != null ? (
-          <span className="ui-component-metadata ml-auto flex-none">{meta}</span>
-        ) : null}
-      </header>
-      {toolbar}
-      <div
-        ref={scrollRef}
-        data-workspace-scroll={id}
-        className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden"
-      >
-        {children}
-      </div>
+      {children}
     </section>
+  );
+}
+
+/**
+ * A column's 24px title strip.
+ *
+ * Not a badge shelf. It carries the column's name at panel-title weight and, at most, one
+ * right-aligned muted count or state - so `Specifications 42` reads as a heading with a number, not
+ * as a heading with a control beside it. At most ONE compact command button sits on the line,
+ * between the name and the count: a column whose single action is a full toolbar row spends a whole
+ * row of vertical space on one button, and a second button belongs in a toolbar or a menu.
+ */
+export function WorkspaceColumnTitleStrip({
+  title,
+  meta,
+  action,
+}: {
+  title: ReactNode;
+  /** The optional right-side count or state. 10px, muted, never badge-styled. */
+  meta?: ReactNode;
+  action?: ReactNode;
+}) {
+  return (
+    <header className="flex h-[24px] flex-none items-center gap-2 border-b border-line bg-band px-2">
+      <span className="ui-panel-title min-w-0 truncate">{title}</span>
+      {action != null ? <span className="flex-none">{action}</span> : null}
+      {meta != null ? (
+        <span className="ui-component-metadata ml-auto flex-none">{meta}</span>
+      ) : null}
+    </header>
+  );
+}
+
+/** The one thing in a column that scrolls. Exactly one per column; the band never scrolls down. */
+export function WorkspaceColumnScroller({
+  id,
+  scrollRef,
+  children,
+}: {
+  id: WorkspaceColumnId;
+  scrollRef?: (node: HTMLDivElement | null) => void;
+  children: ReactNode;
+}) {
+  return (
+    <div
+      ref={scrollRef}
+      data-workspace-scroll={id}
+      className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden"
+    >
+      {children}
+    </div>
   );
 }

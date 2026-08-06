@@ -16,18 +16,30 @@
  * Expansion state persists per component in the ui session. `all` is the three expanded together,
  * which is the reading state: the whole point of the column is that a symbol and a footprint are
  * checked against each other. Focusing one asset compacts the other two and never removes them.
+ *
+ * THE COLUMN IS FIVE PLACEMENTS NOW (plan Phase 1): a title strip, the preferred-source row, and
+ * three placements of ONE module piece parameterised by representation kind. The document decides
+ * the order and which kinds are drawn; `CadColumnChrome` supplies what all five need and nothing
+ * else. The expansion state stays where it was - it is a per-component UI SESSION fact, a data need
+ * of the module, not a per-placement setting - because a person focusing the footprint on one part
+ * is not redesigning the workspace.
  */
-import { useMemo, type MutableRefObject } from "react";
+import { createContext, useContext, useMemo } from "react";
 import type { ComponentDossier, RepresentationKind } from "../../api/dossierTypes";
 import { useWriteCadPreference } from "../../api/queries";
-import type { RepresentationLayout } from "../../lib/uiSession";
 import { Text, useText } from "../../lib/copy";
 import { useToast } from "../../lib/toast";
+import type { PiecePartProps, RegionChromeProps } from "../../layout/LayoutRenderer";
+import { useWorkspaceRender } from "../../layout/workspaceRenderContext";
 import { Button } from "../primitives";
 import { CadAssetModule } from "./CadAssetModule";
 import { REPRESENTATION_KINDS } from "./cadAssetSet";
 import { PreferredSourceControl } from "./PreferredSourceControl";
-import { WorkspaceColumn } from "./WorkspaceColumns";
+import {
+  WorkspaceColumnFrame,
+  WorkspaceColumnScroller,
+  WorkspaceColumnTitleStrip,
+} from "./WorkspaceColumns";
 import { cadAssetStatus } from "./workspaceStatus";
 
 /** How many of the three assets are actually attached. The column strip's right-hand count. */
@@ -70,38 +82,30 @@ function numericSpecification(dossier: ComponentDossier, keys: string[]): number
   return null;
 }
 
-export function CadAssetsColumn({
-  componentId,
-  dossier,
-  layout,
-  onLayout,
-  onCompareSources,
-  onOpenFullPreview,
-  assetRefs,
-}: {
-  componentId: string;
-  dossier: ComponentDossier;
-  /** `all` expands the three; a kind expands that one and compacts the other two. */
-  layout: RepresentationLayout;
-  onLayout: (layout: RepresentationLayout) => void;
-  onCompareSources: () => void;
-  onOpenFullPreview: (kind: RepresentationKind) => void;
-  /** Where each module's element is kept, so the quality summary can scroll one into view. */
-  assetRefs: MutableRefObject<Partial<Record<RepresentationKind, HTMLElement | null>>>;
-}) {
-  const representations = dossier.cadAssets.kinds;
-  const preference = dossier.cadAssets.preference;
-  const columnTitle = useText("component-browser.column-cad", "CAD Assets");
-  const attached = attachedCount(dossier);
-  const pins = expectedPinCount(dossier);
-  const pitch = expectedPitch(dossier);
+/** What the column derives once and its pieces read. Never a second copy of the dossier. */
+interface CadColumnState {
+  attached: number;
+  pins: number | null;
+  pitch: number | null;
+  setAssetRef: Record<RepresentationKind, (node: HTMLElement | null) => void>;
+  writing: boolean;
+  choose: (provider: string) => void;
+  clear: () => void;
+}
+
+const CadColumnContext = createContext<CadColumnState | null>(null);
+
+/** The column's frame, and the one derivation its pieces share. */
+export function CadColumnChrome({ children }: RegionChromeProps) {
+  const workspace = useWorkspaceRender();
+  const componentId = workspace?.componentId ?? "";
   const write = useWriteCadPreference(componentId);
   const { toast } = useToast();
   const failed = useText(
     "component-browser.cad-source-failed",
     "Could not record the preferred source.",
   );
-
+  const assetRefs = workspace?.cad.assetRefs;
   // Stable per-kind callback refs, so a re-render does not detach and reattach every module.
   const setAssetRef = useMemo(
     () =>
@@ -109,80 +113,143 @@ export function CadAssetsColumn({
         REPRESENTATION_KINDS.map((kind) => [
           kind,
           (node: HTMLElement | null) => {
-            assetRefs.current[kind] = node;
+            if (assetRefs) assetRefs.current[kind] = node;
           },
         ]),
       ) as Record<RepresentationKind, (node: HTMLElement | null) => void>,
     [assetRefs],
   );
+  const dossier = workspace?.dossier;
+  const state = useMemo<CadColumnState | null>(() => {
+    if (!dossier) return null;
+    const report = (error: unknown) =>
+      toast(error instanceof Error ? error.message : failed, "err");
+    return {
+      attached: attachedCount(dossier),
+      pins: expectedPinCount(dossier),
+      pitch: expectedPitch(dossier),
+      setAssetRef,
+      writing: write.isPending,
+      choose: (provider: string) =>
+        write.mutate({ kind: "set-set-source", provider }, { onError: report }),
+      clear: () => write.mutate({ kind: "clear-set-source" }, { onError: report }),
+    };
+  }, [dossier, failed, setAssetRef, toast, write]);
 
-  const report = (error: unknown) =>
-    toast(error instanceof Error ? error.message : failed, "err");
-
+  if (!state) return null;
   return (
-    <WorkspaceColumn
-      id="cad"
-      devId="component-browser.column-cad"
+    <WorkspaceColumnFrame id="cad" devId="component-browser.column-cad">
+      <CadColumnContext.Provider value={state}>{children}</CadColumnContext.Provider>
+    </WorkspaceColumnFrame>
+  );
+}
+
+/**
+ * `CAD Assets  [Compare Sources]  2/3` - the column's one action, on the title line.
+ *
+ * It used to sit on a toolbar row of its own ABOVE the preferred source, so a ~300px column spent
+ * two full rows on chrome before the first drawing: measured, the two rows plus six rows of layer
+ * pills came to 14 bordered controls over the symbol. On the title line it costs no vertical space
+ * at all.
+ */
+export function CadTitleStripPart() {
+  const workspace = useWorkspaceRender();
+  const state = useContext(CadColumnContext);
+  if (!workspace || !state) return null;
+  return (
+    <WorkspaceColumnTitleStrip
       title={<Text id="component-browser.column-cad">CAD Assets</Text>}
-      meta={`${attached}/${REPRESENTATION_KINDS.length}`}
-      // `CAD Assets  [Compare Sources]  2/3` - the column's one action, on the title line, which is
-      // where the layout has always put it. It used to sit on a toolbar row of its own ABOVE the
-      // preferred source, so a ~300px column spent two full rows on chrome before the first
-      // drawing: measured, the two rows plus six rows of layer pills came to 14 bordered controls
-      // over the symbol. On the title line it costs no vertical space at all.
+      meta={`${state.attached}/${REPRESENTATION_KINDS.length}`}
       action={
-        <Button small data-dev-id="component-browser.compare-sources" onClick={onCompareSources}>
+        <Button
+          small
+          data-dev-id="component-browser.compare-sources"
+          onClick={workspace.cad.onCompareSources}
+        >
           <Text id="component-browser.compare-sources">Compare Sources</Text>
         </Button>
       }
-      toolbar={
-        // ONE row, and the set decision owns it: the preferred source is the only fact here whose
-        // VALUE has to be readable, so it gets the elastic width rather than sharing it with a
-        // button that has a permanent home on the line above.
-        <div className="flex min-w-0 flex-none items-center gap-2 border-b border-line px-2 py-1">
-          <span className="flex min-w-0 flex-1 items-center">
-            <PreferredSourceControl
-              preference={preference}
-              busy={write.isPending}
-              onChoose={(provider) =>
-                write.mutate({ kind: "set-set-source", provider }, { onError: report })
-              }
-              onClear={() => write.mutate({ kind: "clear-set-source" }, { onError: report })}
-            />
-          </span>
-          {/* The way back to the reading state. Offered only when one module is focused, because
-              a control that puts the column into the state it is already in is a dead click. */}
-          {layout === "all" ? null : (
-            <Button
-              small
-              data-dev-id="component-browser.show-all-assets"
-              onClick={() => onLayout("all")}
-              className="flex-none"
-            >
-              <Text id="component-browser.show-all-assets">Show All Three</Text>
-            </Button>
-          )}
-        </div>
-      }
-    >
+    />
+  );
+}
+
+/**
+ * ONE row, and the set decision owns it.
+ *
+ * The preferred source is the only fact here whose VALUE has to be readable, so it gets the elastic
+ * width rather than sharing it with a button that has a permanent home on the line above.
+ */
+export function CadPreferredSourcePart() {
+  const workspace = useWorkspaceRender();
+  const state = useContext(CadColumnContext);
+  if (!workspace || !state) return null;
+  const { layout, onLayout } = workspace.cad;
+  return (
+    <div className="flex min-w-0 flex-none items-center gap-2 border-b border-line px-2 py-1">
+      <span className="flex min-w-0 flex-1 items-center">
+        <PreferredSourceControl
+          preference={workspace.dossier.cadAssets.preference}
+          busy={state.writing}
+          onChoose={state.choose}
+          onClear={state.clear}
+        />
+      </span>
+      {/* The way back to the reading state. Offered only when one module is focused, because
+          a control that puts the column into the state it is already in is a dead click. */}
+      {layout === "all" ? null : (
+        <Button
+          small
+          data-dev-id="component-browser.show-all-assets"
+          onClick={() => onLayout("all")}
+          className="flex-none"
+        >
+          <Text id="component-browser.show-all-assets">Show All Three</Text>
+        </Button>
+      )}
+    </div>
+  );
+}
+
+/** The column's one scroller, and the group the three modules are read as. */
+export function CadBodyChrome({ children }: RegionChromeProps) {
+  const columnTitle = useText("component-browser.column-cad", "CAD Assets");
+  return (
+    <WorkspaceColumnScroller id="cad">
       <div aria-label={columnTitle} role="group">
-        {REPRESENTATION_KINDS.map((kind) => (
-          <CadAssetModule
-            key={kind}
-            componentId={componentId}
-            kind={kind}
-            view={representations[kind]}
-            preference={preference}
-            expectedPins={pins}
-            expectedPitch={pitch}
-            expanded={layout === "all" || layout === kind}
-            focused={layout === kind}
-            onToggle={() => onLayout(layout === kind ? "all" : kind)}
-            onOpenFullPreview={() => onOpenFullPreview(kind)}
-            focusRef={setAssetRef[kind]}
-          />
-        ))}
+        {children}
       </div>
-    </WorkspaceColumn>
+    </WorkspaceColumnScroller>
+  );
+}
+
+/**
+ * One representation module, named by the placement.
+ *
+ * `params.representation` is what distinguishes three appearances of one piece. A kind the document
+ * asks for that the projection does not carry draws nothing rather than an empty module.
+ */
+export function CadAssetModulePart({ placement }: PiecePartProps) {
+  const workspace = useWorkspaceRender();
+  const state = useContext(CadColumnContext);
+  if (!workspace || !state) return null;
+  const kind = placement.params?.representation as RepresentationKind | undefined;
+  if (!kind) return null;
+  const view = workspace.dossier.cadAssets.kinds[kind];
+  if (!view) return null;
+  const { layout, onLayout, onOpenFullPreview } = workspace.cad;
+  return (
+    <CadAssetModule
+      componentId={workspace.componentId}
+      kind={kind}
+      view={view}
+      preference={workspace.dossier.cadAssets.preference}
+      expectedPins={state.pins}
+      expectedPitch={state.pitch}
+      expanded={layout === "all" || layout === kind}
+      focused={layout === kind}
+      onToggle={() => onLayout(layout === kind ? "all" : kind)}
+      onOpenFullPreview={() => onOpenFullPreview(kind)}
+      focusRef={state.setAssetRef[kind]}
+    />
   );
 }
