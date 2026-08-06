@@ -15,6 +15,15 @@
  * persist, applying an alternate, the sourcing refresh and the delete. One owner for the mutations
  * means one place decides what a failure says and what a success invalidates, and the columns stay
  * renderers. The windows those writes open live in `WorkspaceSurfaces`.
+ *
+ * THE ARRANGEMENT IS A DOCUMENT NOW (plan Phase 1). The three bands, the three columns and every
+ * section in them are no longer composed here: `DEFAULT_WORKSPACE_LAYOUT` says what goes where and
+ * `WorkspaceDocumentView` walks it. Nothing about ownership moved with them. This module still holds
+ * the mutations, the refs, the surface state and the lifted specification filter, and hands them to
+ * the renderer as ONE typed object - which is the same prop drilling it always did, with the chain
+ * replaced by a context because there is no longer a fixed chain to drill down. The loading, failed
+ * and empty states stay here too: they REPLACE the workspace rather than sitting in it, so they are
+ * not placements and the document does not model them.
  */
 import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
 import {
@@ -30,9 +39,9 @@ import {
 } from "../../api/queries";
 import { ApiError } from "../../api/client";
 import type { RepresentationKind } from "../../api/dossierTypes";
-import { componentDevId } from "../../lib/componentDevIds";
+import { WorkspaceDocumentView } from "../../layout/workspaceBindings";
+import type { WorkspaceRenderContext } from "../../layout/workspaceRenderContext";
 import { Text, useText } from "../../lib/copy";
-import { useDevMode } from "../../lib/devMode";
 import { useToast } from "../../lib/toast";
 import {
   componentView,
@@ -44,19 +53,12 @@ import {
 import { EnrichPanel } from "../EnrichPanel";
 import type { PreviewKind } from "../PreviewModal";
 import { ErrorState, LoadingState } from "../primitives";
-import { CadAssetsColumn } from "./CadAssetsColumn";
-import { ComponentHeader } from "./ComponentHeader";
 import { WorkspaceShellDialogs, type ShellDialog } from "./ShellActions";
-import { SourcingColumn } from "./SourcingColumn";
-import { SpecificationsColumn } from "./SpecificationsColumn";
-import { WorkspaceColumns } from "./WorkspaceColumns";
-import { WorkspaceStatusBar } from "./WorkspaceStatusBar";
 import { WorkspaceSurfaces, type WorkspaceSurface } from "./WorkspaceSurfaces";
 import { previewKindFor } from "./cadAssetSet";
 import { manageMenuItems, shellManageItems } from "./manageActions";
 import { cadFocusKind, type QualitySegmentKind } from "./componentIdentity";
 import { openKindFor, type DatasheetTarget } from "./datasheetWorkflow";
-import { sourcingIsSparse, sourcingSectionFill } from "./sourcingSections";
 import type { SpecFilter } from "./specificationRows";
 
 export function ComponentWorkspace({
@@ -80,9 +82,6 @@ export function ComponentWorkspace({
   const shell = usePartShellQuery(componentId);
   const revealFiles = useRevealPartFiles();
   const { toast } = useToast();
-  // Only to decide the sourcing column's width: developer mode always fills Technical Diagnostics,
-  // so a column that is empty for everyone else is not empty here and must not be narrowed.
-  const { enabled: developerMode } = useDevMode();
   const [preview, setPreview] = useState<PreviewKind | null>(null);
   const [surface, setSurface] = useState<WorkspaceSurface | null>(null);
   const [datasheet, setDatasheet] = useState<DatasheetTarget | null>(null);
@@ -210,140 +209,119 @@ export function ComponentWorkspace({
     ? facets.data.category_catalog
     : categories;
 
+  // Everything the placed pieces read, assembled by the one module that owns it. Not memoised, and
+  // deliberately: the callbacks below are the same fresh closures the three columns used to be given
+  // as props every render, so nothing here re-renders more or less often than it did before.
+  const context: WorkspaceRenderContext = {
+    componentId,
+    dossier,
+    header: {
+      manageItems,
+      onQualitySegment,
+      onOpenDatasheet: setDatasheet,
+      onFindDatasheet: () => setSurface("provenance"),
+    },
+    cad: {
+      layout: view.representation_layout,
+      onLayout: (layout: RepresentationLayout) => patchView({ representation_layout: layout }),
+      onCompareSources: () => setSurface("cad-sources"),
+      onOpenFullPreview: (kind) => setPreview(previewKindFor(kind)),
+      assetRefs,
+    },
+    specifications: {
+      filter: specFilter,
+      onFilter: setSpecFilter,
+      scrollRef: specScrollRef,
+      onViewPinout: () => setSurface("pinout"),
+    },
+    sourcing: {
+      onViewOffers: () => setSurface("offers"),
+      onViewProvenance: () => setSurface("provenance"),
+      onOpenDocument: (id) => {
+        const item = dossier.documents.items.find((entry) => entry.id === id);
+        if (item) setDatasheet({ id, document: item, kind: openKindFor(item) });
+      },
+      onRefresh: () => refresh.run(),
+      refreshing,
+      scrollRef: sourcingScrollRef,
+    },
+    status: {
+      activity: deletePart.isPending
+        ? "deleting"
+        : refreshing
+          ? "refreshing"
+          : busy
+            ? "saving"
+            : "idle",
+    },
+  };
+
   return (
-    <div
-      data-dev-id="component-browser.root"
-      className="flex h-full min-h-0 flex-col overflow-hidden"
-    >
-      <div
-        data-dev-id={componentDevId(componentId)}
-        className="flex min-h-0 flex-1 flex-col overflow-hidden"
-      >
-        <ComponentHeader
-          dossier={dossier}
-          manageItems={manageItems}
-          onQualitySegment={onQualitySegment}
-          onOpenDatasheet={setDatasheet}
-          onFindDatasheet={() => setSurface("provenance")}
-        />
-
-        <WorkspaceColumns
-          // A component nobody has sourced can only fill the sourcing column with five lifecycle
-          // rows, so the column takes the width that content needs and Specifications takes the rest
-          // until an offer, a price, a document, a related part or a provenance record arrives.
-          sparseSourcing={sourcingIsSparse(sourcingSectionFill(dossier, developerMode))}
-          cad={
-            <CadAssetsColumn
-              componentId={componentId}
-              dossier={dossier}
-              layout={view.representation_layout}
-              onLayout={(layout: RepresentationLayout) =>
-                patchView({ representation_layout: layout })
-              }
-              onCompareSources={() => setSurface("cad-sources")}
-              onOpenFullPreview={(kind) => setPreview(previewKindFor(kind))}
-              assetRefs={assetRefs}
-            />
-          }
-          specifications={
-            <SpecificationsColumn
-              componentId={componentId}
-              dossier={dossier}
-              filter={specFilter}
-              onFilter={setSpecFilter}
-              scrollRef={specScrollRef}
-              onViewPinout={() => setSurface("pinout")}
-            />
-          }
-          sourcing={
-            <SourcingColumn
-              dossier={dossier}
-              onViewOffers={() => setSurface("offers")}
-              onViewProvenance={() => setSurface("provenance")}
-              onOpenDocument={(id) => {
-                const item = dossier.documents.items.find((entry) => entry.id === id);
-                if (item) setDatasheet({ id, document: item, kind: openKindFor(item) });
-              }}
-              onRefresh={() => refresh.run()}
-              refreshing={refreshing}
-              scrollRef={sourcingScrollRef}
-            />
-          }
-        />
-
-        <WorkspaceStatusBar
-          dossier={dossier}
-          activity={
-            deletePart.isPending
-              ? "deleting"
-              : refreshing
-                ? "refreshing"
-                : busy
-                  ? "saving"
-                  : "idle"
-          }
-        />
-      </div>
-
-      <WorkspaceShellDialogs
-        componentId={componentId}
-        shell={shell.data}
-        open={shellDialog}
-        onClose={() => setShellDialog(null)}
-        onFailure={failure}
-      />
-
-      <WorkspaceSurfaces
-        componentId={componentId}
-        dossier={dossier}
-        surface={surface}
-        onCloseSurface={() => setSurface(null)}
-        preview={preview}
-        onClosePreview={() => setPreview(null)}
-        datasheet={datasheet}
-        onCloseDatasheet={() => setDatasheet(null)}
-        categoryOptions={categoryOptions}
-        busy={busy}
-        refresh={{ run: refresh.run, running: refreshing }}
-        identityDetail={identityDetail}
-        onEditField={applyField}
-        onMoveCategory={(category) =>
-          moveCategory.mutate(
-            { id: componentId, category },
-            {
-              onSuccess: () => toast(`${movedLabel} ${category}`, "ok"),
-              onError: (error) => failure(error, moveFailed),
-            },
-          )
-        }
-        onPinoutSaved={() => toast(pinoutSaved, "ok")}
-        onPinoutFailed={(error) => failure(error, pinoutFailed)}
-        enrich={
-          <EnrichPanel
-            mpn={dossier.identity.mpn}
-            category={dossier.identity.category}
-            current={{
-              manufacturer: dossier.identity.manufacturer,
-              description: dossier.qualitySummary.description,
-            }}
-            busy={busy}
-            onApply={applyField}
+    <WorkspaceDocumentView
+      context={context}
+      overlays={
+        <>
+          <WorkspaceShellDialogs
+            componentId={componentId}
+            shell={shell.data}
+            open={shellDialog}
+            onClose={() => setShellDialog(null)}
+            onFailure={failure}
           />
-        }
-        confirmDelete={confirmDelete}
-        deleting={deletePart.isPending}
-        onCancelDelete={() => setConfirmDelete(false)}
-        onConfirmDelete={() => {
-          setConfirmDelete(false);
-          deletePart.mutate(componentId, {
-            // The page owns the aftermath: it holds the selection, and it is still mounted after
-            // this workspace goes, which is where an Undo has to live.
-            onSuccess: () => onDeleted?.(componentId),
-            onError: (error) => failure(error, deleteFailed),
-          });
-        }}
-      />
-    </div>
+
+          <WorkspaceSurfaces
+            componentId={componentId}
+            dossier={dossier}
+            surface={surface}
+            onCloseSurface={() => setSurface(null)}
+            preview={preview}
+            onClosePreview={() => setPreview(null)}
+            datasheet={datasheet}
+            onCloseDatasheet={() => setDatasheet(null)}
+            categoryOptions={categoryOptions}
+            busy={busy}
+            refresh={{ run: refresh.run, running: refreshing }}
+            identityDetail={identityDetail}
+            onEditField={applyField}
+            onMoveCategory={(category) =>
+              moveCategory.mutate(
+                { id: componentId, category },
+                {
+                  onSuccess: () => toast(`${movedLabel} ${category}`, "ok"),
+                  onError: (error) => failure(error, moveFailed),
+                },
+              )
+            }
+            onPinoutSaved={() => toast(pinoutSaved, "ok")}
+            onPinoutFailed={(error) => failure(error, pinoutFailed)}
+            enrich={
+              <EnrichPanel
+                mpn={dossier.identity.mpn}
+                category={dossier.identity.category}
+                current={{
+                  manufacturer: dossier.identity.manufacturer,
+                  description: dossier.qualitySummary.description,
+                }}
+                busy={busy}
+                onApply={applyField}
+              />
+            }
+            confirmDelete={confirmDelete}
+            deleting={deletePart.isPending}
+            onCancelDelete={() => setConfirmDelete(false)}
+            onConfirmDelete={() => {
+              setConfirmDelete(false);
+              deletePart.mutate(componentId, {
+                // The page owns the aftermath: it holds the selection, and it is still mounted
+                // after this workspace goes, which is where an Undo has to live.
+                onSuccess: () => onDeleted?.(componentId),
+                onError: (error) => failure(error, deleteFailed),
+              });
+            }}
+          />
+        </>
+      }
+    />
   );
 }
 
