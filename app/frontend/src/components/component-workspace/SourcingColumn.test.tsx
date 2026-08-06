@@ -4,9 +4,11 @@
  * Three decisions here are the kind a well-meaning change silently undoes, so each of them is
  * asserted rather than left to a screenshot:
  *
- *   * THE ORDER. Six sections, fixed, with the source ledger last. It is the easiest thing in the
- *     world to move a provenance block up "so people can see where the data came from", and doing
- *     it puts an explanation above the thing it explains.
+ *   * THE ORDER. Six sections, with the source ledger last. It is the easiest thing in the world to
+ *     move a provenance block up "so people can see where the data came from", and doing it puts an
+ *     explanation above the thing it explains. Reframed for Phase 2: the order is stated by the LAYOUT
+ *     DOCUMENT and pinned in `layout/defaultWorkspaceLayout.test.ts`, so what this file asserts is that
+ *     the rendered column agrees with the document it was drawn from - including after a reveal.
  *   * THE REFRESH. A refresh that empties the offers table before repopulating it is
  *     indistinguishable, on screen, from a part no distributor carries. Stale numbers with their
  *     staleness stated are strictly better, and the rule has to hold even when the projection
@@ -40,6 +42,9 @@ import {
   makeRevisionEvent,
   makeSourceLedgerEntry,
 } from "../../test/dossierFixture";
+import { DEFAULT_WORKSPACE_LAYOUT } from "../../layout/defaultWorkspaceLayout";
+import { findRegion } from "../../layout/document";
+import { WORKSPACE_PIECE_REGISTRY, WORKSPACE_REGION } from "../../layout/workspacePieces";
 import { ComponentWorkspace } from "./ComponentWorkspace";
 import { OffersSection } from "./OffersSection";
 import { volumeBreak } from "./offerFacts";
@@ -156,42 +161,47 @@ function region(devId: string): HTMLElement {
   return document.querySelector<HTMLElement>(`[data-dev-id="${devId}"]`)!;
 }
 
-/** The order the sections actually appear in the document, by their catalogue ids. */
+/**
+ * THE SECTIONS ON SCREEN, in the order the rendered column stacks them.
+ *
+ * Reframed for Phase 2: the expected order is no longer a list typed out here, it is READ OFF THE
+ * LAYOUT DOCUMENT (see `documentSectionOrder`), because the order of the sections is the document's to
+ * state and a committed redesign is allowed to change it. What the tests below still use this for is
+ * WHICH sections drew at all, which is content-driven behaviour and is this file's business.
+ */
 function sectionOrder(): string[] {
-  const ids = [
-    "component-browser.lifecycle",
-    "component-browser.offers",
-    "component-browser.pricing",
-    "component-browser.documents",
-    "component-browser.related",
-    "component-browser.provenance",
-  ];
+  const known = new Set(documentSectionOrder());
   const column = region("component-browser.column-sourcing");
   return Array.from(column.querySelectorAll<HTMLElement>("[data-dev-id]"))
     .map((node) => node.dataset.devId!)
-    .filter((id) => ids.includes(id));
+    .filter((id) => known.has(id));
+}
+
+/**
+ * The six sections' dev ids, in the order the layout document places them.
+ *
+ * Resolved through the piece registry - each placement names a piece, each manifest names the dev ids
+ * that piece renders, and the section's own id is the first of them - so this is the document's order
+ * rather than a second copy of it. The reveal control at the bottom is not a section and is dropped.
+ */
+function documentSectionOrder(): string[] {
+  const body = findRegion(DEFAULT_WORKSPACE_LAYOUT, WORKSPACE_REGION.sourcingBody);
+  return (body?.slots ?? [])
+    .map((slot) => (slot.content?.kind === "placement" ? slot.content.piece : ""))
+    .filter((piece) => piece && piece !== "workspace.sourcing-empty-sections")
+    .map((piece) => WORKSPACE_PIECE_REGISTRY.get(piece)?.devIds[0] ?? piece);
 }
 
 describe("the column's shape", () => {
-  it("asks the six questions in the order a person asks them, ledger last", async () => {
-    await open(
-      makeDossier({
-        distributorOffers: [makeOffer()],
-        supplySummary: { offerCount: 1, totalStock: 512 },
-        documents: { items: [makeDocument()], count: 1 },
-        relatedParts: [makeRelatedPart()],
-        provenance: { sources: [makeSourceLedgerEntry()] },
-      }),
-    );
-    expect(sectionOrder()).toEqual([
-      "component-browser.lifecycle",
-      "component-browser.offers",
-      "component-browser.pricing",
-      "component-browser.documents",
-      "component-browser.related",
-      "component-browser.provenance",
-    ]);
-  });
+  // Reframed for Phase 2, and moved: "asks the six questions in the order a person asks them, ledger
+  // last" rendered a fully-sourced component and read the six section dev ids back out of the column.
+  // That order is the layout document's, and it is now written out in full over
+  // `DEFAULT_WORKSPACE_LAYOUT` in `layout/defaultWorkspaceLayout.test.ts` ("asks the six sourcing
+  // questions in the order a person asks them, ledger last"), where a redesign is a different document
+  // and a regression in the shipped one still fails. That the renderer draws a region's slots in the
+  // document's order is `layout/engineInvariants.test.tsx`, held for arbitrary documents. Nothing was
+  // dropped: the ORDER assertions the reveal test below makes are now made against the document's own
+  // order, which is strictly more than this test asserted.
 
   it("keeps the manufacturer's own status apart from the library's lifecycle", async () => {
     await open(
@@ -272,14 +282,11 @@ describe("the empty sections", () => {
     expect(toggle).toHaveAttribute("aria-expanded", "false");
 
     await user.click(toggle);
-    expect(sectionOrder()).toEqual([
-      "component-browser.lifecycle",
-      "component-browser.offers",
-      "component-browser.pricing",
-      "component-browser.documents",
-      "component-browser.related",
-      "component-browser.provenance",
-    ]);
+    // Every section is back, in the order the DOCUMENT places them - the reveal adds sections, it does
+    // not rearrange the column. Compared against the document rather than against a list typed here,
+    // so a committed redesign moves both sides at once and only a reveal that reordered things fails.
+    expect(sectionOrder()).toEqual(documentSectionOrder());
+    expect(documentSectionOrder()).toHaveLength(6);
     // Revealed, the sentences are back: the information was hidden, never removed.
     expect(screen.getByText(/No distributor has quoted/)).toBeInTheDocument();
     expect(

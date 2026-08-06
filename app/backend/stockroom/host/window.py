@@ -29,6 +29,11 @@ _log = logging.getLogger("stockroom.host.window")
 
 _ACTIVE_WINDOW = None
 _FETCH_WINDOW = None
+#: The loopback SPA origin of the running host, known before the window opens. A new-window
+#: request from a document on this origin is Stockroom's own; anything else is a provider page.
+_APP_ORIGIN = ""
+#: The window's tab strip and page controls, once mounted.
+_WINDOW_CHROME = None
 _NATIVE_DOWNLOAD_GUARD = threading.RLock()
 _NATIVE_DOWNLOAD_LEASE: str | None = None
 _NATIVE_DOWNLOAD_SEQUENCE = 0
@@ -57,6 +62,12 @@ def _is_windows() -> bool:
 
 def active_window():
     return _ACTIVE_WINDOW
+
+
+def window_chrome():
+    """The mounted tab strip, or None on a host that has not opened a window."""
+
+    return _WINDOW_CHROME
 
 
 @dataclass(slots=True)
@@ -166,6 +177,8 @@ class InAppProviderBrowserSurface:
             lease_token = _begin_native_webview_download_lease()
             resume_url = ""
 
+            chrome = window_chrome()
+
             def show() -> None:
                 if resume_url:
                     # pywebview navigation is asynchronous. Reload the remembered provider URL
@@ -176,9 +189,13 @@ class InAppProviderBrowserSurface:
                     window.show()
                 except Exception:  # noqa: BLE001 - an already-visible window is usable
                     pass
+                if chrome is not None:
+                    chrome.provider_shown()
 
             def hide() -> None:
                 nonlocal resume_url
+                if chrome is not None:
+                    chrome.provider_hidden()
                 try:
                     current = current_url()
                     if current and not should_inject(current, self._app_url):
@@ -191,6 +208,15 @@ class InAppProviderBrowserSurface:
                 if type(url) is not str or not url or url != url.strip():
                     raise ValueError("provider URL must be exact non-empty text")
                 window.load_url(url)
+                if chrome is not None:
+                    # The tab is named after the provider whose page this is, and the page is
+                    # what the person is looking at once capture has navigated to it.
+                    chrome.open_provider_route(
+                        label=_resolve_route_tab_label(url),
+                        show=show,
+                        hide=hide,
+                    )
+                    chrome.provider_shown()
 
             def current_url() -> str:
                 try:
@@ -294,6 +320,16 @@ class InAppProviderBrowserSurface:
 
             try:
                 self._active_show = show
+                if chrome is not None:
+                    # A route is open before its first page loads, so the tab exists from here
+                    # under the plain word; the first navigation names it for its provider. It
+                    # does not steal the selection: a lease can begin while the person is still
+                    # reading Stockroom.
+                    chrome.open_provider_route(
+                        label=PROVIDER_TAB_FALLBACK,
+                        show=show,
+                        hide=hide,
+                    )
                 yield InAppProviderBrowserLease(
                     _show=show,
                     _hide=hide,
@@ -306,10 +342,24 @@ class InAppProviderBrowserSurface:
             finally:
                 self._active_show = None
                 _end_native_webview_download_lease(lease_token)
+                if chrome is not None:
+                    chrome.close_provider_route()
                 try:
                     window.load_url(self._app_url)
                 except Exception:  # noqa: BLE001 - teardown must not mask capture evidence
                     _log.exception("could not restore Stockroom after provider capture")
+
+
+#: The word a provider tab wears before its first page has named it.
+PROVIDER_TAB_FALLBACK = "Provider"
+
+
+def _resolve_route_tab_label(url: str) -> str:
+    """Name the provider tab from the page the route is on."""
+
+    from stockroom.host.window_chrome import resolve_provider_tab_label
+
+    return resolve_provider_tab_label(url=url)
 
 
 def fetch_window():
@@ -1115,6 +1165,144 @@ def _install_silent_webview2_download_handler(
     setattr(edge_cls, "_stockroom_silent_downloads", True)
 
 
+def _mark_new_window_handled(args) -> None:
+    """Consume the request before deciding anything, so no path can leak to the shell."""
+
+    try:
+        setter = getattr(args, "set_Handled", None)
+        if callable(setter):
+            setter(True)
+        else:
+            args.Handled = True
+    except Exception:  # noqa: BLE001 - an unmarked request is refused below regardless
+        _log.debug("could not consume a new-window request", exc_info=True)
+
+
+def _new_window_request_url(args) -> str:
+    getter = getattr(args, "get_Uri", None)
+    try:
+        return str((getter() if callable(getter) else getattr(args, "Uri", "")) or "")
+    except Exception:  # noqa: BLE001 - an unreadable target is not a target
+        return ""
+
+
+def _new_window_document_is_stockroom(browser, sender) -> bool:
+    """Whether the page that asked for a new window is Stockroom's own SPA.
+
+    Fails closed: an unknown document is treated as a provider page, so the request stays
+    inside this window rather than being handed to whatever program claims the scheme.
+    """
+
+    if not _APP_ORIGIN:
+        return False
+    for candidate in (
+        getattr(sender, "Source", None),
+        getattr(browser, "url", None),
+    ):
+        text = str(candidate or "")
+        if text:
+            return should_inject(text, _APP_ORIGIN)
+    return False
+
+
+def _install_in_window_new_window_handler(edge_cls=None) -> None:
+    """Keep a provider page's ``target="_blank"`` inside Stockroom.
+
+    pywebview ships ``OPEN_EXTERNAL_LINKS_IN_BROWSER`` switched on, so its own
+    ``on_new_window_request`` hands the URL to ``webbrowser.open`` - the person's default browser,
+    outside Stockroom, outside the lease, and outside the download journal that proves a file
+    belongs to one component. That is exactly what a provider page must never be able to do.
+
+    A request from a provider page is therefore navigated in this same window under the same
+    lease, after the same https/no-credentials gate the native host applies. A request from
+    Stockroom's own SPA keeps pywebview's behaviour: those links are Stockroom's, and opening one
+    in the person's browser is the deliberate existing outcome.
+    """
+
+    if edge_cls is None:
+        try:
+            from webview.platforms.edgechromium import EdgeChrome
+        except (ImportError, ModuleNotFoundError):
+            # Test doubles and non-Windows backends expose no EdgeChrome and have no WebView2
+            # new-window handler to replace.
+            return
+        edge_cls = EdgeChrome
+    if bool(getattr(edge_cls, "_stockroom_in_window_new_windows", False)):
+        return
+
+    from stockroom.host.window_chrome import new_window_url_allowed
+
+    original_handler = edge_cls.on_new_window_request
+
+    def on_new_window_request(self, sender, args) -> None:
+        _mark_new_window_handled(args)
+        if _new_window_document_is_stockroom(self, sender):
+            original_handler(self, sender, args)
+            return
+        url = _new_window_request_url(args)
+        if not new_window_url_allowed(url):
+            # Refused rather than redirected. A scheme the operating system would route to
+            # another program is not a provider page's decision to make.
+            return
+        try:
+            self.load_url(url)
+        except Exception:  # noqa: BLE001 - a window mid-navigation keeps the current page
+            _log.debug("could not open a provider link in this window", exc_info=True)
+
+    edge_cls.on_new_window_request = on_new_window_request
+    setattr(edge_cls, "_stockroom_in_window_new_windows", True)
+
+
+def _subscribe_window_event(window, name: str, handler) -> bool:
+    """Attach ``handler`` to one pywebview window event when that event exists.
+
+    Older pywebview releases and the window doubles used in tests do not carry every event. A
+    missing one costs its own feature and nothing else.
+    """
+
+    events = getattr(window, "events", None)
+    hook = getattr(events, name, None)
+    if hook is None:
+        return False
+    try:
+        setattr(events, name, hook + handler)
+    except Exception:  # noqa: BLE001 - an unsubscribable event simply has no subscriber
+        _log.debug("could not subscribe to the window %s event", name, exc_info=True)
+        return False
+    return True
+
+
+def _mount_window_chrome(window) -> None:
+    """Put the tab strip and page controls on the window, on the window's own thread."""
+
+    global _WINDOW_CHROME
+    from stockroom.host.window_chrome import WindowChrome
+
+    form = getattr(window, "native", None)
+    if form is None:
+        return
+    chrome = WindowChrome()
+    if not chrome.mount(form):
+        return
+    _WINDOW_CHROME = chrome
+
+
+def _attach_window_chrome_page(window) -> None:
+    """Follow the WebView's navigation so Back / Forward / the address describe the real page."""
+
+    chrome = _WINDOW_CHROME
+    if chrome is None:
+        return
+    core = None
+    try:
+        core = window.native.browser.webview.CoreWebView2
+    except Exception:  # noqa: BLE001 - a backend without WebView2 simply has no page controls
+        _log.debug("window chrome found no WebView2 to follow", exc_info=True)
+    if core is None:
+        return
+    chrome.dispatch(lambda: chrome.attach_core(core))
+
+
 class ManagedWindowController:
     """Native-only command surface for one replacement WebView window.
 
@@ -1268,7 +1456,7 @@ def run_managed_window(
 ) -> None:
     """Run one hidden-first replacement window until its native HWND closes."""
 
-    global _ACTIVE_WINDOW
+    global _ACTIVE_WINDOW, _APP_ORIGIN
     if not callable(command_loop):
         raise TypeError("command_loop must be callable")
     resolved_profile = Path(profile_dir).resolve()
@@ -1278,6 +1466,8 @@ def run_managed_window(
     import webview  # pywebview, WebView2 backend on Windows
 
     _install_silent_webview2_download_handler(webview)
+    _APP_ORIGIN = base_url
+    _install_in_window_new_window_handler()
 
     try:
         webview.settings["ALLOW_DOWNLOADS"] = True
@@ -1380,11 +1570,15 @@ def run_managed_window(
 def run_window(base_url: str, token: str) -> None:
     """Open Stockroom's visible WebView2 shell and block until it closes."""
 
-    global _ACTIVE_WINDOW
+    global _ACTIVE_WINDOW, _APP_ORIGIN, _WINDOW_CHROME
     _configure_windows_process_identity()
     import webview  # pywebview, WebView2 backend on Windows; lazy so Linux imports
 
     _install_silent_webview2_download_handler(webview)
+    # Known before the window exists, so the very first new-window request can already tell
+    # Stockroom's own page from a provider's.
+    _APP_ORIGIN = base_url
+    _install_in_window_new_window_handler()
 
     from stockroom.store.machine_config import config_dir
 
@@ -1466,7 +1660,16 @@ def run_window(base_url: str, token: str) -> None:
             daemon=True,
         ).start()
 
+    # ``before_show`` is pywebview's one synchronous, window-thread event: the WinForms form
+    # exists and no page has painted yet, which is exactly when chrome may be added. ``loaded``
+    # runs on a worker thread, so it only marshals the page hookup across.
+    _subscribe_window_event(
+        window,
+        "before_show",
+        lambda: _mount_window_chrome(window),
+    )
     window.events.loaded += _on_loaded
+    window.events.loaded += lambda: _attach_window_chrome_page(window)
     window.events.loaded += lambda: _apply_window_icon(window)
 
     profile_dir = config_dir() / "webview-profile"
@@ -1479,3 +1682,4 @@ def run_window(base_url: str, token: str) -> None:
     finally:
         _release_window_icons(window)
         _ACTIVE_WINDOW = None
+        _WINDOW_CHROME = None

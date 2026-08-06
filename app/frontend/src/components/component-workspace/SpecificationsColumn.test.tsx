@@ -119,14 +119,19 @@ function searchBox(): HTMLElement {
 }
 
 describe("searching the specification sheet", () => {
-  it("is a real inline input in the column's own toolbar, not a separate surface", () => {
+  it("is a real inline input, not a separate surface", () => {
     open();
     const input = searchBox();
     expect(input).toHaveAttribute("placeholder", "Search specifications…");
-    // Above the scroller, inside the column, alongside the four filters.
-    expect(
-      input.closest(devIdSelector("component-browser.column-specifications")),
-    ).not.toBeNull();
+    // A search INPUT on the surface itself: not a button that opens one, and not a link that
+    // navigates. Reframed for Phase 2: where the input sits - on the toolbar band, above the column's
+    // one scroller, beside the filters - is the layout document's, and is pinned over
+    // `DEFAULT_WORKSPACE_LAYOUT` in `layout/defaultWorkspaceLayout.test.ts` ("puts the specifications
+    // toolbar above the scroller, with search, filters and anchors on it").
+    expect(input.tagName).toBe("INPUT");
+    expect(input.getAttribute("type")).toBe("search");
+    expect(input.closest("a")).toBeNull();
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 
   it("narrows by label", async () => {
@@ -257,8 +262,12 @@ describe("the section anchor strip", () => {
     const strip = document.querySelector<HTMLElement>(
       devIdSelector("component-browser.spec-anchors"),
     )!;
-    // It wraps. A horizontal scroller here would be a fourth scroll owner in a workspace that
-    // has exactly three, and nobody can predict which one a wheel gesture moves.
+    // It wraps rather than scrolling: a scroller inside a column that already owns one is a surface
+    // nobody can predict a wheel gesture on. Reframed for Phase 2 - only the COMMENT, because the
+    // assertion is about this strip and stays here: the count of the workspace's scroll owners is the
+    // document's ("gives each column region exactly one scroller, and the root none" in
+    // `layout/defaultWorkspaceLayout.test.ts`), and the rule that no piece may add an undeclared one,
+    // for any document and any amount of content, is `layout/engineInvariants.test.tsx`.
     expect(strip.className).toContain("flex-wrap");
     expect(strip.className).not.toContain("overflow-x");
   });

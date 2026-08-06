@@ -836,21 +836,17 @@ describe("the opened component is provider-neutral", () => {
 });
 
 describe("the workspace surface contract", () => {
-  it("scrolls in the three columns and nowhere else", async () => {
-    await open(bigSpecs());
-    const root = document.querySelector<HTMLElement>('[data-dev-id="component-browser.root"]')!;
-    expect(root.className).toContain("h-full");
-    expect(root.className).toContain("min-h-0");
-    expect(root.className).toContain("overflow-hidden");
-    // Exactly three vertical scroll owners: one per column, and nothing above them.
-    const scrollers = document.querySelectorAll("[data-workspace-scroll]");
-    expect(scrollers).toHaveLength(3);
-    for (const section of document.querySelectorAll<HTMLElement>(
-      '[data-dev-id="component-browser.spec-group"], [data-dev-id="component-browser.lifecycle"]',
-    )) {
-      expect(section.className).not.toContain("overflow-y-auto");
-    }
-  });
+  // Reframed for Phase 2, and moved out of this file: "scrolls in the three columns and nowhere else"
+  // opened a component with an enormous specification sheet and read the overflow classes off the
+  // root, counted the three `[data-workspace-scroll]` elements, and checked that no section had grown
+  // one of its own. Every one of those claims is now an ENGINE INVARIANT in
+  // `layout/engineInvariants.test.tsx`, held for arbitrary layout documents rather than for the one
+  // that ships: the frame clips both axes and nothing scrolls outside it, each scroller owns exactly
+  // one axis, no region scroller nests inside another on the same axis, and pathological content adds
+  // no scroll container at all - which is this test's `bigSpecs()` case, generalised (forty groups,
+  // thirty offers) and asserted as a difference against the ordinary render rather than as a count of
+  // three. The three-per-column half is the document's, and is asserted over
+  // `DEFAULT_WORKSPACE_LAYOUT` in `layout/defaultWorkspaceLayout.test.ts`.
 
   it("traps focus, closes on Escape, and hands focus back to the control that opened it", async () => {
     const { user, trigger, dialog } = await openSheet(

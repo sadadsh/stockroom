@@ -19,6 +19,8 @@ Usage
     uv run python scripts/uishot.py --surface components
     uv run python scripts/uishot.py --surface search --themes dark
     uv run python scripts/uishot.py --surface components --width 1100   # narrow-width clipping
+    uv run python scripts/uishot.py --surface projects --seed
+    uv run python scripts/uishot.py --surface stm --seed
     uv run python scripts/uishot.py --surface all --out build/shots
 
 `--width` is the lever for responsive checks: the detail pane's fixed-width chain means
@@ -44,10 +46,19 @@ _SURFACE_CHOICES = (
     "search",
     "part-vendor-data",
     "ingest",
+    # The two rail destinations that had no driver at all. A route the harness cannot reach is a
+    # route nobody reviews: the Phase 0 baseline photographed Projects and STM Viewer in the RAIL
+    # of all thirty shots and neither route itself, because `_goto_surface` raised SystemExit for
+    # any name not listed here. Registered so later phases can see them.
+    "projects",
+    "stm",
     "settings",
     "all",
 )
-_ALL_SURFACES = ("components", "search", "settings")
+# `all` means the ordinary rail destinations - the surfaces that are a whole page rather than a
+# modal or an overlay over another one. Projects and STM Viewer belong to that set and were
+# missing from it only because they had no driver.
+_ALL_SURFACES = ("components", "search", "projects", "stm", "settings")
 
 # Token probe: the values a visual regression most often silently breaks. Reported with
 # every run so a shot is never interpreted against an unknown token state.
@@ -180,6 +191,94 @@ def _browser_failures(console: list[str], http: dict[str, int]) -> list[str]:
         if label.startswith("FAILED ") or label.startswith("5")
     )
     return failures
+
+
+# The element a screenshot of this surface is a picture OF: the surface's own root. Keyed per
+# surface so `_await_opaque` can NAME what it waited on rather than reporting "something faded".
+# `part-vendor-data` shares the components root because it IS the components page, driven deeper.
+_SURFACE_ROOT: dict[str, str] = {
+    "components": "components.root",
+    "part-vendor-data": "components.root",
+    "search": "search.root",
+    # the modal itself, not the page under it: the modal is the thing that fades in, and it is what
+    # the ingest shot is a picture of.
+    "ingest": "addpart.root",
+    "projects": "projects.root",
+    "stm": "stm.root",
+    "settings": "settings.root",
+}
+
+# True once the capture target is FULLY OPAQUE - itself and every ancestor up to the document,
+# because a faded WRAPPER hides an opacity-1 child just as completely as a faded child would.
+_OPAQUE_JS = """(devId) => {
+  const el = document.querySelector(`[data-dev-id="${devId}"]`);
+  if (!el) return false;
+  for (let node = el; node && node.nodeType === 1; node = node.parentElement) {
+    if (parseFloat(getComputedStyle(node).opacity) < 1) return false;
+  }
+  return true;
+}"""
+
+# The same walk, reporting WHICH element is stuck and at what opacity, so a failure is a diagnosis.
+_OPAQUE_WHY_JS = """(devId) => {
+  const el = document.querySelector(`[data-dev-id="${devId}"]`);
+  if (!el) return {missing: true};
+  for (let node = el; node && node.nodeType === 1; node = node.parentElement) {
+    const o = parseFloat(getComputedStyle(node).opacity);
+    if (o < 1) return {
+      element: node.getAttribute('data-dev-id') || node.tagName.toLowerCase(),
+      opacity: o,
+      self: node === el,
+    };
+  }
+  return {settled: true};
+}"""
+
+
+def _await_opaque(page, surface: str) -> str | None:
+    """Refuse to photograph a surface that is still fading in. Returns an error string, or None.
+
+    `reduced_motion="reduce"` is NOT enough, and believing it was cost a real capture. The app
+    ships `transition: none !important` under `prefers-reduced-motion`, which stops every CSS
+    transition -- but a framer-motion entrance interpolates `opacity` as an INLINE STYLE from
+    JavaScript, and no media query stops JavaScript. Playwright then calls an element at opacity
+    0.01 "visible", so `_appears` returns DURING the fade and the shot is a picture of a half-drawn
+    surface with nothing in the run reporting a problem.
+
+    MEASURED, Phase 0 (build/design-baseline/measurements.md 4.2): the first ingest captures caught
+    `addpart.root` at roughly 50% opacity in dark and nearly invisible in light, the workspace
+    showing through it, and the run exited 0. They were caught only because a person opened the
+    PNGs. The workaround at the time was `--hover addpart.header`, whose 350 ms settle happened to
+    be long enough -- i.e. a clock, in the one file whose entire argument is that a clock is not a
+    detector. This is the detector.
+
+    Polled with `wait_for_function`, so it returns on the first frame the condition holds and costs
+    nothing on a settled surface; only a genuinely stuck fade reaches the `_UI_TIMEOUT_MS` ceiling,
+    and then it fails LOUDLY naming the element and its opacity rather than shipping the frame.
+    """
+    from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
+
+    dev_id = _SURFACE_ROOT.get(surface)
+    if dev_id is None:
+        # A new surface with no registered root would otherwise be captured with NO settle check at
+        # all, silently inheriting exactly the failure mode above. Say so instead.
+        return f"no capture-target root registered in _SURFACE_ROOT for surface {surface!r}"
+    try:
+        page.wait_for_function(_OPAQUE_JS, arg=dev_id, timeout=_UI_TIMEOUT_MS)
+    except PlaywrightTimeoutError:
+        why = page.evaluate(_OPAQUE_WHY_JS, dev_id)
+        if why.get("missing"):
+            return (
+                f'the capture target [data-dev-id="{dev_id}"] is not in the page, so this shot '
+                f"would not be a picture of {surface}"
+            )
+        where = "the target itself" if why.get("self") else "an ancestor of the target"
+        return (
+            f'[data-dev-id="{dev_id}"] never reached opacity 1: {why.get("element")} '
+            f'({where}) is stuck at opacity {why.get("opacity")} - capturing now would '
+            f"photograph a mid-fade frame"
+        )
+    return None
 
 
 def _vanishes(locator, timeout_ms: int = _UI_TIMEOUT_MS) -> bool:
@@ -497,42 +596,36 @@ def _goto_surface(page, surface: str, select: str = "") -> bool:
                 wanted.first.click()
             else:
                 rows.first.click()
-            _appears(page.locator('[data-dev-id="detail.root"]'))
+            # THE OPENED COMPONENT'S OWN ROOT, and a loud failure if it never arrives.
+            #
+            # This waited on `detail.root` until 2026-08-06. That id does not exist: the opened
+            # workspace's namespace was renamed `detail.* -> component-browser.*`, and the rename
+            # is visible in the BYTES THIS HARNESS PHOTOGRAPHS -- the committed served bundle
+            # `app/frontend-dist/assets/index-CwAV_bW6.js` contains the string `detail.root` ZERO
+            # times and `component-browser.root` twice (the catalogue row and the attribute).
+            # So the wait could never succeed: every components run burned the full 10 s ceiling
+            # and the capture was then timed by a TIMEOUT rather than by an arrival, which is the
+            # one thing every other wait in this file exists to avoid. Measured in the Phase 0
+            # audit as ~10 s of dead wait per run (manifest.json:staleWaitsOnTheComponentsPath).
+            # The result was ignored, too, so an unopened workspace would have been photographed
+            # as though it had opened.
+            if not _appears(page.locator('[data-dev-id="component-browser.root"]').first):
+                print("  components: the opened component workspace never rendered")
+                return False
             _await_land_pattern(page)
             return True
         # part-vendor-data: the seeded probe part is the only one carrying alternates and an HTS
-        # family, and it is named to sort first. Trade opens FIRST because the schema deliberately
-        # keeps tariff families with sourcing instead of physical specifications; only then does
-        # the nested HTS family exist in the DOM. All three disclosures are opened because what is
-        # behind them is the entire point of the shot.
+        # family, and it is named to sort first.
         probe = rows.filter(has_text="AAA Vendor Data Probe")
         if not probe.count():
             print("  part-vendor-data: the seeded probe part is not in the list")
             return False
         probe.first.click()
-        missing = []
-        for dev_id in ("detail.trade", "detail.spec-family", "detail.alternates"):
-            control = page.locator(f'[data-dev-id="{dev_id}"] button').first
-            if not _appears(control):
-                missing.append(dev_id)
-                continue
-            control.click()
-            # the SUCCESS signal for a disclosure is its own aria-expanded, not a settle delay
-            from playwright.sync_api import expect as _expect
-
-            try:
-                _expect(control).to_have_attribute(
-                    "aria-expanded", "true", timeout=_UI_TIMEOUT_MS
-                )
-            except AssertionError:
-                print(f"  part-vendor-data: {dev_id} did not open when clicked")
-                return False
-        if missing:
-            # Name WHICH control is absent: a partial count sends the next reader hunting, and the
-            # whole reason this surface exists is to make the new controls observable.
-            print(f"  part-vendor-data: these controls are not on the page: {', '.join(missing)}")
+        if not _appears(page.locator('[data-dev-id="component-browser.root"]').first):
+            print("  part-vendor-data: the opened component workspace never rendered")
             return False
-        return True
+        _await_land_pattern(page)
+        return _open_vendor_data(page)
     if surface == "ingest":
         # Add-A-Part is a MODAL over Components, not a rail destination, so it is reached by
         # driving the real button - the same path a user takes. Without this surface the whole
@@ -563,6 +656,50 @@ def _goto_surface(page, surface: str, select: str = "") -> bool:
         # The overlay's own root IS the success signal, so poll it rather than sleeping and then
         # counting - the count was being taken before a slow render had finished.
         return _appears(page.locator('[data-dev-id="search.root"]').first)
+    if surface in {"projects", "stm"}:
+        # Two rail destinations the harness simply had no driver for, so Phase 0 could not
+        # photograph either (manifest.json:gaps.projects-route / gaps.stm-viewer-route). Driven the
+        # same way a person reaches them: click the real rail item, then poll the route's own root.
+        #
+        # An empty state on either route would have been a legitimate shot, and neither turns out to
+        # be empty -- MEASURED 2026-08-06 rather than assumed, because the assumption was wrong in
+        # both directions. `_seed_workspace` copies the whole `libraries/` tree, which carries
+        # `.projects`, so Projects shows two real linked projects (minimal / WiFi_miniPCIe) with the
+        # first auto-selected; and the derived STM index does not live under the config directory
+        # this harness pins to a temp scratch, so STM Viewer is fully populated (2,123 MCUs).
+        # Nothing is faked either way: whatever the seeded workspace honestly holds is the shot.
+        from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
+
+        nav = page.locator(f'[data-dev-id="rail.nav-{surface}"]')
+        if not nav.count():
+            print(f"  {surface}: rail.nav-{surface} is not in the rail")
+            return False
+        nav.first.click()
+        if not _appears(page.locator(f'[data-dev-id="{surface}.root"]').first):
+            print(f"  {surface}: {surface}.root never rendered after clicking its rail item")
+            return False
+        # ...and the route must be ANSWERED, not still asking. Both fetch on mount (Projects lists
+        # this machine's linked projects; STM reads its status and matrix) and render the shared
+        # `LoadingState` while they wait, which stamps `data-product-state="loading"` on the DOM.
+        # That attribute is the arrival signal, so it is what this polls: without it a shot of
+        # either route can be a picture of a spinner, which says nothing about the layout, and
+        # `{surface}.root` alone cannot tell the two apart because the root frames both.
+        try:
+            page.wait_for_function(
+                """(devId) => {
+                     const root = document.querySelector(`[data-dev-id="${devId}"]`);
+                     return !!root && !root.querySelector('[data-product-state="loading"]');
+                   }""",
+                arg=f"{surface}.root",
+                timeout=_UI_TIMEOUT_MS,
+            )
+        except PlaywrightTimeoutError:
+            print(
+                f"  {surface}: still showing a loading state after {_UI_TIMEOUT_MS} ms, so a "
+                f"shot would photograph a spinner rather than the route"
+            )
+            return False
+        return True
     if surface == "settings":
         nav = page.locator(f'[data-dev-id="rail.nav-{surface}"]')
         if not nav.count():
@@ -574,6 +711,116 @@ def _goto_surface(page, surface: str, select: str = "") -> bool:
             page.locator("main, [role=main]").first
         )
     raise SystemExit(f"unknown surface: {surface}")
+
+
+def _open_vendor_data(page) -> bool:
+    """Open what the `part-vendor-data` surface exists to photograph, on the CURRENT registry.
+
+    THE SURFACE'S PURPOSE IS UNCHANGED: show the disagreeing values a distributor offered
+    (the alternates disclosure) and the trade / HTS family, both OPEN. What changed is where the
+    product puts them, and the driver had not followed.
+
+    WHAT WAS STALE. Until 2026-08-06 this drove `detail.trade`, `detail.spec-family` and
+    `detail.alternates`. All three died with `DetailPanel`; the string count for each in the bundle
+    this harness actually serves (`app/frontend-dist/assets/index-CwAV_bW6.js`) is ZERO, against 2
+    each for the `component-browser.*` ids used below. The surface therefore failed outright at
+    every width in the Phase 0 audit -- not a wrong shot, but no shot.
+
+    WHERE THOSE TWO THINGS LIVE NOW.
+      * The alternates are per SPECIFICATION ROW, not one page-level disclosure. A row whose
+        sources disagree carries `component-browser.spec-evidence-toggle`, and the control states
+        the count in its own label ("1 other") when there is a competing value; clicking it reveals
+        `component-browser.spec-alternates`. So the driver opens the toggles that REPORT a count
+        rather than every toggle in the column (many rows carry provenance but no rival value, and
+        opening those would pad the shot without adding what it is for).
+      * The trade / HTS family is no longer a control. `detail.spec-family` was a single collapsed
+        row that folded the six `HTS Code (<country>)` specs together; the workspace files them as
+        ordinary specification rows inside a group section. Those sections are disclosures
+        (`component-browser.spec-group-toggle`) but they render EXPANDED, so the equivalent of
+        "open the family" is "every group section is open" -- asserted, and only clicked when one is
+        actually closed. Blindly clicking would have CLOSED the very thing being photographed.
+        HONEST CHANGE OF SHAPE, recorded rather than hidden: the shot no longer shows a
+        family-collapsing row opening, because the product no longer has one; it shows the trade
+        rows themselves. The last check below is what keeps that claim true.
+
+    Returns False, loudly, if any of it is missing: this surface exists to make that data
+    observable, so a shot that quietly lacks it is worse than no shot.
+    """
+    from playwright.sync_api import expect as _expect
+
+    # --- the alternates disclosure -------------------------------------------------------------
+    evidence = page.locator('[data-dev-id="component-browser.spec-evidence-toggle"]')
+    if not _appears(evidence.first):
+        print(
+            "  part-vendor-data: no specification row carries source evidence, so there is no "
+            "alternates disclosure to photograph"
+        )
+        return False
+    # `has_text` over the control's own label: the count is the app's statement that this row HAS a
+    # competing value, which is more honest than the harness re-deriving it from the seed data.
+    rivals = evidence.filter(has_text="other")
+    opened = 0
+    for i in range(rivals.count()):
+        toggle = rivals.nth(i)
+        # already open is a success, not a reason to click: clicking would shut it.
+        if toggle.get_attribute("aria-expanded") == "true":
+            opened += 1
+            continue
+        toggle.click()
+        # the SUCCESS signal for a disclosure is its own aria-expanded, never a settle delay
+        try:
+            _expect(toggle).to_have_attribute("aria-expanded", "true", timeout=_UI_TIMEOUT_MS)
+        except AssertionError:
+            print("  part-vendor-data: a specification's evidence disclosure did not open")
+            return False
+        opened += 1
+    if not opened:
+        print(
+            "  part-vendor-data: no specification row offers a competing value, so the alternates "
+            "this surface exists to show are not in the record being photographed"
+        )
+        return False
+    if not _appears(page.locator('[data-dev-id="component-browser.spec-alternates"]').first):
+        print(
+            f"  part-vendor-data: {opened} evidence disclosure(s) report open but no "
+            "component-browser.spec-alternates list rendered"
+        )
+        return False
+
+    # --- the trade / HTS family ----------------------------------------------------------------
+    groups = page.locator('[data-dev-id="component-browser.spec-group-toggle"]')
+    if not _appears(groups.first):
+        print("  part-vendor-data: no specification group sections rendered")
+        return False
+    for i in range(groups.count()):
+        group = groups.nth(i)
+        if group.get_attribute("aria-expanded") == "true":
+            continue
+        group.click()
+        try:
+            _expect(group).to_have_attribute("aria-expanded", "true", timeout=_UI_TIMEOUT_MS)
+        except AssertionError:
+            print("  part-vendor-data: a specification group did not open when clicked")
+            return False
+    # The claim this surface makes, checked rather than assumed: the trade rows are on the page.
+    # Keyed on the ROW, never on a group label, and that is not caution for its own sake -- it is
+    # what the captured shot shows. The field registry files its canonical `htsus` field under
+    # "Compliance and Lifecycle" (dossier/vocabulary.py), but the six country-scoped keys the probe
+    # part actually carries (`HTS Code (US)`, `(CN)`, `(CA)`, `(JP)`, `(MX)`, `(EU TARIC)`) do not
+    # match that field's aliases and land in the "Other" group instead. A group-label match would
+    # have looked correct and asserted nothing.
+    trade = page.locator('[data-dev-id="component-browser.spec-row"]').filter(has_text="HTS")
+    if not _appears(trade.first):
+        print(
+            "  part-vendor-data: no HTS specification row is on the page, so the trade family "
+            "this surface exists to photograph is not in the shot"
+        )
+        return False
+    # Bring it into the column's own scroll region. The Specifications column scrolls, so a trade
+    # row that exists can still be below the fold - and "in the DOM" is not "in the picture", which
+    # is the whole failure class this surface was written to avoid.
+    trade.first.scroll_into_view_if_needed()
+    return True
 
 
 def _set_theme(page, theme: str) -> str | None:
@@ -650,7 +897,17 @@ def _await_land_pattern(page) -> None:
     with at least one pad exists, so their presence is the arrival event itself rather than a proxy
     for it. Absence is legitimate - plenty of parts have no footprint - so this cannot fail the run;
     but it must never be SILENT, because "no board in this shot" and "the board had not loaded yet"
-    are indistinguishable in the image and only one of them is a fact about the part."""
+    are indistinguishable in the image and only one of them is a fact about the part.
+
+    BOTH IDS BELOW WERE VERIFIED CURRENT on 2026-08-06 and deliberately NOT changed, while the
+    `detail.*` ids on the components and part-vendor-data paths were. They look stale for the same
+    reason (the workspace rename moved everything else out of the `detail.` namespace) and are not:
+    the 3D instrument is still `detail.*`. Evidence, taken from the bundle this harness serves
+    rather than from the working tree: `app/frontend-dist/assets/index-CwAV_bW6.js` contains
+    `detail.model-show-board` 3 times and `detail.model-layers` twice, and both carry live
+    catalogue rows in `app/frontend/src/lib/devIds.ts` ("3D layer: PCB substrate", "3D layer +
+    shading bar"). The cost of these two waits on a part with no 3D model at all is real (4.5 s)
+    but it is an HONEST absence being confirmed, not a dead selector."""
     if _appears(page.locator('[data-dev-id="detail.model-show-board"]'), 4000):
         return
     if _appears(page.locator('[data-dev-id="detail.model-layers"]'), 500):
@@ -997,6 +1254,17 @@ def run(args) -> int:
                         if gone:
                             print(f"  !! no such data-dev-id to hover: {', '.join(gone)}")
                             failures.append(f"{surface}:hover")
+                    # LAST, immediately before the shutter, for every surface: prove the thing
+                    # being photographed is not still fading in. See `_await_opaque` - reduced
+                    # motion does not stop a framer-motion opacity animation, Playwright calls
+                    # opacity 0.01 "visible", and Phase 0 shipped ingest shots at ~50% opacity
+                    # with the run exiting 0. Placed after --fill and --hover on purpose: both
+                    # mount and reveal things, so the state that must be settled is the final one.
+                    faded = _await_opaque(page, surface)
+                    if faded:
+                        print(f"  !! {faded}")
+                        failures.append(f"{surface}:{theme}:opacity")
+                        continue
                     path = out / f"{surface}-{theme}-{args.width}w.png"
                     page.screenshot(path=str(path), full_page=args.full_page)
                     print(f"  shot {path.name}")
