@@ -499,10 +499,42 @@ export const DEV_IDS: DevIdEntry[] = [
   { id: "shell.content", label: "Page content column", area: "shell" },
   { id: "shell.library", label: "Active library repository", area: "shell" },
   { id: "shell.statusbar", label: "Bottom status bar", area: "shell" },
+  // DESIGN MODE'S ARRANGE SURFACE (plan 1.5, Phase 3B). A new area, and an area rather than rows
+  // under an existing one because these elements belong to the EDITOR OF the application rather
+  // than to any surface in it: they exist only while arrange is on, they sit in a portal over
+  // whatever route is open, and an override written for one of them must never be confused with an
+  // override written for the workspace underneath.
+  //
+  // The Design PANEL's own chrome is deliberately still outside the id system (see the header of
+  // `components/DevPanel.tsx`), with three exceptions that earn a row: the switch that turns arrange
+  // on, and the two blocks that are the only way back from an edit that took a piece off the screen
+  // or out of storage. Those are the controls a screenshot of a broken arrangement has to be able
+  // to name.
+  { id: "design.edit-toggle", label: "Arrange mode switch", area: "design" },
+  { id: "design.arrange", label: "Arrange section", area: "design" },
+  { id: "design.arrange-state", label: "Whether the arrangement carries an edit", area: "design" },
+  { id: "design.arrange-reset", label: "Back to the committed arrangement", area: "design" },
+  { id: "design.arrange-restore", label: "Put one off-screen piece back", area: "design" },
+  { id: "design.arrange-drafts", label: "Named local drafts", area: "design" },
+  { id: "design.arrange-draft-name", label: "Draft name field", area: "design" },
+  { id: "design.arrange-draft-save", label: "Store the arrangement under a name", area: "design" },
+  { id: "design.arrange-draft", label: "One stored draft", area: "design" },
+  // The canvas. Every one of these is drawn in a portal over the running application, one per
+  // rendered placement, so each is a SHARED role in the same sense a part row is: an edit keyed on
+  // it is meant to reach all of them.
+  { id: "design.placement-handle", label: "One placement's drag handle", area: "design" },
+  { id: "design.drop-target", label: "One legal drop position", area: "design" },
+  { id: "design.piece-menu", label: "Piece settings menu", area: "design" },
+  { id: "design.piece-name", label: "Which piece the menu is about", area: "design" },
+  { id: "design.piece-collapse", label: "Collapse or expand one placement", area: "design" },
+  { id: "design.piece-hide", label: "Hide or show one placement", area: "design" },
+  { id: "design.piece-move-up", label: "One position earlier", area: "design" },
+  { id: "design.piece-move-down", label: "One position later", area: "design" },
+  { id: "design.piece-move-into", label: "Send a placement to another region", area: "design" },
 ];
 
 // The areas in first-appearance order, for grouping the catalogue.
-export const DEV_ID_AREAS: readonly string[] = ["rail", "about", "components", "projects", "component-browser", "detail", "search", "addpart", "ingest", "stm", "settings", "altiumdb", "complete", "preview", "diff", "confirm", "shell"];
+export const DEV_ID_AREAS: readonly string[] = ["rail", "about", "components", "projects", "component-browser", "detail", "search", "addpart", "ingest", "stm", "settings", "altiumdb", "complete", "preview", "diff", "confirm", "shell", "design"];
 
 // A by-id lookup so consumers resolve an entry in one call instead of re-scanning the list.
 export const DEV_ID_BY_ID: ReadonlyMap<string, DevIdEntry> = new Map(
