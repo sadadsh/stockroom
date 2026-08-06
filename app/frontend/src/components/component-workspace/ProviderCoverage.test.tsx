@@ -18,6 +18,7 @@ import type {
   ComponentDossier,
   ComponentProvidersView,
 } from "../../api/dossierTypes";
+import { WORKSPACE_PIECES, WORKSPACE_REGION } from "../../layout/workspacePieces";
 import { CaptureProvider } from "../../lib/capture";
 import { componentProviderDevId, devIdSelector } from "../../lib/componentDevIds";
 import { ThemeProvider } from "../../lib/theme";
@@ -613,6 +614,10 @@ describe("the modal contract", () => {
   });
 
   it("keeps the workspace itself unscrollable: only the modal and the wide table scroll", async () => {
+    // The subject here is the MODAL, which is not a placement - the overlay surfaces join the layout
+    // system in plan Phase 7. The workspace frame's own clipping is asserted below as the thing the
+    // modal opens over; the general form of that claim - any document, any content, no page scroll -
+    // is `layout/engineInvariants.test.tsx`.
     const { dialog } = await openSheet();
     const root = document.querySelector<HTMLElement>('[data-dev-id="component-browser.root"]')!;
     expect(root.className).toContain("h-full");
@@ -631,7 +636,7 @@ describe("the modal contract", () => {
     expect(matrix.querySelectorAll(".overflow-y-auto")).toHaveLength(0);
   });
 
-  it("is reached from the CAD column rather than from a control beside the part number", async () => {
+  it("is reached from the assets it is about, not from a control beside the part number", async () => {
     const column = await open();
     // The header carries identity and four actions; which provider can supply a coherent CAD set
     // is a CAD question, so its way in sits with the assets it is about.
@@ -640,6 +645,17 @@ describe("the modal contract", () => {
       '[data-dev-id="component-browser.header-actions"]',
     )!;
     expect(within(header).queryByRole("button", { name: /Complete Component/ })).toBeNull();
+    // Reframed for Phase 2: "in the CAD column" is a fact about the ARRANGEMENT, so it is asserted
+    // where the arrangement is stated - the piece that owns this control and the region it homes in
+    // are the registry's and the document's answer, and `layout/defaultWorkspaceLayout.test.ts` holds
+    // the shipped document to it. A committed redesign that moves the CAD title strip moves this
+    // claim with it, which is why the assertion above no longer names the column.
+    const owner = WORKSPACE_PIECES.find((manifest) =>
+      manifest.devIds.includes("component-browser.compare-sources"),
+    );
+    expect(owner?.id).toBe("workspace.cad-title-strip");
+    expect(owner?.actions).toContain("component-browser.compare-cad-sources");
+    expect(owner?.home.regionId).toBe(WORKSPACE_REGION.cadColumn);
   });
 });
 

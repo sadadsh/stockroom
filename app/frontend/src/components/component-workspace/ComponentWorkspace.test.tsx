@@ -10,6 +10,16 @@
  * The specification assertions all turn on ONE thing the dossier made possible: an expected field
  * nobody supplied is a `Missing` ROW, not an absence. That distinction cannot be recovered from an
  * empty string, so it is asserted on the rendered row rather than on a count.
+ *
+ * WHAT PHASE 2 OF THE DESIGN MODE PLAN MOVED OUT OF THIS FILE, and where each piece went. The
+ * arrangement - which column comes first, which line is above which, which region owns a scrollbar -
+ * is now stated by the layout DOCUMENT, so the assertions that pinned it are assertions about
+ * `DEFAULT_WORKSPACE_LAYOUT` in `layout/defaultWorkspaceLayout.test.ts`, and the properties that must
+ * hold for ANY document are `layout/engineInvariants.test.tsx`. Each move is marked at the place it
+ * left, and none of them was weakened on the way: an order that was read off two rendered elements is
+ * read off the document's slots instead, which is where the order comes from. What stayed here is
+ * everything that is not arrangement - the writes, the filters, the menus, the vocabulary, the type
+ * hierarchy, and the presence of what the current content should produce.
  */
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor, within } from "@testing-library/react";
@@ -166,27 +176,35 @@ function columns(): HTMLElement[] {
 }
 
 describe("the three-column workspace", () => {
+  /**
+   * Reframed for Phase 2: this asserted the ORDER of the three rendered columns, and the order is the
+   * layout document's to state - it now reads `DEFAULT_WORKSPACE_LAYOUT` in
+   * `layout/defaultWorkspaceLayout.test.ts` ("names three column regions, in the order the band draws
+   * them"), and `layout/engineInvariants.test.tsx` holds the renderer to whatever order a document
+   * names. What is still asserted here is what the ORDER never was: all three columns are on screen at
+   * once, each carrying its own name, which is the "never reduced from three to two" decision and is a
+   * fact about the rendered surface rather than about the arrangement.
+   */
   it("renders CAD Assets, Specifications and Sourcing and Resources side by side", async () => {
     await open();
-    const present = columns().map((column) => column.dataset.workspaceColumn);
-    expect(present).toEqual(["cad", "specifications", "sourcing"]);
+    expect(columns().map((column) => column.dataset.workspaceColumn).sort()).toEqual([
+      "cad",
+      "sourcing",
+      "specifications",
+    ]);
     expect(node("component-browser.column-cad")).toHaveTextContent("CAD Assets");
     expect(node("component-browser.column-specifications")).toHaveTextContent("Specifications");
     expect(node("component-browser.column-sourcing")).toHaveTextContent("Sourcing and Resources");
   });
 
-  it("gives every column its own scrollbar and never lets the workspace root scroll", async () => {
-    await open();
-    for (const column of columns()) {
-      const scroller = column.querySelector<HTMLElement>("[data-workspace-scroll]")!;
-      expect(scroller.className).toContain("overflow-y-auto");
-      // The column FRAME is clipped; only the body inside it scrolls, so a long specification
-      // list cannot push the column's own title strip off the top.
-      expect(column.className).toContain("overflow-hidden");
-    }
-    expect(node("component-browser.root").className).toContain("overflow-hidden");
-    expect(node("component-browser.columns").className).toContain("overflow-y-hidden");
-  });
+  // Reframed for Phase 2, and moved out of this file entirely: "gives every column its own scrollbar
+  // and never lets the workspace root scroll" read the overflow classes off the rendered columns, the
+  // band and the root. Scroll OWNERSHIP is the document's, and is asserted over
+  // `DEFAULT_WORKSPACE_LAYOUT` in `layout/defaultWorkspaceLayout.test.ts` ("gives each column region
+  // exactly one scroller, and the root none"). That the RENDERER honours it - one axis per scroller,
+  // nothing scrolling outside the clipped frame, whatever the document says and however much content
+  // arrives - is `layout/engineInvariants.test.tsx`, which holds it for arbitrary documents rather
+  // than only for the one that ships today.
 
   it("has no per-component tab strip and no information tabs", async () => {
     await open();
@@ -348,11 +366,14 @@ describe("the identity header", () => {
 
     const description = node("component-browser.header-description");
     expect(description.className).toContain("ui-component-description");
-    expect(
-      mpn.compareDocumentPosition(description) & Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
-    // Nothing else on the surface may claim the MPN role.
+    // Reframed for Phase 2: the LINE ORDER used to be asserted here with `compareDocumentPosition`,
+    // and the order of the header's lines is the layout document's - it is pinned over
+    // `DEFAULT_WORKSPACE_LAYOUT` in `layout/defaultWorkspaceLayout.test.ts` ("stacks the identity
+    // header's lines in their reading order"). What cannot move is the TYPE HIERARCHY: the generated
+    // name is drawn at description weight and the part number at MPN weight, wherever a redesign puts
+    // the two lines, so "never puts a generated name before it" survives as a claim about the roles.
     expect(document.querySelectorAll(".ui-component-mpn")).toHaveLength(1);
+    expect(document.querySelectorAll(".ui-component-description")).toHaveLength(1);
   });
 
   it("aligns the lifecycle state separately instead of appending it to the part number", async () => {
@@ -945,11 +966,13 @@ describe("the sourcing column", () => {
     const column = node("component-browser.column-sourcing");
     expect(column).toHaveTextContent("512");
     expect(column).toHaveTextContent("$0.42");
-    const lifecycle = node("component-browser.lifecycle");
-    const provenance = node("component-browser.provenance");
-    expect(
-      lifecycle.compareDocumentPosition(provenance) & Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
+    // Reframed for Phase 2: "lifecycle before provenance" was asserted here with
+    // `compareDocumentPosition`, and that order is the layout document's - it is pinned in
+    // `layout/defaultWorkspaceLayout.test.ts` ("asks the six sourcing questions in the order a person
+    // asks them, ledger last"). What stays here is that both sections drew for a component that HAS
+    // sourcing, which is the answer half of this test rather than the arrangement half.
+    expect(node("component-browser.lifecycle")).toBeInTheDocument();
+    expect(node("component-browser.provenance")).toBeInTheDocument();
   });
 
   it("says Unknown when no distributor reported a count, and never renders it as zero", async () => {

@@ -121,6 +121,60 @@ describe("the default workspace layout as a document", () => {
     }
   });
 
+  /**
+   * Reframed for Phase 2: this pinned the RENDERED arrangement - `ComponentWorkspace.test.tsx` opened
+   * the workspace and read the three `[data-workspace-column]` elements back in order - and now it
+   * pins the default layout DOCUMENT, because the arrangement is the document's to state. The truth is
+   * unchanged: three columns, always all three, in this order, with these identities. A committed
+   * redesign that reorders them is a different document and no longer fails a render test that had
+   * nothing to do with it, while a regression in THIS document still fails here. That the renderer
+   * then draws a band's columns in whatever order its slots name is the engine invariant
+   * `engineInvariants.test.tsx` holds, for any document rather than only for this one.
+   */
+  it("names three column regions, in the order the band draws them", () => {
+    const band = findRegion(DEFAULT_WORKSPACE_LAYOUT, "workspace.column-band");
+    const columns = (band?.slots ?? []).map((slot) =>
+      slot.content?.kind === "region" ? slot.content : null,
+    );
+    expect(columns.map((region) => region?.id)).toEqual(
+      WORKSPACE_COLUMN_IDS.map((id) => WORKSPACE_COLUMN_REGION[id]),
+    );
+    // The identities the three columns render, which is what a reader (and the coverage gate)
+    // recognises them by.
+    expect(columns.map((region) => region?.devId)).toEqual([
+      "component-browser.column-cad",
+      "component-browser.column-specifications",
+      "component-browser.column-sourcing",
+    ]);
+    // Side by side, never stacked and never behind tabs: the band is a ROW.
+    expect(band?.mode).toBe("row");
+  });
+
+  /**
+   * Reframed for Phase 2: this was `ComponentWorkspace.test.tsx`'s "gives every column its own
+   * scrollbar and never lets the workspace root scroll", which opened the workspace and read the
+   * overflow classes off the rendered elements. The ownership half is the document's, and is stated
+   * here; that the RENDERER honours it - one axis per scroller, no page scroll, whatever the document
+   * says - is `engineInvariants.test.tsx`, which holds it for arbitrary documents including
+   * deliberately rearranged ones.
+   */
+  it("gives each column region exactly one scroller, and the root none", () => {
+    for (const id of WORKSPACE_COLUMN_IDS) {
+      const column = findRegion(DEFAULT_WORKSPACE_LAYOUT, WORKSPACE_COLUMN_REGION[id]);
+      expect(column?.scroll, `${id} column frame`).toBeUndefined();
+      const owners = layoutRegions({ ...DEFAULT_WORKSPACE_LAYOUT, root: column! })
+        .filter((visit) => visit.node.scroll !== undefined)
+        .map((visit) => [visit.node.id, visit.node.scroll]);
+      // Exactly one, and it is the body: the column FRAME is clipped, so a long list cannot push the
+      // column's own title strip off the top.
+      expect(owners, `${id} column scroll owners`).toEqual([
+        [`${WORKSPACE_COLUMN_REGION[id]}-body`, "vertical"],
+      ]);
+    }
+    // The workspace root scrolls nothing at all - the whole no-page-scroll contract begins here.
+    expect(DEFAULT_WORKSPACE_LAYOUT.root.scroll).toBeUndefined();
+  });
+
   it("gives each column exactly one scroll owner and the band its sideways overflow", () => {
     // Three scroll owners, one per column, and nothing else - the arrangement contract from
     // ComponentWorkspace.tsx. Fails if a fourth scroller is introduced or a column loses its own.
@@ -204,6 +258,95 @@ describe("the three-column geometry the document expresses", () => {
 });
 
 describe("the sections each column stacks", () => {
+  /**
+   * Reframed for Phase 2: the four identity lines' ORDER was pinned in
+   * `ComponentWorkspace.test.tsx` by comparing two rendered elements with
+   * `compareDocumentPosition` ("never puts a generated name before it"). The order is the document's,
+   * so it is stated here; what stayed in the render test is the part that is not about arrangement at
+   * all - which line carries the MPN's type role, and that nothing else on the surface claims it.
+   */
+  it("stacks the identity header's lines in their reading order", () => {
+    const lines = findRegion(DEFAULT_WORKSPACE_LAYOUT, "workspace.header-lines");
+    expect(
+      (lines?.slots ?? []).map((slot) =>
+        slot.content?.kind === "placement" ? slot.content.piece : null,
+      ),
+    ).toEqual([
+      "workspace.header-identity",
+      "workspace.header-description",
+      "workspace.header-classification",
+      "workspace.header-key-facts",
+      "workspace.header-quality-summary",
+    ]);
+    // The lines take the band's elastic width; the action group is the band's second slot and takes
+    // what it needs.
+    expect(lines?.mode).toBe("column");
+    expect(lines?.size?.grow).toBe(true);
+    const band = findRegion(DEFAULT_WORKSPACE_LAYOUT, "workspace.header-band");
+    expect(
+      (band?.slots ?? []).map((slot) =>
+        slot.content?.kind === "placement" ? slot.content.piece : slot.content?.id,
+      ),
+    ).toEqual(["workspace.header-lines", "workspace.header-actions"]);
+  });
+
+  /**
+   * Reframed for Phase 2: `SourcingColumn.test.tsx` opened the workspace and read the six section
+   * dev ids back out of the rendered column ("asks the six questions in the order a person asks them,
+   * ledger last"). That order is the document's, and this is the one place it is written out in full -
+   * the test below it compares the same list against `COLLAPSIBLE_SOURCING_SECTIONS`, so the two
+   * together say both "this is the reading order" and "the document did not retype it".
+   */
+  it("asks the six sourcing questions in the order a person asks them, ledger last", () => {
+    const body = findRegion(DEFAULT_WORKSPACE_LAYOUT, "workspace.column-sourcing-body");
+    expect(
+      (body?.slots ?? []).map((slot) =>
+        slot.content?.kind === "placement" ? slot.content.piece : null,
+      ),
+    ).toEqual([
+      "workspace.sourcing-lifecycle",
+      "workspace.sourcing-offers",
+      "workspace.sourcing-pricing",
+      "workspace.sourcing-documents",
+      "workspace.sourcing-related",
+      "workspace.sourcing-provenance",
+      // Last, under everything it accounts for.
+      "workspace.sourcing-empty-sections",
+    ]);
+  });
+
+  /**
+   * Reframed for Phase 2: `SpecificationsColumn.test.tsx` asserted the search box's POSITION by
+   * walking the rendered tree up to the column ("a real inline input in the column's own toolbar").
+   * Where the toolbar sits, and what is on it, is the document's; the render test keeps what the
+   * search box IS - an inline input that narrows the list rather than opening a surface.
+   */
+  it("puts the specifications toolbar above the scroller, with search, filters and anchors on it", () => {
+    const column = findRegion(DEFAULT_WORKSPACE_LAYOUT, "workspace.column-specifications");
+    expect(
+      (column?.slots ?? []).map((slot) =>
+        slot.content?.kind === "region" ? slot.content.id : slot.content?.id,
+      ),
+    ).toEqual([
+      "workspace.place.specifications-title",
+      "workspace.column-specifications-toolbar",
+      // The one scroller, BELOW the toolbar rather than under it - which is what keeps the toolbar and
+      // the anchor strip on screen for the whole length of the list.
+      "workspace.column-specifications-body",
+    ]);
+    const toolbar = findRegion(DEFAULT_WORKSPACE_LAYOUT, "workspace.column-specifications-toolbar");
+    expect(toolbar?.scroll).toBeUndefined();
+    expect(
+      (toolbar?.slots ?? []).map((slot) =>
+        slot.content?.kind === "placement" ? slot.content.piece : null,
+      ),
+    ).toEqual([
+      "workspace.specifications-search",
+      "workspace.specifications-filters",
+      "workspace.specifications-anchors",
+    ]);
+  });
+
   it("places the three CAD modules as one piece in cadAssetSet's reading order", () => {
     // 3D Model, then Footprint, then Symbol - imported, not restated. Fails if the document
     // reorders them or splits one piece into three manifests.
@@ -323,13 +466,20 @@ describe("the manifests against the id systems that already exist", () => {
     ]);
   });
 
-  it("declares one scroll owner among the pieces, and names its axis", () => {
-    // Only the offers table scrolls inside a piece, and it scrolls sideways. Fails if a piece
-    // claims a scroll it does not own - which is what a scroll-owner conflict is read off.
+  it("declares the two piece-level scroll owners, and names their axis", () => {
+    // TWO wide tables scroll inside a piece, and both scroll SIDEWAYS: the distributor offers table
+    // and the provenance ledger's `Source | Fields Used | Retrieved | State` table. Fails if a piece
+    // claims a scroll it does not own, or renders one it does not declare - the second half of which
+    // `engineInvariants.test.tsx` holds against the rendered DOM.
     const owners = WORKSPACE_PIECES.filter((manifest) => manifest.scroll.owns);
     expect(owners.map((manifest) => [manifest.id, manifest.scroll.axis])).toEqual([
       ["workspace.sourcing-offers", "horizontal"],
+      ["workspace.sourcing-provenance", "horizontal"],
     ]);
+    // NO piece scrolls vertically, and that is the load-bearing half: vertical scrolling belongs to
+    // the three column bodies, and a piece that took an axis one of them already owns would put two
+    // vertical scrollers inside one column with nothing to say which the wheel moves.
+    expect(owners.every((manifest) => manifest.scroll.axis === "horizontal")).toBe(true);
     for (const manifest of WORKSPACE_PIECES) {
       if (!manifest.scroll.owns) expect(manifest.scroll.axis, manifest.id).toBeUndefined();
     }

@@ -438,9 +438,10 @@ export const WORKSPACE_PIECES: readonly PieceManifest[] = [
     home: { regionId: WORKSPACE_REGION.sourcingBody, siblingGroup: GROUP.sourcingSections },
     source: SOURCING_SOURCE,
   },
-  // OffersSection.tsx. The only piece in the workspace that owns a scroll axis of its own: the
-  // offers table declares its column widths in a `<colgroup>` and scrolls SIDEWAYS inside the
-  // column rather than re-measuring the price column when a spinner appears.
+  // OffersSection.tsx. One of the two pieces in the workspace that own a scroll axis of their own
+  // (the other is the provenance ledger below): the offers table declares its column widths in a
+  // `<colgroup>` and scrolls SIDEWAYS inside the column rather than re-measuring the price column
+  // when a spinner appears.
   {
     id: "workspace.sourcing-offers",
     nameCopyId: "component-browser.offers-title",
@@ -532,7 +533,11 @@ export const WORKSPACE_PIECES: readonly PieceManifest[] = [
       "devMode.enabled",
     ],
     actions: ["component-browser.view-provenance"],
-    scroll: { owns: false },
+    // The `Source | Fields Used | Retrieved | State` table inside
+    // `component-browser.provenance-sources` is wrapped in an `overflow-x-auto` div, exactly as the
+    // offers table is: four columns of named facts do not fit a ~300px column, and scrolling the
+    // table SIDEWAYS is what keeps the section's own width off the column's.
+    scroll: { owns: true, axis: "horizontal" },
     home: { regionId: WORKSPACE_REGION.sourcingBody, siblingGroup: GROUP.sourcingSections },
     source: "components/component-workspace/ProvenanceHistory.tsx",
   },

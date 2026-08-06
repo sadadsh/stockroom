@@ -17,6 +17,9 @@ import type { ReactNode } from "react";
 import { ApiError, api } from "../../api/client";
 import { cadVariantApi } from "../../api/cadVariantClient";
 import type { ComponentDossier } from "../../api/dossierTypes";
+import { DEFAULT_WORKSPACE_LAYOUT } from "../../layout/defaultWorkspaceLayout";
+import { findRegion } from "../../layout/document";
+import { WORKSPACE_REGION } from "../../layout/workspacePieces";
 import { devIdSelector } from "../../lib/componentDevIds";
 import { ThemeProvider } from "../../lib/theme";
 import { ToastProvider } from "../../lib/toast";
@@ -423,7 +426,12 @@ describe("the datasheet viewer", () => {
     await user.keyboard("{Escape}");
     await waitFor(() => expect(screen.queryByTestId("pdf-page")).toBeNull());
     // The reading surface never went anywhere: this is a window ON the workspace, not a
-    // replacement for it.
-    expect(document.querySelectorAll("[data-workspace-column]")).toHaveLength(3);
+    // replacement for it. Reframed for Phase 2: the expected count is READ OFF THE LAYOUT DOCUMENT
+    // rather than typed as three, because how many columns the workspace has is the document's to say
+    // and this test is about the viewer closing, not about the arrangement it closed over.
+    const columnsInDocument = findRegion(DEFAULT_WORKSPACE_LAYOUT, WORKSPACE_REGION.columnBand)
+      ?.slots.length;
+    expect(columnsInDocument).toBeGreaterThan(0);
+    expect(document.querySelectorAll("[data-workspace-column]")).toHaveLength(columnsInDocument!);
   });
 });
