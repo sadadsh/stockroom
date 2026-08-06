@@ -28,6 +28,12 @@
  *   nothing, which is exactly what makes the coverage gate meaningful: a section that appears on
  *   screen appeared because a placement put it there.
  *
+ *   ONE SEAM FOR AN EDITOR, AND NO KNOWLEDGE OF ONE. `LayoutPlacementChromeProvider` wraps every
+ *   drawn placement in a component the CALLER supplies, which is how Phase 3B hangs a drag handle
+ *   off each placement without this module learning that Design Mode exists. With no chrome
+ *   installed - the shipped state - the renderer returns the same element it returned before the
+ *   seam was cut, so the DOM-parity digests are untouched by its existence.
+ *
  *   IDENTITY FOLLOWS THE DOCUMENT. Children are keyed by SLOT ID and repeated children by the
  *   collection's own key, so a node keeps its React identity - and therefore its local state and
  *   its DOM node - across every re-render in which the document did not change. A renderer that
@@ -149,9 +155,63 @@ function TransparentChrome({ children }: RegionChromeProps) {
   return <>{children}</>;
 }
 
-/** Does the runtime put this placement on screen at all. */
+/**
+ * What a placement chrome is handed: the placement, and whatever the piece drew for it.
+ *
+ * The ONE seam Phase 3B's editing surface needs from the renderer, and deliberately the whole of
+ * it. A chrome wraps a drawn placement and is otherwise nothing: it is not told what the piece is,
+ * it cannot change what was drawn, and with no chrome installed the renderer returns exactly the
+ * element it returned before this seam existed - by reference - which is why the DOM-parity digests
+ * do not move.
+ */
+export interface PlacementChromeProps {
+  placement: PiecePlacement;
+  children: ReactNode;
+}
+
+export type PlacementChrome = ComponentType<PlacementChromeProps>;
+
+const PlacementChromeContext = createContext<PlacementChrome | null>(null);
+
+/**
+ * Wrap every placement drawn inside in this chrome. `null` installs none, which is the default and
+ * the shipped state: nothing in the application supplies a chrome unless Design Mode's arrange
+ * switch is on.
+ */
+export function LayoutPlacementChromeProvider({
+  chrome,
+  children,
+}: {
+  chrome: PlacementChrome | null;
+  children: ReactNode;
+}) {
+  return (
+    <PlacementChromeContext.Provider value={chrome}>{children}</PlacementChromeContext.Provider>
+  );
+}
+
+/**
+ * Does the runtime put this placement on screen at all.
+ *
+ * TWO PER-PLACEMENT SETTINGS TURN IT OFF, and they are answered here rather than by the piece
+ * because a piece must not have to know it is placed.
+ *
+ *   `hidden` - off the screen entirely. Not deleted: the placement keeps its id, its slot and its
+ *   position, so `setPlacementHidden(false)` puts it back exactly where it was.
+ *
+ *   `collapsed` - THE SAME THING TODAY, and that coarseness is recorded rather than hidden. The
+ *   plan's intent (1.5) is a header-only piece, and drawing one needs a piece whose heading is
+ *   separately addressable from its body. No piece in `workspacePieces.ts` declares such a split -
+ *   a piece is one component, and the renderer's only way to draw "its header alone" would be to
+ *   reach into the piece's own DOM subtree and clip it, which is precisely the restructuring the
+ *   arrange overlay exists to avoid. So collapse currently draws nothing, the editor SAYS SO in the
+ *   piece menu rather than implying a header will appear, and the day a manifest declares separable
+ *   chrome this is the one function that changes. The setting itself is already delivered to the
+ *   piece in `PiecePartProps.placement`, so a piece that grows a header-only form needs no renderer
+ *   change to honour it.
+ */
 function placementDraws(placement: PiecePlacement, runtime: LayoutRuntime): boolean {
-  if (placement.hidden) return false;
+  if (placement.hidden || placement.collapsed) return false;
   const anyOf = placement.visibility?.anyOf;
   // No `visibility` means unconditional. An EMPTY list is treated the same way rather than as
   // "never": a placement nobody can see is an editing accident, and hiding is what `hidden` is for.
@@ -162,19 +222,25 @@ function placementDraws(placement: PiecePlacement, runtime: LayoutRuntime): bool
 function LayoutPlacementView({ placement }: { placement: PiecePlacement }) {
   const runtime = useContext(RuntimeContext);
   const { pieces } = useContext(BindingsContext);
+  const Chrome = useContext(PlacementChromeContext);
   const Part = pieces[placement.piece];
   // Unbound, hidden, or every condition false: nothing is drawn and nothing is reported here.
   // `validateLayout` is the module that names an unknown piece; this one just does not invent it.
   if (!Part || !placementDraws(placement, runtime)) return null;
-  if (!placement.repeat) return <Part placement={placement} />;
-  const items = runtime.collections[placement.repeat.over] ?? [];
-  return (
+  const items = placement.repeat ? runtime.collections[placement.repeat.over] ?? [] : null;
+  // ONE placement is one arrangement unit even when it repeats, so a repeated placement is wrapped
+  // ONCE around the whole run rather than once per item - a chrome per row would offer a handle
+  // that moves nothing, since the document places the collection and not its members.
+  const drawn = items ? (
     <>
       {items.map((item, index) => (
         <Part key={item.key} placement={placement} item={item.value} index={index} />
       ))}
     </>
+  ) : (
+    <Part placement={placement} />
   );
+  return Chrome ? <Chrome placement={placement}>{drawn}</Chrome> : drawn;
 }
 
 function LayoutRegionView({ region }: { region: LayoutRegion }) {

@@ -111,6 +111,12 @@ interface DevModeContextValue {
   // The all-at-once overlay: one static id badge over every [data-dev-id] node, in every window.
   showIds: boolean;
   toggleShowIds: () => void;
+  // ARRANGE (plan 1.5): the running application becomes the canvas - a handle over every placement,
+  // draggable region boundaries, a settings menu per piece. Already ANDed with `enabled` by
+  // `devModeToggle`, so a consumer never has to remember to. OFF is zero behaviour change, which is
+  // what `ComponentWorkspace.domParity.test.tsx` holds this phase to.
+  editMode: boolean;
+  toggleEditMode: () => void;
   // The used design tokens of the current selection (cssVars), driving which Tokens rows show and a
   // scroll-into-view of the first. Set alongside the selection via selectVars.
   highlightedVars: string[];
@@ -182,6 +188,8 @@ const DEFAULT: DevModeContextValue = {
   toggleInspect: noop,
   showIds: false,
   toggleShowIds: noop,
+  editMode: false,
+  toggleEditMode: noop,
   highlightedVars: [],
   selectVars: noop,
   dirty: false,

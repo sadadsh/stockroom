@@ -83,6 +83,10 @@ import {
   sourcingIsSparse,
   sourcingSectionFill,
 } from "../components/component-workspace/sourcingSections";
+import {
+  ArrangePlacementChrome,
+  ArrangeSurfaceProvider,
+} from "../components/design-mode/ArrangeSurface";
 import { componentDevId } from "../lib/componentDevIds";
 import { useDevMode } from "../lib/devMode";
 import { sourcingFillCondition, WORKSPACE_CONDITION } from "./defaultWorkspaceLayout";
@@ -90,6 +94,7 @@ import { findRegion, type LayoutDocument } from "./document";
 import { resolveWorkspaceLayout } from "./resolveWorkspaceLayout";
 import {
   LayoutDocumentView,
+  LayoutPlacementChromeProvider,
   LayoutRegionScope,
   LayoutRuntimeScope,
   useLayoutCondition,
@@ -250,6 +255,34 @@ function useWorkspaceLayout(): LayoutDocument {
 }
 
 /**
+ * The workspace, drawn with whatever editing chrome Design Mode currently asks for.
+ *
+ * TWO WRAPPERS AND NEITHER DRAWS AN ELEMENT. `ArrangeSurfaceProvider` carries the arrangement, the
+ * one write path into the draft, and the drag / menu state; `LayoutPlacementChromeProvider` hands
+ * the renderer a component to wrap each placement in. With arrange OFF the provider's value is
+ * `null` and the chrome is `null`, so the renderer takes the branch it always took and the rendered
+ * DOM is byte-identical - which is what `ComponentWorkspace.domParity.test.tsx` holds. Both wrappers
+ * are here rather than in `LayoutRenderer`, because the renderer has to keep drawing the shell and
+ * every remaining route (plan Phase 6 and 7) without learning that an editor exists.
+ */
+function ArrangeableWorkspace({
+  layout,
+  children,
+}: {
+  layout: LayoutDocument;
+  children: ReactNode;
+}) {
+  const { editMode, setLayoutDraft } = useDevMode();
+  return (
+    <ArrangeSurfaceProvider active={editMode} layout={layout} onLayout={setLayoutDraft}>
+      <LayoutPlacementChromeProvider chrome={editMode ? ArrangePlacementChrome : null}>
+        {children}
+      </LayoutPlacementChromeProvider>
+    </ArrangeSurfaceProvider>
+  );
+}
+
+/**
  * The opened component, drawn from the layout document in force.
  *
  * `ComponentWorkspace` still owns every write and every piece of workspace state; this takes the
@@ -268,7 +301,9 @@ export function WorkspaceDocumentView({
     <WorkspaceRenderProvider value={context}>
       <WorkspaceOverlaysContext.Provider value={overlays ?? null}>
         <LayoutRuntimeScope conditions={conditions}>
-          <LayoutDocumentView document={layout} bindings={WORKSPACE_LAYOUT_BINDINGS} />
+          <ArrangeableWorkspace layout={layout}>
+            <LayoutDocumentView document={layout} bindings={WORKSPACE_LAYOUT_BINDINGS} />
+          </ArrangeableWorkspace>
         </LayoutRuntimeScope>
       </WorkspaceOverlaysContext.Provider>
     </WorkspaceRenderProvider>
@@ -297,7 +332,9 @@ export function WorkspaceRegionView({
   return (
     <WorkspaceRenderProvider value={context}>
       <LayoutRuntimeScope conditions={conditions}>
-        <LayoutRegionScope region={region} bindings={WORKSPACE_LAYOUT_BINDINGS} />
+        <ArrangeableWorkspace layout={layout}>
+          <LayoutRegionScope region={region} bindings={WORKSPACE_LAYOUT_BINDINGS} />
+        </ArrangeableWorkspace>
       </LayoutRuntimeScope>
     </WorkspaceRenderProvider>
   );
