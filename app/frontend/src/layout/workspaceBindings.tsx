@@ -83,16 +83,18 @@ import {
   sourcingIsSparse,
   sourcingSectionFill,
 } from "../components/component-workspace/sourcingSections";
+import {
+  ArrangePlacementChrome,
+  ArrangeSurfaceProvider,
+} from "../components/design-mode/ArrangeSurface";
 import { componentDevId } from "../lib/componentDevIds";
 import { useDevMode } from "../lib/devMode";
-import {
-  DEFAULT_WORKSPACE_LAYOUT,
-  sourcingFillCondition,
-  WORKSPACE_CONDITION,
-} from "./defaultWorkspaceLayout";
-import { findRegion } from "./document";
+import { sourcingFillCondition, WORKSPACE_CONDITION } from "./defaultWorkspaceLayout";
+import { findRegion, type LayoutDocument } from "./document";
+import { resolveWorkspaceLayout } from "./resolveWorkspaceLayout";
 import {
   LayoutDocumentView,
+  LayoutPlacementChromeProvider,
   LayoutRegionScope,
   LayoutRuntimeScope,
   useLayoutCondition,
@@ -236,7 +238,52 @@ function useWorkspaceConditions(dossier: ComponentDossier): Record<string, boole
 }
 
 /**
- * The opened component, drawn from the shipped layout document.
+ * WHICH ARRANGEMENT THIS WORKSPACE DRAWS - the one place the question is asked.
+ *
+ * Design Mode's working draft, else the committed override, else the shipped default; the order and
+ * the reasons for it are in `resolveWorkspaceLayout.ts`, and the resolution is a pure function so the
+ * only thing this hook adds is reading the draft out of the provider. With no draft and a `null`
+ * committed override - as the app ships - it returns `DEFAULT_WORKSPACE_LAYOUT` by reference, which is
+ * why `ComponentWorkspace.domParity.test.tsx`'s digests do not move.
+ *
+ * The RENDERER is untouched by this: `LayoutRenderer` is handed a document and never learns that
+ * overrides exist, which is what keeps it able to draw the shell (Phase 6) and every route after it.
+ */
+function useWorkspaceLayout(): LayoutDocument {
+  const { layoutDraft } = useDevMode();
+  return resolveWorkspaceLayout(layoutDraft);
+}
+
+/**
+ * The workspace, drawn with whatever editing chrome Design Mode currently asks for.
+ *
+ * TWO WRAPPERS AND NEITHER DRAWS AN ELEMENT. `ArrangeSurfaceProvider` carries the arrangement, the
+ * one write path into the draft, and the drag / menu state; `LayoutPlacementChromeProvider` hands
+ * the renderer a component to wrap each placement in. With arrange OFF the provider's value is
+ * `null` and the chrome is `null`, so the renderer takes the branch it always took and the rendered
+ * DOM is byte-identical - which is what `ComponentWorkspace.domParity.test.tsx` holds. Both wrappers
+ * are here rather than in `LayoutRenderer`, because the renderer has to keep drawing the shell and
+ * every remaining route (plan Phase 6 and 7) without learning that an editor exists.
+ */
+function ArrangeableWorkspace({
+  layout,
+  children,
+}: {
+  layout: LayoutDocument;
+  children: ReactNode;
+}) {
+  const { editMode, setLayoutDraft } = useDevMode();
+  return (
+    <ArrangeSurfaceProvider active={editMode} layout={layout} onLayout={setLayoutDraft}>
+      <LayoutPlacementChromeProvider chrome={editMode ? ArrangePlacementChrome : null}>
+        {children}
+      </LayoutPlacementChromeProvider>
+    </ArrangeSurfaceProvider>
+  );
+}
+
+/**
+ * The opened component, drawn from the layout document in force.
  *
  * `ComponentWorkspace` still owns every write and every piece of workspace state; this takes the
  * object it assembles and walks the document with it.
@@ -249,14 +296,14 @@ export function WorkspaceDocumentView({
   overlays?: ReactNode;
 }) {
   const conditions = useWorkspaceConditions(context.dossier);
+  const layout = useWorkspaceLayout();
   return (
     <WorkspaceRenderProvider value={context}>
       <WorkspaceOverlaysContext.Provider value={overlays ?? null}>
         <LayoutRuntimeScope conditions={conditions}>
-          <LayoutDocumentView
-            document={DEFAULT_WORKSPACE_LAYOUT}
-            bindings={WORKSPACE_LAYOUT_BINDINGS}
-          />
+          <ArrangeableWorkspace layout={layout}>
+            <LayoutDocumentView document={layout} bindings={WORKSPACE_LAYOUT_BINDINGS} />
+          </ArrangeableWorkspace>
         </LayoutRuntimeScope>
       </WorkspaceOverlaysContext.Provider>
     </WorkspaceRenderProvider>
@@ -277,12 +324,17 @@ export function WorkspaceRegionView({
   context: WorkspaceRenderContext;
 }) {
   const conditions = useWorkspaceConditions(context.dossier);
-  const region = findRegion(DEFAULT_WORKSPACE_LAYOUT, regionId);
+  // The same document the whole workspace draws, so a column mounted on its own is the column the
+  // arrangement in force describes rather than the one that shipped.
+  const layout = useWorkspaceLayout();
+  const region = findRegion(layout, regionId);
   if (!region) return null;
   return (
     <WorkspaceRenderProvider value={context}>
       <LayoutRuntimeScope conditions={conditions}>
-        <LayoutRegionScope region={region} bindings={WORKSPACE_LAYOUT_BINDINGS} />
+        <ArrangeableWorkspace layout={layout}>
+          <LayoutRegionScope region={region} bindings={WORKSPACE_LAYOUT_BINDINGS} />
+        </ArrangeableWorkspace>
       </LayoutRuntimeScope>
     </WorkspaceRenderProvider>
   );

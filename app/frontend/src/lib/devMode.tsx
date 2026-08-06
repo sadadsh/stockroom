@@ -16,6 +16,7 @@
  * selection (devModeSelection) and the on/off switch (devModeToggle).
  */
 import { createContext, useCallback, useContext, useMemo, type ReactNode } from "react";
+import type { LayoutDocument } from "../layout/document";
 import { useTheme, type Theme } from "./theme";
 import { DEV_TOKEN_BY_VAR } from "./devTokens";
 import { COPY_OVERRIDES } from "./copy.overrides";
@@ -75,6 +76,19 @@ interface DevModeContextValue {
   behaviorOverrideFor: (id: string) => BehaviorOverride | undefined;
   setBehaviorOverride: (id: string, override: BehaviorOverride) => void;
   resetBehaviorOverride: (id: string) => void;
+  // --- the arrangement (Design Mode Phase 3) ---
+  // The WORKING layout document for the opened-component workspace, or null when nothing is being
+  // edited. Null does NOT mean "the shipped default": the committed override in lib/layout.overrides.ts
+  // sits between the two, and `layout/resolveWorkspaceLayout.ts` is the one place that order is decided.
+  layoutDraft: LayoutDocument | null;
+  // True when a working arrangement is in force (an owner edit, or the committed override this session
+  // started from). Drives the panel's revert affordance in 3C.
+  isLayoutEdited: boolean;
+  // Write the whole document. The EDITS are the pure functions in `layout/editOperations.ts`; nothing
+  // in the provider knows what a move or a resize means.
+  setLayoutDraft: (document: LayoutDocument) => void;
+  // Back to no edit, so the committed override (or the shipped default) draws again.
+  resetLayoutDraft: () => void;
   canUndo: boolean;
   canRedo: boolean;
   undo: () => void;
@@ -97,6 +111,12 @@ interface DevModeContextValue {
   // The all-at-once overlay: one static id badge over every [data-dev-id] node, in every window.
   showIds: boolean;
   toggleShowIds: () => void;
+  // ARRANGE (plan 1.5): the running application becomes the canvas - a handle over every placement,
+  // draggable region boundaries, a settings menu per piece. Already ANDed with `enabled` by
+  // `devModeToggle`, so a consumer never has to remember to. OFF is zero behaviour change, which is
+  // what `ComponentWorkspace.domParity.test.tsx` holds this phase to.
+  editMode: boolean;
+  toggleEditMode: () => void;
   // The used design tokens of the current selection (cssVars), driving which Tokens rows show and a
   // scroll-into-view of the first. Set alongside the selection via selectVars.
   highlightedVars: string[];
@@ -146,6 +166,14 @@ const DEFAULT: DevModeContextValue = {
   behaviorOverrideFor: (id) => BEHAVIOR_OVERRIDES[id],
   setBehaviorOverride: noop,
   resetBehaviorOverride: noop,
+  // No provider: there is no working arrangement, and that is not the same as there being no
+  // committed one. Unlike the five keyed slices, the committed layout is NOT exposed here - the
+  // resolver reads `LAYOUT_OVERRIDES` directly, so a workspace mounted with no provider (an isolated
+  // test) draws the committed arrangement exactly as the application does.
+  layoutDraft: null,
+  isLayoutEdited: false,
+  setLayoutDraft: noop,
+  resetLayoutDraft: noop,
   canUndo: false,
   canRedo: false,
   undo: noop,
@@ -160,6 +188,8 @@ const DEFAULT: DevModeContextValue = {
   toggleInspect: noop,
   showIds: false,
   toggleShowIds: noop,
+  editMode: false,
+  toggleEditMode: noop,
   highlightedVars: [],
   selectVars: noop,
   dirty: false,
@@ -183,8 +213,8 @@ export function DevModeProvider({ children }: { children: ReactNode }) {
   const selectionApi = useDevModeSelection();
   const saveApi = useDevModeSave(draft);
 
-  // Reset all is one draft action - all five slices clear together - plus dropping the label the
-  // copy editor was pointed at, which is not part of the saved document.
+  // Reset all is one draft action - all six slices clear together, the arrangement included - plus
+  // dropping the label the copy editor was pointed at, which is not part of the saved document.
   const resetAll = useCallback(() => {
     resetDraft();
     clearSelectedCopy();

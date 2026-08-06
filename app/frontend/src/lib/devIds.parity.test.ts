@@ -247,7 +247,21 @@ const KNOWN_PROP_PASSED: readonly string[] = [
   // preview a button belongs to arrives as a `devId` prop rather than as two copies of the shell.
   "component-browser.asset-options-symbol",
   "component-browser.asset-options-footprint",
-]; // 80
+  // components/DevPanel.tsx ToggleButton: the arrange switch is the third toggle on a shelf whose
+  // other two are the editor's own chrome and carry no id, so the id arrives as an optional `devId`
+  // prop rather than being written into a shell two elements already share. Spelled out in full at
+  // the call site.
+  "design.edit-toggle",
+  // components/design-mode/ArrangeSurface.tsx MenuButton: the four piece-menu commands are one
+  // button shell used four times, so each one's id arrives as a `devId` string prop. Spelled out in
+  // full at each call site, never built as `design.piece-${command}` - an interpolated id is
+  // invisible to this gate and to grep, and these are exactly the controls an inspection of a
+  // half-edited arrangement has to be able to name one at a time.
+  "design.piece-collapse",
+  "design.piece-hide",
+  "design.piece-move-up",
+  "design.piece-move-down",
+]; // 85
 
 describe("devIds catalogue <-> code parity (IDSYS-02)", () => {
   const catalogueIds = new Set(DEV_IDS.map((e) => e.id));

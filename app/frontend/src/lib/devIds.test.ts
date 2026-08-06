@@ -172,7 +172,15 @@ import { DEV_IDS, DEV_ID_AREAS, DEV_ID_BY_ID } from "./devIds";
 // pieces of metadata around every value - a source tier, a state word and the word `Evidence` - and
 // a conflict became a quiet marker instead of a sentence. The marker is a new addressable element;
 // the word it replaced was not one.
-const EXPECTED_ENTRIES = 448;
+// 466 with the eighteen `design` rows of Design Mode's arrange surface (plan 1.5, Phase 3B). Nine
+// are the CANVAS - the per-placement drag handle, its two drop positions, and the piece settings
+// menu with its name block, its collapse / hide pair, its two step controls and its region picker -
+// drawn in a portal over the running application while arrange is on. Nine are the panel's Arrange
+// section: the switch, the section, its edited/unedited state, the revert, the control that puts an
+// off-screen piece back, and the four the named local drafts need. The `design` AREA is new, and it
+// is an area rather than rows under `shell` because these belong to the editor OF the application
+// rather than to a surface in it. A deliberate re-baseline, which is what this gate is for.
+const EXPECTED_ENTRIES = 466;
 
 describe("devIds catalogue", () => {
   // The count is asserted from a single constant so bumping it is one edit, and so the test NAME can
@@ -199,7 +207,7 @@ describe("devIds catalogue", () => {
     expect(seen.size).toBe(EXPECTED_ENTRIES);
   });
 
-  it("enumerates the 17 areas in first-appearance order, and every entry is a member", () => {
+  it("enumerates the 18 areas in first-appearance order, and every entry is a member", () => {
     expect(DEV_ID_AREAS).toEqual([
       "rail",
       "about",
@@ -218,8 +226,11 @@ describe("devIds catalogue", () => {
       "diff",
       "confirm",
       "shell",
+      // Design Mode's arrange surface. Last, because it arrived last and this list is
+      // first-appearance order rather than a taxonomy.
+      "design",
     ]);
-    expect(DEV_ID_AREAS).toHaveLength(17);
+    expect(DEV_ID_AREAS).toHaveLength(18);
 
     // Every catalogued area is declared in DEV_ID_AREAS...
     const declared = new Set(DEV_ID_AREAS);

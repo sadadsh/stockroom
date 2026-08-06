@@ -48,6 +48,8 @@ import {
   reorderSiblingsOf,
 } from "../lib/elementLayout";
 import { copyOverrideProblem, copyPlaceholders } from "../lib/copyPlaceholders";
+import { useText } from "../lib/copy";
+import { ArrangeSection } from "./design-mode/ArrangePanel";
 import { Button } from "./primitives";
 // The Interface Studio is part of the product, so its own chrome comes from the shared design
 // system rather than from a private set of class strings that drift away from it.
@@ -286,19 +288,25 @@ function CopyEditor() {
 
 type Facet = "tokens" | "copy" | "icon" | "box" | "behavior";
 
-// A small pressed-state toolbar toggle (Inspect / Show IDs).
+// A small pressed-state toolbar toggle (Inspect / Show IDs / Arrange).
+//
+// `devId` is optional and omitted by the two toggles that shipped before the id system reached this
+// panel; React drops an `undefined` attribute, so those two render exactly the markup they did.
 function ToggleButton({
   pressed,
   onClick,
   label,
+  devId,
 }: {
   pressed: boolean;
   onClick: () => void;
   label: string;
+  devId?: string;
 }) {
   return (
     <button
       type="button"
+      data-dev-id={devId}
       aria-pressed={pressed}
       onClick={onClick}
       className={
@@ -315,10 +323,20 @@ function ToggleButton({
 
 function Toolbar({ search, setSearch }: { search: string; setSearch: (s: string) => void }) {
   const dev = useDevMode();
+  // Arrange is the one toolbar label that goes through the copy layer, because it is the switch for
+  // a surface whose own labels do (see `design-mode/ArrangePanel.tsx` for why the string form and
+  // not `<Text>`). Inspect and Show IDs stay the editor's own chrome, per this file's header.
+  const arrangeLabel = useText("design.arrange-mode", "Arrange");
   return (
     <div className="flex shrink-0 items-center gap-1.5 border-b border-line px-3.5 py-2">
       <ToggleButton pressed={dev.inspect} onClick={dev.toggleInspect} label="Inspect" />
       <ToggleButton pressed={dev.showIds} onClick={dev.toggleShowIds} label="Show IDs" />
+      <ToggleButton
+        pressed={dev.editMode}
+        onClick={dev.toggleEditMode}
+        label={arrangeLabel}
+        devId="design.edit-toggle"
+      />
       <input
         type="search"
         aria-label="Search ids"
@@ -1330,6 +1348,7 @@ export function DevPanel() {
   const [search, setSearch] = useState("");
   const [showAll, setShowAll] = useState(false);
   const [catalogueOpen, setCatalogueOpen] = useState(false);
+  const [arrangeOpen, setArrangeOpen] = useState(false);
   const [publishOpen, setPublishOpen] = useState(false);
   const [publishMessage, setPublishMessage] = useState("Refine Stockroom interface");
   const [publishing, setPublishing] = useState(false);
@@ -1448,6 +1467,7 @@ export function DevPanel() {
           showAll={showAll}
           setShowAll={setShowAll}
         />
+        <ArrangeSection open={arrangeOpen} setOpen={setArrangeOpen} />
         <Catalogue search={search} open={catalogueOpen} setOpen={setCatalogueOpen} />
       </div>
 
