@@ -1,22 +1,35 @@
 /**
  * The dev mode override draft: the one working document Save writes back to source.
  *
- * tokens + copy + icons + elements + behaviors are five slices of ONE document, not five
- * independent states - a history restore writes all five together, and Reset all clears all five
+ * tokens + copy + icons + elements + behaviors + layout are six slices of ONE document, not six
+ * independent states - a history restore writes all six together, and Reset all clears all six
  * together. They therefore live behind a single reducer, so each of those transitions is one
  * dispatched action rather than a list of setter calls that could ever land apart.
  *
+ * THE SIXTH SLICE IS THE ARRANGEMENT (Design Mode Phase 3). It is one whole layout document rather
+ * than a map of keyed overrides, because an arrangement is a tree and half a tree is not an
+ * arrangement. `null` means "no edit", and the renderer then falls through to the committed override
+ * and the shipped default - see `layout/resolveWorkspaceLayout.ts` for that order.
+ *
+ * It joins the same history and the same Reset all as the other five (plan 1.5: "undo/redo spans
+ * structure and style as one history"), and it is deliberately EXCLUDED from Save - see the comment
+ * in `devModeSave.ts`.
+ *
  * This module also owns the two effects that push the draft at the document (tokens as CSS
  * variables, elements as inline styles). Both run regardless of whether dev mode is `enabled`, so
- * the shipped design is always whatever was last saved.
+ * the shipped design is always whatever was last saved. The layout slice needs no effect of its own:
+ * the workspace reads it at render, which is what makes an arrangement edit a re-render rather than a
+ * write to the DOM behind React's back.
  */
 import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef } from "react";
+import type { LayoutDocument } from "../layout/document";
 import type { Theme } from "./theme";
 import { DEV_TOKENS, DEV_TOKEN_BY_VAR } from "./devTokens";
 import { TOKEN_OVERRIDES } from "./token.overrides";
 import { COPY_OVERRIDES } from "./copy.overrides";
 import { ICON_OVERRIDES, type IconOverride } from "./icon.overrides";
 import { ELEMENT_OVERRIDES } from "./element.overrides";
+import { LAYOUT_OVERRIDES } from "./layout.overrides";
 import {
   BEHAVIOR_OVERRIDES,
   type BehaviorOverride,
@@ -43,6 +56,8 @@ export interface DevModeDraft {
   icons: Record<string, IconOverride>;
   elements: Record<string, Record<string, string>>;
   behaviors: Record<string, BehaviorOverride>;
+  /** The working arrangement of the opened-component workspace, or `null` for "no edit". */
+  layout: LayoutDocument | null;
 }
 
 function cloneTokens(src: TokenOverrides): TokenOverrides {
@@ -67,6 +82,16 @@ function cloneElements(
   return out;
 }
 
+// A DEEP copy of the committed layout document, because an edit operation returns a new document but
+// shares every untouched subtree with the one it was handed - so a working draft that started life as
+// the imported module would share subtrees with it, and editing the draft would reach into the
+// committed arrangement. `structuredClone` rather than a JSON round trip: a layout document is plain
+// serialisable data (document.ts), so both produce the same tree, and this one does it without
+// building the whole document as a string first.
+function cloneLayout(src: LayoutDocument | null): LayoutDocument | null {
+  return src ? structuredClone(src) : null;
+}
+
 function committedDraft(): DevModeDraft {
   return {
     tokens: cloneTokens(TOKEN_OVERRIDES),
@@ -74,12 +99,21 @@ function committedDraft(): DevModeDraft {
     icons: cloneIcons(ICON_OVERRIDES),
     elements: cloneElements(ELEMENT_OVERRIDES),
     behaviors: { ...BEHAVIOR_OVERRIDES },
+    layout: cloneLayout(LAYOUT_OVERRIDES.workspace),
   };
 }
 
 // Reset all: every slice back to the shipped design, in one object so no slice can be forgotten.
+// `layout: null` is the arrangement's version of an empty override map - the shipped default document.
 function emptyDraft(): DevModeDraft {
-  return { tokens: { root: {}, light: {} }, copy: {}, icons: {}, elements: {}, behaviors: {} };
+  return {
+    tokens: { root: {}, light: {} },
+    copy: {},
+    icons: {},
+    elements: {},
+    behaviors: {},
+    layout: null,
+  };
 }
 
 type DraftAction =
@@ -94,9 +128,13 @@ type DraftAction =
   | { type: "clearElement"; id: string }
   | { type: "setBehavior"; id: string; override: BehaviorOverride }
   | { type: "resetBehavior"; id: string }
-  // One action restores all five slices, so a history step can never half-apply.
+  // The arrangement is written WHOLE (the edit operations in `layout/editOperations.ts` each return a
+  // complete document), so there is one write action and one clear, not a set of field actions.
+  | { type: "setLayout"; layout: LayoutDocument }
+  | { type: "resetLayout" }
+  // One action restores all six slices, so a history step can never half-apply.
   | { type: "restore"; draft: DevModeDraft }
-  // One action clears all five slices, for the same reason.
+  // One action clears all six slices, for the same reason.
   | { type: "resetAll" };
 
 function draftReducer(state: DevModeDraft, action: DraftAction): DevModeDraft {
@@ -162,9 +200,15 @@ function draftReducer(state: DevModeDraft, action: DraftAction): DevModeDraft {
       delete behaviors[action.id];
       return { ...state, behaviors };
     }
+    case "setLayout":
+      return { ...state, layout: action.layout };
+    case "resetLayout":
+      return state.layout === null ? state : { ...state, layout: null };
     case "restore": {
-      const { tokens, copy, icons, elements, behaviors } = action.draft;
-      return { tokens, copy, icons, elements, behaviors };
+      const { tokens, copy, icons, elements, behaviors, layout } = action.draft;
+      // Rebuilt field by field rather than spread, so the snapshot shape is stated in one place and a
+      // stored snapshot that predates a slice restores as that slice's empty value.
+      return { tokens, copy, icons, elements, behaviors, layout: layout ?? null };
     }
     case "resetAll":
       return emptyDraft();
@@ -177,7 +221,7 @@ function draftReducer(state: DevModeDraft, action: DraftAction): DevModeDraft {
  */
 export function useDevModeDraft(theme: Theme) {
   const [draft, dispatch] = useReducer(draftReducer, undefined, committedDraft);
-  const { tokens, copy, icons, elements, behaviors } = draft;
+  const { tokens, copy, icons, elements, behaviors, layout } = draft;
 
   const activeSelector: TokenSelector = theme === "light" ? "light" : "root";
 
@@ -293,11 +337,21 @@ export function useDevModeDraft(theme: Theme) {
     dispatch({ type: "resetBehavior", id });
   }, []);
 
-  // Write all five slices at once (an undo/redo step), so the draft can never half-restore.
+  // --- the arrangement (Design Mode Phase 3) --- one whole document in, one whole document out. The
+  // EDITS live in `layout/editOperations.ts` as pure functions from document to document; this slice
+  // only holds the result, which is what keeps arrangement logic out of the provider.
+  const setLayoutDraft = useCallback((next: LayoutDocument) => {
+    dispatch({ type: "setLayout", layout: next });
+  }, []);
+  const resetLayoutDraft = useCallback(() => {
+    dispatch({ type: "resetLayout" });
+  }, []);
+
+  // Write all six slices at once (an undo/redo step), so the draft can never half-restore.
   const restore = useCallback((next: DevModeDraft) => {
     dispatch({ type: "restore", draft: next });
   }, []);
-  // Clear all five slices at once (Reset all), for the same reason.
+  // Clear all six slices at once (Reset all), for the same reason.
   const resetDraft = useCallback(() => {
     dispatch({ type: "resetAll" });
   }, []);
@@ -326,6 +380,12 @@ export function useDevModeDraft(theme: Theme) {
       behaviorOverrideFor,
       setBehaviorOverride,
       resetBehaviorOverride,
+      // The VALUE, not a reader: whoever draws a surface needs the document itself, and the resolution
+      // order that decides whether it is the one drawn lives in `layout/resolveWorkspaceLayout.ts`.
+      layoutDraft: layout,
+      isLayoutEdited: layout !== null,
+      setLayoutDraft,
+      resetLayoutDraft,
     }),
     [
       tokenValue,
@@ -350,6 +410,9 @@ export function useDevModeDraft(theme: Theme) {
       behaviorOverrideFor,
       setBehaviorOverride,
       resetBehaviorOverride,
+      layout,
+      setLayoutDraft,
+      resetLayoutDraft,
     ],
   );
 
