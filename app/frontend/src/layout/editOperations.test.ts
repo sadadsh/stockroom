@@ -46,12 +46,16 @@ import {
   type PiecePlacement,
 } from "./document";
 import {
+  isStyleRole,
   MIN_REGION_FRACTION,
   movePlacement,
   setPlacementCollapsed,
   setPlacementHidden,
+  setPlacementStyleRole,
   setRegionSize,
+  STYLE_ROLE_NAMES,
 } from "./editOperations";
+import { TYPOGRAPHY_SCALE } from "../components/typography";
 import { WORKSPACE_REGION } from "./workspacePieces";
 
 /* -------------------------------------------------------------------------- */
@@ -523,6 +527,101 @@ describe("per-placement settings", () => {
 });
 
 /* -------------------------------------------------------------------------- */
+/*  setPlacementStyleRole                                                      */
+/* -------------------------------------------------------------------------- */
+
+describe("setPlacementStyleRole", () => {
+  /**
+   * THE VOCABULARY IS CLOSED, and the operation is where that is true rather than the picker.
+   *
+   * FAILS IF: the role names are hand-listed here instead of read off `TYPOGRAPHY_SCALE` (a role
+   * added to the type system would then be unreachable from the editor), or `isStyleRole` answers
+   * for a string the scale does not define - which would write a document naming a class that
+   * resolves to nothing and draws no difference at all.
+   */
+  it("takes its whole vocabulary from the type system and nothing else", () => {
+    expect([...STYLE_ROLE_NAMES]).toEqual(Object.keys(TYPOGRAPHY_SCALE));
+    expect(STYLE_ROLE_NAMES.length).toBeGreaterThan(15);
+    for (const name of STYLE_ROLE_NAMES) expect(isStyleRole(name)).toBe(true);
+    // Neither a near miss, a class name, nor anything inherited from `Object.prototype`.
+    for (const bad of ["", "heading", "ui-section-title", "toString", "constructor"]) {
+      expect(isStyleRole(bad)).toBe(false);
+    }
+  });
+
+  /**
+   * FAILS IF: a free string is written through - the plan's "only here" scope would then be able to
+   * name a role nothing defines, and the exception the validator reports would point at nothing.
+   */
+  it("refuses a role name the type system does not define, on either side", () => {
+    const before = twoColumns();
+    expect(setPlacementStyleRole(before, "place.a", "heading", "sourceText")).toBe(before);
+    expect(setPlacementStyleRole(before, "place.a", "sectionTitle", "heading")).toBe(before);
+    expect(setPlacementStyleRole(before, "place.nobody", "sectionTitle", "sourceText")).toBe(before);
+    // Both legal: this is the same call succeeding, so the three above failed on the NAME rather
+    // than on the operation being inert.
+    expect(setPlacementStyleRole(before, "place.a", "sectionTitle", "sourceText")).not.toBe(before);
+  });
+
+  /**
+   * FAILS IF: clearing the last role leaves `styleRoles: {}` behind. `validateDocument` treats an
+   * empty object as no exception, so the list would be right and the DOCUMENT would be wrong - a
+   * committed layout would stop being byte-identical to the arrangement it describes, and the
+   * shipped default sets no `styleRoles` at all.
+   */
+  it("writes an exception, keeps siblings, and DELETES the key when the last one goes", () => {
+    const before = twoColumns();
+    const one = setPlacementStyleRole(before, "place.a", "sectionTitle", "sourceText");
+    expect(findPlacement(one, "place.a")?.styleRoles).toEqual({ sectionTitle: "sourceText" });
+
+    const two = setPlacementStyleRole(one, "place.a", "rowMetadata", "machineText");
+    expect(findPlacement(two, "place.a")?.styleRoles).toEqual({
+      sectionTitle: "sourceText",
+      rowMetadata: "machineText",
+    });
+    // The first entry is untouched by the second write.
+    const back = setPlacementStyleRole(two, "place.a", "rowMetadata", null);
+    expect(findPlacement(back, "place.a")?.styleRoles).toEqual({ sectionTitle: "sourceText" });
+
+    const none = setPlacementStyleRole(back, "place.a", "sectionTitle", null);
+    expect(Object.keys(findPlacement(none, "place.a") ?? {})).toEqual(["kind", "id", "piece"]);
+    expect(roundTrip(none)).toEqual(before);
+  });
+
+  /** FAILS IF: a write that changes nothing still rebuilds the document. */
+  it("hands back the same document for the exception already in force", () => {
+    const before = twoColumns();
+    expect(setPlacementStyleRole(before, "place.a", "sectionTitle", null)).toBe(before);
+    const one = setPlacementStyleRole(before, "place.a", "sectionTitle", "sourceText");
+    expect(setPlacementStyleRole(one, "place.a", "sectionTitle", "sourceText")).toBe(one);
+  });
+
+  /**
+   * FAILS IF: the edit is applied by ID rather than by the resolved object - which would give BOTH
+   * nodes of a document carrying one placement id twice the same exception.
+   */
+  it("edits one node of a document that carries the same placement id twice", () => {
+    const edited = setPlacementStyleRole(duplicateIds(), "place.dup", "sectionTitle", "sourceText");
+    expect(layoutPlacements(edited).map((visit) => visit.node.styleRoles)).toEqual([
+      { sectionTitle: "sourceText" },
+      undefined,
+    ]);
+  });
+
+  /**
+   * FAILS IF: the operation reaches into the placement it was handed. The narrow scope exists to
+   * leave every OTHER appearance of the piece alone, and a shared object mutated in place would make
+   * "only here" reach the sibling placements of the same piece.
+   */
+  it("leaves the input document untouched", () => {
+    const before = twoColumns();
+    const text = JSON.stringify(before);
+    setPlacementStyleRole(before, "place.a", "sectionTitle", "sourceText");
+    expect(JSON.stringify(before)).toBe(text);
+  });
+});
+
+/* -------------------------------------------------------------------------- */
 /*  setRegionSize                                                             */
 /* -------------------------------------------------------------------------- */
 
@@ -685,6 +784,16 @@ function everyOperation(
       add(`collapsed ${ref} ${value}`, () => setPlacementCollapsed(document, ref, value));
       add(`hidden ${ref} ${value}`, () => setPlacementHidden(document, ref, value));
     }
+    // Both legal names, the clear, and a name the type system does not define - so the whole
+    // battery's four promises cover the refusal path as well as the write.
+    for (const becomes of ["propertyLabel", "machineText", null, "heading"]) {
+      add(`role ${ref} -> ${becomes}`, () =>
+        setPlacementStyleRole(document, ref, "sectionTitle", becomes),
+      );
+    }
+    add(`role ${ref} on a name that is not a role`, () =>
+      setPlacementStyleRole(document, ref, "heading", "machineText"),
+    );
   }
   for (const region of [...new Set([...regions, "nowhere"])]) {
     for (const patch of [

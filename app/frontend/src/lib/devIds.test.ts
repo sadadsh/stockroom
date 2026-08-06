@@ -180,7 +180,13 @@ import { DEV_IDS, DEV_ID_AREAS, DEV_ID_BY_ID } from "./devIds";
 // off-screen piece back, and the four the named local drafts need. The `design` AREA is new, and it
 // is an area rather than rows under `shell` because these belong to the editor OF the application
 // rather than to a surface in it. A deliberate re-baseline, which is what this gate is for.
-const EXPECTED_ENTRIES = 466;
+// 472 with the six `design` rows of Phase 3C. Two are the narrow style scope on the piece menu (the
+// role being overridden, and what it becomes for that one placement); three are the Issues section
+// in the panel - the section, its warning/note count, and the shared row - which is where a
+// committed layout's known cost is read (plan 1.4); one is the live letter-rule warning on the copy
+// editor (plan 1.5). The WIDE style scope earns no row: editing a role everywhere it appears is the
+// Tokens rows and the Box tab, which stay outside the id system with the panel's other chrome.
+const EXPECTED_ENTRIES = 472;
 
 describe("devIds catalogue", () => {
   // The count is asserted from a single constant so bumping it is one edit, and so the test NAME can
