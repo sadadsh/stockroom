@@ -35,6 +35,14 @@ Saving regenerates exactly these files:
 - `app/frontend/src/lib/icon.overrides.ts`
 - `app/frontend/src/lib/element.overrides.ts`
 - `app/frontend/src/lib/behavior.overrides.ts`
+- `app/frontend/src/lib/layout.overrides.ts`
+
+`layout.overrides.ts` carries the committed arrangement (Design Mode Phase 4) and, beside it,
+`LAYOUT_COMMITTED_ISSUES` - the validator's reading of that arrangement at the moment it was
+committed. That list is a record rather than a cache: live validation may differ as data, tokens and
+the piece registry move, and both readings are worth having. `copy.overrides.ts` carries a second
+export too, `OWNER_AUTHORED_COPY_IDS`, marking the rewordings the owner typed themselves so the
+interface-letter gate exempts them while still binding everything the application authors.
 
 The backend validates every payload before writing any file. CSS is restricted to the editor's
 property/value grammar, SVG is parsed and rebuilt from a safe element and attribute allowlist, and
@@ -51,7 +59,7 @@ show a blocker instead of failing late. Stockroom then:
 2. fetches GitHub and requires local `HEAD` to equal `origin/main`;
 3. runs TypeScript validation and the production frontend build without opening command windows;
 4. rechecks the dirty-file boundary;
-5. commits only the five override modules and `app/frontend-dist`; and
+5. commits only the six override modules and `app/frontend-dist`; and
 6. pushes `main`, reporting a push failure rather than claiming success.
 
 The confirmation step accepts a one-line commit message. It does not force-push or merge divergent
