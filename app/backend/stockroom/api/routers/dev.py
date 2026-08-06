@@ -1,12 +1,25 @@
-"""Dev mode (owner-only): persist nudged design tokens, reworded UI copy, re-drawn icons, and
-per-element overrides back to source.
+"""Dev mode (owner-only): persist nudged design tokens, reworded UI copy, re-drawn icons,
+per-element overrides and the committed ARRANGEMENT back to source.
 
 The frontend's hidden dev mode (Ctrl+Shift+D) edits the app's own colours, radii, labels, icons,
-and per-element size / spacing / layout live, then POSTs the complete override set here. This writes
-five committed source files - ``lib/token.overrides.ts``, ``lib/copy.overrides.ts``,
-``lib/icon.overrides.ts``, ``lib/element.overrides.ts`` and ``lib/behavior.overrides.ts`` - so a saved change ships for everyone
-once committed, not as a per-machine setting. It is a source-tree tool: with no frontend source
-present (a packaged build) it refuses honestly rather than pretending to save.
+per-element size / spacing / layout and - since Design Mode Phase 4 - the layout document itself
+live, then POSTs the complete override set here. This writes six committed source files -
+``lib/token.overrides.ts``, ``lib/copy.overrides.ts``, ``lib/icon.overrides.ts``,
+``lib/element.overrides.ts``, ``lib/behavior.overrides.ts`` and ``lib/layout.overrides.ts`` - so a
+saved change ships for everyone once committed, not as a per-machine setting. It is a source-tree
+tool: with no frontend source present (a packaged build) it refuses honestly rather than pretending
+to save.
+
+WHAT GATES THIS ENDPOINT RUNS, stated plainly because the Phase 4 brief asks for the finding rather
+than an assumption: /api/dev/save runs NO build, NO typecheck and NO test suite. It validates every
+value, writes the six modules, and returns. The gates a saved design actually passes are the ones
+every one of the six slices has always relied on - ``POST /api/dev/publish`` below runs a locked
+dependency install, ``npm run typecheck`` and a production build before it commits and pushes, and
+the repository's own CI / pre-commit run the suites. The layout module is deliberately inside that
+same regime rather than gaining a private one: it is in ``_DEV_SOURCE_PATHS`` (so publish owns it,
+commits it, and refuses if a build moved anything outside the boundary), and because it is a TYPED
+module - the emitted document is assigned to ``LayoutOverrides`` - a malformed commit fails the
+publish typecheck exactly as a malformed token file would.
 
 Every value is validated and the writer re-serialises from the validated fields, never echoing raw
 input, so nothing a caller sends can inject code into a generated module: tokens/copy against a
@@ -167,6 +180,83 @@ export interface BehaviorOverride {
 
 export const BEHAVIOR_OVERRIDES: Record<string, BehaviorOverride> = """
 
+# --- the committed ARRANGEMENT (Design Mode Phase 4) --------------------------------------------
+# Two exports in one module, written together and never apart: the document the owner committed, and
+# the validator's reading of it AT THAT MOMENT. The second is not recomputed here - the validator is
+# frontend TypeScript (layout/validateDocument.ts) and re-deriving it in Python would be a second
+# implementation of the same rules, which is the shape that drifts. The frontend computes it at save
+# time and this writer emits it verbatim after a structural check.
+_LAYOUT_HEADER = """/**
+ * Committed LAYOUT overrides: the arrangement the owner shipped, written by Design Mode's commit.
+ *
+ * The sibling of `token.overrides.ts`, `copy.overrides.ts`, `icon.overrides.ts`,
+ * `element.overrides.ts` and `behavior.overrides.ts`, and it follows the same rule: this file is the
+ * SOURCE OF TRUTH for a redesign, it applies on boot for EVERYONE (Design Mode on or off, because a
+ * committed layout is not a per-machine setting), and `null` means "use the shipped default in
+ * `layout/defaultWorkspaceLayout.ts`".
+ *
+ * Regenerated whole by POST /api/dev/save, exactly as its five siblings are - that is the owner's
+ * decision 4 (plan 1.6): a committed redesign becomes the app and ships through main like any other
+ * change. Named local drafts are still where an experiment lives; Save is what ends the experiment.
+ *
+ * WHY A KEYED OBJECT rather than a bare document. The plan's sequencing puts the workspace first
+ * (Phase 1), the application shell in Phase 6 and the remaining routes in Phase 7, one at a time. Each
+ * of those is its own layout document with its own default, so each gets its own key here rather than
+ * its own module - one file the writer regenerates whole.
+ *
+ * WHAT MAY BE WRITTEN HERE: a document `layout/document.ts` can validate, at the schema version this
+ * build knows. Nothing enforces that at boot and nothing should - a committed layout naming a piece
+ * this build has not shipped is a real state (an older machine opening a newer layout), and
+ * `validateLayout` REPORTS it while the renderer draws what it can. Warn, never block.
+ */
+import type { LayoutDocument } from "../layout/document";
+import type { ValidatorIssue } from "../layout/validatorIssues";
+
+export interface LayoutOverrides {
+  /** The opened-component workspace (`workspace.component`), or `null` for the shipped default. */
+  workspace: LayoutDocument | null;
+}
+
+export const LAYOUT_OVERRIDES: LayoutOverrides = """
+
+_LAYOUT_ISSUES_HEADER = """/**
+ * THE DEVIATION LIST THAT SHIPS WITH THE COMMIT (plan 1.4: "a committed layout's known issues are
+ * part of the commit, visible in Dev Mode - honesty travels with the design").
+ *
+ * These are `validateDocument`'s findings for the document above, computed on the frontend at the
+ * moment Save was pressed and written here verbatim. They are a RECORD, not a cache: live validation
+ * may legitimately differ, because contrast is measured against whatever palette is in force, a
+ * reachability finding follows the piece registry this build ships, and a later build can register
+ * pieces this commit had never heard of. A row here that live validation no longer reports is not a
+ * bug in either one - it is what the owner accepted when they committed, next to what is true now.
+ *
+ * An empty array for a slice means the validator found nothing at commit time. An absent slice key
+ * cannot happen: the writer emits one entry per key of `LayoutOverrides`.
+ */
+export interface LayoutCommittedIssues {
+  /** The validator's reading of `LAYOUT_OVERRIDES.workspace`, as of the commit that wrote it. */
+  workspace: readonly ValidatorIssue[];
+}
+
+export const LAYOUT_COMMITTED_ISSUES: LayoutCommittedIssues = """
+
+# Appended to lib/copy.overrides.ts beneath COPY_OVERRIDES. See `_clean_owner_authored_copy`.
+_OWNER_AUTHORED_COPY_HEADER = """/**
+ * OWNER-AUTHORED PROVENANCE for the rewordings above (plan 1.5, the owner amendment).
+ *
+ * The letter rule and the term map are the owner's own rules, enforced by `copy.letterRule.test.ts`
+ * against text this application AUTHORS FOR the owner. Text the owner types themselves, through the
+ * Design Mode editor, is not that: the lint exists to catch an agent writing a blocked word into
+ * their product, not to overrule the owner inside it. So an id listed here is exempt from the letter
+ * rule and every id that is not listed stays bound by it - including a rewording somebody hand-edited
+ * into the map above, which is exactly the case the exemption must not cover.
+ *
+ * Written by POST /api/dev/save from what the editor reports it authored. Only an id that HAS an
+ * override above can appear; the writer drops any other, so this can never become a standing
+ * exemption for a string that is not there.
+ */
+export const OWNER_AUTHORED_COPY_IDS: readonly string[] = """
+
 
 # --- token + copy validators (v1, unchanged) --------------------------------------------------
 
@@ -223,7 +313,9 @@ def _clean_declared_placeholders(block: object) -> dict[str, set[str]]:
             continue
         if not isinstance(names, list):
             continue
-        declared = {n for n in names if isinstance(n, str) and _PLACEHOLDER_RE.fullmatch("{" + n + "}")}
+        declared = {
+            n for n in names if isinstance(n, str) and _PLACEHOLDER_RE.fullmatch("{" + n + "}")
+        }
         if len(declared) != len(names):
             continue
         out[key] = declared
@@ -654,9 +746,396 @@ def _clean_behaviors(block: object) -> dict:
     return out
 
 
+# --- the layout document (Design Mode Phase 4) --------------------------------------------------
+# THE SERVER-SIDE CHECK IS STRUCTURAL, AND ONLY STRUCTURAL. `validateLayout` and `validateDocument`
+# are frontend TypeScript, and the two things they need - the piece registry and the token palettes -
+# live there too. Re-implementing either here would be a second set of design rules that drifts from
+# the first, so this does what a writer of committed source has to do and nothing more: prove the
+# payload is JSON-serialisable, prove it parses as a layout DOCUMENT (the node kinds, the required
+# fields, the closed enums), and rebuild it from the validated fields so nothing a caller sends is
+# echoed into a generated module. A document that is structurally sound but a bad DESIGN is written,
+# because Design Mode warns and never blocks (decision 3) - the deviation list beside it is how that
+# stays honest.
+
+_LAYOUT_SLICES = ("workspace",)
+_REGION_MODES = {"row", "column", "stack"}
+_SCROLL_AXES = {"vertical", "horizontal", "both"}
+_MAX_LAYOUT_ID_LEN = 256
+_MAX_LAYOUT_NODES = 4000
+_MAX_LAYOUT_DEPTH = 64
+_MAX_LAYOUT_STRING_LEN = 512
+_MAX_COMMITTED_ISSUES = 2000
+# An issue code / copy id as the frontend writes them. A closed list would make a code added on the
+# frontend a 400 here; the union in `layout/validatorIssues.ts` is the real authority, and an unknown
+# code fails the publish typecheck rather than being silently dropped from the owner's known issues.
+_ISSUE_CODE_RE = re.compile(r"^[a-z][a-z0-9-]*$")
+_ISSUE_COPY_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+_ISSUE_SEVERITIES = {"warning", "info"}
+_ISSUE_SUBJECT_KINDS = {
+    "document",
+    "region",
+    "slot",
+    "placement",
+    "piece",
+    "action",
+    "splitter",
+    "token-pair",
+}
+
+
+def _layout_str(value: object, what: str, *, max_len: int = _MAX_LAYOUT_ID_LEN) -> str:
+    if not isinstance(value, str) or not value or len(value) > max_len:
+        raise ApiError(
+            400, f"Layout {what} must be a non-empty string of at most {max_len} characters."
+        )
+    return value
+
+
+def _layout_number(value: object, what: str) -> float | int:
+    """A finite JSON number. `NaN` / `Infinity` parse from JSON in Python and would not re-parse."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ApiError(400, f"Layout {what} must be a number.")
+    if value != value or value in (float("inf"), float("-inf")):
+        raise ApiError(400, f"Layout {what} must be a finite number.")
+    return value
+
+
+def _axis_size_override(block: object, what: str) -> dict:
+    if not isinstance(block, dict):
+        raise ApiError(400, f"Layout {what} must be an object.")
+    out: dict = {}
+    for key in ("min", "preferred", "fraction"):
+        if block.get(key) is not None:
+            out[key] = _layout_number(block[key], f"{what}.{key}")
+    return out
+
+
+def _axis_size(block: object, what: str) -> dict:
+    out = _axis_size_override(block, what)
+    assert isinstance(block, dict)  # _axis_size_override raised otherwise
+    if block.get("grow") is not None:
+        if not isinstance(block["grow"], bool):
+            raise ApiError(400, f"Layout {what}.grow must be true or false.")
+        out["grow"] = block["grow"]
+    when = block.get("when")
+    if when is not None:
+        if not isinstance(when, dict):
+            raise ApiError(400, f"Layout {what}.when must be an object.")
+        conditions: dict = {}
+        for condition, sizes in when.items():
+            name = _layout_str(condition, f"{what}.when key")
+            conditions[name] = _axis_size_override(sizes, f"{what}.when.{name}")
+        out["when"] = conditions
+    return out
+
+
+def _splitters(block: object, region_id: str) -> list:
+    if not isinstance(block, list):
+        raise ApiError(400, f"Layout region '{region_id}' splitters must be a list.")
+    out: list = []
+    for spec in block:
+        if not isinstance(spec, dict):
+            raise ApiError(
+                400, f"Layout region '{region_id}' has a splitter that is not an object."
+            )
+        between = spec.get("between")
+        if not isinstance(between, list) or len(between) != 2:
+            raise ApiError(400, "A layout splitter must name exactly two slots.")
+        clean = {
+            "id": _layout_str(spec.get("id"), "splitter id"),
+            "between": [
+                _layout_str(between[0], "splitter slot"),
+                _layout_str(between[1], "splitter slot"),
+            ],
+            "keyStep": _layout_number(spec.get("keyStep"), "splitter keyStep"),
+            "lineThickness": _layout_number(spec.get("lineThickness"), "splitter lineThickness"),
+            "grabWidth": _layout_number(spec.get("grabWidth"), "splitter grabWidth"),
+        }
+        if spec.get("persistenceKey") is not None:
+            clean["persistenceKey"] = _layout_str(spec["persistenceKey"], "splitter persistenceKey")
+        out.append(clean)
+    return out
+
+
+def _placement_params(block: object, placement_id: str) -> dict:
+    if not isinstance(block, dict):
+        raise ApiError(400, f"Layout placement '{placement_id}' params must be an object.")
+    out: dict = {}
+    for key, value in block.items():
+        name = _layout_str(key, "placement param name")
+        if isinstance(value, bool):
+            out[name] = value
+        elif isinstance(value, (int, float)):
+            out[name] = _layout_number(value, f"placement param '{name}'")
+        else:
+            out[name] = _layout_str(
+                value, f"placement param '{name}'", max_len=_MAX_LAYOUT_STRING_LEN
+            )
+    return out
+
+
+def _layout_node(node: object, depth: int, counter: list[int]) -> dict:
+    """One region or one placement, rebuilt from its validated fields."""
+    counter[0] += 1
+    if counter[0] > _MAX_LAYOUT_NODES:
+        raise ApiError(400, "Layout document has too many nodes.")
+    if depth > _MAX_LAYOUT_DEPTH:
+        raise ApiError(400, "Layout document is nested too deeply.")
+    if not isinstance(node, dict):
+        raise ApiError(400, "A layout node must be an object.")
+    kind = node.get("kind")
+    if kind == "region":
+        return _layout_region(node, depth, counter)
+    if kind == "placement":
+        return _layout_placement(node)
+    raise ApiError(400, f"A layout node must be a region or a placement, not '{kind}'.")
+
+
+def _layout_region(node: dict, depth: int, counter: list[int]) -> dict:
+    region_id = _layout_str(node.get("id"), "region id")
+    mode = node.get("mode")
+    if mode not in _REGION_MODES:
+        raise ApiError(
+            400, f"Layout region '{region_id}' names an unknown arrangement mode '{mode}'."
+        )
+    slots = node.get("slots")
+    if not isinstance(slots, list):
+        raise ApiError(400, f"Layout region '{region_id}' must carry a list of slots.")
+    clean: dict = {"kind": "region", "id": region_id, "mode": mode, "slots": []}
+    if node.get("devId") is not None:
+        clean["devId"] = _layout_str(node["devId"], "region devId")
+    if node.get("size") is not None:
+        clean["size"] = _axis_size(node["size"], f"region '{region_id}' size")
+    if node.get("scroll") is not None:
+        if node["scroll"] not in _SCROLL_AXES:
+            raise ApiError(400, f"Layout region '{region_id}' names an unknown scroll axis.")
+        clean["scroll"] = node["scroll"]
+    if node.get("splitters") is not None:
+        clean["splitters"] = _splitters(node["splitters"], region_id)
+    for slot in slots:
+        counter[0] += 1
+        if counter[0] > _MAX_LAYOUT_NODES:
+            raise ApiError(400, "Layout document has too many nodes.")
+        if not isinstance(slot, dict) or slot.get("kind") != "slot":
+            raise ApiError(400, f"Layout region '{region_id}' holds something that is not a slot.")
+        slot_id = _layout_str(slot.get("id"), "slot id")
+        content = slot.get("content")
+        clean["slots"].append(
+            {
+                "kind": "slot",
+                "id": slot_id,
+                "content": None if content is None else _layout_node(content, depth + 1, counter),
+            }
+        )
+    return clean
+
+
+def _layout_placement(node: dict) -> dict:
+    placement_id = _layout_str(node.get("id"), "placement id")
+    clean: dict = {
+        "kind": "placement",
+        "id": placement_id,
+        "piece": _layout_str(node.get("piece"), "placement piece"),
+    }
+    for flag in ("collapsed", "hidden"):
+        if node.get(flag) is not None:
+            if not isinstance(node[flag], bool):
+                raise ApiError(
+                    400, f"Layout placement '{placement_id}' {flag} must be true or false."
+                )
+            clean[flag] = node[flag]
+    if node.get("size") is not None:
+        clean["size"] = _axis_size(node["size"], f"placement '{placement_id}' size")
+    if node.get("styleRoles") is not None:
+        roles = node["styleRoles"]
+        if not isinstance(roles, dict):
+            raise ApiError(400, f"Layout placement '{placement_id}' styleRoles must be an object.")
+        clean["styleRoles"] = {
+            _layout_str(role, "style role name"): _layout_str(value, "style role value")
+            for role, value in roles.items()
+        }
+    if node.get("params") is not None:
+        clean["params"] = _placement_params(node["params"], placement_id)
+    if node.get("visibility") is not None:
+        visibility = node["visibility"]
+        any_of = visibility.get("anyOf") if isinstance(visibility, dict) else None
+        if not isinstance(any_of, list):
+            raise ApiError(400, f"Layout placement '{placement_id}' visibility must carry anyOf.")
+        clean["visibility"] = {"anyOf": [_layout_str(c, "visibility condition") for c in any_of]}
+    if node.get("repeat") is not None:
+        repeat = node["repeat"]
+        over = repeat.get("over") if isinstance(repeat, dict) else None
+        clean["repeat"] = {"over": _layout_str(over, "repeat collection")}
+    return clean
+
+
+def _clean_layout_document(document: object) -> dict:
+    """A whole layout document, rebuilt field by field. `None` stays `None` (the shipped default)."""
+    if not isinstance(document, dict):
+        raise ApiError(400, "A committed layout must be an object.")
+    version = document.get("schemaVersion")
+    if isinstance(version, bool) or not isinstance(version, int):
+        raise ApiError(400, "A committed layout must carry an integer schemaVersion.")
+    root = document.get("root")
+    if not isinstance(root, dict) or root.get("kind") != "region":
+        raise ApiError(400, "A committed layout's root must be a region.")
+    return {
+        "schemaVersion": version,
+        "id": _layout_str(document.get("id"), "document id"),
+        "root": _layout_node(root, 0, [0]),
+    }
+
+
+def _clean_layout(block: object) -> dict:
+    """The layout block into {slice -> document | None}. Every known slice key is always present."""
+    out: dict = {slice_name: None for slice_name in _LAYOUT_SLICES}
+    if block is None:
+        return out
+    if not isinstance(block, dict):
+        raise ApiError(400, "The layout block must be an object keyed by surface.")
+    for slice_name in _LAYOUT_SLICES:
+        document = block.get(slice_name)
+        if document is not None:
+            out[slice_name] = _clean_layout_document(document)
+    return out
+
+
+def _issue_detail(block: object) -> dict:
+    if not isinstance(block, dict):
+        raise ApiError(400, "A committed issue's detail must be an object.")
+    out: dict = {}
+    for key, value in block.items():
+        name = _layout_str(key, "issue detail name")
+        if isinstance(value, bool):
+            raise ApiError(400, f"Committed issue detail '{name}' must be a string or a number.")
+        if isinstance(value, (int, float)):
+            out[name] = _layout_number(value, f"issue detail '{name}'")
+        else:
+            out[name] = _layout_str(value, f"issue detail '{name}'", max_len=_MAX_LAYOUT_STRING_LEN)
+    return out
+
+
+def _issue_subject(block: object) -> dict:
+    if not isinstance(block, dict):
+        raise ApiError(400, "A committed issue must carry a subject object.")
+    kind = block.get("kind")
+    if kind not in _ISSUE_SUBJECT_KINDS:
+        raise ApiError(400, f"A committed issue names an unknown subject kind '{kind}'.")
+    out = {
+        "kind": kind,
+        "id": _layout_str(block.get("id"), "issue subject id", max_len=_MAX_LAYOUT_STRING_LEN),
+    }
+    if kind == "token-pair":
+        for extra in ("theme", "ink", "surface"):
+            out[extra] = _layout_str(block.get(extra), f"issue subject {extra}")
+    return out
+
+
+def _clean_committed_issues(block: object) -> dict:
+    """The deviation list per slice, rebuilt from validated fields. Absent means an empty list."""
+    out: dict = {slice_name: [] for slice_name in _LAYOUT_SLICES}
+    if block is None:
+        return out
+    if not isinstance(block, dict):
+        raise ApiError(400, "The committedIssues block must be an object keyed by surface.")
+    for slice_name in _LAYOUT_SLICES:
+        raw = block.get(slice_name)
+        if raw is None:
+            continue
+        if not isinstance(raw, list):
+            raise ApiError(400, f"Committed issues for '{slice_name}' must be a list.")
+        if len(raw) > _MAX_COMMITTED_ISSUES:
+            raise ApiError(400, f"Committed issues for '{slice_name}' are too many to write.")
+        issues = []
+        for issue in raw:
+            if not isinstance(issue, dict):
+                raise ApiError(400, "A committed issue must be an object.")
+            code = issue.get("code")
+            if not isinstance(code, str) or not _ISSUE_CODE_RE.match(code):
+                raise ApiError(400, f"Committed issue code '{code}' is not a known shape.")
+            severity = issue.get("severity")
+            if severity not in _ISSUE_SEVERITIES:
+                raise ApiError(
+                    400, f"Committed issue severity '{severity}' is not warning or info."
+                )
+            copy_block = issue.get("copy")
+            if not isinstance(copy_block, dict):
+                raise ApiError(400, "A committed issue must carry its copy id and fallback.")
+            copy_id = copy_block.get("id")
+            if not isinstance(copy_id, str) or not _ISSUE_COPY_ID_RE.match(copy_id):
+                raise ApiError(400, f"Committed issue copy id '{copy_id}' is not a known shape.")
+            clean: dict = {
+                "code": code,
+                "severity": severity,
+                "copy": {
+                    "id": copy_id,
+                    "fallback": _layout_str(
+                        copy_block.get("fallback"), "issue fallback", max_len=_MAX_COPY_LEN
+                    ),
+                },
+                "subject": _issue_subject(issue.get("subject")),
+            }
+            if issue.get("detail") is not None:
+                clean["detail"] = _issue_detail(issue["detail"])
+            if issue.get("path") is not None:
+                if not isinstance(issue["path"], list):
+                    raise ApiError(400, "A committed issue's path must be a list of node ids.")
+                clean["path"] = [_layout_str(step, "issue path step") for step in issue["path"]]
+            issues.append(clean)
+        out[slice_name] = issues
+    return out
+
+
+def _clean_owner_authored_copy(block: object, written_copy: dict) -> list[str]:
+    """Owner-typed copy ids, held to ids that actually carry an override in the same write.
+
+    The letter-rule lint exempts these (plan 1.5), so the record is the one thing in this file that
+    can make the gate quieter - which is why it is capped by construction rather than by size: an id
+    with no committed rewording has nothing to exempt, and is dropped."""
+    if block is None:
+        return []
+    if not isinstance(block, list):
+        raise ApiError(400, "The ownerAuthoredCopy block must be a list of copy ids.")
+    seen = {
+        value
+        for value in block
+        if isinstance(value, str) and _COPY_ID_RE.match(value) and value in written_copy
+    }
+    return sorted(seen)
+
+
+def _json_block(data) -> str:
+    return json.dumps(data, indent=2, ensure_ascii=False, sort_keys=True)
+
+
 def _emit(path: Path, header: str, data) -> None:
-    body = json.dumps(data, indent=2, ensure_ascii=False, sort_keys=True)
-    path.write_text(header + body + ";\n", encoding="utf-8")
+    path.write_text(header + _json_block(data) + ";\n", encoding="utf-8")
+
+
+def _emit_copy(path: Path, overrides: dict, owner_authored: list[str]) -> None:
+    """copy.overrides.ts: the rewordings, then the owner-authored provenance record beside them."""
+    path.write_text(
+        _COPY_HEADER
+        + _json_block(overrides)
+        + ";\n\n"
+        + _OWNER_AUTHORED_COPY_HEADER
+        + _json_block(owner_authored)
+        + ";\n",
+        encoding="utf-8",
+    )
+
+
+def _emit_layout(path: Path, overrides: dict, issues: dict) -> None:
+    """layout.overrides.ts: the committed documents, then the deviation list they were committed with."""
+    path.write_text(
+        _LAYOUT_HEADER
+        + _json_block(overrides)
+        + ";\n\n"
+        + _LAYOUT_ISSUES_HEADER
+        + _json_block(issues)
+        + ";\n",
+        encoding="utf-8",
+    )
 
 
 _DEV_SOURCE_PATHS = (
@@ -665,6 +1144,7 @@ _DEV_SOURCE_PATHS = (
     "app/frontend/src/lib/icon.overrides.ts",
     "app/frontend/src/lib/element.overrides.ts",
     "app/frontend/src/lib/behavior.overrides.ts",
+    "app/frontend/src/lib/layout.overrides.ts",
 )
 
 
@@ -776,7 +1256,9 @@ def _publish(request: Request, body: object) -> dict:
             409, "Publish refused because unrelated files are changed: " + ", ".join(foreign[:8])
         )
     dirty = [path.relative_to(repo.root).as_posix() for path in repo.dirty_paths()]
-    if not any(path in _DEV_SOURCE_PATHS or path.startswith("app/frontend-dist/") for path in dirty):
+    if not any(
+        path in _DEV_SOURCE_PATHS or path.startswith("app/frontend-dist/") for path in dirty
+    ):
         raise ApiError(409, "There is no saved Dev Mode change to publish.")
 
     ok, reason = repo.fetch()
@@ -835,9 +1317,13 @@ def dev_router(require_token) -> APIRouter:
         icons = body.get("icons") if isinstance(body, dict) else None
         elements = body.get("elements") if isinstance(body, dict) else None
         behaviors = body.get("behaviors") if isinstance(body, dict) else None
+        layout = body.get("layout") if isinstance(body, dict) else None
+        committed_issues = body.get("committedIssues") if isinstance(body, dict) else None
+        owner_authored = body.get("ownerAuthoredCopy") if isinstance(body, dict) else None
 
-        # Validate every block up front: a malicious icon / CSS value raises here, before any file is
-        # written, so a bad payload can never leave the four override files half-updated.
+        # Validate every block up front: a malicious icon / CSS value, or a layout that is not a
+        # document, raises here before any file is written, so a bad payload can never leave the six
+        # override files half-updated.
         declared = _clean_declared_placeholders(
             body.get("copyPlaceholders") if isinstance(body, dict) else None
         )
@@ -848,27 +1334,30 @@ def dev_router(require_token) -> APIRouter:
         clean_icons = _clean_icons(icons)
         clean_elements = _clean_elements(elements)
         clean_behaviors = _clean_behaviors(behaviors)
+        clean_layout = _clean_layout(layout)
+        clean_issues = _clean_committed_issues(committed_issues)
+        clean_owner_authored = _clean_owner_authored_copy(owner_authored, clean_copy)
 
         _emit(lib / "token.overrides.ts", _TOKENS_HEADER, {"root": root, "light": light})
-        _emit(lib / "copy.overrides.ts", _COPY_HEADER, clean_copy)
+        _emit_copy(lib / "copy.overrides.ts", clean_copy, clean_owner_authored)
         _emit(lib / "icon.overrides.ts", _ICONS_HEADER, clean_icons)
         _emit(lib / "element.overrides.ts", _ELEMENTS_HEADER, clean_elements)
         _emit(lib / "behavior.overrides.ts", _BEHAVIORS_HEADER, clean_behaviors)
+        _emit_layout(lib / "layout.overrides.ts", clean_layout, clean_issues)
 
         return {
             "ok": True,
-            "written": [
-                "app/frontend/src/lib/token.overrides.ts",
-                "app/frontend/src/lib/copy.overrides.ts",
-                "app/frontend/src/lib/icon.overrides.ts",
-                "app/frontend/src/lib/element.overrides.ts",
-                "app/frontend/src/lib/behavior.overrides.ts",
-            ],
+            "written": list(_DEV_SOURCE_PATHS),
             "tokens": len(root) + len(light),
             "copy": len(clean_copy),
             "icons": len(clean_icons),
             "elements": len(clean_elements),
             "behaviors": len(clean_behaviors),
+            # How many surfaces carry a committed arrangement, and how many known issues travel with
+            # them - the deviation list is part of the commit, so the save reports it.
+            "layouts": sum(1 for document in clean_layout.values() if document is not None),
+            "committedIssues": sum(len(rows) for rows in clean_issues.values()),
+            "ownerAuthoredCopy": len(clean_owner_authored),
         }
 
     @r.get("/status")

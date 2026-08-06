@@ -7,18 +7,14 @@
  * committed layout is not a per-machine setting), and `null` means "use the shipped default in
  * `layout/defaultWorkspaceLayout.ts`".
  *
- * ONE DIFFERENCE FROM ITS SIBLINGS, and it is the owner's decision 4 (plan 1.6): the other five are
- * written by `POST /api/dev/save`, which is a live round trip to source. A layout is NOT. Named local
- * drafts (`lib/layoutDrafts.ts`) are where an experiment lives, and a COMMIT - the plan's Phase 4
- * pipeline - is what serialises a draft into this file, regenerates whatever registries it touches
- * and runs the gates. Nothing writes this file yet; Phase 3 defines its shape and its application so
- * that Phase 4 has one place to write and no rendering question left to answer.
+ * Regenerated whole by POST /api/dev/save, exactly as its five siblings are - that is the owner's
+ * decision 4 (plan 1.6): a committed redesign becomes the app and ships through main like any other
+ * change. Named local drafts are still where an experiment lives; Save is what ends the experiment.
  *
  * WHY A KEYED OBJECT rather than a bare document. The plan's sequencing puts the workspace first
  * (Phase 1), the application shell in Phase 6 and the remaining routes in Phase 7, one at a time. Each
  * of those is its own layout document with its own default, so each gets its own key here rather than
- * its own module - one file the commit pipeline regenerates whole, exactly as
- * `POST /api/dev/save` regenerates the other five.
+ * its own module - one file the writer regenerates whole.
  *
  * WHAT MAY BE WRITTEN HERE: a document `layout/document.ts` can validate, at the schema version this
  * build knows. Nothing enforces that at boot and nothing should - a committed layout naming a piece
@@ -26,6 +22,7 @@
  * `validateLayout` REPORTS it while the renderer draws what it can. Warn, never block.
  */
 import type { LayoutDocument } from "../layout/document";
+import type { ValidatorIssue } from "../layout/validatorIssues";
 
 export interface LayoutOverrides {
   /** The opened-component workspace (`workspace.component`), or `null` for the shipped default. */
@@ -34,4 +31,27 @@ export interface LayoutOverrides {
 
 export const LAYOUT_OVERRIDES: LayoutOverrides = {
   workspace: null,
+};
+
+/**
+ * THE DEVIATION LIST THAT SHIPS WITH THE COMMIT (plan 1.4: "a committed layout's known issues are
+ * part of the commit, visible in Dev Mode - honesty travels with the design").
+ *
+ * These are `validateDocument`'s findings for the document above, computed on the frontend at the
+ * moment Save was pressed and written here verbatim. They are a RECORD, not a cache: live validation
+ * may legitimately differ, because contrast is measured against whatever palette is in force, a
+ * reachability finding follows the piece registry this build ships, and a later build can register
+ * pieces this commit had never heard of. A row here that live validation no longer reports is not a
+ * bug in either one - it is what the owner accepted when they committed, next to what is true now.
+ *
+ * An empty array for a slice means the validator found nothing at commit time. An absent slice key
+ * cannot happen: the writer emits one entry per key of `LayoutOverrides`.
+ */
+export interface LayoutCommittedIssues {
+  /** The validator's reading of `LAYOUT_OVERRIDES.workspace`, as of the commit that wrote it. */
+  workspace: readonly ValidatorIssue[];
+}
+
+export const LAYOUT_COMMITTED_ISSUES: LayoutCommittedIssues = {
+  workspace: [],
 };
