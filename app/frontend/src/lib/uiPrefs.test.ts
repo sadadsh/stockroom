@@ -17,8 +17,12 @@
  * `statusVocabulary.test.ts` and `devIds.parity.test.ts`: `node:fs` breaks `tsc -b`, which
  * type-checks this file too.
  */
-import { beforeEach, describe, expect, it } from "vitest";
-import { injectedPrefs, readPref, writePref } from "./uiPrefs";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { flushPendingUiPrefs, injectedPrefs, readPref, writePref } from "./uiPrefs";
+
+const { updateSettings } = vi.hoisted(() => ({ updateSettings: vi.fn() }));
+
+vi.mock("../api/client", () => ({ api: { updateSettings } }));
 
 const RAW = import.meta.glob("/src/lib/*.ts", {
   query: "?raw",
@@ -81,7 +85,10 @@ describe("the shape of UiPrefs", () => {
 });
 
 describe("reading and writing one preference", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
+    updateSettings.mockResolvedValue({});
+    await flushPendingUiPrefs();
+    updateSettings.mockClear();
     localStorage.clear();
     // The host injects the machine config into the page at boot, so the injected copy is part of
     // the slate a test has to reset. See lib/uiPrefs.ts.
@@ -117,5 +124,45 @@ describe("reading and writing one preference", () => {
     window.__STOCKROOM_UI__ = { theme: "light" };
     writePref("theme", "light", "sr-theme");
     expect(localStorage.getItem("sr-theme")).toBeNull();
+  });
+
+  it("keeps a rejected same-value write dirty until the machine preference path can retry", async () => {
+    updateSettings.mockRejectedValueOnce(new Error("Fixture preview blocks product mutations"));
+
+    writePref("design_studio_left_width", 302, "sr-studio-left-width");
+    await vi.waitFor(() => expect(updateSettings).toHaveBeenCalledTimes(1));
+
+    writePref("design_studio_left_width", 302, "sr-studio-left-width");
+    expect(updateSettings).toHaveBeenCalledTimes(1);
+
+    updateSettings.mockResolvedValue({});
+    await flushPendingUiPrefs();
+    expect(updateSettings).toHaveBeenCalledTimes(2);
+    expect(updateSettings).toHaveBeenLastCalledWith({
+      ui: { design_studio_left_width: 302 },
+    });
+
+    writePref("design_studio_left_width", 302, "sr-studio-left-width");
+    expect(updateSettings).toHaveBeenCalledTimes(2);
+  });
+
+  it("serializes same-key writes so an older PATCH cannot land after the newest value", async () => {
+    let resolveFirst!: (value: unknown) => void;
+    updateSettings.mockImplementationOnce(
+      () => new Promise((resolve) => {
+        resolveFirst = resolve;
+      }),
+    );
+
+    writePref("design_studio_left_width", 302, "sr-studio-left-width");
+    await vi.waitFor(() => expect(updateSettings).toHaveBeenCalledTimes(1));
+    writePref("design_studio_left_width", 318, "sr-studio-left-width");
+
+    expect(updateSettings).toHaveBeenCalledTimes(1);
+    resolveFirst({});
+    await vi.waitFor(() => expect(updateSettings).toHaveBeenCalledTimes(2));
+    expect(updateSettings).toHaveBeenLastCalledWith({
+      ui: { design_studio_left_width: 318 },
+    });
   });
 });

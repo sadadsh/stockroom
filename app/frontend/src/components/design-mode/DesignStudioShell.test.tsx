@@ -39,7 +39,6 @@ vi.mock("../../api/client", async (importActual) => {
         can_publish: false,
         publish_blocker: "Source promotion is unavailable.",
       }),
-      updateSettings: vi.fn().mockResolvedValue({}),
     },
   };
 });
@@ -146,6 +145,55 @@ describe("DesignStudioShell", () => {
     expect(entry).toHaveFocus();
   });
 
+  it("shares one mode authority with the retained Dev panel controls", async () => {
+    const { entry } = await renderStudio();
+    const studioMode = within(screen.getByLabelText("Studio Mode"));
+    const devPanel = within(screen.getByRole("complementary", { name: "Dev mode" }));
+
+    await userEvent.setup().click(devPanel.getByRole("button", { name: "Inspect" }));
+    expect(studioMode.getByRole("button", { name: "Inspect" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+
+    await userEvent.setup().click(devPanel.getByRole("button", { name: "Arrange" }));
+    expect(studioMode.getByRole("button", { name: "Inspect" })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
+    expect(studioMode.getByRole("button", { name: "Arrange" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(studioMode.getByRole("button", { name: "Browse" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(screen.getByRole("region", { name: "Stockroom Preview" })).toBeVisible();
+
+    fireEvent.keyDown(window, { key: "Escape" });
+    await waitFor(() => expect(screen.queryByRole("region", { name: "Stockroom Preview" })).toBeNull());
+    expect(entry).toHaveFocus();
+  });
+
+  it("lets an open production modal own Escape before Design Studio", async () => {
+    await renderStudio();
+    const aboutButton = screen.getByRole("button", { name: "About" });
+    await userEvent.setup().click(aboutButton);
+    expect(await screen.findByRole("dialog", { name: "About Stockroom" })).toBeVisible();
+
+    fireEvent.keyDown(window, { key: "Escape" });
+
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: "About Stockroom" })).not.toBeInTheDocument(),
+    );
+    expect(screen.getByRole("region", { name: "Stockroom Preview" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Browse" })).toHaveAttribute("aria-pressed", "true");
+    await waitFor(() => expect(aboutButton).toHaveFocus());
+  });
+
   it("gives panel resizers named keyboard controls", async () => {
     await renderStudio();
     const resizer = screen.getByRole("separator", { name: "Resize Screens And States Panel" });
@@ -154,5 +202,39 @@ describe("DesignStudioShell", () => {
     fireEvent.keyDown(resizer, { key: "ArrowRight" });
 
     expect(screen.getByRole("complementary", { name: "Screens And States" }).getAttribute("style")).not.toBe(before);
+  });
+
+  it("keeps a failed fixture-preview panel preference dirty and flushes it in Real Data", async () => {
+    await renderStudio();
+    await userEvent.setup().click(screen.getByRole("button", { name: /^Onboarding Open/ }));
+    const resizer = screen.getByRole("separator", { name: "Resize Screens And States Panel" });
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockClear();
+
+    fireEvent.keyDown(resizer, { key: "ArrowRight" });
+    await waitFor(() =>
+      expect(window.__STOCKROOM_UI__?.design_studio_left_width).toBeGreaterThan(0),
+    );
+    const queuedWidth = window.__STOCKROOM_UI__?.design_studio_left_width;
+    expect(
+      fetchMock.mock.calls.filter(
+        ([input, init]) => String(input).includes("/api/settings") && init?.method === "PATCH",
+      ),
+    ).toHaveLength(0);
+
+    await userEvent.setup().click(screen.getByRole("button", { name: "Real Data" }));
+    await waitFor(() =>
+      expect(
+        fetchMock.mock.calls.filter(
+          ([input, init]) => String(input).includes("/api/settings") && init?.method === "PATCH",
+        ),
+      ).toHaveLength(1),
+    );
+    const settingsCall = fetchMock.mock.calls.find(
+      ([input, init]) => String(input).includes("/api/settings") && init?.method === "PATCH",
+    );
+    expect(settingsCall?.[1]?.body).toBe(
+      JSON.stringify({ ui: { design_studio_left_width: queuedWidth } }),
+    );
   });
 });

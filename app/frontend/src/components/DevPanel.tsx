@@ -362,11 +362,15 @@ function Toolbar({ search, setSearch }: { search: string; setSearch: (s: string)
   const arrangeLabel = useText("design.arrange-mode", "Arrange");
   return (
     <div className="flex shrink-0 items-center gap-1.5 border-b border-line px-3.5 py-2">
-      <ToggleButton pressed={dev.inspect} onClick={dev.toggleInspect} label="Inspect" />
+      <ToggleButton
+        pressed={dev.studioMode === "inspect"}
+        onClick={() => dev.setStudioMode(dev.studioMode === "inspect" ? "browse" : "inspect")}
+        label="Inspect"
+      />
       <ToggleButton pressed={dev.showIds} onClick={dev.toggleShowIds} label="Show IDs" />
       <ToggleButton
-        pressed={dev.editMode}
-        onClick={dev.toggleEditMode}
+        pressed={dev.studioMode === "arrange"}
+        onClick={() => dev.setStudioMode(dev.studioMode === "arrange" ? "browse" : "arrange")}
         label={arrangeLabel}
         devId="design.edit-toggle"
       />

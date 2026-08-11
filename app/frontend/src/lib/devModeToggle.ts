@@ -38,6 +38,7 @@ export function useDevModeToggle() {
   }, []);
 
   const toggle = useCallback(() => setEnabled((v) => !v), []);
+  const setArrangeMode = useCallback((value: boolean) => setEditMode(value), []);
   const toggleEditMode = useCallback(() => setEditMode((v) => !v), []);
 
   const selectCopy = useCallback((id: string, defaultText: string) => {
@@ -60,5 +61,5 @@ export function useDevModeToggle() {
     [enabled, toggle, editMode, toggleEditMode, selectedCopy, selectCopy, clearSelectedCopy],
   );
 
-  return { api, enabled, clearSelectedCopy };
+  return { api, enabled, clearSelectedCopy, setArrangeMode };
 }

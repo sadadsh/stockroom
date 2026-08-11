@@ -15,11 +15,12 @@ export function useDevModeSelection() {
   const [highlightedVars, setHighlightedVars] = useState<string[]>([]);
 
   const selectDevId = useCallback((id: string | null) => setSelectedDevId(id), []);
+  const setInspectMode = useCallback((value: boolean) => setInspect(value), []);
   const toggleInspect = useCallback(() => setInspect((v) => !v), []);
   const toggleShowIds = useCallback(() => setShowIds((v) => !v), []);
   const selectVars = useCallback((vars: string[]) => setHighlightedVars(vars), []);
 
-  return useMemo(
+  const api = useMemo(
     () => ({
       selectedDevId,
       selectDevId,
@@ -41,4 +42,6 @@ export function useDevModeSelection() {
       selectVars,
     ],
   );
+
+  return { api, setInspectMode };
 }

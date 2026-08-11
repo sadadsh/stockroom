@@ -15,7 +15,7 @@
  * (devModeDraft), undo/redo (devModeHistory), Save + dirty (devModeSave), the inspect-first
  * selection (devModeSelection) and the on/off switch (devModeToggle).
  */
-import { createContext, useCallback, useContext, useMemo, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, type ReactNode } from "react";
 import type { LayoutDocument } from "../layout/document";
 import { useTheme, type Theme } from "./theme";
 import { DEV_TOKEN_BY_VAR } from "./devTokens";
@@ -37,6 +37,8 @@ import { useDevModeHistory, useDevModeHistoryKeys } from "./devModeHistory";
 import { useDevModeSave } from "./devModeSave";
 import { useDevModeSelection } from "./devModeSelection";
 import { useDevModeToggle } from "./devModeToggle";
+
+export type StudioMode = "browse" | "inspect" | "arrange";
 
 export interface DevModeContextValue {
   enabled: boolean;
@@ -118,6 +120,9 @@ export interface DevModeContextValue {
   // selects it and is swallowed (never fires the app / copy layer). Off is zero behaviour change.
   inspect: boolean;
   toggleInspect: () => void;
+  // The single mode authority shared by the Design Studio shell and retained Dev panel controls.
+  studioMode: StudioMode;
+  setStudioMode: (mode: StudioMode) => void;
   // The all-at-once overlay: one static id badge over every [data-dev-id] node, in every window.
   showIds: boolean;
   toggleShowIds: () => void;
@@ -203,6 +208,8 @@ const DEFAULT: DevModeContextValue = {
   selectDevId: noop,
   inspect: false,
   toggleInspect: noop,
+  studioMode: "browse",
+  setStudioMode: noop,
   showIds: false,
   toggleShowIds: noop,
   editMode: false,
@@ -226,11 +233,30 @@ export function DevModeProvider({ children }: { children: ReactNode }) {
   // Ctrl/Cmd+Z history keys, then the two document applies (tokens, elements).
   const { draft, restore, replaceDraft, resetDraft, api: draftApi } = useDevModeDraft(theme);
   const { api: historyApi, historyRevision, undo, redo } = useDevModeHistory(draft, restore);
-  const { api: toggleApi, enabled, clearSelectedCopy } = useDevModeToggle();
+  const { api: toggleApi, enabled, clearSelectedCopy, setArrangeMode } = useDevModeToggle();
   useDevModeHistoryKeys(enabled, undo, redo);
   useApplyDraftOverrides(draft.tokens, draft.elements, theme);
-  const selectionApi = useDevModeSelection();
+  const { api: selectionApi, setInspectMode } = useDevModeSelection();
   const saveApi = useDevModeSave(draft);
+  const studioMode: StudioMode = toggleApi.editMode
+    ? "arrange"
+    : selectionApi.inspect
+      ? "inspect"
+      : "browse";
+  const setStudioMode = useCallback((mode: StudioMode) => {
+    setInspectMode(mode === "inspect");
+    setArrangeMode(mode === "arrange");
+  }, [setArrangeMode, setInspectMode]);
+  const toggleInspect = useCallback(() => {
+    setStudioMode(studioMode === "inspect" ? "browse" : "inspect");
+  }, [setStudioMode, studioMode]);
+  const toggleEditMode = useCallback(() => {
+    setStudioMode(studioMode === "arrange" ? "browse" : "arrange");
+  }, [setStudioMode, studioMode]);
+
+  useEffect(() => {
+    if (!enabled) setStudioMode("browse");
+  }, [enabled, setStudioMode]);
 
   // Reset all is one draft action - all six slices clear together, the arrangement included - plus
   // dropping the label the copy editor was pointed at, which is not part of the saved document.
@@ -247,6 +273,10 @@ export function DevModeProvider({ children }: { children: ReactNode }) {
       ...historyApi,
       ...selectionApi,
       ...saveApi,
+      studioMode,
+      setStudioMode,
+      toggleInspect,
+      toggleEditMode,
       resetAll,
       draft,
       replaceDraft,
@@ -261,6 +291,10 @@ export function DevModeProvider({ children }: { children: ReactNode }) {
       historyRevision,
       selectionApi,
       saveApi,
+      studioMode,
+      setStudioMode,
+      toggleInspect,
+      toggleEditMode,
       resetAll,
       draft,
       replaceDraft,

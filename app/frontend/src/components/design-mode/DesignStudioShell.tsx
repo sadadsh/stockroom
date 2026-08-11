@@ -2,9 +2,10 @@ import { useCallback, useEffect, useState, type CSSProperties, type ReactNode } 
 import { useDesignStudio } from "../../design-studio/DesignStudioProvider";
 import { useDevMode } from "../../lib/devMode";
 import { useText } from "../../lib/copy";
-import { readPref, writePref } from "../../lib/uiPrefs";
+import { openModalCount } from "../../lib/useModalDismiss";
+import { flushPendingUiPrefs, readPref, writePref } from "../../lib/uiPrefs";
 import { DevPanel } from "../DevPanel";
-import { DesignStudioToolbar, type StudioMode, type StudioViewport } from "./DesignStudioToolbar";
+import { DesignStudioToolbar, type StudioViewport } from "./DesignStudioToolbar";
 import { LayersHierarchyPanel } from "./LayersHierarchyPanel";
 import { ScenarioCatalog } from "./ScenarioCatalog";
 
@@ -77,7 +78,6 @@ function PanelResizer({
 export function DesignStudioShell({ children }: { children: ReactNode }) {
   const studio = useDesignStudio();
   const dev = useDevMode();
-  const [mode, setMode] = useState<StudioMode>("browse");
   const [presentation, setPresentation] = useState(false);
   const [viewport, setViewport] = useState<StudioViewport>("fit");
   const [zoom, setZoom] = useState(100);
@@ -103,13 +103,8 @@ export function DesignStudioShell({ children }: { children: ReactNode }) {
   const hideInspectorLabel = useText("design-studio.panel.inspector-hide", "Hide Inspector");
   const showInspectorLabel = useText("design-studio.panel.inspector-show", "Show Inspector");
 
-  const changeMode = useCallback((next: StudioMode) => {
-    if (dev.inspect && next !== "inspect") dev.toggleInspect();
-    if (dev.editMode && next !== "arrange") dev.toggleEditMode();
-    if (next === "inspect" && !dev.inspect) dev.toggleInspect();
-    if (next === "arrange" && !dev.editMode) dev.toggleEditMode();
-    setMode(next);
-  }, [dev]);
+  const mode = dev.studioMode;
+  const changeMode = dev.setStudioMode;
 
   const close = useCallback(() => {
     changeMode("browse");
@@ -126,6 +121,7 @@ export function DesignStudioShell({ children }: { children: ReactNode }) {
     if (!studio.enabled) return;
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
+      if (openModalCount() > 0) return;
       event.preventDefault();
       if (mode !== "browse") changeMode("browse");
       else close();
@@ -139,6 +135,10 @@ export function DesignStudioShell({ children }: { children: ReactNode }) {
     if (mode !== "browse") changeMode("browse");
     if (presentation) setPresentation(false);
   }, [changeMode, mode, presentation, studio.enabled]);
+
+  useEffect(() => {
+    if (studio.activeScenario === null) void flushPendingUiPrefs();
+  }, [studio.activeScenario]);
 
   const setLeftPanelCollapsed = (collapsed: boolean) => {
     setLeftCollapsed(collapsed);

@@ -49,7 +49,7 @@ export function modalZIndex(depth: number): number {
   return MODAL_BASE_Z + Math.max(0, depth) * MODAL_Z_STEP;
 }
 
-/** How many modals are open. Exported for tests and for reasoning about the stack. */
+/** How many modals are open. Shell-level Escape handlers defer while this stack owns the key. */
 export function openModalCount(): number {
   return stack.length;
 }

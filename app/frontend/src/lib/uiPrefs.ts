@@ -70,6 +70,47 @@ export function readPref<T>(
   return fallback;
 }
 
+interface PendingUiPref {
+  readonly value: unknown;
+}
+
+const pendingUiPrefs = new Map<keyof UiPrefs, PendingUiPref>();
+const inFlightUiPrefs = new Map<keyof UiPrefs, Promise<void>>();
+
+function persistPendingUiPref(key: keyof UiPrefs): Promise<void> {
+  const active = inFlightUiPrefs.get(key);
+  if (active) return active;
+  const pending = pendingUiPrefs.get(key);
+  if (!pending) return Promise.resolve();
+
+  // One request per key at a time. A newer value written while this PATCH is pending remains in the
+  // map, then starts only after this request settles, so an older response can never land last.
+  const attempt = Promise.resolve().then(async () => {
+    try {
+      await api.updateSettings({ ui: { [key]: pending.value } } as never);
+      if (pendingUiPrefs.get(key) === pending) pendingUiPrefs.delete(key);
+    } catch {
+      // Fixture preview, offline, 401, or an older backend: retain the dirty scalar for a later flush.
+    } finally {
+      inFlightUiPrefs.delete(key);
+      const latest = pendingUiPrefs.get(key);
+      if (latest && latest !== pending) void persistPendingUiPref(key);
+    }
+  });
+  inFlightUiPrefs.set(key, attempt);
+  return attempt;
+}
+
+/** Retry dirty machine preferences after fixture preview restores the live request adapter. */
+export async function flushPendingUiPrefs(): Promise<void> {
+  await Promise.all(
+    [...pendingUiPrefs.keys()].map(async (key) => {
+      await inFlightUiPrefs.get(key);
+      if (pendingUiPrefs.has(key)) await persistPendingUiPref(key);
+    }),
+  );
+}
+
 /**
  * Persist one preference. Writes the mirror first (synchronous, so a reload inside the same launch
  * is already correct) and then the machine config, which is what actually survives a restart.
@@ -97,17 +138,7 @@ export function writePref(key: keyof UiPrefs, value: unknown, mirrorKey: string)
   } catch {
     /* non-fatal */
   }
-  // A preference that fails to persist must never break the interaction that set it. The try/catch
-  // is NOT redundant with .catch(): that only handles a rejected promise, while a client that
-  // throws synchronously would propagate straight out of the useEffect calling this and take the
-  // component down with it.
-  try {
-    void api
-      .updateSettings({ ui: { [key]: value } } as never)
-      .catch(() => {
-        /* offline, 401, or a backend that predates the `ui` field: the mirror still holds */
-      });
-  } catch {
-    /* nothing to do; the value is already mirrored locally */
-  }
+  const nextPending = { value };
+  pendingUiPrefs.set(key, nextPending);
+  void persistPendingUiPref(key);
 }

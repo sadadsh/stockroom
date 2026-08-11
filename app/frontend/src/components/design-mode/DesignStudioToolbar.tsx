@@ -1,10 +1,10 @@
 import { useDesignStudio } from "../../design-studio/DesignStudioProvider";
 import { useDevMode } from "../../lib/devMode";
+import type { StudioMode } from "../../lib/devMode";
 import { useText } from "../../lib/copy";
 import { useTheme } from "../../lib/theme";
 import { Button } from "../primitives";
 
-export type StudioMode = "browse" | "inspect" | "arrange";
 export type StudioViewport = "fit" | "desktop" | "tablet" | "mobile";
 
 interface DesignStudioToolbarProps {
