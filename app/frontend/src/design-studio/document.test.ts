@@ -97,6 +97,119 @@ describe("Design Studio document", () => {
     expect(result.ok && result.document.variations).toEqual({});
   });
 
+  it("treats prototype-named variation ids as absent unless they are own entries", () => {
+    const active = parseDesignDocument({
+      schemaVersion: 1,
+      base: emptyDraft(),
+      activeVariationId: "toString",
+    });
+    const parent = parseDesignDocument({
+      schemaVersion: 1,
+      base: emptyDraft(),
+      variations: {
+        child: { id: "child", title: "Child", extends: "toString", patch: {} },
+      },
+    });
+
+    expect(active).toEqual({ ok: false, error: expect.objectContaining({ code: "unknown-active-variation" }) });
+    expect(parent).toEqual({ ok: false, error: expect.objectContaining({ code: "missing-variation-parent" }) });
+  });
+
+  it("preserves an own __proto__ variation entry without changing dictionary membership", () => {
+    const value = JSON.parse(`{
+      "schemaVersion": 1,
+      "base": { "tokens": { "root": {}, "light": {} }, "copy": {}, "icons": {}, "elements": {}, "behaviors": {}, "layout": null },
+      "variations": { "__proto__": { "id": "__proto__", "title": "Prototype", "patch": { "copy": { "rail.about": "Info" } } } },
+      "activeVariationId": "__proto__"
+    }`);
+    const result = parseDesignDocument(value);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(Object.prototype.hasOwnProperty.call(result.document.variations, "__proto__")).toBe(true);
+    expect(resolveDesign(result.document, "__proto__", "dark").copy["rail.about"]).toBe("Info");
+  });
+
+  it("parses a nested layout document before resolution trusts it", () => {
+    const layout = {
+      schemaVersion: 1,
+      id: "workspace",
+      root: {
+        kind: "region",
+        id: "root",
+        mode: "row",
+        size: { fraction: 1, when: { narrow: { min: 240 } } },
+        slots: [
+          {
+            kind: "slot",
+            id: "main",
+            content: {
+              kind: "placement",
+              id: "offers",
+              piece: "component-browser.offers",
+              params: { page: 1, visible: true },
+              styleRoles: { heading: "section" },
+              visibility: { anyOf: ["offers.present"] },
+              repeat: { over: "offers" },
+            },
+          },
+        ],
+      },
+    };
+    const result = parseDesignDocument({ schemaVersion: 1, base: { ...emptyDraft(), layout } });
+
+    expect(result.ok && result.document.base.layout).toEqual(layout);
+  });
+
+  it.each([
+    [
+      {
+        schemaVersion: 1,
+        base: emptyDraft(),
+        variations: { key: { id: "different", title: "Different", patch: {} } },
+      },
+      "duplicate-variation-id",
+    ],
+    [
+      {
+        schemaVersion: 1,
+        base: emptyDraft(),
+        variations: { child: { id: "child", title: "Child", extends: "missing", patch: {} } },
+      },
+      "missing-variation-parent",
+    ],
+    [{ schemaVersion: 1, base: emptyDraft(), variations: { bad: { id: "bad", title: "Bad", patch: [] } } }, "invalid-variation"],
+    [
+      {
+        schemaVersion: 1,
+        base: emptyDraft(),
+        variations: { bad: { id: "bad", title: "Bad", patch: {}, themes: { sepia: {} } } },
+      },
+      "invalid-variation",
+    ],
+    [
+      {
+        schemaVersion: 1,
+        base: {
+          ...emptyDraft(),
+          layout: {
+            schemaVersion: 1,
+            id: "workspace",
+            root: {
+              kind: "region",
+              id: "root",
+              mode: "row",
+              slots: [{ kind: "slot", id: "slot", content: { kind: "not-a-node" } }],
+            },
+          },
+        },
+      },
+      "invalid-layout",
+    ],
+  ])("returns %s as parse data", (value, code) => {
+    expect(parseDesignDocument(value)).toEqual({ ok: false, error: expect.objectContaining({ code }) });
+  });
+
   it("applies sparse patches and explicit deletions without mutating the document", () => {
     const document = fixtureDocument();
     document.variations.purchasing.patch = {

@@ -5,7 +5,17 @@
  * but never reads storage, the DOM, or an API. A v1 scope records where an edit was authored after
  * that edit has already been expanded to stable target ids; it is not a second selector system.
  */
-import type { LayoutDocument } from "../layout/document";
+import {
+  REGION_LAYOUT_MODES,
+  type AxisSize,
+  type AxisSizeOverride,
+  type LayoutDocument,
+  type LayoutNode,
+  type LayoutRegion,
+  type LayoutSlot,
+  type PiecePlacement,
+  type SplitterSpec,
+} from "../layout/document";
 import {
   committedDevModeDraft,
   type DevModeDraft,
@@ -58,6 +68,7 @@ export interface DesignDocumentParseError {
     | "invalid-schema-version"
     | "unsupported-schema-version"
     | "invalid-base"
+    | "invalid-layout"
     | "invalid-variation"
     | "invalid-variation-theme"
     | "duplicate-variation-id"
@@ -87,6 +98,14 @@ function isRecord(value: unknown): value is UnknownRecord {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
+function dictionary<T>(): Record<string, T> {
+  return Object.create(null) as Record<string, T>;
+}
+
+function hasOwn(record: object, key: string): boolean {
+  return Object.prototype.hasOwnProperty.call(record, key);
+}
+
 function error(code: DesignDocumentParseError["code"], message: string): DesignDocumentParseResult {
   return { ok: false, error: { code, message } };
 }
@@ -104,7 +123,7 @@ function emptyDraft(): DevModeDraft {
 
 function copyStringMap(value: unknown, nullable: boolean): Record<string, string | null> | null {
   if (!isRecord(value)) return null;
-  const out: Record<string, string | null> = {};
+  const out = dictionary<string | null>();
   for (const [key, entry] of Object.entries(value)) {
     if (typeof entry !== "string" && (!nullable || entry !== null)) return null;
     out[key] = entry;
@@ -122,7 +141,7 @@ function copyIcon(value: unknown): IconOverride | null {
 
 function copyIcons(value: unknown, nullable: boolean): Record<string, IconOverride | null> | null {
   if (!isRecord(value)) return null;
-  const out: Record<string, IconOverride | null> = {};
+  const out = dictionary<IconOverride | null>();
   for (const [key, entry] of Object.entries(value)) {
     if (entry === null && nullable) {
       out[key] = null;
@@ -140,7 +159,7 @@ function copyElements(
   nullable: boolean,
 ): Record<string, Record<string, string | null> | null> | null {
   if (!isRecord(value)) return null;
-  const out: Record<string, Record<string, string | null> | null> = {};
+  const out = dictionary<Record<string, string | null> | null>();
   for (const [key, entry] of Object.entries(value)) {
     if (entry === null && nullable) {
       out[key] = null;
@@ -172,7 +191,7 @@ function copyBehavior(value: unknown): BehaviorOverride | null {
 
 function copyBehaviors(value: unknown, nullable: boolean): Record<string, BehaviorOverride | null> | null {
   if (!isRecord(value)) return null;
-  const out: Record<string, BehaviorOverride | null> = {};
+  const out = dictionary<BehaviorOverride | null>();
   for (const [key, entry] of Object.entries(value)) {
     if (entry === null && nullable) {
       out[key] = null;
@@ -185,9 +204,187 @@ function copyBehaviors(value: unknown, nullable: boolean): Record<string, Behavi
   return out;
 }
 
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+function parseStringRecord(value: unknown): Record<string, string> | null {
+  const parsed = copyStringMap(value, false);
+  if (!parsed) return null;
+  const out = dictionary<string>();
+  for (const [key, entry] of Object.entries(parsed)) {
+    if (entry === null) return null;
+    out[key] = entry;
+  }
+  return out;
+}
+
+function parseAxisSizeOverride(value: unknown): AxisSizeOverride | null {
+  if (!isRecord(value)) return null;
+  const out: AxisSizeOverride = {};
+  for (const key of ["min", "preferred", "fraction"] as const) {
+    const entry = value[key];
+    if (entry !== undefined && !isFiniteNumber(entry)) return null;
+    if (entry !== undefined) out[key] = entry;
+  }
+  return out;
+}
+
+function parseAxisSize(value: unknown): AxisSize | null {
+  const base = parseAxisSizeOverride(value);
+  if (!base || !isRecord(value)) return null;
+  const out: AxisSize = { ...base };
+  if (value.grow !== undefined) {
+    if (typeof value.grow !== "boolean") return null;
+    out.grow = value.grow;
+  }
+  if (value.when !== undefined) {
+    if (!isRecord(value.when)) return null;
+    const when = dictionary<AxisSizeOverride>();
+    for (const [condition, override] of Object.entries(value.when)) {
+      const parsed = parseAxisSizeOverride(override);
+      if (!parsed) return null;
+      when[condition] = parsed;
+    }
+    out.when = when;
+  }
+  return out;
+}
+
+function parseSplitter(value: unknown): SplitterSpec | null {
+  if (!isRecord(value) || typeof value.id !== "string" || !Array.isArray(value.between)) return null;
+  const [before, after] = value.between;
+  if (value.between.length !== 2 || typeof before !== "string" || typeof after !== "string") return null;
+  if (!isFiniteNumber(value.keyStep) || !isFiniteNumber(value.lineThickness) || !isFiniteNumber(value.grabWidth)) return null;
+  if (value.persistenceKey !== undefined && typeof value.persistenceKey !== "string") return null;
+  return {
+    id: value.id,
+    between: [before, after],
+    keyStep: value.keyStep,
+    lineThickness: value.lineThickness,
+    grabWidth: value.grabWidth,
+    ...(value.persistenceKey === undefined ? {} : { persistenceKey: value.persistenceKey }),
+  };
+}
+
+function isRegionLayoutMode(value: unknown): value is LayoutRegion["mode"] {
+  return REGION_LAYOUT_MODES.some((mode) => mode === value);
+}
+
+function parseLayoutRegion(value: unknown, ancestors: WeakSet<object>): LayoutRegion | null {
+  if (!isRecord(value) || ancestors.has(value)) return null;
+  const mode = value.mode;
+  if (value.kind !== "region" || typeof value.id !== "string" || !isRegionLayoutMode(mode)) return null;
+  if (!Array.isArray(value.slots)) return null;
+  ancestors.add(value);
+  const slots: LayoutSlot[] = [];
+  for (const rawSlot of value.slots) {
+    const slot = parseLayoutSlot(rawSlot, ancestors);
+    if (!slot) {
+      ancestors.delete(value);
+      return null;
+    }
+    slots.push(slot);
+  }
+  ancestors.delete(value);
+  const out: LayoutRegion = { kind: "region", id: value.id, mode, slots };
+  if (value.devId !== undefined) {
+    if (typeof value.devId !== "string") return null;
+    out.devId = value.devId;
+  }
+  if (value.size !== undefined) {
+    const size = parseAxisSize(value.size);
+    if (!size) return null;
+    out.size = size;
+  }
+  if (value.scroll !== undefined) {
+    if (value.scroll !== "vertical" && value.scroll !== "horizontal" && value.scroll !== "both") return null;
+    out.scroll = value.scroll;
+  }
+  if (value.splitters !== undefined) {
+    if (!Array.isArray(value.splitters)) return null;
+    const splitters: SplitterSpec[] = [];
+    for (const rawSplitter of value.splitters) {
+      const splitter = parseSplitter(rawSplitter);
+      if (!splitter) return null;
+      splitters.push(splitter);
+    }
+    out.splitters = splitters;
+  }
+  return out;
+}
+
+function parseLayoutSlot(value: unknown, ancestors: WeakSet<object>): LayoutSlot | null {
+  if (!isRecord(value) || ancestors.has(value) || value.kind !== "slot" || typeof value.id !== "string") return null;
+  if (value.content === null) return { kind: "slot", id: value.id, content: null };
+  ancestors.add(value);
+  const content = parseLayoutNode(value.content, ancestors);
+  ancestors.delete(value);
+  return content ? { kind: "slot", id: value.id, content } : null;
+}
+
+function parseLayoutPlacement(value: unknown): PiecePlacement | null {
+  if (!isRecord(value) || value.kind !== "placement" || typeof value.id !== "string" || typeof value.piece !== "string") return null;
+  const out: PiecePlacement = { kind: "placement", id: value.id, piece: value.piece };
+  if (value.collapsed !== undefined && typeof value.collapsed !== "boolean") return null;
+  if (value.collapsed !== undefined) out.collapsed = value.collapsed;
+  if (value.hidden !== undefined && typeof value.hidden !== "boolean") return null;
+  if (value.hidden !== undefined) out.hidden = value.hidden;
+  if (value.size !== undefined) {
+    const size = parseAxisSize(value.size);
+    if (!size) return null;
+    out.size = size;
+  }
+  if (value.styleRoles !== undefined) {
+    const styleRoles = parseStringRecord(value.styleRoles);
+    if (!styleRoles) return null;
+    out.styleRoles = styleRoles;
+  }
+  if (value.params !== undefined) {
+    if (!isRecord(value.params)) return null;
+    const params = dictionary<string | number | boolean>();
+    for (const [key, param] of Object.entries(value.params)) {
+      if (typeof param !== "string" && typeof param !== "number" && typeof param !== "boolean") return null;
+      params[key] = param;
+    }
+    out.params = params;
+  }
+  if (value.visibility !== undefined) {
+    if (!isRecord(value.visibility) || !Array.isArray(value.visibility.anyOf)) return null;
+    const anyOf: string[] = [];
+    for (const id of value.visibility.anyOf) {
+      if (typeof id !== "string") return null;
+      anyOf.push(id);
+    }
+    out.visibility = { anyOf };
+  }
+  if (value.repeat !== undefined) {
+    if (!isRecord(value.repeat) || typeof value.repeat.over !== "string") return null;
+    out.repeat = { over: value.repeat.over };
+  }
+  return out;
+}
+
+function parseLayoutNode(value: unknown, ancestors: WeakSet<object>): LayoutNode | null {
+  if (!isRecord(value)) return null;
+  if (value.kind === "region") return parseLayoutRegion(value, ancestors);
+  if (value.kind === "placement") return parseLayoutPlacement(value);
+  return null;
+}
+
+function parseLayoutDocument(value: unknown): LayoutDocument | null {
+  if (!isRecord(value) || !isFiniteNumber(value.schemaVersion) || typeof value.id !== "string") return null;
+  const root = parseLayoutRegion(value.root, new WeakSet<object>());
+  return root ? { schemaVersion: value.schemaVersion, id: value.id, root } : null;
+}
+
 function copyLayout(value: unknown): LayoutDocument | null | undefined {
   if (value === undefined || value === null) return value;
-  return isRecord(value) ? structuredClone(value) as unknown as LayoutDocument : undefined;
+  return parseLayoutDocument(value) ?? undefined;
+}
+
+function hasMalformedLayout(value: unknown): boolean {
+  return value !== undefined && value !== null && parseLayoutDocument(value) === null;
 }
 
 function parseDraft(value: unknown): DevModeDraft | null {
@@ -292,7 +489,7 @@ function parseVariation(key: string, value: unknown): DesignVariation | null {
 
 function validateVariationGraph(variations: Record<string, DesignVariation>): DesignDocumentParseResult | null {
   for (const variation of Object.values(variations)) {
-    if (variation.extends && !variations[variation.extends]) {
+    if (variation.extends && !hasOwn(variations, variation.extends)) {
       return error("missing-variation-parent", `Variation '${variation.id}' extends missing '${variation.extends}'.`);
     }
   }
@@ -302,7 +499,7 @@ function validateVariationGraph(variations: Record<string, DesignVariation>): De
     if (visited.has(id)) return null;
     if (visiting.has(id)) return id;
     visiting.add(id);
-    const parent = variations[id].extends;
+    const parent = variations[id]?.extends;
     const loop = parent ? visit(parent) : null;
     visiting.delete(id);
     visited.add(id);
@@ -325,13 +522,26 @@ export function parseDesignDocument(value: unknown): DesignDocumentParseResult {
   if (value.schemaVersion !== DESIGN_DOCUMENT_SCHEMA_VERSION) {
     return error("invalid-schema-version", `Design document schemaVersion must be ${DESIGN_DOCUMENT_SCHEMA_VERSION}.`);
   }
+  if (isRecord(value.base) && hasMalformedLayout(value.base.layout)) {
+    return error("invalid-layout", "Design document base layout is malformed.");
+  }
   const base = parseDraft(value.base);
   if (!base) return error("invalid-base", "Design document base must contain only valid override slices.");
 
-  const variations: Record<string, DesignVariation> = {};
+  const variations = dictionary<DesignVariation>();
   if (value.variations !== undefined) {
     if (!isRecord(value.variations)) return error("invalid-variation", "Design document variations must be an object.");
     for (const [key, rawVariation] of Object.entries(value.variations)) {
+      if (
+        isRecord(rawVariation) &&
+        ((isRecord(rawVariation.patch) && hasMalformedLayout(rawVariation.patch.layout)) ||
+          (isRecord(rawVariation.themes) &&
+            Object.values(rawVariation.themes).some(
+              (themePatch) => isRecord(themePatch) && hasMalformedLayout(themePatch.layout),
+            )))
+      ) {
+        return error("invalid-layout", `Variation '${key}' contains a malformed layout.`);
+      }
       const variation = parseVariation(key, rawVariation);
       if (!variation) {
         if (isRecord(rawVariation) && typeof rawVariation.id === "string" && rawVariation.id !== key) {
@@ -347,11 +557,11 @@ export function parseDesignDocument(value: unknown): DesignDocumentParseResult {
 
   const activeVariationId = value.activeVariationId === undefined ? "" : value.activeVariationId;
   if (typeof activeVariationId !== "string") return error("unknown-active-variation", "activeVariationId must be a string.");
-  if (activeVariationId && !variations[activeVariationId]) {
+  if (activeVariationId && !hasOwn(variations, activeVariationId)) {
     return error("unknown-active-variation", `Active variation '${activeVariationId}' does not exist.`);
   }
 
-  const targetScopes: Record<string, DesignScope> = {};
+  const targetScopes = dictionary<DesignScope>();
   if (value.targetScopes !== undefined) {
     if (!isRecord(value.targetScopes)) return error("invalid-target-scope", "targetScopes must be an object.");
     for (const [targetId, scope] of Object.entries(value.targetScopes)) {
@@ -447,12 +657,14 @@ function patchFromDraft(draft: DevModeDraft): DesignPatch {
 
 function variationLineage(variations: Record<string, DesignVariation>, id: string): DesignVariation[] {
   const lineage: DesignVariation[] = [];
-  let current: DesignVariation | undefined = variations[id];
+  let current: DesignVariation | undefined = hasOwn(variations, id) ? variations[id] : undefined;
   const seen = new Set<string>();
   while (current && !seen.has(current.id)) {
     lineage.unshift(current);
     seen.add(current.id);
-    current = current.extends ? variations[current.extends] : undefined;
+    current = current.extends && hasOwn(variations, current.extends)
+      ? variations[current.extends]
+      : undefined;
   }
   return lineage;
 }
@@ -472,7 +684,9 @@ export function resolveDesign(
   let resolved = applyPatch(committedDevModeDraft(), patchFromDraft(document.base));
   const lineage = variationLineage(document.variations, variationId);
   for (const variation of lineage) resolved = applyPatch(resolved, variation.patch);
-  const selected = document.variations[variationId];
+  const selected = hasOwn(document.variations, variationId)
+    ? document.variations[variationId]
+    : undefined;
   if (selected?.themes?.[theme]) resolved = applyPatch(resolved, selected.themes[theme]);
   return resolved;
 }
