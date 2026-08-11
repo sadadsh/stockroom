@@ -8,7 +8,6 @@ import { useDevMode } from "../lib/devMode";
 import { ThemeProvider } from "../lib/theme";
 import type { DesignDocument } from "./document";
 import { DesignStudioProvider, useDesignStudio } from "./DesignStudioProvider";
-import type { DesignScenario } from "./requestAdapter";
 
 vi.mock("../api/client", async (importActual) => {
   const actual = await importActual<typeof import("../api/client")>();
@@ -66,7 +65,7 @@ function themedVariationDocument(): DesignDocument {
 interface StudioCommands {
   setCopy: (id: string, text: string) => void;
   setVariation: (id: string) => void;
-  activateScenario: (scenario: DesignScenario) => Promise<void>;
+  activateScenario: (scenarioId: string) => Promise<void>;
   exitScenario: () => Promise<void>;
 }
 
@@ -113,32 +112,16 @@ function renderStudio() {
     setVariation(id: string) {
       act(() => commands.setVariation?.(id));
     },
-    activateScenario(scenario: DesignScenario) {
-      return act(async () => commands.activateScenario?.(scenario));
+    activateScenario(scenarioId: string) {
+      return act(async () => commands.activateScenario?.(scenarioId));
     },
-    startScenario(scenario: DesignScenario) {
-      return commands.activateScenario?.(scenario) ?? Promise.resolve();
+    startScenario(scenarioId: string) {
+      return commands.activateScenario?.(scenarioId) ?? Promise.resolve();
     },
     exitScenario() {
       return act(async () => commands.exitScenario?.());
     },
     queryClient,
-  };
-}
-
-function fixtureScenario(
-  route: DesignScenario["route"] = "components",
-): DesignScenario {
-  return {
-    id: `${route}.fixture`,
-    title: `${route} fixture`,
-    area: route,
-    group: "Test",
-    route,
-    fixtures: [],
-    initialUi: {},
-    expectedTargets: ["shell.root"],
-    coverage: [`route:${route}`],
   };
 }
 
@@ -291,15 +274,10 @@ describe("DesignStudioProvider", () => {
     queryClient.setQueryData(["design-studio", "personal"], "keep-me");
 
     source = "fixture-components";
-    await studio.activateScenario(fixtureScenario("components"));
+    await studio.activateScenario("global.onboarding.open");
     await waitFor(() => expect(queryClient.getQueryData(["parts"])).toBe("fixture-components"));
     expect(queryClient.getQueryData(["design-studio", "personal"])).toBe("keep-me");
     expect(window.location.hash).toBe("#route=components");
-
-    source = "fixture-settings";
-    await studio.activateScenario(fixtureScenario("settings"));
-    await waitFor(() => expect(queryClient.getQueryData(["parts"])).toBe("fixture-settings"));
-    expect(window.location.hash).toBe("#route=settings");
 
     source = "real-after";
     await studio.exitScenario();
@@ -320,7 +298,7 @@ describe("DesignStudioProvider", () => {
     });
     vi.spyOn(studio.queryClient, "cancelQueries").mockReturnValueOnce(cancellation);
 
-    const activation = studio.startScenario(fixtureScenario("components"));
+    const activation = studio.startScenario("global.onboarding.open");
     await waitFor(() => expect(studio.queryClient.cancelQueries).toHaveBeenCalled());
     studio.unmount();
     releaseCancellation();

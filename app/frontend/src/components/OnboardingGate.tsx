@@ -88,7 +88,7 @@ export function OnboardingGate({ status }: { status: OnboardingStatus }) {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-app px-4 py-10">
+    <div data-dev-id="onboarding.gate" className="flex min-h-screen items-center justify-center bg-app px-4 py-10">
       <Card className="w-full max-w-lg p-6">
         <Eyebrow>
           <Text id="onboarding.eyebrow">Welcome</Text>

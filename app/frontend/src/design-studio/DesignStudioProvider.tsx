@@ -24,8 +24,9 @@ import {
 import {
   installApiRequestAdapter,
   previewAdapter,
-  type DesignScenario,
 } from "./requestAdapter";
+import type { DesignScenario } from "./scenario";
+import { scenarioById } from "./scenarios";
 
 export interface DesignStudioContextValue {
   open: () => void;
@@ -38,7 +39,7 @@ export interface DesignStudioContextValue {
   personalState: PersonalDesignState;
   lastValidDocument: DesignDocument;
   activeScenario: DesignScenario | null;
-  activateScenario: (scenario: DesignScenario) => Promise<void>;
+  activateScenario: (scenarioId: string) => Promise<void>;
   exitScenario: () => Promise<void>;
 }
 
@@ -221,7 +222,7 @@ function DesignStudioBridge({ children }: { children: ReactNode }) {
       }),
     [queryClient],
   );
-  const activateScenario = useCallback(
+  const activateScenarioInternal = useCallback(
     (scenario: DesignScenario) =>
       beginTransition(async () => {
         if (!mounted.current) return;
@@ -260,6 +261,15 @@ function DesignStudioBridge({ children }: { children: ReactNode }) {
         await refreshActiveProductQueries();
       }),
     [beginTransition, clearInactiveProductQueries, queryClient, refreshActiveProductQueries],
+  );
+  const activateScenario = useCallback(
+    (scenarioId: string) => {
+      if (scenarioId === "global.real-data") return exitScenario();
+      const scenario = scenarioById(scenarioId);
+      if (!scenario) return Promise.reject(new Error(`Unknown Design Studio scenario '${scenarioId}'.`));
+      return activateScenarioInternal(scenario);
+    },
+    [activateScenarioInternal, exitScenario],
   );
 
   const value = useMemo<DesignStudioContextValue>(

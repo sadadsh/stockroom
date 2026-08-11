@@ -1,0 +1,114 @@
+import { describe, expect, it } from "vitest";
+import type { DesignScenario, ScenarioFixture } from "./scenario";
+import { registerScenarios } from "./scenarioRegistry";
+import { bootstrapScenarioRegistry } from "./scenarios";
+
+function scenario(id: string): DesignScenario {
+  return {
+    id,
+    title: "Scenario fixture",
+    area: "global",
+    group: "Bootstrap",
+    route: "components",
+    fixtures: [
+      {
+        method: "GET",
+        path: "/api/onboarding",
+        params: {},
+        body: undefined,
+        response: {
+          onboarded: true,
+          first_run: false,
+          libraries_root: "C:\\Stockroom",
+          profiles: [],
+          under_git: true,
+          default_dir: "C:\\Stockroom",
+          libraries: [],
+        },
+      } satisfies ScenarioFixture,
+    ],
+    initialUi: {},
+    expectedTargets: ["shell.root"],
+    coverage: ["route:components", "state:ready"],
+  };
+}
+
+describe("registerScenarios", () => {
+  it("rejects duplicate IDs and missing route/state coverage tags", () => {
+    const duplicate = scenario("global.onboarding.open");
+    const missingCoverage = {
+      ...scenario("global.missing-coverage"),
+      coverage: [],
+    };
+
+    const result = registerScenarios([duplicate, duplicate, missingCoverage]);
+
+    expect(result.issues).toContainEqual(
+      expect.objectContaining({ code: "duplicate-scenario", value: duplicate.id }),
+    );
+    expect(result.issues).toContainEqual(
+      expect.objectContaining({ code: "missing-coverage", value: "route" }),
+    );
+    expect(result.issues).toContainEqual(
+      expect.objectContaining({ code: "missing-coverage", value: "state" }),
+    );
+  });
+
+  it("rejects unknown routes, malformed fixture descriptors, mutation fixtures without outcomes, and missing targets", () => {
+    const invalid = {
+      ...scenario("global.invalid"),
+      route: "not-a-route",
+      fixtures: [
+        { method: "GET", path: "/api/onboarding", params: {}, response: {} },
+        {
+          method: "POST",
+          path: "/api/onboarding/library",
+          params: {},
+          body: { mode: "create" },
+          response: {},
+        },
+      ],
+      expectedTargets: [],
+    } as unknown as DesignScenario;
+
+    const result = registerScenarios([invalid]);
+
+    expect(result.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: "unknown-route", value: "not-a-route" }),
+        expect.objectContaining({ code: "malformed-fixture" }),
+        expect.objectContaining({ code: "missing-local-outcome" }),
+        expect.objectContaining({ code: "missing-targets" }),
+      ]),
+    );
+  });
+
+  it("indexes valid scenarios by area and search terms", () => {
+    const onboarding = scenario("global.onboarding.open");
+    const serviceError = { ...scenario("global.service-error"), title: "Service Error" };
+    const registry = registerScenarios([onboarding, serviceError]);
+
+    expect(registry.issues).toEqual([]);
+    expect(registry.scenarioById(onboarding.id)).toBe(onboarding);
+    expect(registry.scenariosForArea("global")).toEqual([onboarding, serviceError]);
+    expect(registry.searchScenarios("SERVICE")).toEqual([serviceError]);
+  });
+
+  it("registers the global bootstrap scenarios with stable targets and typed fixtures", () => {
+    expect(bootstrapScenarioRegistry.issues).toEqual([]);
+    expect(bootstrapScenarioRegistry.scenarios.map((item) => item.id)).toEqual([
+      "global.real-data",
+      "global.onboarding.open",
+      "global.onboarding.create",
+      "global.onboarding.clone",
+      "global.onboarding.error",
+      "global.about.open",
+      "global.update.available",
+      "global.search.open",
+      "global.service-error",
+    ]);
+    expect(bootstrapScenarioRegistry.searchScenarios("update")).toEqual([
+      expect.objectContaining({ id: "global.update.available", expectedTargets: ["rail.update"] }),
+    ]);
+  });
+});

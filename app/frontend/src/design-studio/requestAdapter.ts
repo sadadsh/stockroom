@@ -1,5 +1,7 @@
-import type { Route } from "../lib/router";
+import type { DesignScenario, ScenarioFixture } from "./scenario";
 import { guardPreviewRequest } from "./mutationGuard";
+
+export type { DesignScenario, ScenarioFixture } from "./scenario";
 
 export type ApiRequestParams = Readonly<Record<string, string | readonly string[]>>;
 
@@ -12,24 +14,6 @@ export interface ApiRequestDescriptor {
 
 export interface ApiRequestAdapter {
   handle<T>(descriptor: ApiRequestDescriptor, live: () => Promise<T>): Promise<T>;
-}
-
-/** Minimal Task 4 fixture contract. Task 5 adds registry validation around this data shape. */
-export interface ScenarioFixture<T = unknown> extends ApiRequestDescriptor {
-  response: T;
-}
-
-/** Adapter-facing scenario shape, intentionally free of registry behavior or alternate markup. */
-export interface DesignScenario {
-  id: string;
-  title: string;
-  area: string;
-  group: string;
-  route: Route;
-  fixtures: readonly ScenarioFixture[];
-  initialUi: Readonly<Record<string, unknown>>;
-  expectedTargets: readonly string[];
-  coverage: readonly string[];
 }
 
 export class MissingScenarioFixtureError extends Error {

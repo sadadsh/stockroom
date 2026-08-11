@@ -19,7 +19,8 @@ import {
 } from "react";
 import { readUiSession, updateUiSession } from "./uiSession";
 
-export type Route = "components" | "projects" | "stm" | "settings";
+export const PRODUCTION_ROUTES = ["components", "projects", "stm", "settings"] as const;
+export type Route = (typeof PRODUCTION_ROUTES)[number];
 
 interface RouterValue {
   route: Route;
@@ -28,7 +29,7 @@ interface RouterValue {
 
 const RouterContext = createContext<RouterValue | null>(null);
 const DEFAULT_ROUTE: Route = "components";
-const ROUTES: ReadonlySet<Route> = new Set(["components", "projects", "stm", "settings"]);
+const ROUTES: ReadonlySet<Route> = new Set(PRODUCTION_ROUTES);
 const ROUTE_HASH_PREFIX = "#route=";
 
 function isRoute(value: unknown): value is Route {
