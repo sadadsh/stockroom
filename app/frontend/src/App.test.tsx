@@ -298,7 +298,8 @@ describe("App shell", () => {
     expect(screen.getByLabelText("Git URL")).toBeInTheDocument();
 
     await activate("global.onboarding.error");
-    expect(document.querySelector('[data-dev-id="onboarding.error"]')).toHaveTextContent("Could not set up the components");
+    expect(await screen.findByRole("status")).toHaveTextContent("Could not set up the components");
+    expect(document.querySelector('[data-dev-id="toast.status"]')).toBeInTheDocument();
 
     await activate("global.about.open");
     expect(await screen.findByRole("dialog", { name: "About Stockroom" })).toBeInTheDocument();

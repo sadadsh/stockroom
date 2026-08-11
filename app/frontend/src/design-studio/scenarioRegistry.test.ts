@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
+import type { OnboardingStatus } from "../api/types";
 import type { DesignScenario, ScenarioFixture } from "./scenario";
 import { registerScenarios } from "./scenarioRegistry";
-import { bootstrapScenarioRegistry } from "./scenarios";
+import { bootstrapScenarioRegistry, globalScenarios } from "./scenarios";
+import { bootstrapFixtureValidators } from "./scenarioFixtureValidation";
 
 function scenario(id: string): DesignScenario {
   return {
@@ -117,6 +119,51 @@ describe("registerScenarios", () => {
     expect(registerScenarios([invalid]).issues).toContainEqual(
       expect.objectContaining({ code: "invalid-fixture-shape" }),
     );
+  });
+
+  it("rejects malformed nested bootstrap DTOs and clone bodies", () => {
+    const validOnboarding = scenario("global.valid-onboarding").fixtures[0]?.response as OnboardingStatus;
+    const invalidScenarios = [
+      {
+        ...scenario("global.invalid-onboarding-library"),
+        fixtures: [{ method: "GET", path: "/api/onboarding", params: {}, body: undefined, response: { ...validOnboarding, libraries: [null] } }],
+      },
+      {
+        ...scenario("global.invalid-search-part"),
+        fixtures: [{ method: "GET", path: "/api/library/search", params: {}, body: undefined, response: { parts: [null], count: 1 } }],
+      },
+      {
+        ...scenario("global.invalid-parametric-facet"),
+        fixtures: [{ method: "GET", path: "/api/library/facets/parametric", params: {}, body: undefined, response: { category: null, facets: [null], total: 1 } }],
+      },
+      {
+        ...scenario("global.invalid-clone-body"),
+        fixtures: [{
+          method: "POST",
+          path: "/api/onboarding/library",
+          params: {},
+          body: { mode: "clone", url: 42 },
+          response: validOnboarding,
+          localOutcome: { state: "succeeded", target: "onboarding.gate" },
+        }],
+      },
+    ] as unknown as DesignScenario[];
+
+    const result = registerScenarios(invalidScenarios);
+
+    for (const invalidScenario of invalidScenarios) {
+      expect(result.issues).toContainEqual(
+        expect.objectContaining({ code: "invalid-fixture-shape", scenarioId: invalidScenario.id }),
+      );
+    }
+  });
+
+  it("accepts the shipped typed fixtures through their endpoint-owned validators", () => {
+    expect(
+      globalScenarios.flatMap((scenario) => scenario.fixtures).every((fixture) =>
+        bootstrapFixtureValidators.validate(fixture),
+      ),
+    ).toBe(true);
   });
 
   it("registers the global bootstrap scenarios with stable targets and typed fixtures", () => {

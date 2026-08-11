@@ -73,6 +73,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             key={t.id}
             onClick={() => dismiss(t.id)}
             role="status"
+            data-dev-id="toast.status"
             layout
             initial={{ opacity: 0, y: 8, scale: 0.97 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}

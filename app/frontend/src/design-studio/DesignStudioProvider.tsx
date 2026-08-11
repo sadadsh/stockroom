@@ -26,7 +26,8 @@ import {
   previewAdapter,
 } from "./requestAdapter";
 import type { DesignScenario } from "./scenario";
-import { scenarioById } from "./scenarios";
+import { bootstrapScenarioRegistry } from "./scenarios";
+import type { ScenarioRegistry } from "./scenarioRegistry";
 import { ScenarioUiProvider } from "./scenarioState";
 
 export interface DesignStudioContextValue {
@@ -121,7 +122,13 @@ function withWorkingDraft(document: DesignDocument, draft: DevModeDraft): Design
   };
 }
 
-function DesignStudioBridge({ children }: { children: ReactNode }) {
+function DesignStudioBridge({
+  children,
+  scenarioRegistry,
+}: {
+  children: ReactNode;
+  scenarioRegistry: ScenarioRegistry;
+}) {
   const devMode = useDevMode();
   const queryClient = useQueryClient();
   const controller = useMemo(() => createPersonalDesignController(initialDocument()), []);
@@ -269,11 +276,11 @@ function DesignStudioBridge({ children }: { children: ReactNode }) {
   const activateScenario = useCallback(
     (scenarioId: string) => {
       if (scenarioId === "global.real-data") return exitScenario();
-      const scenario = scenarioById(scenarioId);
+      const scenario = scenarioRegistry.scenarioById(scenarioId);
       if (!scenario) return Promise.reject(new Error(`Unknown Design Studio scenario '${scenarioId}'.`));
       return activateScenarioInternal(scenario);
     },
-    [activateScenarioInternal, exitScenario],
+    [activateScenarioInternal, exitScenario, scenarioRegistry],
   );
 
   const value = useMemo<DesignStudioContextValue>(
@@ -314,10 +321,16 @@ function DesignStudioBridge({ children }: { children: ReactNode }) {
 }
 
 /** Installs the existing Dev Mode provider and adds machine-local document orchestration around it. */
-export function DesignStudioProvider({ children }: { children: ReactNode }) {
+export function DesignStudioProvider({
+  children,
+  scenarioRegistry = bootstrapScenarioRegistry,
+}: {
+  children: ReactNode;
+  scenarioRegistry?: ScenarioRegistry;
+}) {
   return (
     <DevModeProvider>
-      <DesignStudioBridge>{children}</DesignStudioBridge>
+      <DesignStudioBridge scenarioRegistry={scenarioRegistry}>{children}</DesignStudioBridge>
     </DevModeProvider>
   );
 }

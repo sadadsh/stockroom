@@ -123,8 +123,8 @@ export const globalScenarios: readonly DesignScenario[] = [
     id: "global.onboarding.error",
     title: "Onboarding Error",
     fixtures: [onboardingFixture(ONBOARDING_FIRST_RUN)],
-    initialUi: { onboarding: { mode: "open", error: "Could not set up the components" } },
-    expectedTargets: ["onboarding.error"],
+    initialUi: { onboarding: { mode: "open", setupError: "Could not set up the components" } },
+    expectedTargets: ["toast.status"],
     coverage: coverage("onboarding-error"),
   },
   {

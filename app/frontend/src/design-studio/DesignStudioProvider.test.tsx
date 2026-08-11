@@ -1,13 +1,19 @@
 import { QueryClient, QueryClientProvider, QueryObserver } from "@tanstack/react-query";
 import { act, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useEffect } from "react";
 import { api } from "../api/client";
+import { OnboardingGate } from "../components/OnboardingGate";
 import { Text } from "../lib/copy";
 import { useDevMode } from "../lib/devMode";
 import { ThemeProvider } from "../lib/theme";
+import { ToastProvider } from "../lib/toast";
+import type { OnboardingStatus } from "../api/types";
 import type { DesignDocument } from "./document";
 import { DesignStudioProvider, useDesignStudio } from "./DesignStudioProvider";
+import { registerScenarios, type ScenarioRegistry } from "./scenarioRegistry";
+import type { DesignScenario } from "./scenario";
 
 vi.mock("../api/client", async (importActual) => {
   const actual = await importActual<typeof import("../api/client")>();
@@ -46,6 +52,34 @@ function personalDocument(): DesignDocument {
   document.base.copy["rail.components"] = "My Components";
   return document;
 }
+
+const ONBOARDING_STATUS: OnboardingStatus = {
+  onboarded: false,
+  first_run: true,
+  libraries_root: "C:\\Stockroom",
+  profiles: [],
+  under_git: true,
+  default_dir: "C:\\Stockroom\\Components",
+  libraries: [],
+};
+
+const DUPLICATE_ONBOARDING_SCENARIO: DesignScenario = {
+  id: "global.onboarding.open",
+  title: "Duplicate onboarding",
+  area: "global",
+  group: "Test",
+  route: "components",
+  fixtures: [{
+    method: "GET",
+    path: "/api/onboarding",
+    params: {},
+    body: undefined,
+    response: ONBOARDING_STATUS,
+  }],
+  initialUi: { onboarding: { mode: "open" } },
+  expectedTargets: ["onboarding.gate"],
+  coverage: ["route:components", "state:onboarding-open"],
+};
 
 function themedVariationDocument(): DesignDocument {
   const document = fixtureDocument();
@@ -90,7 +124,7 @@ function Probe({ expose }: { expose: (commands: StudioCommands) => void }) {
   );
 }
 
-function renderStudio() {
+function renderStudio(options: { scenarioRegistry?: ScenarioRegistry; includeOnboardingGate?: boolean } = {}) {
   const commands: Partial<StudioCommands> = {};
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
@@ -98,9 +132,12 @@ function renderStudio() {
   const result = render(
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
-        <DesignStudioProvider>
-          <Probe expose={(next) => Object.assign(commands, next)} />
-        </DesignStudioProvider>
+        <ToastProvider>
+          <DesignStudioProvider scenarioRegistry={options.scenarioRegistry}>
+            <Probe expose={(next) => Object.assign(commands, next)} />
+            {options.includeOnboardingGate ? <OnboardingGate status={ONBOARDING_STATUS} /> : null}
+          </DesignStudioProvider>
+        </ToastProvider>
       </ThemeProvider>
     </QueryClientProvider>,
   );
@@ -318,5 +355,44 @@ describe("DesignStudioProvider", () => {
       count: 1,
     });
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("restores the existing onboarding mode after a scenario exits", async () => {
+    mockApi.designStudioGet.mockResolvedValue({ revision: "r1", document: fixtureDocument() });
+    const studio = renderStudio({ includeOnboardingGate: true });
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: "Clone From Git" }));
+    expect(screen.getByRole("button", { name: "Clone From Git" })).toHaveAttribute("aria-pressed", "true");
+
+    await studio.activateScenario("global.onboarding.open");
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Open Existing" })).toHaveAttribute("aria-pressed", "true"),
+    );
+
+    await studio.exitScenario();
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Clone From Git" })).toHaveAttribute("aria-pressed", "true"),
+    );
+  });
+
+  it("rejects an excluded duplicate through the public activation API without transition side effects", async () => {
+    mockApi.designStudioGet.mockResolvedValue({ revision: "r1", document: fixtureDocument() });
+    window.history.replaceState({ workspace: "real" }, "", "#route=projects");
+    const duplicateRegistry = registerScenarios([
+      DUPLICATE_ONBOARDING_SCENARIO,
+      { ...DUPLICATE_ONBOARDING_SCENARIO, title: "Duplicate onboarding again" },
+    ]);
+    const studio = renderStudio({ scenarioRegistry: duplicateRegistry });
+    const cancelQueries = vi.spyOn(studio.queryClient, "cancelQueries");
+
+    await expect(studio.startScenario("global.onboarding.open")).rejects.toThrow(
+      "Unknown Design Studio scenario 'global.onboarding.open'.",
+    );
+
+    expect(window.location.hash).toBe("#route=projects");
+    expect(window.history.state).toEqual({ workspace: "real" });
+    expect(screen.getByTestId("active-scenario")).toHaveTextContent("real-data");
+    expect(cancelQueries).not.toHaveBeenCalled();
   });
 });
