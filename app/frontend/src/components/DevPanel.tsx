@@ -52,6 +52,7 @@ import { letterRuleOffences } from "../lib/letterRule";
 import { useText } from "../lib/copy";
 import { ArrangeSection } from "./design-mode/ArrangePanel";
 import { IssuesSection } from "./design-mode/IssuesPanel";
+import { InspectorPanel } from "./design-mode/InspectorPanel";
 import { Button } from "./primitives";
 // The Interface Studio is part of the product, so its own chrome comes from the shared design
 // system rather than from a private set of class strings that drift away from it.
@@ -1509,6 +1510,7 @@ export function DevPanel({
           showAll={showAll}
           setShowAll={setShowAll}
         />
+        <InspectorPanel integrated />
         <ArrangeSection open={arrangeOpen} setOpen={setArrangeOpen} />
         {/* Plan 1.4: the issues list stays inspectable OUTSIDE edit mode, so it is mounted with the
             panel and not with the arrange switch - a committed layout's known cost has to be

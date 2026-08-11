@@ -86,7 +86,7 @@ export function isValidGridSlot(value: string): boolean {
 // (`isValidGridSlot` above): anything the writer accepted must keep applying, or upgrading the app
 // would delete a tweak that was legitimately committed.
 
-const EDITABLE_PROPS: ReadonlySet<string> = new Set([
+export const EDITABLE_ELEMENT_PROPS = [
   "width",
   "height",
   "min-width",
@@ -126,7 +126,9 @@ const EDITABLE_PROPS: ReadonlySet<string> = new Set([
   "justify-content",
   "align-items",
   "align-content",
-]);
+] as const;
+
+const EDITABLE_PROPS: ReadonlySet<string> = new Set(EDITABLE_ELEMENT_PROPS);
 
 /** True only for a property Dev Mode may override. Anything else is not editable, by contract. */
 export function isEditableElementProp(prop: string): boolean {

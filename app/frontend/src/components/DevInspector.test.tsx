@@ -4,6 +4,7 @@ import { ThemeProvider } from "../lib/theme";
 import { DevModeProvider, useDevMode } from "../lib/devMode";
 import { DevInspector } from "./DevInspector";
 import { usedVarsForElement } from "../lib/inspectVars";
+import { TECHNICAL_CONTENT_ATTRIBUTE } from "../design-studio/targetDomains";
 
 afterEach(() => {
   document.documentElement.removeAttribute("style");
@@ -48,6 +49,9 @@ function Harness({ onAppClick }: { onAppClick?: () => void }) {
           <svg className="ico" viewBox="0 0 24 24" data-testid="ico">
             <path d="M4 12h16" />
           </svg>
+        </div>
+        <div data-dev-id="component-browser.symbol-canvas" {...{ [TECHNICAL_CONTENT_ATTRIBUTE]: "true" }}>
+          <svg data-dev-id="detail.technical-shape" data-testid="technical-shape"><path d="M0 0h10" /></svg>
         </div>
         <DevInspector />
       </DevModeProvider>
@@ -100,6 +104,14 @@ describe("DevInspector", () => {
     expect(screen.getByTestId("vars")).toHaveTextContent("--c-raise,--icon-stroke");
   });
 
+  it("selects a technical drawing's presentation root instead of an engineering descendant", () => {
+    render(<Harness />);
+    on("toggle-dev");
+    on("toggle-inspect");
+    fireEvent.click(screen.getByTestId("technical-shape"));
+    expect(screen.getByTestId("selected")).toHaveTextContent("component-browser.symbol-canvas");
+  });
+
   it("inspect-off is zero behaviour change: the app click fires and nothing is selected", () => {
     const appClick = vi.fn();
     render(<Harness onAppClick={appClick} />);
@@ -117,7 +129,7 @@ describe("DevInspector", () => {
     on("toggle-showids");
 
     const nodeCount = document.querySelectorAll("[data-dev-id]").length;
-    expect(nodeCount).toBe(2);
+    expect(nodeCount).toBe(4);
     expect(screen.getAllByTestId("dev-id-badge")).toHaveLength(nodeCount);
   });
 

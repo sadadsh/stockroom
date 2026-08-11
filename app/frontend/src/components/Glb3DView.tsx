@@ -14,6 +14,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { LandPattern } from "../api/client";
 import { ApiError } from "../api/client";
+import { TECHNICAL_CONTENT_ATTRIBUTE } from "../design-studio/targetDomains";
 import { Text, useText } from "../lib/copy";
 import { useModelScene, type ModelVisibility } from "../lib/useModelScene";
 import { ModelViewerControlSurface, type ModelControlsMode } from "./Glb3DViewControls";
@@ -165,6 +166,7 @@ export function Glb3DView({
       <div
         ref={scene.mountRef}
         data-testid="model-canvas"
+        {...{ [TECHNICAL_CONTENT_ATTRIBUTE]: "true" }}
         tabIndex={0}
         role="application"
         aria-label={canvasLabel}

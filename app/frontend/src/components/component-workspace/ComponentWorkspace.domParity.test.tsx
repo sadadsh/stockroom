@@ -245,7 +245,7 @@ describe("the opened component renders the same DOM it shipped with", () => {
     await expectTree(
       "populated",
       await renderWorkspace(populatedDossier()),
-      "58634-fbd06272-9cca0980",
+      "58671-6a8116b4-0f959863",
     );
   });
 
@@ -254,12 +254,12 @@ describe("the opened component renders the same DOM it shipped with", () => {
     await expectTree(
       "populated-developer",
       await renderWorkspace(populatedDossier()),
-      "85144-6ae1ccdd-0f5b91a4",
+      "85181-bb90184b-ba97263e",
     );
   });
 
   it("draws a component nobody has sourced identically", async () => {
-    await expectTree("sparse", await renderWorkspace(sparseDossier()), "24903-c3ac2afa-30df46e4");
+    await expectTree("sparse", await renderWorkspace(sparseDossier()), "24940-0c676544-9f1ff1ab");
   });
 
   it("draws a component nobody has sourced identically in developer mode", async () => {
@@ -269,7 +269,7 @@ describe("the opened component renders the same DOM it shipped with", () => {
     await expectTree(
       "sparse-developer",
       await renderWorkspace(sparseDossier()),
-      "39748-2e23fea1-a4f13baa",
+      "39785-a86ec0e1-48c03fa5",
     );
   });
 

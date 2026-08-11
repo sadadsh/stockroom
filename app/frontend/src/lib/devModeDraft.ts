@@ -112,7 +112,7 @@ export function committedDevModeDraft(): DevModeDraft {
 
 // Reset all: every slice back to the shipped design, in one object so no slice can be forgotten.
 // `layout: null` is the arrangement's version of an empty override map - the shipped default document.
-function emptyDraft(): DevModeDraft {
+export function emptyDevModeDraft(): DevModeDraft {
   return {
     tokens: { root: {}, light: {} },
     copy: {},
@@ -121,6 +121,39 @@ function emptyDraft(): DevModeDraft {
     behaviors: {},
     layout: null,
   };
+}
+
+export interface DraftTargetReset {
+  targetIds: readonly string[];
+  copyIds?: readonly string[];
+  iconIds?: readonly string[];
+}
+
+/** Remove every persisted facet owned by concrete inspected targets in one immutable history step. */
+export function resetDraftTargets(draft: DevModeDraft, reset: DraftTargetReset): DevModeDraft {
+  const next: DevModeDraft = {
+    tokens: cloneTokens(draft.tokens),
+    copy: { ...draft.copy },
+    icons: cloneIcons(draft.icons),
+    elements: cloneElements(draft.elements),
+    behaviors: cloneBehaviors(draft.behaviors),
+    layout: cloneLayout(draft.layout),
+  };
+  for (const id of reset.targetIds) {
+    delete next.elements[id];
+    delete next.behaviors[id];
+  }
+  for (const id of reset.copyIds ?? []) delete next.copy[id];
+  for (const id of reset.iconIds ?? []) delete next.icons[id];
+  return next;
+}
+
+/** Clear only the active theme's token overrides; all structural and opposite-theme edits survive. */
+export function resetDraftTheme(draft: DevModeDraft, theme: Theme): DevModeDraft {
+  const next = resetDraftTargets(draft, { targetIds: [] });
+  if (theme === "light") next.tokens.light = {};
+  else next.tokens.root = {};
+  return next;
 }
 
 type DraftAction =
@@ -229,7 +262,7 @@ function draftReducer(state: DevModeDraft, action: DraftAction): DevModeDraft {
         layout: cloneLayout(action.draft.layout),
       };
     case "resetAll":
-      return emptyDraft();
+      return emptyDevModeDraft();
   }
 }
 

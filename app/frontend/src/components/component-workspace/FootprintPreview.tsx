@@ -27,6 +27,7 @@
  */
 import { useMemo, useState } from "react";
 import type { LandPad, LandPattern } from "../../api/client";
+import { TECHNICAL_CONTENT_ATTRIBUTE } from "../../design-studio/targetDomains";
 import { Text, useText } from "../../lib/copy";
 import { usePanZoom } from "../../lib/usePanZoom";
 import { copperBounds, onLayer } from "./cadEvidence";
@@ -181,6 +182,7 @@ export function FootprintPreview({
       // swallowed the column's scroll and zoomed a preview nobody was pointing at.
       ref={interactive ? frameRef : undefined}
       data-dev-id="component-browser.footprint-canvas"
+      {...{ [TECHNICAL_CONTENT_ATTRIBUTE]: "true" }}
       role={interactive ? "application" : undefined}
       aria-label={interactive ? canvasLabel : undefined}
       tabIndex={interactive ? 0 : -1}

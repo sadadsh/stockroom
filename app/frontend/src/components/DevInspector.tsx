@@ -25,6 +25,7 @@ import { useDevMode } from "../lib/devMode";
 import { usedVarsForElement } from "../lib/inspectVars";
 import { DEV_ID_BY_ID } from "../lib/devIds";
 import { devIdScope, sharedRoleOf } from "../lib/componentDevIds";
+import { TECHNICAL_CONTENT_SELECTOR } from "../design-studio/targetDomains";
 
 interface Badge {
   id: string;
@@ -42,6 +43,12 @@ interface Hover {
 function rectOf(el: Element): { left: number; top: number; width: number; height: number } {
   const r = el.getBoundingClientRect();
   return { left: r.left, top: r.top, width: r.width, height: r.height };
+}
+
+/** Technical drawings select their registered presentation root, never an engineering descendant. */
+function selectableTarget(target: Element): Element | null {
+  const technicalRoot = target.closest(TECHNICAL_CONTENT_SELECTOR);
+  return (technicalRoot?.closest("[data-dev-id]") ?? target.closest("[data-dev-id]"));
 }
 
 /**
@@ -74,7 +81,7 @@ export function DevInspector() {
     function onPointerMove(e: PointerEvent) {
       if (!inspect) return;
       const target = e.target as Element | null;
-      const el = target && "closest" in target ? target.closest("[data-dev-id]") : null;
+      const el = target && "closest" in target ? selectableTarget(target) : null;
       if (!el) {
         setHover(null);
         return;
@@ -90,7 +97,7 @@ export function DevInspector() {
     function onClick(e: MouseEvent) {
       if (!inspect) return; // inspect OFF: zero behaviour change, the click passes through untouched
       const target = e.target as Element | null;
-      const el = target && "closest" in target ? target.closest("[data-dev-id]") : null;
+      const el = target && "closest" in target ? selectableTarget(target) : null;
       if (!el) return;
       const id = el.getAttribute("data-dev-id");
       if (!id) return;

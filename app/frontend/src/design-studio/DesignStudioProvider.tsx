@@ -340,3 +340,8 @@ export function useDesignStudio(): DesignStudioContextValue {
   if (!context) throw new Error("useDesignStudio must be used within a DesignStudioProvider");
   return context;
 }
+
+/** Existing isolated Dev Mode tests may mount no studio wrapper; inspector features degrade safely. */
+export function useOptionalDesignStudio(): DesignStudioContextValue | null {
+  return useContext(DesignStudioContext);
+}
