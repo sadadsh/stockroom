@@ -4,6 +4,13 @@ import {
   CadVariantApiError,
   type CadVariantDocument,
 } from "./cadVariantClient";
+import {
+  installApiRequestAdapter,
+  previewAdapter,
+  type DesignScenario,
+  type ScenarioFixture,
+} from "../design-studio/requestAdapter";
+import { PreviewMutationError } from "../design-studio/mutationGuard";
 
 const DOCUMENT: CadVariantDocument = {
   partId: "part/1",
@@ -34,11 +41,80 @@ const REVERIFIED_DOCUMENT: CadVariantDocument = {
   ],
 };
 
+function scenarioWith(fixtures: readonly ScenarioFixture[]): DesignScenario {
+  return {
+    id: "components.cad-variants",
+    title: "CAD Variants",
+    area: "components",
+    group: "Components",
+    route: "components",
+    fixtures,
+    initialUi: {},
+    expectedTargets: ["shell.root"],
+    coverage: ["route:components"],
+  };
+}
+
 afterEach(() => {
   vi.unstubAllGlobals();
 });
 
 describe("cadVariantApi", () => {
+  it("resolves inventory from the active scenario without a live product read", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ ...DOCUMENT, partId: "live" }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const restore = installApiRequestAdapter(
+      previewAdapter(
+        scenarioWith([
+          {
+            method: "GET",
+            path: "/api/library/parts/part%2F1/cad-variants",
+            params: {},
+            body: undefined,
+            response: DOCUMENT,
+          },
+        ]),
+      ),
+    );
+
+    try {
+      await expect(cadVariantApi.inventory("part/1")).resolves.toEqual(DOCUMENT);
+      expect(fetchMock).not.toHaveBeenCalled();
+    } finally {
+      restore();
+    }
+  });
+
+  it("blocks pair activation before a live product mutation", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify(DOCUMENT), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const restore = installApiRequestAdapter(previewAdapter(scenarioWith([])));
+
+    try {
+      await expect(
+        cadVariantApi.activatePair("part/1", {
+          kicadVariantId: "sha256:kicad-new",
+          altiumVariantId: "sha256:altium-new",
+          expectedActiveKicadVariantId: "sha256:kicad-old",
+          expectedActiveAltiumVariantId: "sha256:altium-old",
+        }),
+      ).rejects.toBeInstanceOf(PreviewMutationError);
+      expect(fetchMock).not.toHaveBeenCalled();
+    } finally {
+      restore();
+    }
+  });
+
   it("reads only the requested part through the authenticated API boundary", async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(JSON.stringify(DOCUMENT), {

@@ -4,6 +4,10 @@
  * The main client is intentionally not widened while other acquisition work is active in it.
  * This module still follows the same runtime bearer-token contract and `/api/*` boundary.
  */
+import {
+  dispatchApiRequest,
+  type ApiRequestDescriptor,
+} from "../design-studio/requestAdapter";
 import { apiBase, apiToken } from "../lib/runtime";
 
 export type CadVariantTool = "kicad" | "altium";
@@ -95,18 +99,30 @@ async function requestCadVariants(
   path: string,
   body?: CadVariantPairActivation,
 ): Promise<CadVariantDocument> {
+  const descriptor: ApiRequestDescriptor = {
+    method,
+    path,
+    params: {},
+    body,
+  };
+  return dispatchApiRequest(descriptor, () => liveCadVariantRequest(descriptor));
+}
+
+async function liveCadVariantRequest(
+  descriptor: ApiRequestDescriptor,
+): Promise<CadVariantDocument> {
   const headers: Record<string, string> = { Accept: "application/json" };
   const token = apiToken();
   if (token) headers.Authorization = `Bearer ${token}`;
-  const init: RequestInit = { method, headers };
-  if (body) {
+  const init: RequestInit = { method: descriptor.method, headers };
+  if (descriptor.body !== undefined) {
     headers["Content-Type"] = "application/json";
-    init.body = JSON.stringify(body);
+    init.body = JSON.stringify(descriptor.body);
   }
 
   let response: Response;
   try {
-    response = await fetch(apiBase() + path, init);
+    response = await fetch(apiBase() + descriptor.path, init);
   } catch (error) {
     throw new CadVariantApiError(
       0,

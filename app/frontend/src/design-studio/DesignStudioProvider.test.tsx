@@ -116,6 +116,9 @@ function renderStudio() {
     activateScenario(scenario: DesignScenario) {
       return act(async () => commands.activateScenario?.(scenario));
     },
+    startScenario(scenario: DesignScenario) {
+      return commands.activateScenario?.(scenario) ?? Promise.resolve();
+    },
     exitScenario() {
       return act(async () => commands.exitScenario?.());
     },
@@ -148,6 +151,7 @@ describe("DesignStudioProvider", () => {
 
   afterEach(() => {
     vi.useRealTimers();
+    vi.unstubAllGlobals();
   });
 
   it("hydrates the personal document before applying its resolved draft", async () => {
@@ -304,5 +308,37 @@ describe("DesignStudioProvider", () => {
     expect(window.history.state).toEqual({ workspace: "real" });
     expect(screen.getByTestId("active-scenario")).toHaveTextContent("real-data");
     unsubscribe();
+  });
+
+  it("does not install preview state after unmount during pending query cancellation", async () => {
+    mockApi.designStudioGet.mockResolvedValue({ revision: "r1", document: fixtureDocument() });
+    window.history.replaceState({ workspace: "real" }, "", "#route=projects");
+    const studio = renderStudio();
+    let releaseCancellation!: () => void;
+    const cancellation = new Promise<void>((resolve) => {
+      releaseCancellation = resolve;
+    });
+    vi.spyOn(studio.queryClient, "cancelQueries").mockReturnValueOnce(cancellation);
+
+    const activation = studio.startScenario(fixtureScenario("components"));
+    await waitFor(() => expect(studio.queryClient.cancelQueries).toHaveBeenCalled());
+    studio.unmount();
+    releaseCancellation();
+    await activation;
+
+    expect(window.location.hash).toBe("#route=projects");
+    expect(window.history.state).toEqual({ workspace: "real" });
+
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ parts: [{ id: "live" }], count: 1 }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(api.listParts({})).resolves.toEqual({
+      parts: [{ id: "live" }],
+      count: 1,
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });

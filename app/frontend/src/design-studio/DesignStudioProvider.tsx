@@ -133,6 +133,8 @@ function DesignStudioBridge({ children }: { children: ReactNode }) {
   const restoreAdapter = useRef<(() => void) | null>(null);
   const realRouteContext = useRef<RealRouteContext | null>(null);
   const transition = useRef<Promise<void> | undefined>(undefined);
+  const mounted = useRef(false);
+  const lifecycleGeneration = useRef(0);
 
   useEffect(() => {
     controller.activate();
@@ -140,16 +142,19 @@ function DesignStudioBridge({ children }: { children: ReactNode }) {
     return () => controller.dispose();
   }, [controller]);
 
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    mounted.current = true;
+    lifecycleGeneration.current += 1;
+    return () => {
+      mounted.current = false;
+      lifecycleGeneration.current += 1;
       restoreAdapter.current?.();
       restoreAdapter.current = null;
       const real = realRouteContext.current;
       if (real) replaceBrowserLocation(real.href, real.historyState);
       realRouteContext.current = null;
-    },
-    [],
-  );
+    };
+  }, []);
 
   const resolved = useMemo(
     () => resolveDesign(snapshot.document, snapshot.document.activeVariationId, devMode.theme),
@@ -219,7 +224,10 @@ function DesignStudioBridge({ children }: { children: ReactNode }) {
   const activateScenario = useCallback(
     (scenario: DesignScenario) =>
       beginTransition(async () => {
+        if (!mounted.current) return;
+        const generation = lifecycleGeneration.current;
         await queryClient.cancelQueries({ predicate: isProductQuery });
+        if (!mounted.current || lifecycleGeneration.current !== generation) return;
         clearInactiveProductQueries();
         restoreAdapter.current?.();
         if (!realRouteContext.current && typeof window !== "undefined") {
@@ -238,7 +246,10 @@ function DesignStudioBridge({ children }: { children: ReactNode }) {
   const exitScenario = useCallback(
     () =>
       beginTransition(async () => {
+        if (!mounted.current) return;
+        const generation = lifecycleGeneration.current;
         await queryClient.cancelQueries({ predicate: isProductQuery });
+        if (!mounted.current || lifecycleGeneration.current !== generation) return;
         clearInactiveProductQueries();
         restoreAdapter.current?.();
         restoreAdapter.current = null;
