@@ -54,7 +54,14 @@ describe("the shape of UiPrefs", () => {
   it("reads the declaration (the glob and the pattern are wired)", () => {
     // A silently-empty glob or a renamed interface would turn the assertion below into a false pass.
     expect(SOURCE).toBeTruthy();
-    expect(declaredMembers().map((m) => m.name)).toEqual(["theme", "rail_collapsed"]);
+    expect(declaredMembers().map((m) => m.name)).toEqual([
+      "theme",
+      "rail_collapsed",
+      "design_studio_left_collapsed",
+      "design_studio_right_collapsed",
+      "design_studio_left_width",
+      "design_studio_right_width",
+    ]);
   });
 
   it("declares only scalar preferences, because the mirror can hold nothing else", () => {

@@ -112,6 +112,7 @@ export function Rail() {
   const expandRailLabel = useText("nav.rail-expand", "Expand Rail");
   const collapseRailLabel = useText("nav.rail-collapse", "Collapse Rail");
   const railAboutLabel = useText("nav.about-label", "About");
+  const designStudioLabel = useText("nav.design-studio", "Design Studio");
   const [collapsed, setCollapsed] = useState(readCollapsed);
   // Persist only what the USER chose. This effect used to run on mount, which wrote the derived
   // value straight into the preference store - and after that first launch "never chosen" could
@@ -271,6 +272,33 @@ export function Rail() {
             onSelect={() => navigate(item.route)}
           />
         ))}
+        <button
+          type="button"
+          data-design-studio-entry
+          aria-label={designStudioLabel}
+          title={designStudioLabel}
+          onClick={() => {
+            window.dispatchEvent(
+              new KeyboardEvent("keydown", {
+                key: "D",
+                ctrlKey: true,
+                shiftKey: true,
+                bubbles: true,
+              }),
+            );
+          }}
+          className={
+            RAIL_ROW +
+            " text-sm font-medium text-t2 transition hover:bg-[var(--c-hover)] hover:text-t1"
+          }
+        >
+          <span aria-hidden className={RAIL_GLYPH}>
+            <Icon id="nav.settings" className="h-full w-full" />
+          </span>
+          <span className={collapsed ? COLLAPSED_LABEL + " whitespace-nowrap" : ""}>
+            {designStudioLabel}
+          </span>
+        </button>
         <button
           type="button"
           data-dev-id="rail.about"

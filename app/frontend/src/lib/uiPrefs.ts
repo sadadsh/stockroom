@@ -1,5 +1,5 @@
 /**
- * UI preferences that must outlive a restart (theme, rail collapsed).
+ * UI preferences that must outlive a restart (theme, rail and Design Studio panels).
  *
  * WHY NOT localStorage. The host serves the SPA from `http://127.0.0.1:<ephemeral port>`, so the
  * page ORIGIN is different on every launch, and localStorage is origin-scoped. Measured on real
@@ -28,6 +28,10 @@ import { api } from "../api/client";
 export interface UiPrefs {
   theme?: "dark" | "light";
   rail_collapsed?: boolean;
+  design_studio_left_collapsed?: boolean;
+  design_studio_right_collapsed?: boolean;
+  design_studio_left_width?: number;
+  design_studio_right_width?: number;
 }
 
 declare global {

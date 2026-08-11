@@ -186,7 +186,8 @@ import { DEV_IDS, DEV_ID_AREAS, DEV_ID_BY_ID } from "./devIds";
 // committed layout's known cost is read (plan 1.4); one is the live letter-rule warning on the copy
 // editor (plan 1.5). The WIDE style scope earns no row: editing a role everywhere it appears is the
 // Tokens rows and the Box tab, which stay outside the id system with the panel's other chrome.
-const EXPECTED_ENTRIES = 472;
+// 474 with the onboarding and toast targets used by Design Studio's real-component scenarios.
+const EXPECTED_ENTRIES = 474;
 
 describe("devIds catalogue", () => {
   // The count is asserted from a single constant so bumping it is one edit, and so the test NAME can
@@ -213,10 +214,12 @@ describe("devIds catalogue", () => {
     expect(seen.size).toBe(EXPECTED_ENTRIES);
   });
 
-  it("enumerates the 18 areas in first-appearance order, and every entry is a member", () => {
+  it("enumerates the 20 areas in first-appearance order, and every entry is a member", () => {
     expect(DEV_ID_AREAS).toEqual([
       "rail",
       "about",
+      "onboarding",
+      "toast",
       "components",
       "projects",
       "component-browser",
@@ -236,7 +239,7 @@ describe("devIds catalogue", () => {
       // first-appearance order rather than a taxonomy.
       "design",
     ]);
-    expect(DEV_ID_AREAS).toHaveLength(18);
+    expect(DEV_ID_AREAS).toHaveLength(20);
 
     // Every catalogued area is declared in DEV_ID_AREAS...
     const declared = new Set(DEV_ID_AREAS);

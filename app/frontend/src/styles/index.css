@@ -503,6 +503,18 @@
   }
 }
 
+/* Design Studio preview grid: a toolbar preference, never a shipped application style. */
+.design-studio-preview-grid {
+  background-image:
+    linear-gradient(to right, var(--c-line) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--c-line) 1px, transparent 1px);
+  background-size: 16px 16px;
+}
+
+.design-studio-resizer {
+  cursor: col-resize;
+}
+
 /* ==============================================================================
    Semantic typography roles.
 

@@ -8,8 +8,8 @@ import { AddPartProvider } from "./lib/addPart";
 import { ToastProvider } from "./lib/toast";
 import { ThemeProvider } from "./lib/theme";
 import { DesignStudioProvider } from "./design-studio/DesignStudioProvider";
-import { DevPanel } from "./components/DevPanel";
 import { DevInspector } from "./components/DevInspector";
+import { DesignStudioShell } from "./components/design-mode/DesignStudioShell";
 import { CaptureProvider } from "./lib/capture";
 // The interface face is the PLATFORM's: Segoe UI Variable, named in the token sheet, loaded from
 // Windows itself. Nothing is bundled for it. A branded webfont in application chrome is the single
@@ -58,12 +58,13 @@ createRoot(rootEl).render(
                 <RouterProvider>
                   <CaptureProvider>
                     <AddPartProvider>
-                      <App />
+                      <DesignStudioShell>
+                        <App />
+                      </DesignStudioShell>
                     </AddPartProvider>
                   </CaptureProvider>
                 </RouterProvider>
               </ToastProvider>
-              <DevPanel />
               <DevInspector />
             </DesignStudioProvider>
           </ThemeProvider>

@@ -1374,7 +1374,13 @@ function SelectionPane({
   );
 }
 
-export function DevPanel() {
+export function DevPanel({
+  fixturePreview = false,
+  onClose,
+}: {
+  fixturePreview?: boolean;
+  onClose?: () => void;
+} = {}) {
   const dev = useDevMode();
   const { theme, setTheme } = useTheme();
   const [facet, setFacet] = useState<Facet>("tokens");
@@ -1391,7 +1397,7 @@ export function DevPanel() {
   const [publishStatus, setPublishStatus] = useState<DevWorkspaceStatus | null>(null);
 
   useEffect(() => {
-    if (!dev.enabled || dev.dirty || dev.saving) {
+    if (fixturePreview || !dev.enabled || dev.dirty || dev.saving) {
       setPublishStatus(null);
       return;
     }
@@ -1406,13 +1412,14 @@ export function DevPanel() {
     return () => {
       current = false;
     };
-  }, [dev.enabled, dev.dirty, dev.saving, publishedCommit]);
+  }, [fixturePreview, dev.enabled, dev.dirty, dev.saving, publishedCommit]);
 
   async function publish() {
     setPublishing(true);
     setPublishError(null);
     setPublishedCommit("");
     try {
+      if (fixturePreview) throw new Error("Return to Real Data before publishing this design.");
       if (dev.dirty) throw new Error("Save the current design to source before publishing.");
       const status = await api.devStatus();
       if (!status.available) throw new Error("This app is not running from a managed source checkout.");
@@ -1463,10 +1470,7 @@ export function DevPanel() {
   if (!dev.enabled) return null;
 
   return (
-    <aside
-      className="fixed right-0 top-0 z-[200] flex h-full w-[340px] max-w-[calc(100vw-16px)] flex-col border-l border-line bg-popover shadow-pop"
-      aria-label="Dev mode"
-    >
+    <aside aria-label="Dev mode" className="flex h-full min-h-0 w-full flex-col bg-popover">
       <header className="flex shrink-0 items-center gap-2 border-b border-line px-3.5 py-3">
         <span className="rounded-control bg-acc px-1.5 py-0.5 text-2xs font-semibold text-acc-on">
           DEV
@@ -1482,7 +1486,7 @@ export function DevPanel() {
         </button>
         <button
           type="button"
-          onClick={dev.toggle}
+          onClick={onClose ?? dev.toggle}
           aria-label="Close dev mode"
           className="grid h-6 w-6 place-items-center rounded-control text-t3 hover:bg-raise2 hover:text-t1"
         >
@@ -1564,7 +1568,7 @@ export function DevPanel() {
             variant="accent"
             small
             aria-label="Save to source"
-            disabled={!dev.dirty || dev.saving}
+            disabled={fixturePreview || !dev.dirty || dev.saving}
             onClick={dev.save}
           >
             {dev.saving ? "Saving..." : "Save To Source"}
@@ -1572,7 +1576,7 @@ export function DevPanel() {
           <Button
             type="button"
             small
-            disabled={dev.dirty || publishing || publishStatus?.can_publish !== true}
+            disabled={fixturePreview || dev.dirty || publishing || publishStatus?.can_publish !== true}
             onClick={() => setPublishOpen(true)}
           >
             Publish To Main

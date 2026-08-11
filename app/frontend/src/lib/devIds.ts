@@ -31,6 +31,8 @@ export const DEV_IDS: DevIdEntry[] = [
   { id: "rail.update", label: "Update / up-to-date control", area: "rail" },
   { id: "rail.theme-toggle", label: "Theme toggle", area: "rail" },
   { id: "about.root", label: "About dialog", area: "about" },
+  { id: "onboarding.gate", label: "Onboarding gate", area: "onboarding" },
+  { id: "toast.status", label: "Toast status", area: "toast" },
   { id: "about.scrim", label: "About backdrop", area: "about" },
   { id: "about.icon", label: "About logo tile", area: "about" },
   { id: "about.title", label: "About title", area: "about" },
@@ -550,7 +552,7 @@ export const DEV_IDS: DevIdEntry[] = [
 ];
 
 // The areas in first-appearance order, for grouping the catalogue.
-export const DEV_ID_AREAS: readonly string[] = ["rail", "about", "components", "projects", "component-browser", "detail", "search", "addpart", "ingest", "stm", "settings", "altiumdb", "complete", "preview", "diff", "confirm", "shell", "design"];
+export const DEV_ID_AREAS: readonly string[] = ["rail", "about", "onboarding", "toast", "components", "projects", "component-browser", "detail", "search", "addpart", "ingest", "stm", "settings", "altiumdb", "complete", "preview", "diff", "confirm", "shell", "design"];
 
 // A by-id lookup so consumers resolve an entry in one call instead of re-scanning the list.
 export const DEV_ID_BY_ID: ReadonlyMap<string, DevIdEntry> = new Map(
