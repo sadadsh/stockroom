@@ -10,6 +10,7 @@
  */
 import type { LayoutDocument } from "../layout/document";
 import type { ValidatorIssue } from "../layout/validatorIssues";
+import type { DesignDocument } from "../design-studio/document";
 
 export type TrustVerdict = "pass" | "fail" | "unknown";
 
@@ -3005,4 +3006,24 @@ export interface PartShell {
   component_directory: boolean;
   export_formats: string[];
   eda_applications: EdaApplication[];
+}
+
+/** The machine-scoped personal Design Studio document returned by the backend. */
+export interface PersonalDesignResponse {
+  revision: string | null;
+  /** Parsed at the Design Studio boundary before it can replace the live draft. */
+  document: unknown | null;
+}
+
+export interface PersonalDesignSaveBody {
+  document: DesignDocument;
+  expected_revision: string | null;
+}
+
+export interface PersonalDesignDeleteBody {
+  expected_revision: string | null;
+}
+
+export interface PersonalDesignDeleteResponse {
+  ok: true;
 }

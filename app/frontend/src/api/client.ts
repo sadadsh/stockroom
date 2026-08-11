@@ -97,6 +97,10 @@ import type {
   SuggestionsResponse,
   AfCheckBody,
   AfCheckResponse,
+  PersonalDesignResponse,
+  PersonalDesignSaveBody,
+  PersonalDesignDeleteBody,
+  PersonalDesignDeleteResponse,
 } from "./types";
 
 export class ApiError extends Error {
@@ -376,6 +380,18 @@ export interface StmMcusArgs {
 }
 
 export const api = {
+  designStudioGet(): Promise<PersonalDesignResponse> {
+    return request<PersonalDesignResponse>("GET", "/api/design-studio/personal");
+  },
+
+  designStudioPut(body: PersonalDesignSaveBody): Promise<PersonalDesignResponse> {
+    return request<PersonalDesignResponse>("PUT", "/api/design-studio/personal", { body });
+  },
+
+  designStudioDelete(body: PersonalDesignDeleteBody): Promise<PersonalDesignDeleteResponse> {
+    return request<PersonalDesignDeleteResponse>("DELETE", "/api/design-studio/personal", { body });
+  },
+
   listProjects(): Promise<ProjectSummary[]> {
     return apiGet<ProjectSummary[]>("/api/projects");
   },

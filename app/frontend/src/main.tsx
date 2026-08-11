@@ -7,7 +7,7 @@ import { RouterProvider } from "./lib/router";
 import { AddPartProvider } from "./lib/addPart";
 import { ToastProvider } from "./lib/toast";
 import { ThemeProvider } from "./lib/theme";
-import { DevModeProvider } from "./lib/devMode";
+import { DesignStudioProvider } from "./design-studio/DesignStudioProvider";
 import { DevPanel } from "./components/DevPanel";
 import { DevInspector } from "./components/DevInspector";
 import { CaptureProvider } from "./lib/capture";
@@ -53,7 +53,7 @@ createRoot(rootEl).render(
           <ThemeProvider>
             {/* Dev mode wraps the app so its token overrides apply for everyone on boot; the panel
                 itself renders only while dev mode is toggled on (Ctrl/Cmd+Shift+D). */}
-            <DevModeProvider>
+            <DesignStudioProvider>
               <ToastProvider>
                 <RouterProvider>
                   <CaptureProvider>
@@ -65,7 +65,7 @@ createRoot(rootEl).render(
               </ToastProvider>
               <DevPanel />
               <DevInspector />
-            </DevModeProvider>
+            </DesignStudioProvider>
           </ThemeProvider>
         </LazyMotion>
       </MotionConfig>

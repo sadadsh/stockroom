@@ -27,8 +27,10 @@ import {
   type BehaviorOverride,
 } from "./behavior.overrides";
 import {
+  committedDevModeDraft,
   useApplyDraftOverrides,
   useDevModeDraft,
+  type DevModeDraft,
   type TokenOverrides,
 } from "./devModeDraft";
 import { useDevModeHistory, useDevModeHistoryKeys } from "./devModeHistory";
@@ -36,7 +38,7 @@ import { useDevModeSave } from "./devModeSave";
 import { useDevModeSelection } from "./devModeSelection";
 import { useDevModeToggle } from "./devModeToggle";
 
-interface DevModeContextValue {
+export interface DevModeContextValue {
   enabled: boolean;
   toggle: () => void;
   // The active theme, so the panel can say which theme a colour edit targets.
@@ -135,6 +137,10 @@ interface DevModeContextValue {
   lastError: string | null;
   save: () => Promise<void>;
   resetAll: () => void;
+  // Design Studio persistence observes and replaces the same complete draft. Existing consumers
+  // continue to use the facet-level commands above; this is the whole-document bridge.
+  draft: DevModeDraft;
+  replaceDraft: (draft: DevModeDraft) => void;
 }
 
 const noop = () => {};
@@ -208,6 +214,8 @@ const DEFAULT: DevModeContextValue = {
   lastError: null,
   save: async () => {},
   resetAll: noop,
+  draft: committedDevModeDraft(),
+  replaceDraft: noop,
 };
 
 const DevModeContext = createContext<DevModeContextValue>(DEFAULT);
@@ -216,7 +224,7 @@ export function DevModeProvider({ children }: { children: ReactNode }) {
   const { theme } = useTheme();
   // The hook call order below is the effect order: snapshot, the Ctrl/Cmd+Shift+D toggle, the
   // Ctrl/Cmd+Z history keys, then the two document applies (tokens, elements).
-  const { draft, restore, resetDraft, api: draftApi } = useDevModeDraft(theme);
+  const { draft, restore, replaceDraft, resetDraft, api: draftApi } = useDevModeDraft(theme);
   const { api: historyApi, historyRevision, undo, redo } = useDevModeHistory(draft, restore);
   const { api: toggleApi, enabled, clearSelectedCopy } = useDevModeToggle();
   useDevModeHistoryKeys(enabled, undo, redo);
@@ -240,6 +248,8 @@ export function DevModeProvider({ children }: { children: ReactNode }) {
       ...selectionApi,
       ...saveApi,
       resetAll,
+      draft,
+      replaceDraft,
     }),
     [
       toggleApi,
@@ -252,6 +262,8 @@ export function DevModeProvider({ children }: { children: ReactNode }) {
       selectionApi,
       saveApi,
       resetAll,
+      draft,
+      replaceDraft,
     ],
   );
 
