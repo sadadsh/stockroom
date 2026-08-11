@@ -92,13 +92,20 @@ function cloneLayout(src: LayoutDocument | null): LayoutDocument | null {
   return src ? structuredClone(src) : null;
 }
 
-function committedDraft(): DevModeDraft {
+function cloneBehaviors(src: Record<string, BehaviorOverride>): Record<string, BehaviorOverride> {
+  const out: Record<string, BehaviorOverride> = {};
+  for (const [id, override] of Object.entries(src)) out[id] = { ...override };
+  return out;
+}
+
+/** A fresh copy of the source-owned design that resolution can safely build on. */
+export function committedDevModeDraft(): DevModeDraft {
   return {
     tokens: cloneTokens(TOKEN_OVERRIDES),
     copy: { ...COPY_OVERRIDES },
     icons: cloneIcons(ICON_OVERRIDES),
     elements: cloneElements(ELEMENT_OVERRIDES),
-    behaviors: { ...BEHAVIOR_OVERRIDES },
+    behaviors: cloneBehaviors(BEHAVIOR_OVERRIDES),
     layout: cloneLayout(LAYOUT_OVERRIDES.workspace),
   };
 }
@@ -134,6 +141,8 @@ type DraftAction =
   | { type: "resetLayout" }
   // One action restores all six slices, so a history step can never half-apply.
   | { type: "restore"; draft: DevModeDraft }
+  // One action replaces all six slices from a resolved personal document.
+  | { type: "replace"; draft: DevModeDraft }
   // One action clears all six slices, for the same reason.
   | { type: "resetAll" };
 
@@ -210,6 +219,15 @@ function draftReducer(state: DevModeDraft, action: DraftAction): DevModeDraft {
       // stored snapshot that predates a slice restores as that slice's empty value.
       return { tokens, copy, icons, elements, behaviors, layout: layout ?? null };
     }
+    case "replace":
+      return {
+        tokens: cloneTokens(action.draft.tokens),
+        copy: { ...action.draft.copy },
+        icons: cloneIcons(action.draft.icons),
+        elements: cloneElements(action.draft.elements),
+        behaviors: cloneBehaviors(action.draft.behaviors),
+        layout: cloneLayout(action.draft.layout),
+      };
     case "resetAll":
       return emptyDraft();
   }
@@ -220,7 +238,7 @@ function draftReducer(state: DevModeDraft, action: DraftAction): DevModeDraft {
  * block a colour edit lands in, so the same token id can hold a different value per theme.
  */
 export function useDevModeDraft(theme: Theme) {
-  const [draft, dispatch] = useReducer(draftReducer, undefined, committedDraft);
+  const [draft, dispatch] = useReducer(draftReducer, undefined, committedDevModeDraft);
   const { tokens, copy, icons, elements, behaviors, layout } = draft;
 
   const activeSelector: TokenSelector = theme === "light" ? "light" : "root";
@@ -351,6 +369,10 @@ export function useDevModeDraft(theme: Theme) {
   const restore = useCallback((next: DevModeDraft) => {
     dispatch({ type: "restore", draft: next });
   }, []);
+  // Hydration is one complete document transition, so history records it as one step.
+  const replaceDraft = useCallback((next: DevModeDraft) => {
+    dispatch({ type: "replace", draft: next });
+  }, []);
   // Clear all six slices at once (Reset all), for the same reason.
   const resetDraft = useCallback(() => {
     dispatch({ type: "resetAll" });
@@ -422,7 +444,7 @@ export function useDevModeDraft(theme: Theme) {
     ],
   );
 
-  return { draft, restore, resetDraft, api };
+  return { draft, restore, replaceDraft, resetDraft, api };
 }
 
 /**

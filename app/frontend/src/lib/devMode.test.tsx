@@ -3,6 +3,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ReactNode } from "react";
 import { ThemeProvider } from "./theme";
 import { DevModeProvider, useDevMode } from "./devMode";
+import { useDevModeDraft, type DevModeDraft } from "./devModeDraft";
+import { useDevModeHistory } from "./devModeHistory";
 import { Text } from "./copy";
 import { DevPanel } from "../components/DevPanel";
 import { api } from "../api/client";
@@ -438,6 +440,41 @@ describe("dev mode edit history", () => {
     await waitFor(() =>
       expect(result.current.behaviorOverrideFor("detail.category-control")?.preset).toBe("segmented"),
     );
+  });
+});
+
+describe("whole-draft replacement", () => {
+  it("joins history and restores all draft slices together", async () => {
+    const { result } = renderHook(() => {
+      const draftState = useDevModeDraft("dark");
+      const history = useDevModeHistory(draftState.draft, draftState.restore);
+      return { ...draftState, ...history.api };
+    });
+    const replacement: DevModeDraft = {
+      tokens: { root: { "--c-acc": "#123456" }, light: { "--c-acc": "#abcdef" } },
+      copy: { "rail.about": "Info" },
+      icons: { "action.add": { swapToId: "action.edit" } },
+      elements: { "component-browser.offers": { display: "grid" } },
+      behaviors: { "detail.category-control": { preset: "segmented" } },
+      layout: null,
+    };
+
+    act(() => result.current.api.setCopy("rail.components", "Components"));
+    await waitFor(() => expect(result.current.canUndo).toBe(true));
+    act(() => result.current.replaceDraft(replacement));
+    await waitFor(() => expect(result.current.draft.copy["rail.about"]).toBe("Info"));
+
+    expect(result.current.draft).toEqual(replacement);
+    replacement.copy["rail.about"] = "Mutated after replacement";
+    expect(result.current.draft.copy["rail.about"]).toBe("Info");
+
+    act(() => result.current.undo());
+    await waitFor(() => expect(result.current.draft.copy["rail.components"]).toBe("Components"));
+    expect(result.current.draft.tokens).toEqual({ root: {}, light: {} });
+    expect(result.current.draft.icons).toEqual({});
+    expect(result.current.draft.elements).toEqual({});
+    expect(result.current.draft.behaviors).toEqual({});
+    expect(result.current.draft.layout).toBeNull();
   });
 });
 
