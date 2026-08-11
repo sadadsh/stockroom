@@ -11,9 +11,9 @@ import os
 import tempfile
 import time
 from contextlib import contextmanager
-from typing import BinaryIO
 from dataclasses import dataclass
 from pathlib import Path
+from typing import BinaryIO
 
 from stockroom.store.machine_config import config_dir
 

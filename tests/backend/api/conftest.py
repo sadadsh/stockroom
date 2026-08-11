@@ -5,7 +5,6 @@ from pathlib import Path
 
 import pytest
 
-from stockroom.api.app import create_app
 from stockroom.api.context import build_context
 from stockroom.store.machine_config import MachineConfig
 from stockroom.vcs.repo import GitRepo
@@ -172,6 +171,8 @@ def app_ctx(library_root, tmp_path):
 def client(app_ctx):
     from fastapi.testclient import TestClient
 
+    from stockroom.api.app import create_app
+
     app = create_app(app_ctx)
     with TestClient(app, base_url="http://test", raise_server_exceptions=False,
                     headers={"X-Stockroom-Token": "testtoken"}) as c:
@@ -181,6 +182,8 @@ def client(app_ctx):
 @pytest.fixture
 def anon_client(app_ctx):
     from fastapi.testclient import TestClient
+
+    from stockroom.api.app import create_app
 
     app = create_app(app_ctx)
     with TestClient(app, base_url="http://test", raise_server_exceptions=False) as c:

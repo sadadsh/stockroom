@@ -1,3 +1,8 @@
+import os
+import subprocess
+import sys
+import textwrap
+
 import pytest
 
 
@@ -6,6 +11,51 @@ def personal_config(tmp_path, monkeypatch):
     root = tmp_path / "design-studio-config"
     monkeypatch.setenv("STOCKROOM_CONFIG_DIR", str(root))
     return root
+
+
+def test_api_app_imports_after_machine_config_isolation(tmp_path):
+    guard_dir = tmp_path / "import-guard"
+    guard_dir.mkdir()
+    guard_dir.joinpath("sitecustomize.py").write_text(
+        textwrap.dedent(
+            """
+            import builtins
+            import os
+
+            _unsafe_config_dir = os.environ["STOCKROOM_CONFIG_DIR"]
+            _original_import = builtins.__import__
+
+            def _guarded_import(name, *args, **kwargs):
+                if name == "stockroom.api.app" and os.environ.get("STOCKROOM_CONFIG_DIR") == _unsafe_config_dir:
+                    raise RuntimeError("stockroom.api.app imported before test config isolation")
+                return _original_import(name, *args, **kwargs)
+
+            builtins.__import__ = _guarded_import
+            """
+        ),
+        encoding="utf-8",
+    )
+    environment = os.environ | {
+        "PYTHONPATH": str(guard_dir) + os.pathsep + os.environ.get("PYTHONPATH", ""),
+        "STOCKROOM_CONFIG_DIR": str(tmp_path / "unsafe-before-pytest-fixture"),
+    }
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "pytest",
+            "tests/backend/api/test_design_studio.py::test_personal_design_api_round_trip_and_delete",
+            "-q",
+        ],
+        cwd=os.getcwd(),
+        env=environment,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
 
 
 def test_personal_design_api_round_trip_and_delete(client, personal_config):
