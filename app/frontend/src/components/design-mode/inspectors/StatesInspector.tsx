@@ -1,31 +1,30 @@
 import { useEffect, useState } from "react";
+import {
+  applyDesignPreviewState,
+  type DesignPreviewState,
+} from "../../../design-studio/previewState";
 import { useText } from "../../../lib/copy";
 import type { DomainInspectorProps } from "./types";
 
-type PreviewState = "default" | "focus" | "disabled";
-
 export function StatesInspector({ inspection }: DomainInspectorProps) {
-  const [state, setState] = useState<PreviewState>("default");
+  const [state, setState] = useState<DesignPreviewState>("default");
   const defaultLabel = useText("design-studio.inspector.states.default", "Default");
+  const hoverLabel = useText("design-studio.inspector.states.hover", "Hover");
   const focusLabel = useText("design-studio.inspector.states.focus", "Focus");
+  const activeLabel = useText("design-studio.inspector.states.active", "Active");
   const disabledLabel = useText("design-studio.inspector.states.disabled", "Disabled");
   const emptyLabel = useText("design-studio.inspector.states.empty", "No product state is declared on this target.");
-  const states: readonly { value: PreviewState; label: string }[] = [
+  const states: readonly { value: DesignPreviewState; label: string }[] = [
     { value: "default", label: defaultLabel },
+    { value: "hover", label: hoverLabel },
     { value: "focus", label: focusLabel },
+    { value: "active", label: activeLabel },
     { value: "disabled", label: disabledLabel },
   ];
-  useEffect(() => {
-    const target = inspection.target;
-    const previous = target.getAttribute("data-design-preview-state");
-    if (state === "default") target.removeAttribute("data-design-preview-state");
-    else target.setAttribute("data-design-preview-state", state);
-    if (state === "focus" && target instanceof HTMLElement) target.focus();
-    return () => {
-      if (previous === null) target.removeAttribute("data-design-preview-state");
-      else target.setAttribute("data-design-preview-state", previous);
-    };
-  }, [inspection, state]);
+  useEffect(
+    () => applyDesignPreviewState(inspection.target, state),
+    [inspection, state],
+  );
   return (
     <div className="px-3.5 py-3">
       <div className="flex flex-wrap gap-1">

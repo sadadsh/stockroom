@@ -1,6 +1,6 @@
 import { render, screen, fireEvent, waitFor, renderHook, act } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { ThemeProvider } from "./theme";
 import { DevModeProvider, useDevMode } from "./devMode";
 import { useDevModeDraft, type DevModeDraft } from "./devModeDraft";
@@ -475,6 +475,59 @@ describe("whole-draft replacement", () => {
     expect(result.current.draft.elements).toEqual({});
     expect(result.current.draft.behaviors).toEqual({});
     expect(result.current.draft.layout).toBeNull();
+  });
+
+  it("records an atomic external document participant with the draft for undo and redo", async () => {
+    const initialDocument = {
+      activeVariationId: "custom",
+      variations: { custom: { title: "Custom", patch: { copy: { label: "Before" } } } },
+      targetScopes: { "detail.header": "screen" },
+    };
+    const nextDocument = {
+      activeVariationId: "",
+      variations: {},
+      targetScopes: {},
+    };
+    const replacement: DevModeDraft = {
+      tokens: { root: {}, light: {} },
+      copy: {},
+      icons: {},
+      elements: {},
+      behaviors: {},
+      layout: null,
+    };
+    const { result } = renderHook(() => {
+      const draftState = useDevModeDraft("dark");
+      const [documentState, setDocumentState] = useState(initialDocument);
+      const readDocument = useCallback(() => JSON.stringify(documentState), [documentState]);
+      const restoreDocument = useCallback((raw: string) => {
+        setDocumentState(JSON.parse(raw) as typeof initialDocument);
+      }, []);
+      const history = useDevModeHistory(draftState.draft, draftState.restore);
+      useEffect(
+        () => history.registerParticipant("design-document", { read: readDocument, restore: restoreDocument }),
+        [history.registerParticipant, readDocument, restoreDocument],
+      );
+      return { ...draftState, draftApi: draftState.api, ...history.api, ...history, documentState };
+    });
+
+    act(() => result.current.draftApi.setCopy("label", "Before"));
+    await waitFor(() => expect(result.current.draft.copy.label).toBe("Before"));
+
+    act(() => result.current.replaceAtomically(
+      replacement,
+      "design-document",
+      JSON.stringify(nextDocument),
+    ));
+    await waitFor(() => expect(result.current.documentState).toEqual(nextDocument));
+
+    act(() => result.current.undo());
+    await waitFor(() => expect(result.current.documentState).toEqual(initialDocument));
+    expect(result.current.draft).not.toEqual(replacement);
+
+    act(() => result.current.redo());
+    await waitFor(() => expect(result.current.documentState).toEqual(nextDocument));
+    expect(result.current.draft).toEqual(replacement);
   });
 });
 

@@ -718,3 +718,23 @@
 .tnum {
   font-variant-numeric: tabular-nums;
 }
+/* Design Studio state simulation is preview-only and is removed when the state tab changes. */
+[data-design-preview-state="hover"] {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--c-acc) 55%, transparent) !important;
+}
+
+[data-design-preview-state="focus"] {
+  outline: 2px solid var(--c-acc) !important;
+  outline-offset: 2px !important;
+}
+
+[data-design-preview-state="active"] {
+  filter: brightness(0.88) !important;
+  transform: scale(0.98) !important;
+}
+
+.design-preview-disabled[data-design-preview-state="disabled"] {
+  cursor: not-allowed !important;
+  filter: grayscale(0.35) !important;
+  opacity: 0.45 !important;
+}

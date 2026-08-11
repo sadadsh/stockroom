@@ -4,6 +4,7 @@ import type { LandPattern, SymbolGeometry } from "../api/client";
 import { Glb3DView } from "../components/Glb3DView";
 import { FootprintPreview } from "../components/component-workspace/FootprintPreview";
 import { SymbolPreview } from "../components/component-workspace/SymbolPreview";
+import { applyElementOverrides } from "../lib/applyElementOverrides";
 import {
   TECHNICAL_CONTENT_ATTRIBUTE,
   inspectTarget,
@@ -85,6 +86,56 @@ describe("inspectTarget", () => {
         layout: 1,
         states: 0,
       });
+      expect(result.editTargets.box).toMatchObject({
+        domain: "box",
+        overrideId: "detail.preview.3d.header",
+        selector: ":scope",
+      });
+      expect(result.editTargets.text).toMatchObject({
+        domain: "text",
+        overrideId: "detail.preview.3d.header::text",
+      });
+      expect(result.editTargets.icon).toMatchObject({
+        domain: "icon",
+        overrideId: "detail.preview.3d.header::icon",
+      });
+      expect(result.editTargets.text.elements).toHaveLength(8);
+      expect(result.editTargets.icon.elements).toHaveLength(1);
+    },
+  );
+
+  it.each<FixtureName>(["currentColor SVG", "fill SVG", "nested text", "mixed CAD header"])(
+    "applies Text and Icon writes only to their internal %s domain targets",
+    (fixture) => {
+      const target = renderTargetFixture(fixture);
+      document.body.append(target);
+      const inspection = inspectTarget(document.body, "detail.preview.3d.header");
+      const textElements = [...new Set(inspection.texts.map((text) => text.element))] as HTMLElement[];
+      const icon = inspection.icons[0]!.element as SVGElement;
+      const technical = target.querySelector<HTMLElement>(`[${TECHNICAL_CONTENT_ATTRIBUTE}]`);
+
+      applyElementOverrides({
+        "detail.preview.3d.header::text": { "font-size": "20px" },
+        "detail.preview.3d.header::icon": {
+          color: "#123456",
+          width: "32px",
+          height: "32px",
+        },
+      });
+
+      expect(target.style.fontSize).toBe("");
+      expect(target.style.color).toBe("");
+      expect(target.style.width).toBe("");
+      expect(textElements.every((element) => element.style.fontSize === "20px")).toBe(true);
+      expect(textElements.every((element) => element.style.color === "")).toBe(true);
+      expect(icon.style.width).toBe("32px");
+      expect(icon.style.height).toBe("32px");
+      expect(icon.style.color).toBe("rgb(18, 52, 86)");
+      if (fixture === "fill SVG") {
+        expect(icon.querySelector<SVGElement>("path")?.style.fill).toBe("#123456");
+      }
+      expect(technical?.style.color ?? "").toBe("");
+      expect(technical?.querySelector<SVGElement>("svg")?.style.color ?? "").toBe("");
     },
   );
 

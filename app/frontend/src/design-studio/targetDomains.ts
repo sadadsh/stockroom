@@ -1,4 +1,5 @@
 import type { DesignScope } from "./document";
+import { nodesForDevId } from "../lib/componentDevIds";
 
 /** Stable opt-out boundary for engineering drawings and model canvases inside editable UI. */
 export const TECHNICAL_CONTENT_ATTRIBUTE = "data-design-technical-content";
@@ -44,6 +45,44 @@ export interface TargetInspection {
   behaviors: Element[];
   layout: Element[];
   states: TargetStateDomain[];
+  editTargets: TargetDomainEditTargets;
+}
+
+export type EditableTargetDomain = "box" | "text" | "icon";
+
+export interface TargetDomainEditTarget {
+  domain: EditableTargetDomain;
+  targetId: string;
+  overrideId: string;
+  selector: string;
+  elements: Element[];
+  contentIds: string[];
+}
+
+export type TargetDomainEditTargets = Record<EditableTargetDomain, TargetDomainEditTarget>;
+
+export const TARGET_DOMAIN_SELECTORS: Readonly<Record<EditableTargetDomain, string>> = {
+  box: ":scope",
+  text: ":scope, :scope *",
+  icon: ":scope [data-icon-id], :scope svg.ico, :scope svg",
+};
+
+const DOMAIN_OVERRIDE_SUFFIX = "::";
+
+/** One persisted override key that keeps an internal edit separate from its owning box. */
+export function targetDomainOverrideId(targetId: string, domain: EditableTargetDomain): string {
+  return domain === "box" ? targetId : `${targetId}${DOMAIN_OVERRIDE_SUFFIX}${domain}`;
+}
+
+export function parseTargetDomainOverrideId(
+  overrideId: string,
+): { targetId: string; domain: EditableTargetDomain } {
+  const separator = overrideId.lastIndexOf(DOMAIN_OVERRIDE_SUFFIX);
+  if (separator === -1) return { targetId: overrideId, domain: "box" };
+  const targetId = overrideId.slice(0, separator);
+  const suffix = overrideId.slice(separator + DOMAIN_OVERRIDE_SUFFIX.length);
+  if (suffix === "text" || suffix === "icon") return { targetId, domain: suffix };
+  return { targetId: overrideId, domain: "box" };
 }
 
 export interface ScopePreview {
@@ -83,6 +122,7 @@ function textDomains(target: Element): TargetTextDomain[] {
     if (node.nodeType === Node.ELEMENT_NODE) {
       const element = node as Element;
       if (element !== target && isTechnical(element)) return;
+      if (element !== target && element.hasAttribute("data-dev-id")) return;
       if (element.matches("script, style, template")) return;
     }
     if (node.nodeType === Node.TEXT_NODE) {
@@ -105,6 +145,7 @@ function iconDomains(target: Element): TargetIconDomain[] {
   const claimed = new Set<Element>();
   for (const element of inclusiveElements(target, "[data-icon-id], svg.ico, svg")) {
     if (isTechnical(element)) continue;
+    if (element.closest("[data-dev-id]") !== target) continue;
     const iconOwner = element.closest("[data-icon-id]");
     const owner = iconOwner && target.contains(iconOwner) ? iconOwner : element;
     if (claimed.has(owner)) continue;
@@ -115,19 +156,70 @@ function iconDomains(target: Element): TargetIconDomain[] {
 }
 
 function behaviorDomains(target: Element): Element[] {
-  return inclusiveElements(target, "[data-dev-control]").filter((element) => !isTechnical(element));
+  return inclusiveElements(target, "[data-dev-control]").filter(
+    (element) => !isTechnical(element) && element.closest("[data-dev-id]") === target,
+  );
 }
 
 function stateDomains(target: Element): TargetStateDomain[] {
   const states: TargetStateDomain[] = [];
   for (const element of inclusiveElements(target, "*")) {
     if (isTechnical(element)) continue;
+    if (element.closest("[data-dev-id]") !== target) continue;
     for (const name of STATE_ATTRIBUTES) {
       const value = element.getAttribute(name);
       if (value !== null) states.push({ element, name, value });
     }
   }
   return states;
+}
+
+function uniqueElements(elements: readonly Element[]): Element[] {
+  return [...new Set(elements)];
+}
+
+function domainElementsExceptTarget<T extends { element: Element }>(
+  domains: readonly T[],
+  target: Element,
+): Element[] {
+  const elements: Element[] = [];
+  for (const domain of domains) {
+    if (domain.element !== target) elements.push(domain.element);
+  }
+  return uniqueElements(elements);
+}
+
+function editTargets(
+  id: string,
+  target: Element,
+  texts: readonly TargetTextDomain[],
+  icons: readonly TargetIconDomain[],
+): TargetDomainEditTargets {
+  const make = (
+    domain: EditableTargetDomain,
+    elements: Element[],
+    contentIds: string[],
+  ): TargetDomainEditTarget => ({
+    domain,
+    targetId: id,
+    overrideId: targetDomainOverrideId(id, domain),
+    selector: TARGET_DOMAIN_SELECTORS[domain],
+    elements,
+    contentIds: [...new Set(contentIds)],
+  });
+  return {
+    box: make("box", [target], []),
+    text: make(
+      "text",
+      domainElementsExceptTarget(texts, target),
+      texts.flatMap((text) => text.copyId ? [text.copyId] : []),
+    ),
+    icon: make(
+      "icon",
+      domainElementsExceptTarget(icons, target),
+      icons.flatMap((icon) => icon.iconId ? [icon.iconId] : []),
+    ),
+  };
 }
 
 /** Inspect one exact stable target without collapsing its independent editing domains. */
@@ -163,7 +255,26 @@ export function inspectTarget(root: Element, id: string): TargetInspection {
     behaviors,
     layout: [target],
     states,
+    editTargets: editTargets(id, target, texts, icons),
   };
+}
+
+/** Resolve a persisted domain override against every live instance of its owning stable target. */
+export function elementsForTargetDomainOverride(
+  overrideId: string,
+  root: ParentNode = document,
+): Element[] {
+  const address = parseTargetDomainOverrideId(overrideId);
+  const elements: Element[] = [];
+  for (const target of nodesForDevId(address.targetId, root)) {
+    if (address.domain === "box") elements.push(target);
+    else if (address.domain === "text") {
+      elements.push(...domainElementsExceptTarget(textDomains(target), target));
+    } else {
+      elements.push(...domainElementsExceptTarget(iconDomains(target), target));
+    }
+  }
+  return uniqueElements(elements);
 }
 
 function allTargetElements(root: Element): Element[] {

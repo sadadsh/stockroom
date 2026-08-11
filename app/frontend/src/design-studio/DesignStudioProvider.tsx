@@ -14,6 +14,7 @@ import { DevModeProvider, useDevMode } from "../lib/devMode";
 import { committedDevModeDraft, type DevModeDraft } from "../lib/devModeDraft";
 import {
   DESIGN_DOCUMENT_SCHEMA_VERSION,
+  diffDesignDraft,
   resolveDesign,
   type DesignDocument,
 } from "./document";
@@ -36,6 +37,8 @@ export interface DesignStudioContextValue {
   enabled: boolean;
   document: DesignDocument;
   replaceDocument: (document: DesignDocument) => void;
+  replaceDocumentAtomically: (document: DesignDocument) => void;
+  replaceResolvedDraftAtomically: (draft: DevModeDraft) => void;
   activeVariationId: string;
   setVariation: (variationId: string) => void;
   personalState: PersonalDesignState;
@@ -114,9 +117,36 @@ function withWorkingDraft(document: DesignDocument, draft: DevModeDraft): Design
     ...document,
     variations: {
       ...document.variations,
+      [active.id]: { ...active, patch: cloneDraft(draft) },
+    },
+  };
+}
+
+function withExactWorkingDraft(document: DesignDocument, draft: DevModeDraft, theme: "dark" | "light"): DesignDocument {
+  if (!document.activeVariationId || !document.variations[document.activeVariationId]) {
+    return { ...document, base: cloneDraft(draft) };
+  }
+  const active = document.variations[document.activeVariationId];
+  const themes = { ...active.themes };
+  delete themes[theme];
+  const baselineDocument: DesignDocument = {
+    ...document,
+    variations: {
+      ...document.variations,
+      [active.id]: { ...active, themes },
+    },
+  };
+  const baseline = resolveDesign(baselineDocument, active.id, theme);
+  return {
+    ...document,
+    variations: {
+      ...document.variations,
       [active.id]: {
         ...active,
-        patch: cloneDraft(draft),
+        themes: {
+          ...themes,
+          [theme]: diffDesignDraft(baseline, draft),
+        },
       },
     },
   };
@@ -151,6 +181,14 @@ function DesignStudioBridge({
     void controller.hydrate();
     return () => controller.dispose();
   }, [controller]);
+
+  useEffect(
+    () => devMode.registerHistoryParticipant("design-document", {
+      read: () => JSON.stringify(controller.getSnapshot().document),
+      restore: (raw) => controller.replaceDocument(JSON.parse(raw) as DesignDocument),
+    }),
+    [controller, devMode.registerHistoryParticipant],
+  );
 
   useEffect(() => {
     mounted.current = true;
@@ -202,6 +240,28 @@ function DesignStudioBridge({
       controller.replaceDocument(document);
     },
     [controller],
+  );
+  const replaceDocumentAtomically = useCallback(
+    (document: DesignDocument) => {
+      const nextDraft = resolveDesign(document, document.activeVariationId, devMode.theme);
+      devMode.replaceDraftAtomically(
+        nextDraft,
+        "design-document",
+        JSON.stringify(document),
+      );
+    },
+    [devMode.replaceDraftAtomically, devMode.theme],
+  );
+  const replaceResolvedDraftAtomically = useCallback(
+    (draft: DevModeDraft) => {
+      const document = withExactWorkingDraft(snapshot.document, draft, devMode.theme);
+      devMode.replaceDraftAtomically(
+        draft,
+        "design-document",
+        JSON.stringify(document),
+      );
+    },
+    [devMode.replaceDraftAtomically, devMode.theme, snapshot.document],
   );
   const setVariation = useCallback(
     (variationId: string) => {
@@ -290,6 +350,8 @@ function DesignStudioBridge({
       enabled: devMode.enabled,
       document: snapshot.document,
       replaceDocument,
+      replaceDocumentAtomically,
+      replaceResolvedDraftAtomically,
       activeVariationId: snapshot.document.activeVariationId,
       setVariation,
       personalState: snapshot.personalState,
@@ -306,6 +368,8 @@ function DesignStudioBridge({
       snapshot.personalState,
       snapshot.lastValidDocument,
       replaceDocument,
+      replaceDocumentAtomically,
+      replaceResolvedDraftAtomically,
       setVariation,
       activeScenario,
       activateScenario,

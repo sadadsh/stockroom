@@ -21,11 +21,15 @@ export function TextInspector(props: DomainInspectorProps) {
   const noneLabel = useText("design-studio.inspector.text.none", "none");
   const normalLabel = useText("design-studio.inspector.text.normal", "normal");
   const clipLabel = useText("design-studio.inspector.text.clip", "clip");
-  const copyIds = useMemo(
-    () => [...new Set(props.inspection.texts.flatMap((text) => text.copyId ? [text.copyId] : []))],
-    [props.inspection],
+  const texts = useMemo(
+    () => props.inspections.flatMap((inspection) => inspection.texts),
+    [props.inspections],
   );
-  const primary = props.inspection.texts[0];
+  const copyIds = useMemo(
+    () => [...new Set(texts.flatMap((text) => text.copyId ? [text.copyId] : []))],
+    [texts],
+  );
+  const primary = props.inspection.texts[0] ?? texts[0];
   const copyId = copyIds[0];
   const computed = getComputedStyle(primary?.element ?? props.inspection.target);
   if (!primary) return <p className="px-3.5 py-3 text-2xs text-t3">{emptyLabel}</p>;
@@ -52,8 +56,8 @@ export function TextInspector(props: DomainInspectorProps) {
               placeholder={computed.getPropertyValue(property)}
               onBlur={(event) => {
                 const value = event.currentTarget.value.trim();
-                if (!value) props.resetElementProperty(property);
-                else if (isSafeElementValue(property, value)) props.setElementProperty(property, value);
+                if (!value) props.resetDomainProperty("text", property);
+                else if (isSafeElementValue(property, value)) props.setDomainProperty("text", property, value);
               }}
               className="w-full rounded-control border border-line bg-field px-2 py-1 text-2xs font-mono text-t1 outline-none focus:border-acc"
             />

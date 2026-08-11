@@ -477,6 +477,37 @@ def test_dev_save_accepts_approved_dynamic_element_ids(client, tmp_path, monkeyp
     assert "ingest.candidate[abc-123]" in elem_ts
 
 
+def test_dev_save_accepts_only_text_and_icon_domain_qualifiers_on_valid_element_ids(
+    client, tmp_path, monkeypatch
+):
+    src = _src_with_lib(tmp_path, monkeypatch)
+    body = {
+        "tokens": {"root": {}, "light": {}},
+        "copy": {},
+        "elements": {
+            "detail.header::text": {"font-size": "18px"},
+            "detail.header::icon": {"width": "24px"},
+            "component-browser.component[part-1].tab::text": {"color": "#123456"},
+            "ingest.candidate[abc-123]::icon": {"height": "20px"},
+            "detail.header::box": {"width": "10px"},
+            "detail.header::script": {"width": "10px"},
+            "made_up::text": {"width": "10px"},
+        },
+    }
+    res = client.post("/api/dev/save", json=body)
+    assert res.status_code == 200
+    assert res.json()["elements"] == 4
+
+    elem_ts = (src / "lib" / "element.overrides.ts").read_text(encoding="utf-8")
+    assert "detail.header::text" in elem_ts
+    assert "detail.header::icon" in elem_ts
+    assert "component-browser.component[part-1].tab::text" in elem_ts
+    assert "ingest.candidate[abc-123]::icon" in elem_ts
+    assert "::box" not in elem_ts
+    assert "::script" not in elem_ts
+    assert "made_up" not in elem_ts
+
+
 def test_dev_save_drops_unregistered_dynamic_element_ids(client, tmp_path, monkeypatch):
     # A bracketed id that is not one of the approved shapes is not "a dev id we forgot to
     # catalogue", it is an unregistered selector. Dropped, exactly like a malformed static id.

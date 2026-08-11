@@ -7,6 +7,12 @@ import { api } from "../api/client";
 import { OnboardingGate } from "../components/OnboardingGate";
 import { Text } from "../lib/copy";
 import { useDevMode } from "../lib/devMode";
+import {
+  emptyDevModeDraft,
+  resetDraftElementProperty,
+  resetDraftTargets,
+  type DevModeDraft,
+} from "../lib/devModeDraft";
 import { ThemeProvider } from "../lib/theme";
 import { ToastProvider } from "../lib/toast";
 import type { OnboardingStatus } from "../api/types";
@@ -96,11 +102,46 @@ function themedVariationDocument(): DesignDocument {
   return document;
 }
 
+function historyDocument(): DesignDocument {
+  const document = fixtureDocument();
+  document.base.copy["target.copy"] = "Base copy";
+  document.base.icons["target.icon"] = { body: '<path d="M1 1h2" />' };
+  document.base.elements.target = { width: "100px" };
+  document.base.elements["target::text"] = { fontSize: "14px" };
+  document.base.elements["target::icon"] = { color: "#111111" };
+  document.base.elements.target2 = { width: "200px" };
+  document.variations.parent = {
+    id: "parent",
+    title: "Parent",
+    patch: { elements: { target: { minWidth: "80px" } } },
+  };
+  document.variations.custom = {
+    id: "custom",
+    title: "Custom",
+    extends: "parent",
+    patch: {
+      copy: { "target.copy": "Variation copy" },
+      elements: { target: { width: "300px" }, target2: { width: "400px" } },
+    },
+    themes: {
+      dark: { elements: { target: { color: "#abcdef" } } },
+      light: { elements: { target: { color: "#fedcba" } } },
+    },
+  };
+  document.activeVariationId = "custom";
+  document.targetScopes = { target: "role", target2: "screen" };
+  return document;
+}
+
 interface StudioCommands {
   setCopy: (id: string, text: string) => void;
   setVariation: (id: string) => void;
   activateScenario: (scenarioId: string) => Promise<void>;
   exitScenario: () => Promise<void>;
+  replaceDraft: (draft: DevModeDraft) => void;
+  replaceResolvedDraftAtomically: (draft: DevModeDraft) => void;
+  replaceDocumentAtomically: (document: DesignDocument) => void;
+  undo: () => void;
 }
 
 function Probe({ expose }: { expose: (commands: StudioCommands) => void }) {
@@ -112,14 +153,30 @@ function Probe({ expose }: { expose: (commands: StudioCommands) => void }) {
       setVariation: studio.setVariation,
       activateScenario: studio.activateScenario,
       exitScenario: studio.exitScenario,
+      replaceDraft: devMode.replaceDraft,
+      replaceResolvedDraftAtomically: studio.replaceResolvedDraftAtomically,
+      replaceDocumentAtomically: studio.replaceDocumentAtomically,
+      undo: devMode.undo,
     });
-  }, [devMode.setCopy, expose, studio.activateScenario, studio.exitScenario, studio.setVariation]);
+  }, [
+    devMode.replaceDraft,
+    devMode.setCopy,
+    devMode.undo,
+    expose,
+    studio.activateScenario,
+    studio.exitScenario,
+    studio.replaceDocumentAtomically,
+    studio.replaceResolvedDraftAtomically,
+    studio.setVariation,
+  ]);
   return (
     <>
       <span data-testid="resolved-copy"><Text id="rail.components">Components</Text></span>
       <span data-testid="personal-state">{studio.personalState}</span>
       <span data-testid="active-variation">{studio.activeVariationId}</span>
       <span data-testid="active-scenario">{studio.activeScenario?.id ?? "real-data"}</span>
+      <output data-testid="studio-document">{JSON.stringify(studio.document)}</output>
+      <output data-testid="studio-draft">{JSON.stringify(devMode.draft)}</output>
     </>
   );
 }
@@ -157,6 +214,18 @@ function renderStudio(options: { scenarioRegistry?: ScenarioRegistry; includeOnb
     },
     exitScenario() {
       return act(async () => commands.exitScenario?.());
+    },
+    replaceDraft(draft: DevModeDraft) {
+      act(() => commands.replaceDraft?.(draft));
+    },
+    replaceDocumentAtomically(document: DesignDocument) {
+      act(() => commands.replaceDocumentAtomically?.(document));
+    },
+    replaceResolvedDraftAtomically(draft: DevModeDraft) {
+      act(() => commands.replaceResolvedDraftAtomically?.(draft));
+    },
+    undo() {
+      act(() => commands.undo?.());
     },
     queryClient,
   };
@@ -258,6 +327,71 @@ describe("DesignStudioProvider", () => {
     const saved = mockApi.designStudioPut.mock.calls[0][0].document;
     expect(saved.variations.custom.themes).toEqual(personal.variations.custom.themes);
   });
+
+  it.each(["property", "target", "screen", "variation", "theme", "full"] as const)(
+    "restores document metadata and resolved values after a %s reset is undone",
+    async (resetKind) => {
+      const initialDocument = historyDocument();
+      mockApi.designStudioGet.mockResolvedValue({ revision: "r1", document: initialDocument });
+      mockApi.designStudioPut.mockImplementation(async ({ document }) => ({ revision: "r2", document }));
+      const studio = renderStudio();
+      await waitFor(() => expect(screen.getByTestId("personal-state")).toHaveTextContent("ready"));
+      const readDocument = () => JSON.parse(screen.getByTestId("studio-document").textContent ?? "{}") as DesignDocument;
+      const readDraft = () => JSON.parse(screen.getByTestId("studio-draft").textContent ?? "{}") as DevModeDraft;
+      const beforeDocument = readDocument();
+      const beforeDraft = readDraft();
+
+      if (resetKind === "property") {
+        studio.replaceResolvedDraftAtomically(
+          resetDraftElementProperty(beforeDraft, ["target"], "width"),
+        );
+      } else if (resetKind === "target") {
+        studio.replaceResolvedDraftAtomically(resetDraftTargets(beforeDraft, {
+          targetIds: ["target"], copyIds: ["target.copy"], iconIds: ["target.icon"],
+        }));
+      } else if (resetKind === "screen") {
+        studio.replaceResolvedDraftAtomically(resetDraftTargets(beforeDraft, {
+          targetIds: ["target", "target2"], copyIds: ["target.copy"], iconIds: ["target.icon"],
+        }));
+      } else if (resetKind === "variation") {
+        const active = beforeDocument.variations.custom!;
+        studio.replaceDocumentAtomically({
+          ...beforeDocument,
+          variations: {
+            ...beforeDocument.variations,
+            custom: { ...active, patch: {}, themes: {} },
+          },
+        });
+      } else if (resetKind === "theme") {
+        const active = beforeDocument.variations.custom!;
+        studio.replaceDocumentAtomically({
+          ...beforeDocument,
+          variations: {
+            ...beforeDocument.variations,
+            custom: { ...active, themes: { light: active.themes?.light ?? {} } },
+          },
+        });
+      } else {
+        studio.replaceDocumentAtomically({
+          schemaVersion: 1,
+          base: emptyDevModeDraft(),
+          variations: {},
+          activeVariationId: "",
+          targetScopes: {},
+        });
+      }
+
+      await waitFor(() => expect(readDraft()).not.toEqual(beforeDraft));
+      studio.undo();
+      await waitFor(() => {
+        expect(readDocument()).toEqual(beforeDocument);
+        expect(readDraft()).toEqual(beforeDraft);
+      });
+      expect(readDocument().targetScopes).toEqual({ target: "role", target2: "screen" });
+      expect(readDocument().activeVariationId).toBe("custom");
+      expect(readDocument().variations.custom?.extends).toBe("parent");
+    },
+  );
 
   it("falls back to the shipped draft when persisted input is invalid", async () => {
     mockApi.designStudioGet.mockResolvedValue({

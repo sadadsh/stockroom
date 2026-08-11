@@ -655,6 +655,45 @@ function patchFromDraft(draft: DevModeDraft): DesignPatch {
   return cloneDraft(draft);
 }
 
+function diffNullableMap<T>(
+  baseline: Record<string, T>,
+  target: Record<string, T>,
+): Record<string, T | null> | undefined {
+  const patch: Record<string, T | null> = {};
+  for (const key of new Set([...Object.keys(baseline), ...Object.keys(target)])) {
+    if (!hasOwn(target, key)) patch[key] = null;
+    else if (!hasOwn(baseline, key) || JSON.stringify(baseline[key]) !== JSON.stringify(target[key])) {
+      patch[key] = target[key];
+    }
+  }
+  return Object.keys(patch).length > 0 ? patch : undefined;
+}
+
+/** Produce the sparse, deletion-aware patch which resolves `baseline` to exactly `target`. */
+export function diffDesignDraft(baseline: DevModeDraft, target: DevModeDraft): DesignPatch {
+  const patch: DesignPatch = {};
+  const root = diffNullableMap(baseline.tokens.root, target.tokens.root);
+  const light = diffNullableMap(baseline.tokens.light, target.tokens.light);
+  if (root || light) patch.tokens = { ...(root ? { root } : {}), ...(light ? { light } : {}) };
+  patch.copy = diffNullableMap(baseline.copy, target.copy);
+  patch.icons = diffNullableMap(baseline.icons, target.icons);
+  patch.behaviors = diffNullableMap(baseline.behaviors, target.behaviors);
+  const elementPatch: NonNullable<DesignPatch["elements"]> = {};
+  for (const id of new Set([...Object.keys(baseline.elements), ...Object.keys(target.elements)])) {
+    if (!hasOwn(target.elements, id)) {
+      elementPatch[id] = null;
+      continue;
+    }
+    const props = diffNullableMap(baseline.elements[id] ?? {}, target.elements[id]);
+    if (props) elementPatch[id] = props;
+  }
+  if (Object.keys(elementPatch).length > 0) patch.elements = elementPatch;
+  if (JSON.stringify(baseline.layout) !== JSON.stringify(target.layout)) {
+    patch.layout = target.layout ? structuredClone(target.layout) : null;
+  }
+  return patch;
+}
+
 function variationLineage(variations: Record<string, DesignVariation>, id: string): DesignVariation[] {
   const lineage: DesignVariation[] = [];
   let current: DesignVariation | undefined = hasOwn(variations, id) ? variations[id] : undefined;

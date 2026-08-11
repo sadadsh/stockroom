@@ -21,7 +21,7 @@ export function LayoutInspector(props: DomainInspectorProps) {
         <select
           aria-label={visibilityAria}
           value={dev.elementOverridesFor(props.affectedTargetIds[0] ?? props.inspection.id)?.visibility ?? "visible"}
-          onChange={(event) => event.target.value === "visible" ? props.resetElementProperty("visibility") : props.setElementProperty("visibility", event.target.value)}
+          onChange={(event) => event.target.value === "visible" ? props.resetDomainProperty("box", "visibility") : props.setDomainProperty("box", "visibility", event.target.value)}
           className="rounded-control border border-line bg-field px-2 py-1 text-2xs text-t1"
         >
           <option value="visible">{visibleLabel}</option>
@@ -30,7 +30,7 @@ export function LayoutInspector(props: DomainInspectorProps) {
       </label>
       <button
         type="button"
-        onClick={() => removed ? props.resetElementProperty("display") : props.setElementProperty("display", "none")}
+        onClick={() => removed ? props.resetDomainProperty("box", "display") : props.setDomainProperty("box", "display", "none")}
         className="mt-3 w-full rounded-control border border-line bg-field px-2 py-2 text-xs font-semibold text-t2 hover:text-t1"
       >
         {removed ? restoreLabel : removeLabel}

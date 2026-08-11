@@ -33,7 +33,11 @@ import {
   type DevModeDraft,
   type TokenOverrides,
 } from "./devModeDraft";
-import { useDevModeHistory, useDevModeHistoryKeys } from "./devModeHistory";
+import {
+  useDevModeHistory,
+  useDevModeHistoryKeys,
+  type DevModeHistoryParticipant,
+} from "./devModeHistory";
 import { useDevModeSave } from "./devModeSave";
 import { useDevModeSelection } from "./devModeSelection";
 import { useDevModeToggle } from "./devModeToggle";
@@ -146,6 +150,15 @@ export interface DevModeContextValue {
   // continue to use the facet-level commands above; this is the whole-document bridge.
   draft: DevModeDraft;
   replaceDraft: (draft: DevModeDraft) => void;
+  registerHistoryParticipant: (
+    key: string,
+    participant: DevModeHistoryParticipant,
+  ) => () => void;
+  replaceDraftAtomically: (
+    draft: DevModeDraft,
+    participantKey: string,
+    participantSnapshot: string,
+  ) => void;
 }
 
 const noop = () => {};
@@ -223,6 +236,8 @@ const DEFAULT: DevModeContextValue = {
   resetAll: noop,
   draft: committedDevModeDraft(),
   replaceDraft: noop,
+  registerHistoryParticipant: () => noop,
+  replaceDraftAtomically: noop,
 };
 
 const DevModeContext = createContext<DevModeContextValue>(DEFAULT);
@@ -232,7 +247,14 @@ export function DevModeProvider({ children }: { children: ReactNode }) {
   // The hook call order below is the effect order: snapshot, the Ctrl/Cmd+Shift+D toggle, the
   // Ctrl/Cmd+Z history keys, then the two document applies (tokens, elements).
   const { draft, restore, replaceDraft, resetDraft, api: draftApi } = useDevModeDraft(theme);
-  const { api: historyApi, historyRevision, undo, redo } = useDevModeHistory(draft, restore);
+  const {
+    api: historyApi,
+    historyRevision,
+    undo,
+    redo,
+    registerParticipant: registerHistoryParticipant,
+    replaceAtomically: replaceDraftAtomically,
+  } = useDevModeHistory(draft, restore);
   const { api: toggleApi, enabled, clearSelectedCopy, setArrangeMode } = useDevModeToggle();
   useDevModeHistoryKeys(enabled, undo, redo);
   useApplyDraftOverrides(draft.tokens, draft.elements, theme);
@@ -280,6 +302,8 @@ export function DevModeProvider({ children }: { children: ReactNode }) {
       resetAll,
       draft,
       replaceDraft,
+      registerHistoryParticipant,
+      replaceDraftAtomically,
     }),
     [
       toggleApi,
@@ -298,6 +322,8 @@ export function DevModeProvider({ children }: { children: ReactNode }) {
       resetAll,
       draft,
       replaceDraft,
+      registerHistoryParticipant,
+      replaceDraftAtomically,
     ],
   );
 

@@ -95,9 +95,14 @@ _MAX_DEV_ID_LEN = 512
 
 
 def _valid_element_id(value: object) -> bool:
-    """True for a catalogued dot-namespaced id OR one of the approved dynamic instance shapes."""
+    """True for a stable box id or its explicit ``::text`` / ``::icon`` internal domain."""
     if not isinstance(value, str) or not value or len(value) > _MAX_DEV_ID_LEN:
         return False
+    if "::" in value:
+        base, separator, domain = value.rpartition("::")
+        if not separator or domain not in {"text", "icon"} or "::" in base:
+            return False
+        value = base
     if "[" in value or "]" in value:
         return any(pattern.match(value) for pattern in _DYNAMIC_DEV_ID_RES)
     return bool(_DEV_ID_RE.match(value))

@@ -3,6 +3,7 @@ import type { DesignScope } from "../../design-studio/document";
 import {
   inspectTarget,
   previewTargetScope,
+  type EditableTargetDomain,
   type ScopePreview,
   type TargetInspection,
 } from "../../design-studio/targetDomains";
@@ -11,6 +12,7 @@ import { useDevMode } from "../../lib/devMode";
 import { useCopyFormatter, useText } from "../../lib/copy";
 import {
   emptyDevModeDraft,
+  resetDraftElementProperty,
   resetDraftTargets,
   resetDraftTheme,
 } from "../../lib/devModeDraft";
@@ -43,6 +45,12 @@ function domainKeys(inspections: readonly TargetInspection[]) {
     copyIds: [...new Set(inspections.flatMap((inspection) => inspection.texts.flatMap((text) => text.copyId ? [text.copyId] : [])))],
     iconIds: [...new Set(inspections.flatMap((inspection) => inspection.icons.flatMap((icon) => icon.iconId ? [icon.iconId] : [])))],
   };
+}
+
+function inspectionsFor(root: Element, ids: readonly string[]): TargetInspection[] {
+  return ids
+    .map((id) => inspectionFor(root, id))
+    .filter((item): item is TargetInspection => item !== null);
 }
 
 export function InspectorPanel({ root, integrated = false }: { root?: Element; integrated?: boolean } = {}) {
@@ -85,6 +93,8 @@ export function InspectorPanel({ root, integrated = false }: { root?: Element; i
   const singularTarget = useText("design-studio.inspector.scope.singular-target", "Target");
   const pluralTargets = useText("design-studio.inspector.scope.plural-targets", "Targets");
   const integratedDomain = useCopyFormatter("design-studio.inspector.domain.integrated", "{domain} Domain");
+  const textDomainPreviewLabel = useText("design-studio.inspector.domain.text-preview", "Text Domain Preview");
+  const iconDomainPreviewLabel = useText("design-studio.inspector.domain.icon-preview", "Icon Domain Preview");
   const facets: readonly { id: InspectorFacet; label: string }[] = [
     { id: "box", label: boxLabel }, { id: "text", label: textLabel },
     { id: "icon", label: iconLabel }, { id: "layout", label: layoutLabel },
@@ -103,6 +113,10 @@ export function InspectorPanel({ root, integrated = false }: { root?: Element; i
     [inspection, resolvedRoot, scope],
   );
   const affectedTargetIds = scopePreview.affectedTargetIds;
+  const affectedInspections = useMemo(
+    () => inspectionsFor(resolvedRoot, affectedTargetIds),
+    [affectedTargetIds, resolvedRoot],
+  );
 
   if (!dev.enabled || !inspection) return null;
 
@@ -115,17 +129,26 @@ export function InspectorPanel({ root, integrated = false }: { root?: Element; i
       studio.replaceDocument({ ...studio.document, targetScopes });
     }
   };
-  const setElementProperty = (property: string, value: string) => {
-    affectedTargetIds.forEach((id) => dev.setElementProp(id, property, value));
+  const domainOverrideIds = (domain: EditableTargetDomain) => {
+    const ids = new Set<string>();
+    for (const item of affectedInspections) {
+      const target = item.editTargets[domain];
+      if (target.elements.length > 0) ids.add(target.overrideId);
+    }
+    return [...ids];
   };
-  const resetElementProperty = (property: string) => {
-    affectedTargetIds.forEach((id) => dev.resetElementProp(id, property));
+  const setDomainProperty = (domain: EditableTargetDomain, property: string, value: string) => {
+    domainOverrideIds(domain).forEach((id) => dev.setElementProp(id, property, value));
   };
-  const inspectionsFor = (ids: readonly string[]) => ids
-    .map((id) => inspectionFor(resolvedRoot, id))
-    .filter((item): item is TargetInspection => item !== null);
+  const resetDomainProperty = (domain: EditableTargetDomain, property: string) => {
+    const next = resetDraftElementProperty(dev.draft, domainOverrideIds(domain), property);
+    if (studio) studio.replaceResolvedDraftAtomically(next);
+    else dev.replaceDraft(next);
+  };
   const resetTargets = (ids: readonly string[]) => {
-    dev.replaceDraft(resetDraftTargets(dev.draft, domainKeys(inspectionsFor(ids))));
+    const next = resetDraftTargets(dev.draft, domainKeys(inspectionsFor(resolvedRoot, ids)));
+    if (studio) studio.replaceResolvedDraftAtomically(next);
+    else dev.replaceDraft(next);
   };
   const screenIds = previewTargetScope(resolvedRoot, inspection.id, "screen").affectedTargetIds;
 
@@ -133,7 +156,7 @@ export function InspectorPanel({ root, integrated = false }: { root?: Element; i
     if (!studio?.activeVariationId) return;
     const active = studio.document.variations[studio.activeVariationId];
     if (!active) return;
-    studio.replaceDocument({
+    studio.replaceDocumentAtomically({
       ...studio.document,
       variations: {
         ...studio.document.variations,
@@ -143,22 +166,27 @@ export function InspectorPanel({ root, integrated = false }: { root?: Element; i
   };
   const resetTheme = () => {
     if (!studio?.activeVariationId) {
-      dev.replaceDraft(resetDraftTheme(dev.draft, dev.theme));
+      const next = resetDraftTheme(dev.draft, dev.theme);
+      if (studio) studio.replaceResolvedDraftAtomically(next);
+      else dev.replaceDraft(next);
       return;
     }
     const active = studio.document.variations[studio.activeVariationId];
     if (!active?.themes?.[dev.theme]) return;
     const themes = { ...active.themes };
     delete themes[dev.theme];
-    studio.replaceDocument({
+    studio.replaceDocumentAtomically({
       ...studio.document,
       variations: { ...studio.document.variations, [active.id]: { ...active, themes } },
     });
   };
   const resetPersonalDesign = () => {
     const empty = emptyDevModeDraft();
-    dev.replaceDraft(empty);
-    studio?.replaceDocument({
+    if (!studio) {
+      dev.replaceDraft(empty);
+      return;
+    }
+    studio.replaceDocumentAtomically({
       schemaVersion: 1,
       base: empty,
       variations: {},
@@ -167,7 +195,17 @@ export function InspectorPanel({ root, integrated = false }: { root?: Element; i
     });
   };
 
-  const inspectorProps = { inspection, affectedTargetIds, setElementProperty, resetElementProperty };
+  const inspectorProps = {
+    inspection,
+    inspections: affectedInspections,
+    affectedTargetIds,
+    setDomainProperty,
+    resetDomainProperty,
+  };
+  const previewDomain: EditableTargetDomain | null = facet === "text" || facet === "icon" ? facet : null;
+  const previewContentIds = previewDomain
+    ? [...new Set(affectedInspections.flatMap((item) => item.editTargets[previewDomain].contentIds))]
+    : [];
   return (
     <section aria-label={contextualInspectorLabel} className="border-b border-line">
       <div className="border-b border-line px-3.5 py-2.5">
@@ -221,6 +259,15 @@ export function InspectorPanel({ root, integrated = false }: { root?: Element; i
           </button>
         ))}
       </div>
+
+      {previewDomain ? (
+        <div
+          aria-label={previewDomain === "text" ? textDomainPreviewLabel : iconDomainPreviewLabel}
+          className="border-b border-line px-3.5 py-2 font-mono text-2xs text-t3"
+        >
+          {previewContentIds.join(" ")}
+        </div>
+      ) : null}
 
       {facet === "box" ? <BoxInspector {...inspectorProps} /> : null}
       {facet === "text" ? <TextInspector {...inspectorProps} /> : null}

@@ -141,10 +141,27 @@ export function resetDraftTargets(draft: DevModeDraft, reset: DraftTargetReset):
   };
   for (const id of reset.targetIds) {
     delete next.elements[id];
+    delete next.elements[`${id}::text`];
+    delete next.elements[`${id}::icon`];
     delete next.behaviors[id];
   }
   for (const id of reset.copyIds ?? []) delete next.copy[id];
   for (const id of reset.iconIds ?? []) delete next.icons[id];
+  return next;
+}
+
+/** Remove one CSS property from each resolved domain target in one immutable draft. */
+export function resetDraftElementProperty(
+  draft: DevModeDraft,
+  targetIds: readonly string[],
+  property: string,
+): DevModeDraft {
+  const next = resetDraftTargets(draft, { targetIds: [] });
+  for (const id of targetIds) {
+    if (!next.elements[id]) continue;
+    delete next.elements[id][property];
+    if (Object.keys(next.elements[id]).length === 0) delete next.elements[id];
+  }
   return next;
 }
 

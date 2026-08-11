@@ -33,12 +33,12 @@ function PropertyRow({ property, ...props }: { property: string } & DomainInspec
         placeholder={resolved}
         onChange={(event) => setValue(event.target.value)}
         onBlur={() => {
-          if (!value) props.resetElementProperty(property);
-          else if (valid) props.setElementProperty(property, value);
+          if (!value) props.resetDomainProperty("box", property);
+          else if (valid) props.setDomainProperty("box", property, value);
         }}
         className={`w-full rounded-control border bg-field px-2 py-1 text-2xs font-mono text-t1 outline-none ${valid ? "border-line focus:border-acc" : "border-err"}`}
       />
-      <button type="button" aria-label={resetAria({ property: label })} onClick={() => { setValue(""); props.resetElementProperty(property); }} className="text-2xs font-semibold text-t3 hover:text-t1">{resetLabel}</button>
+      <button type="button" aria-label={resetAria({ property: label })} onClick={() => { setValue(""); props.resetDomainProperty("box", property); }} className="text-2xs font-semibold text-t3 hover:text-t1">{resetLabel}</button>
     </div>
   );
 }

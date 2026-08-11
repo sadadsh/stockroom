@@ -22,11 +22,49 @@
  * `data-dev-role`. Selection goes through `CSS.escape`, so a record id holding a quote, a bracket or
  * a backslash is a miss, never a thrown selector.
  */
-import { nodesForDevId } from "./componentDevIds";
+import {
+  elementsForTargetDomainOverride,
+  parseTargetDomainOverrideId,
+} from "../design-studio/targetDomains";
 import { isApplicableElementOverride } from "./elementLayout";
 
 // devId -> (cssProp -> value). Mirrors ELEMENT_OVERRIDES exactly.
 export type ElementOverrides = Record<string, Record<string, string>>;
+
+function styled(element: Element): (Element & ElementCSSInlineStyle) | null {
+  return "style" in element ? element as Element & ElementCSSInlineStyle : null;
+}
+
+function concreteIconPaintTargets(icon: Element): Array<{ element: Element & ElementCSSInlineStyle; property: "fill" | "stroke" }> {
+  const targets: Array<{ element: Element & ElementCSSInlineStyle; property: "fill" | "stroke" }> = [];
+  for (const element of [icon, ...icon.querySelectorAll("[fill], [stroke]")]) {
+    const styleTarget = styled(element);
+    if (!styleTarget) continue;
+    for (const property of ["fill", "stroke"] as const) {
+      const paint = element.getAttribute(property);
+      if (paint && paint !== "none" && paint.toLowerCase() !== "currentcolor") {
+        targets.push({ element: styleTarget, property });
+      }
+    }
+  }
+  return targets;
+}
+
+function writeOverrideProperty(id: string, property: string, value: string | null): void {
+  const domain = parseTargetDomainOverrideId(id).domain;
+  for (const element of elementsForTargetDomainOverride(id)) {
+    const target = styled(element);
+    if (!target) continue;
+    if (value === null) target.style.removeProperty(property);
+    else target.style.setProperty(property, value);
+    if (domain === "icon" && property === "color") {
+      for (const paint of concreteIconPaintTargets(element)) {
+        if (value === null) paint.element.style.removeProperty(paint.property);
+        else paint.element.style.setProperty(paint.property, value);
+      }
+    }
+  }
+}
 
 /**
  * The subset of an override map this runtime will apply: the entries whose property is editable and
@@ -59,9 +97,7 @@ export function applyElementOverrides(current: ElementOverrides, previous?: Elem
 
   // Set every current prop on every element the id addresses.
   for (const [id, props] of Object.entries(live)) {
-    for (const el of nodesForDevId(id)) {
-      for (const [prop, value] of Object.entries(props)) el.style.setProperty(prop, value);
-    }
+    for (const [prop, value] of Object.entries(props)) writeOverrideProperty(id, prop, value);
   }
 
   // Clear anything present in `previous` that no longer appears in `current` (a removed id, or a
@@ -71,9 +107,7 @@ export function applyElementOverrides(current: ElementOverrides, previous?: Elem
       const nextProps = live[id];
       const removed = Object.keys(prevProps).filter((prop) => !nextProps || !(prop in nextProps));
       if (removed.length === 0) continue;
-      for (const el of nodesForDevId(id)) {
-        for (const prop of removed) el.style.removeProperty(prop);
-      }
+      for (const prop of removed) writeOverrideProperty(id, prop, null);
     }
   }
 }

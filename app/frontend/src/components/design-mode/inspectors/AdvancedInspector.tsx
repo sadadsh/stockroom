@@ -39,7 +39,7 @@ export function AdvancedInspector(props: DomainInspectorProps) {
           <input aria-label={valueAria} aria-invalid={value !== "" && !valid || undefined} value={value} onChange={(event) => setValue(event.target.value)} className="mt-1 w-full rounded-control border border-line bg-field px-2 py-1 text-2xs font-mono text-t1" />
         </label>
       </div>
-      <button type="button" disabled={!valid} onClick={() => props.setElementProperty(property, value)} className="mt-2 rounded-control border border-line bg-field px-2 py-1 text-2xs font-semibold text-t2 disabled:opacity-40">{applyLabel}</button>
+      <button type="button" disabled={!valid} onClick={() => props.setDomainProperty("box", property, value)} className="mt-2 rounded-control border border-line bg-field px-2 py-1 text-2xs font-semibold text-t2 disabled:opacity-40">{applyLabel}</button>
       <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-2 gap-y-1 text-2xs"><dt className="text-t3">{resolvedLabel}</dt><dd className="truncate font-mono text-t2">{getComputedStyle(props.inspection.target).getPropertyValue(property) || inheritedLabel}</dd></dl>
     </div>
   );
