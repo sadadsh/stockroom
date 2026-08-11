@@ -3,8 +3,9 @@ import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useEffect } from "react";
 import App from "./App";
-import { api } from "./api/client";
+import { api, type LandPattern, type SymbolGeometry } from "./api/client";
 import type { PartDetail, PartSummary } from "./api/types";
+import type { PartShell } from "./api/types";
 import { makePartDetail } from "./test/partFixture";
 import { makeDossier } from "./test/dossierFixture";
 import { RouterProvider } from "./lib/router";
@@ -55,6 +56,38 @@ const DETAIL: PartDetail = makePartDetail({
   derived: { display_name: "LM358", description: "Dual Operational Amplifier" },
 });
 
+const EMPTY_LAND_PATTERN: LandPattern = {
+  units: "mm",
+  pads: [],
+  graphics: [],
+  model_placement: null,
+};
+
+const EMPTY_SYMBOL_GEOMETRY: SymbolGeometry = {
+  units: "mm",
+  name: "LM358",
+  namesHidden: false,
+  numbersHidden: false,
+  pins: [],
+  graphics: [],
+  bounds: null,
+};
+
+const UNSUPPORTED_PART_SHELL: PartShell = {
+  supported: false,
+  component_directory: false,
+  export_formats: [],
+  eda_applications: [],
+};
+
+function configureWorkspaceFixtures() {
+  mockApi.partDetail.mockResolvedValue(DETAIL);
+  mockApi.partDossier.mockResolvedValue(makeDossier());
+  mockApi.landPattern.mockResolvedValue(EMPTY_LAND_PATTERN);
+  mockApi.symbolGeometry.mockResolvedValue(EMPTY_SYMBOL_GEOMETRY);
+  mockApi.partShell.mockResolvedValue(UNSUPPORTED_PART_SHELL);
+}
+
 function ScenarioProbe({ expose }: { expose: (activate: (id: string) => Promise<void>) => void }) {
   const studio = useDesignStudio();
   useEffect(() => expose(studio.activateScenario), [expose, studio.activateScenario]);
@@ -70,12 +103,7 @@ describe("App shell", () => {
       complete: 1,
       incomplete: 0,
     });
-    mockApi.partDetail.mockResolvedValue(DETAIL);
-    mockApi.partDossier.mockResolvedValue(makeDossier());
-    mockApi.landPattern.mockResolvedValue({ pads: [], graphics: [] } as never);
-    mockApi.symbolGeometry.mockResolvedValue({ pins: [] } as never);
-    mockApi.partDetail.mockResolvedValue(DETAIL);
-    mockApi.partDossier.mockResolvedValue(makeDossier());
+    configureWorkspaceFixtures();
 
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     render(
@@ -221,6 +249,7 @@ describe("App shell", () => {
       complete: 1,
       incomplete: 0,
     });
+    configureWorkspaceFixtures();
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       status: 200,
