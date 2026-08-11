@@ -1,4 +1,4 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, QueryObserver } from "@tanstack/react-query";
 import { act, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useEffect } from "react";
@@ -8,6 +8,7 @@ import { useDevMode } from "../lib/devMode";
 import { ThemeProvider } from "../lib/theme";
 import type { DesignDocument } from "./document";
 import { DesignStudioProvider, useDesignStudio } from "./DesignStudioProvider";
+import type { DesignScenario } from "./requestAdapter";
 
 vi.mock("../api/client", async (importActual) => {
   const actual = await importActual<typeof import("../api/client")>();
@@ -65,19 +66,27 @@ function themedVariationDocument(): DesignDocument {
 interface StudioCommands {
   setCopy: (id: string, text: string) => void;
   setVariation: (id: string) => void;
+  activateScenario: (scenario: DesignScenario) => Promise<void>;
+  exitScenario: () => Promise<void>;
 }
 
 function Probe({ expose }: { expose: (commands: StudioCommands) => void }) {
   const devMode = useDevMode();
   const studio = useDesignStudio();
   useEffect(() => {
-    expose({ setCopy: devMode.setCopy, setVariation: studio.setVariation });
-  }, [devMode.setCopy, expose, studio.setVariation]);
+    expose({
+      setCopy: devMode.setCopy,
+      setVariation: studio.setVariation,
+      activateScenario: studio.activateScenario,
+      exitScenario: studio.exitScenario,
+    });
+  }, [devMode.setCopy, expose, studio.activateScenario, studio.exitScenario, studio.setVariation]);
   return (
     <>
       <span data-testid="resolved-copy"><Text id="rail.components">Components</Text></span>
       <span data-testid="personal-state">{studio.personalState}</span>
       <span data-testid="active-variation">{studio.activeVariationId}</span>
+      <span data-testid="active-scenario">{studio.activeScenario?.id ?? "real-data"}</span>
     </>
   );
 }
@@ -104,6 +113,29 @@ function renderStudio() {
     setVariation(id: string) {
       act(() => commands.setVariation?.(id));
     },
+    activateScenario(scenario: DesignScenario) {
+      return act(async () => commands.activateScenario?.(scenario));
+    },
+    exitScenario() {
+      return act(async () => commands.exitScenario?.());
+    },
+    queryClient,
+  };
+}
+
+function fixtureScenario(
+  route: DesignScenario["route"] = "components",
+): DesignScenario {
+  return {
+    id: `${route}.fixture`,
+    title: `${route} fixture`,
+    area: route,
+    group: "Test",
+    route,
+    fixtures: [],
+    initialUi: {},
+    expectedTargets: ["shell.root"],
+    coverage: [`route:${route}`],
   };
 }
 
@@ -238,5 +270,39 @@ describe("DesignStudioProvider", () => {
     await act(async () => Promise.resolve());
 
     expect(screen.getByTestId("resolved-copy")).toHaveTextContent("My Components");
+  });
+
+  it("clears and refetches product queries for preview entry and exact real-context exit", async () => {
+    mockApi.designStudioGet.mockResolvedValue({ revision: "r1", document: fixtureDocument() });
+    window.history.replaceState({ workspace: "real" }, "", "#route=projects");
+    const studio = renderStudio();
+    const queryClient = studio.queryClient;
+    let source = "real-before";
+    const observer = new QueryObserver(queryClient, {
+      queryKey: ["parts"],
+      queryFn: async () => source,
+    });
+    const unsubscribe = observer.subscribe(() => undefined);
+    await observer.refetch();
+    queryClient.setQueryData(["design-studio", "personal"], "keep-me");
+
+    source = "fixture-components";
+    await studio.activateScenario(fixtureScenario("components"));
+    await waitFor(() => expect(queryClient.getQueryData(["parts"])).toBe("fixture-components"));
+    expect(queryClient.getQueryData(["design-studio", "personal"])).toBe("keep-me");
+    expect(window.location.hash).toBe("#route=components");
+
+    source = "fixture-settings";
+    await studio.activateScenario(fixtureScenario("settings"));
+    await waitFor(() => expect(queryClient.getQueryData(["parts"])).toBe("fixture-settings"));
+    expect(window.location.hash).toBe("#route=settings");
+
+    source = "real-after";
+    await studio.exitScenario();
+    await waitFor(() => expect(queryClient.getQueryData(["parts"])).toBe("real-after"));
+    expect(window.location.hash).toBe("#route=projects");
+    expect(window.history.state).toEqual({ workspace: "real" });
+    expect(screen.getByTestId("active-scenario")).toHaveTextContent("real-data");
+    unsubscribe();
   });
 });

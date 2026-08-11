@@ -5,9 +5,11 @@ import {
   useEffect,
   useMemo,
   useRef,
+  useState,
   useSyncExternalStore,
   type ReactNode,
 } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { DevModeProvider, useDevMode } from "../lib/devMode";
 import { committedDevModeDraft, type DevModeDraft } from "../lib/devModeDraft";
 import {
@@ -19,6 +21,11 @@ import {
   createPersonalDesignController,
   type PersonalDesignState,
 } from "./personalDesign";
+import {
+  installApiRequestAdapter,
+  previewAdapter,
+  type DesignScenario,
+} from "./requestAdapter";
 
 export interface DesignStudioContextValue {
   open: () => void;
@@ -30,6 +37,9 @@ export interface DesignStudioContextValue {
   setVariation: (variationId: string) => void;
   personalState: PersonalDesignState;
   lastValidDocument: DesignDocument;
+  activeScenario: DesignScenario | null;
+  activateScenario: (scenario: DesignScenario) => Promise<void>;
+  exitScenario: () => Promise<void>;
 }
 
 const DesignStudioContext = createContext<DesignStudioContextValue | null>(null);
@@ -68,6 +78,29 @@ function cloneDraft(draft: DevModeDraft): DevModeDraft {
   };
 }
 
+interface RealRouteContext {
+  href: string;
+  historyState: unknown;
+}
+
+function isProductQuery(query: { queryKey: readonly unknown[] }): boolean {
+  const root = query.queryKey[0];
+  return root !== "design-studio" && root !== "dev-status";
+}
+
+function replaceBrowserLocation(href: string, historyState: unknown): void {
+  if (typeof window === "undefined") return;
+  window.history.replaceState(historyState, "", href);
+  window.dispatchEvent(new PopStateEvent("popstate", { state: historyState }));
+}
+
+function mountScenarioRoute(route: DesignScenario["route"]): void {
+  if (typeof window === "undefined") return;
+  const next = new URL(window.location.href);
+  next.hash = `#route=${route}`;
+  replaceBrowserLocation(next.href, window.history.state);
+}
+
 /** Build a complete v1 document from the one working Dev Mode draft. */
 function withWorkingDraft(document: DesignDocument, draft: DevModeDraft): DesignDocument {
   if (!document.activeVariationId || !document.variations[document.activeVariationId]) {
@@ -88,6 +121,7 @@ function withWorkingDraft(document: DesignDocument, draft: DevModeDraft): Design
 
 function DesignStudioBridge({ children }: { children: ReactNode }) {
   const devMode = useDevMode();
+  const queryClient = useQueryClient();
   const controller = useMemo(() => createPersonalDesignController(initialDocument()), []);
   const snapshot = useSyncExternalStore(
     controller.subscribe,
@@ -95,12 +129,27 @@ function DesignStudioBridge({ children }: { children: ReactNode }) {
     controller.getSnapshot,
   );
   const applyingDraft = useRef<string | null>(null);
+  const [activeScenario, setActiveScenario] = useState<DesignScenario | null>(null);
+  const restoreAdapter = useRef<(() => void) | null>(null);
+  const realRouteContext = useRef<RealRouteContext | null>(null);
+  const transition = useRef<Promise<void> | undefined>(undefined);
 
   useEffect(() => {
     controller.activate();
     void controller.hydrate();
     return () => controller.dispose();
   }, [controller]);
+
+  useEffect(
+    () => () => {
+      restoreAdapter.current?.();
+      restoreAdapter.current = null;
+      const real = realRouteContext.current;
+      if (real) replaceBrowserLocation(real.href, real.historyState);
+      realRouteContext.current = null;
+    },
+    [],
+  );
 
   const resolved = useMemo(
     () => resolveDesign(snapshot.document, snapshot.document.activeVariationId, devMode.theme),
@@ -146,6 +195,62 @@ function DesignStudioBridge({ children }: { children: ReactNode }) {
     [controller, snapshot.document],
   );
 
+  const beginTransition = useCallback(
+    (operation: () => Promise<void>): Promise<void> => {
+      const pending = (transition.current ?? Promise.resolve()).then(operation, operation);
+      transition.current = pending.catch(() => undefined);
+      return pending;
+    },
+    [],
+  );
+  const clearInactiveProductQueries = useCallback(() => {
+    queryClient.removeQueries({
+      predicate: (query) => isProductQuery(query) && !query.isActive(),
+    });
+  }, [queryClient]);
+  const refreshActiveProductQueries = useCallback(
+    () =>
+      queryClient.resetQueries({
+        predicate: isProductQuery,
+        type: "active",
+      }),
+    [queryClient],
+  );
+  const activateScenario = useCallback(
+    (scenario: DesignScenario) =>
+      beginTransition(async () => {
+        await queryClient.cancelQueries({ predicate: isProductQuery });
+        clearInactiveProductQueries();
+        restoreAdapter.current?.();
+        if (!realRouteContext.current && typeof window !== "undefined") {
+          realRouteContext.current = {
+            href: window.location.href,
+            historyState: window.history.state,
+          };
+        }
+        restoreAdapter.current = installApiRequestAdapter(previewAdapter(scenario));
+        setActiveScenario(scenario);
+        mountScenarioRoute(scenario.route);
+        await refreshActiveProductQueries();
+      }),
+    [beginTransition, clearInactiveProductQueries, queryClient, refreshActiveProductQueries],
+  );
+  const exitScenario = useCallback(
+    () =>
+      beginTransition(async () => {
+        await queryClient.cancelQueries({ predicate: isProductQuery });
+        clearInactiveProductQueries();
+        restoreAdapter.current?.();
+        restoreAdapter.current = null;
+        setActiveScenario(null);
+        const real = realRouteContext.current;
+        realRouteContext.current = null;
+        if (real) replaceBrowserLocation(real.href, real.historyState);
+        await refreshActiveProductQueries();
+      }),
+    [beginTransition, clearInactiveProductQueries, queryClient, refreshActiveProductQueries],
+  );
+
   const value = useMemo<DesignStudioContextValue>(
     () => ({
       open,
@@ -157,6 +262,9 @@ function DesignStudioBridge({ children }: { children: ReactNode }) {
       setVariation,
       personalState: snapshot.personalState,
       lastValidDocument: snapshot.lastValidDocument,
+      activeScenario,
+      activateScenario,
+      exitScenario,
     }),
     [
       open,
@@ -167,6 +275,9 @@ function DesignStudioBridge({ children }: { children: ReactNode }) {
       snapshot.lastValidDocument,
       replaceDocument,
       setVariation,
+      activeScenario,
+      activateScenario,
+      exitScenario,
     ],
   );
 

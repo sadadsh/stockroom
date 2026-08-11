@@ -5,6 +5,11 @@
  * mutations go through the atomic engine and rebuild the index server-side, so
  * the caller invalidates the affected queries after a success.
  */
+import {
+  dispatchApiRequest,
+  type ApiRequestDescriptor,
+  type ApiRequestParams,
+} from "../design-studio/requestAdapter";
 import { apiBase, apiToken } from "../lib/runtime";
 import type {
   ComponentDossier,
@@ -150,25 +155,38 @@ async function request<T>(
   path: string,
   opts: RequestOptions = {},
 ): Promise<T> {
+  const descriptor: ApiRequestDescriptor = {
+    method,
+    path,
+    params: opts.params ?? {},
+    body: opts.body,
+  };
+  return dispatchApiRequest(descriptor, () => liveJsonRequest<T>(descriptor));
+}
+
+function requestUrl(path: string, params: ApiRequestParams): URL {
   const url = new URL(apiBase() + path);
-  if (opts.params) {
-    for (const [k, v] of Object.entries(opts.params)) {
-      if (Array.isArray(v)) {
-        for (const item of v) {
-          if (item !== "" && item != null) url.searchParams.append(k, item);
-        }
-      } else if (v !== "" && v != null) {
-        url.searchParams.set(k, v);
+  for (const [k, v] of Object.entries(params)) {
+    if (typeof v !== "string") {
+      for (const item of v) {
+        if (item !== "" && item != null) url.searchParams.append(k, item);
       }
+    } else if (v !== "" && v != null) {
+      url.searchParams.set(k, v);
     }
   }
+  return url;
+}
+
+async function liveJsonRequest<T>(descriptor: ApiRequestDescriptor): Promise<T> {
+  const url = requestUrl(descriptor.path, descriptor.params);
   const token = apiToken();
   const headers: Record<string, string> = { Accept: "application/json" };
   if (token) headers.Authorization = `Bearer ${token}`;
-  const init: RequestInit = { method, headers };
-  if (opts.body !== undefined) {
+  const init: RequestInit = { method: descriptor.method, headers };
+  if (descriptor.body !== undefined) {
     headers["Content-Type"] = "application/json";
-    init.body = JSON.stringify(opts.body);
+    init.body = JSON.stringify(descriptor.body);
   }
 
   let res: Response;
@@ -206,12 +224,20 @@ function apiGet<T>(path: string, params?: Record<string, string>): Promise<T> {
 // Blob with the token (the openJobStream idiom), mapping a non-2xx to an ApiError so
 // the viewer can tell "no symbol" (404) from "no 3D tooling" (502) apart.
 async function fetchPreviewBlob(path: string, accept: string): Promise<Blob> {
+  const descriptor = descriptorFromPath("GET", path);
+  return dispatchApiRequest(descriptor, () => livePreviewBlob(descriptor, accept));
+}
+
+async function livePreviewBlob(
+  descriptor: ApiRequestDescriptor,
+  accept: string,
+): Promise<Blob> {
   const token = apiToken();
   const headers: Record<string, string> = { Accept: accept };
   if (token) headers.Authorization = `Bearer ${token}`;
   let res: Response;
   try {
-    res = await fetch(apiBase() + path, { headers });
+    res = await fetch(requestUrl(descriptor.path, descriptor.params).toString(), { headers });
   } catch (err) {
     throw new ApiError(0, err instanceof Error ? err.message : "Network error");
   }
@@ -237,10 +263,12 @@ async function fetchDownload(
   path: string,
   params: Record<string, string>,
 ): Promise<DownloadedFile> {
-  const url = new URL(apiBase() + path);
-  for (const [key, value] of Object.entries(params)) {
-    url.searchParams.set(key, value);
-  }
+  const descriptor: ApiRequestDescriptor = { method: "GET", path, params, body: undefined };
+  return dispatchApiRequest(descriptor, () => liveDownload(descriptor));
+}
+
+async function liveDownload(descriptor: ApiRequestDescriptor): Promise<DownloadedFile> {
+  const url = requestUrl(descriptor.path, descriptor.params);
   const token = apiToken();
   const headers: Record<string, string> = { Accept: "text/csv" };
   if (token) headers.Authorization = `Bearer ${token}`;
@@ -266,6 +294,16 @@ async function fetchDownload(
     blob: await res.blob(),
     filename: match?.[1] || "stockroom-bom.csv",
   };
+}
+
+function descriptorFromPath(method: string, pathWithQuery: string): ApiRequestDescriptor {
+  const parsed = new URL(pathWithQuery, "http://stockroom.local");
+  const params: Record<string, string | string[]> = {};
+  for (const key of new Set(parsed.searchParams.keys())) {
+    const values = parsed.searchParams.getAll(key);
+    params[key] = values.length === 1 ? values[0] : values;
+  }
+  return { method, path: parsed.pathname, params, body: undefined };
 }
 
 export interface LandPad {
@@ -1032,16 +1070,24 @@ export const api = {
   // bearer token, so this reads the stream through fetch (see lib/sse) and returns
   // the raw body for streamEvents to parse.
   async openJobStream(jobId: string): Promise<ReadableStream<Uint8Array>> {
-    const token = apiToken();
-    const headers: Record<string, string> = { Accept: "text/event-stream" };
-    if (token) headers.Authorization = `Bearer ${token}`;
-    const res = await fetch(apiBase() + `/api/jobs/${encodeURIComponent(jobId)}/events`, {
-      headers,
+    const descriptor: ApiRequestDescriptor = {
+      method: "GET",
+      path: `/api/jobs/${encodeURIComponent(jobId)}/events`,
+      params: {},
+      body: undefined,
+    };
+    return dispatchApiRequest(descriptor, async () => {
+      const token = apiToken();
+      const headers: Record<string, string> = { Accept: "text/event-stream" };
+      if (token) headers.Authorization = `Bearer ${token}`;
+      const res = await fetch(apiBase() + `/api/jobs/${encodeURIComponent(jobId)}/events`, {
+        headers,
+      });
+      if (!res.ok || !res.body) {
+        throw new ApiError(res.status || 0, `Job stream failed (${res.status})`);
+      }
+      return res.body;
     });
-    if (!res.ok || !res.body) {
-      throw new ApiError(res.status || 0, `Job stream failed (${res.status})`);
-    }
-    return res.body;
   },
 
   // Per-machine settings (spec section 11). The GET is redacted (presence + a
