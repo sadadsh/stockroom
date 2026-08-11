@@ -81,7 +81,6 @@ function withWorkingDraft(document: DesignDocument, draft: DevModeDraft): Design
       [active.id]: {
         ...active,
         patch: cloneDraft(draft),
-        themes: undefined,
       },
     },
   };
@@ -107,22 +106,26 @@ function DesignStudioBridge({ children }: { children: ReactNode }) {
     () => resolveDesign(snapshot.document, snapshot.document.activeVariationId, devMode.theme),
     [snapshot.document, devMode.theme],
   );
+  const resolvedSignature = useMemo(() => JSON.stringify(resolved), [resolved]);
+  const draftSignature = useMemo(() => JSON.stringify(devMode.draft), [devMode.draft]);
+  const previousResolvedSignature = useRef(resolvedSignature);
 
   useEffect(() => {
-    if (sameDraft(devMode.draft, resolved)) return;
-    applyingDraft.current = JSON.stringify(resolved);
+    const documentResolutionChanged = previousResolvedSignature.current !== resolvedSignature;
+    previousResolvedSignature.current = resolvedSignature;
+    if (!documentResolutionChanged || draftSignature === resolvedSignature) return;
+    applyingDraft.current = resolvedSignature;
     devMode.replaceDraft(resolved);
-  }, [devMode.replaceDraft, resolved]);
+  }, [devMode.replaceDraft, draftSignature, resolved, resolvedSignature]);
 
   useEffect(() => {
-    const draftSignature = JSON.stringify(devMode.draft);
     if (applyingDraft.current !== null) {
       if (applyingDraft.current === draftSignature) applyingDraft.current = null;
       return;
     }
     if (sameDraft(devMode.draft, resolved)) return;
     controller.replaceDocument(withWorkingDraft(snapshot.document, devMode.draft));
-  }, [controller, devMode.draft, resolved, snapshot.document]);
+  }, [controller, devMode.draft, draftSignature, resolved, snapshot.document]);
 
   const open = useCallback(() => {
     if (!devMode.enabled) devMode.toggle();

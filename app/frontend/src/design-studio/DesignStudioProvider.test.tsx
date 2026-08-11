@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { useEffect } from "react";
 import { api } from "../api/client";
 import { Text } from "../lib/copy";
 import { useDevMode } from "../lib/devMode";
@@ -46,6 +47,21 @@ function personalDocument(): DesignDocument {
   return document;
 }
 
+function themedVariationDocument(): DesignDocument {
+  const document = fixtureDocument();
+  document.variations.custom = {
+    id: "custom",
+    title: "Custom",
+    patch: { copy: { "rail.components": "Variation Components" } },
+    themes: {
+      dark: { elements: { "shell.root": { opacity: "0.9" } } },
+      light: { elements: { "shell.root": { opacity: "0.8" } } },
+    },
+  };
+  document.activeVariationId = "custom";
+  return document;
+}
+
 interface StudioCommands {
   setCopy: (id: string, text: string) => void;
   setVariation: (id: string) => void;
@@ -54,7 +70,9 @@ interface StudioCommands {
 function Probe({ expose }: { expose: (commands: StudioCommands) => void }) {
   const devMode = useDevMode();
   const studio = useDesignStudio();
-  expose({ setCopy: devMode.setCopy, setVariation: studio.setVariation });
+  useEffect(() => {
+    expose({ setCopy: devMode.setCopy, setVariation: studio.setVariation });
+  }, [devMode.setCopy, expose, studio.setVariation]);
   return (
     <>
       <span data-testid="resolved-copy"><Text id="rail.components">Components</Text></span>
@@ -132,6 +150,57 @@ describe("DesignStudioProvider", () => {
       }),
       expected_revision: "r1",
     });
+  });
+
+  it("keeps a pre-hydration edit instead of applying a late server draft over it", async () => {
+    vi.useFakeTimers();
+    let resolveHydration!: (value: { revision: string; document: DesignDocument }) => void;
+    mockApi.designStudioGet.mockImplementation(
+      () => new Promise((resolve) => { resolveHydration = resolve; }),
+    );
+    mockApi.designStudioPut.mockImplementation(async ({ document }) => ({
+      revision: "r2",
+      document,
+    }));
+    const studio = renderStudio();
+
+    studio.setCopy("rail.components", "Local Components");
+    await vi.advanceTimersByTimeAsync(400);
+    expect(mockApi.designStudioPut).not.toHaveBeenCalled();
+
+    await act(async () => {
+      resolveHydration({ revision: "r1", document: personalDocument() });
+      await Promise.resolve();
+    });
+    expect(screen.getByTestId("resolved-copy")).toHaveTextContent("Local Components");
+
+    await vi.advanceTimersByTimeAsync(400);
+    expect(mockApi.designStudioPut).toHaveBeenCalledWith({
+      document: expect.objectContaining({
+        base: expect.objectContaining({
+          copy: expect.objectContaining({ "rail.components": "Local Components" }),
+        }),
+      }),
+      expected_revision: "r1",
+    });
+  });
+
+  it("preserves both theme patches when editing an unrelated active-variation value", async () => {
+    vi.useFakeTimers();
+    const personal = themedVariationDocument();
+    mockApi.designStudioGet.mockResolvedValue({ revision: "r1", document: personal });
+    mockApi.designStudioPut.mockImplementation(async ({ document }) => ({
+      revision: "r2",
+      document,
+    }));
+    const studio = renderStudio();
+    await act(async () => Promise.resolve());
+
+    studio.setCopy("rail.about", "Information");
+    await vi.advanceTimersByTimeAsync(400);
+
+    const saved = mockApi.designStudioPut.mock.calls[0][0].document;
+    expect(saved.variations.custom.themes).toEqual(personal.variations.custom.themes);
   });
 
   it("falls back to the shipped draft when persisted input is invalid", async () => {

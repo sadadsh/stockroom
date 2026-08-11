@@ -101,6 +101,65 @@ describe("personal design persistence", () => {
     expect(mockApi.designStudioPut).not.toHaveBeenCalled();
   });
 
+  it("waits for hydration before saving an edit and keeps the newer local document", async () => {
+    const initial = fixtureDocument();
+    const server = fixtureDocument({ "rail.about": "Server" });
+    const local = fixtureDocument({ "rail.about": "Local" });
+    const hydration = deferred<{ revision: string; document: DesignDocument }>();
+    mockApi.designStudioGet.mockImplementation(() => hydration.promise);
+    mockApi.designStudioPut.mockResolvedValue({ revision: "r2", document: local });
+    const controller = createPersonalDesignController(initial);
+    const hydrating = controller.hydrate();
+
+    controller.replaceDocument(local);
+    await vi.advanceTimersByTimeAsync(400);
+    expect(mockApi.designStudioPut).not.toHaveBeenCalled();
+
+    hydration.resolve({ revision: "r1", document: server });
+    await hydrating;
+    expect(controller.getSnapshot()).toMatchObject({
+      document: local,
+      lastValidDocument: server,
+      personalState: "ready",
+      revision: "r1",
+    });
+    await vi.advanceTimersByTimeAsync(399);
+    expect(mockApi.designStudioPut).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(mockApi.designStudioPut).toHaveBeenCalledWith({
+      document: local,
+      expected_revision: "r1",
+    });
+  });
+
+  it("cannot enter a stale 409 before late hydration and never overwrites the local edit", async () => {
+    const initial = fixtureDocument();
+    const server = fixtureDocument({ "rail.about": "Server" });
+    const local = fixtureDocument({ "rail.about": "Local" });
+    const hydration = deferred<{ revision: string; document: DesignDocument }>();
+    mockApi.designStudioGet.mockImplementation(() => hydration.promise);
+    mockApi.designStudioPut.mockRejectedValue(new ApiError(409, "revision conflict"));
+    const controller = createPersonalDesignController(initial);
+    const hydrating = controller.hydrate();
+
+    controller.replaceDocument(local);
+    await vi.advanceTimersByTimeAsync(400);
+    expect(mockApi.designStudioPut).not.toHaveBeenCalled();
+
+    hydration.resolve({ revision: "r1", document: server });
+    await hydrating;
+    expect(controller.getSnapshot().document).toEqual(local);
+    await vi.advanceTimersByTimeAsync(400);
+    await settle();
+
+    expect(controller.getSnapshot()).toMatchObject({
+      document: local,
+      lastValidDocument: server,
+      personalState: "conflict",
+      revision: "r1",
+    });
+  });
+
   it("reports an ordinary save failure without replacing the last valid document", async () => {
     const initial = fixtureDocument({ "rail.about": "About" });
     const edited = fixtureDocument({ "rail.about": "Information" });
@@ -205,6 +264,41 @@ describe("personal design persistence", () => {
     expect(mockApi.designStudioPut).toHaveBeenLastCalledWith({
       document: latest,
       expected_revision: "r2",
+    });
+  });
+
+  it("preserves the queued latest edit when an in-flight save returns an invalid document", async () => {
+    const initial = fixtureDocument();
+    const first = fixtureDocument({ "rail.about": "First" });
+    const latest = fixtureDocument({ "rail.about": "Latest" });
+    const firstSave = deferred<{ revision: string; document: unknown }>();
+    mockApi.designStudioGet.mockResolvedValue({ revision: "r1", document: initial });
+    mockApi.designStudioPut
+      .mockImplementationOnce(() => firstSave.promise)
+      .mockResolvedValueOnce({ revision: "r2", document: latest });
+    const controller = createPersonalDesignController(initial);
+    await controller.hydrate();
+
+    controller.replaceDocument(first);
+    await vi.advanceTimersByTimeAsync(400);
+    controller.replaceDocument(latest);
+    await vi.advanceTimersByTimeAsync(400);
+    firstSave.resolve({ revision: "untrusted", document: { schemaVersion: 99 } });
+    await settle();
+
+    expect(controller.getSnapshot()).toMatchObject({
+      document: latest,
+      lastValidDocument: initial,
+      personalState: "invalid",
+      revision: "r1",
+    });
+    expect(mockApi.designStudioPut).toHaveBeenCalledTimes(1);
+
+    await controller.flush();
+    expect(mockApi.designStudioPut).toHaveBeenCalledTimes(2);
+    expect(mockApi.designStudioPut).toHaveBeenLastCalledWith({
+      document: latest,
+      expected_revision: "r1",
     });
   });
 

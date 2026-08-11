@@ -59,6 +59,8 @@ export function createPersonalDesignController(
   let pendingReady = false;
   let inFlight: Promise<void> | null = null;
   let hydration: Promise<void> | null = null;
+  let hydrationSettled = false;
+  let flushRequested = false;
   const listeners = new Set<() => void>();
 
   const publish = (next: PersonalDesignSnapshot) => {
@@ -83,8 +85,8 @@ export function createPersonalDesignController(
       .then((response) => {
         const savedDocument = validDocument(response.document);
         if (!savedDocument) {
+          pendingReady = false;
           publish({ ...snapshot, personalState: "invalid" });
-          pendingDocument = null;
           return;
         }
         publish({
@@ -120,6 +122,21 @@ export function createPersonalDesignController(
     }, AUTOSAVE_DELAY_MS);
   };
 
+  const waitForInFlight = (): Promise<void> => {
+    const activeRequest = inFlight;
+    return activeRequest ? activeRequest.then(waitForInFlight) : Promise.resolve();
+  };
+
+  const releasePendingAfterHydration = () => {
+    if (!pendingDocument) return;
+    if (flushRequested) {
+      pendingReady = true;
+      void savePending();
+    } else {
+      scheduleSave();
+    }
+  };
+
   const controller: PersonalDesignController = {
     getSnapshot: () => snapshot,
     subscribe: (listener) => {
@@ -128,29 +145,44 @@ export function createPersonalDesignController(
     },
     activate: () => {
       disposed = false;
+      flushRequested = false;
     },
     hydrate: () => {
       if (hydration) return hydration;
       hydration = api
         .designStudioGet()
         .then((response) => {
+          hydrationSettled = true;
           if (response.document === null) {
-            publish({ ...snapshot, personalState: "ready", revision: response.revision });
+            publish({
+              ...snapshot,
+              document: pendingDocument ?? snapshot.document,
+              personalState: "ready",
+              revision: response.revision,
+            });
+            releasePendingAfterHydration();
             return;
           }
           const hydrated = validDocument(response.document);
           if (!hydrated) {
-            publish({ ...snapshot, personalState: "invalid", revision: response.revision });
+            publish({
+              ...snapshot,
+              document: pendingDocument ?? snapshot.document,
+              personalState: "invalid",
+              revision: response.revision,
+            });
             return;
           }
           publish({
-            document: hydrated,
+            document: pendingDocument ?? hydrated,
             lastValidDocument: hydrated,
             personalState: "ready",
             revision: response.revision,
           });
+          releasePendingAfterHydration();
         })
         .catch(() => {
+          hydrationSettled = true;
           publish({ ...snapshot, personalState: "error" });
         });
       return hydration;
@@ -169,23 +201,32 @@ export function createPersonalDesignController(
       publish({
         ...snapshot,
         document,
-        personalState: blockedByConflict ? "conflict" : inFlight ? "saving" : "ready",
+        personalState: !hydrationSettled
+          ? "loading"
+          : blockedByConflict
+            ? "conflict"
+            : inFlight
+              ? "saving"
+              : "ready",
       });
-      if (!blockedByConflict) scheduleSave();
+      if (hydrationSettled && !blockedByConflict) scheduleSave();
       return true;
     },
     flush: async () => {
+      flushRequested = true;
+      if (!hydrationSettled) await controller.hydrate();
       if (debounceTimer) clearTimeout(debounceTimer);
       debounceTimer = null;
       pendingReady = true;
       await savePending();
-      while (inFlight) await inFlight;
+      await waitForInFlight();
     },
     dispose: () => {
+      flushRequested = true;
       if (debounceTimer) clearTimeout(debounceTimer);
       debounceTimer = null;
       pendingReady = true;
-      void savePending();
+      if (hydrationSettled) void savePending();
       disposed = true;
       listeners.clear();
     },
