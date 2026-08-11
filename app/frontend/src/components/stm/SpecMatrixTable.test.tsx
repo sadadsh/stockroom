@@ -96,6 +96,23 @@ describe("SpecMatrixTable", () => {
     expect(screen.getByRole("button", { name: /^Series/ })).toBeInTheDocument();
   });
 
+  it("consumes Escape when closing the Columns popover", async () => {
+    const escapedToParent = vi.fn();
+    window.addEventListener("keydown", escapedToParent);
+    try {
+      render(<SpecMatrixTable rows={ROWS} activePart={null} onSelectPart={vi.fn()} />);
+      await userEvent.click(screen.getByRole("button", { name: "Columns" }));
+      expect(screen.getByTestId("column-picker")).toBeVisible();
+
+      await userEvent.keyboard("{Escape}");
+
+      expect(screen.queryByTestId("column-picker")).not.toBeInTheDocument();
+      expect(escapedToParent).not.toHaveBeenCalled();
+    } finally {
+      window.removeEventListener("keydown", escapedToParent);
+    }
+  });
+
   it("shows mpn_example in the Part cell and never the raw ref_name", () => {
     render(<SpecMatrixTable rows={ROWS} activePart={null} onSelectPart={vi.fn()} />);
     expect(screen.getByText("STM32F407VETx")).toBeInTheDocument();

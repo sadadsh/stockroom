@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState, type CSSProperties, type ReactNode } 
 import { useDesignStudio } from "../../design-studio/DesignStudioProvider";
 import { useDevMode } from "../../lib/devMode";
 import { useText } from "../../lib/copy";
-import { openModalCount } from "../../lib/useModalDismiss";
+import { openEscapeLayerCount } from "../../lib/useEscapeDismiss";
 import { flushPendingUiPrefs, readPref, writePref } from "../../lib/uiPrefs";
 import { DevPanel } from "../DevPanel";
 import { DesignStudioToolbar, type StudioViewport } from "./DesignStudioToolbar";
@@ -121,7 +121,7 @@ export function DesignStudioShell({ children }: { children: ReactNode }) {
     if (!studio.enabled) return;
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
-      if (openModalCount() > 0) return;
+      if (openEscapeLayerCount() > 0) return;
       event.preventDefault();
       if (mode !== "browse") changeMode("browse");
       else close();

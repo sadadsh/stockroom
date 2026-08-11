@@ -21,6 +21,7 @@
  * the modal that already exists, so the parent is always on the stack first.
  */
 import { useEffect, useRef, useSyncExternalStore, type RefObject } from "react";
+import { useEscapeDismiss } from "./useEscapeDismiss";
 
 // One opaque token per open layer. An array, not a Set, because the ORDER is the whole point.
 const stack: object[] = [];
@@ -77,6 +78,7 @@ export function useModalDismiss(open: boolean, onClose: () => void): ModalLayer 
   // A stable identity for this modal instance, independent of its props.
   const tokenRef = useRef<object>({});
   const token = tokenRef.current;
+  useEscapeDismiss(open, onClose);
 
   // Join the stack while open. The cleanup runs both when `open` goes false and when the modal
   // unmounts outright, so a modal that is removed from the tree still leaves the stack.
@@ -119,17 +121,9 @@ export function useModalDismiss(open: boolean, onClose: () => void): ModalLayer 
   useEffect(() => {
     if (!open) return;
     function onKey(e: KeyboardEvent) {
-      // Read the stack at EVENT time, not at effect time: the top layer changes while this
-      // listener is attached, and a captured `isTop` would be stale the moment one nested.
+      // The shared Escape owner above handles dismissal. This modal stack still owns Tab trapping;
+      // read it at EVENT time because the top modal can change while this listener is attached.
       if (stack[stack.length - 1] !== token) return;
-      if (e.key === "Escape") {
-        e.preventDefault();
-        // Stop the same press reaching any other keydown listener (a page-level shortcut, an
-        // older modal that has not yet detached): one Escape is one dismissal.
-        e.stopPropagation();
-        onClose();
-        return;
-      }
       if (e.key === "Tab") {
         const nodes = dialogRef.current?.querySelectorAll<HTMLElement>(FOCUSABLE);
         if (!nodes || nodes.length === 0) return;
@@ -154,7 +148,7 @@ export function useModalDismiss(open: boolean, onClose: () => void): ModalLayer 
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [open, onClose, token]);
+  }, [open, token]);
 
   return {
     ref: dialogRef,

@@ -27,6 +27,7 @@ import { observeElementRect, useVirtualizer } from "@tanstack/react-virtual";
 import type { McuSpecRow } from "../../api/types";
 import { SearchIcon } from "../icons";
 import { Text, useCopyFormatter, useText } from "../../lib/copy";
+import { useEscapeDismiss } from "../../lib/useEscapeDismiss";
 
 // The peripheral columns TABLE-01 names (a representative count column each), read from
 // row.peripherals; NOT the full CubeMX peripheral set (the every-fact view is a deferred P2).
@@ -441,7 +442,9 @@ function MatrixToolbar({
   const [columnsOpen, setColumnsOpen] = useState(false);
   const columnsRef = useRef<HTMLDivElement>(null);
   const searchLabel = useText("stm.spec-matrix.search.placeholder", "Search Parts");
-  // Close the column picker on any outside click or Escape (a mini popover, not a modal).
+  useEscapeDismiss(columnsOpen, () => setColumnsOpen(false));
+  // Close the column picker on any outside click. Escape belongs to the shared transient-layer
+  // owner above, so the same key cannot also reach a parent window or Design Studio.
   useEffect(() => {
     if (!columnsOpen) return;
     function onDown(e: MouseEvent) {
@@ -449,14 +452,9 @@ function MatrixToolbar({
         setColumnsOpen(false);
       }
     }
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") setColumnsOpen(false);
-    }
     document.addEventListener("mousedown", onDown);
-    document.addEventListener("keydown", onKey);
     return () => {
       document.removeEventListener("mousedown", onDown);
-      document.removeEventListener("keydown", onKey);
     };
   }, [columnsOpen]);
   return (

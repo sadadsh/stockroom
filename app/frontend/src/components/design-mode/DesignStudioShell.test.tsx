@@ -39,6 +39,57 @@ vi.mock("../../api/client", async (importActual) => {
         can_publish: false,
         publish_blocker: "Source promotion is unavailable.",
       }),
+      getStmStatus: vi.fn().mockResolvedValue({
+        built: true,
+        building: false,
+        source_path: "C:\\ST-MCU-FINDER",
+        source_present: true,
+        all_families: true,
+        device_xml_count: 1,
+        family_count: 1,
+        families: ["STM32F4"],
+        mcu_count: 1,
+        classifier_rev: 1,
+        af_schema_rev: 1,
+        geometry_rev: 1,
+        source_sha256: "a".repeat(64),
+        built_at: "2026-08-11T00:00:00Z",
+      }),
+      getStmMcus: vi.fn().mockResolvedValue({
+        mcus: [{
+          part: "STM32F407V(E-G)Tx",
+          mpn_example: "STM32F407VETx",
+          series: "STM32F4",
+          line: "STM32F407",
+          core: "Cortex-M4",
+          package: "LQFP100",
+          pin_count: 100,
+          io_count: 82,
+          flash_kb: 512,
+          ram_kb: 192,
+          max_freq_mhz: 168,
+          vdd_min: 1.8,
+          vdd_max: 3.6,
+          temp_min_c: -40,
+          temp_max_c: 85,
+          peripherals: { USART: 4, SPI: 3 },
+        }],
+        count: 1,
+        facets: {
+          family: { STM32F4: 1 },
+          core: { "Cortex-M4": 1 },
+          package: { LQFP100: 1 },
+          series: { STM32F4: 1 },
+        },
+      }),
+      getStmFamilies: vi.fn().mockResolvedValue({
+        families: [{
+          family: "STM32F4",
+          lines: ["STM32F407"],
+          mcu_count: 1,
+          packages: ["LQFP100"],
+        }],
+      }),
     },
   };
 });
@@ -192,6 +243,24 @@ describe("DesignStudioShell", () => {
     expect(screen.getByRole("region", { name: "Stockroom Preview" })).toBeVisible();
     expect(screen.getByRole("button", { name: "Browse" })).toHaveAttribute("aria-pressed", "true");
     await waitFor(() => expect(aboutButton).toHaveFocus());
+  });
+
+  it("lets the real SpecMatrix Columns popover own Escape before Design Studio", async () => {
+    const { entry } = await renderStudio();
+    await userEvent.setup().click(screen.getByRole("button", { name: "STM Viewer" }));
+    const columnsButton = await screen.findByRole("button", { name: "Columns" });
+    await userEvent.setup().click(columnsButton);
+    expect(screen.getByTestId("column-picker")).toBeVisible();
+
+    await userEvent.setup().keyboard("{Escape}");
+
+    await waitFor(() => expect(screen.queryByTestId("column-picker")).not.toBeInTheDocument());
+    expect(screen.getByRole("region", { name: "Stockroom Preview" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Browse" })).toHaveAttribute("aria-pressed", "true");
+
+    await userEvent.setup().keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("region", { name: "Stockroom Preview" })).toBeNull());
+    expect(entry).toHaveFocus();
   });
 
   it("gives panel resizers named keyboard controls", async () => {
