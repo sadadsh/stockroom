@@ -119,6 +119,10 @@ def create_app(
 
     app.include_router(ui_session_router_mod.ui_session_router(require_token))
 
+    from stockroom.api.routers import design_studio as design_studio_router_mod
+
+    app.include_router(design_studio_router_mod.design_studio_router(require_token))
+
     from stockroom.api.routers import projects as projects_router_mod
 
     app.include_router(projects_router_mod.projects_router(require_token))
