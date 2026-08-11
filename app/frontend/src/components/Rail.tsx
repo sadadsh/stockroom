@@ -14,6 +14,7 @@ import { readPref, writePref } from "../lib/uiPrefs";
 import { useModalDismiss } from "../lib/useModalDismiss";
 import { aboutVersion, type UpdateStanding } from "../lib/updateStanding";
 import { useUpdateStanding } from "../lib/useUpdateStanding";
+import { useScenarioUiState } from "../design-studio/scenarioState";
 
 // Collapsed labels stay in the accessibility tree but never grow an overlay over the workspace.
 // The old hover peek expanded from 52px to 190px and then sustained its own :hover state. After a
@@ -141,6 +142,17 @@ export function Rail() {
 
   const { query: update, view: updateView } = useUpdateStanding();
   const [aboutOpen, setAboutOpen] = useState(false);
+  const scenarioAboutOpen = useScenarioUiState().rail?.aboutOpen;
+  const priorAboutOpen = useRef<boolean | null>(null);
+  useEffect(() => {
+    if (scenarioAboutOpen === undefined) {
+      if (priorAboutOpen.current !== null) setAboutOpen(priorAboutOpen.current);
+      priorAboutOpen.current = null;
+      return;
+    }
+    if (priorAboutOpen.current === null) priorAboutOpen.current = aboutOpen;
+    setAboutOpen(scenarioAboutOpen);
+  }, [scenarioAboutOpen]);
 
   return (
     // COLLAPSED, the outer shell holds a fixed 52px of layout. Pinned open, the content reflows

@@ -94,6 +94,31 @@ describe("registerScenarios", () => {
     expect(registry.searchScenarios("SERVICE")).toEqual([serviceError]);
   });
 
+  it("fails closed for every duplicate ID instead of activating the first entry", () => {
+    const duplicate = scenario("global.duplicate");
+    const registry = registerScenarios([duplicate, { ...duplicate, title: "Second" }]);
+
+    expect(registry.scenarioById(duplicate.id)).toBeUndefined();
+    expect(registry.scenarios).not.toContainEqual(expect.objectContaining({ id: duplicate.id }));
+  });
+
+  it("rejects a known endpoint fixture with an invalid typed response", () => {
+    const invalid = {
+      ...scenario("global.invalid-onboarding-response"),
+      fixtures: [{
+        method: "GET",
+        path: "/api/onboarding",
+        params: {},
+        body: undefined,
+        response: { first_run: "yes" },
+      }],
+    } as unknown as DesignScenario;
+
+    expect(registerScenarios([invalid]).issues).toContainEqual(
+      expect.objectContaining({ code: "invalid-fixture-shape" }),
+    );
+  });
+
   it("registers the global bootstrap scenarios with stable targets and typed fixtures", () => {
     expect(bootstrapScenarioRegistry.issues).toEqual([]);
     expect(bootstrapScenarioRegistry.scenarios.map((item) => item.id)).toEqual([

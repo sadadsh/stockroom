@@ -28,6 +28,9 @@ vi.mock("./api/client", async (importActual) => {
       getStmMcus: vi.fn(),
       getStmFamilies: vi.fn(),
       buildStmIndex: vi.fn(),
+      landPattern: vi.fn().mockResolvedValue({ pads: [], graphics: [] }),
+      symbolGeometry: vi.fn().mockResolvedValue({ pins: [] }),
+      partShell: vi.fn().mockResolvedValue({ supported: false, component_directory: false, export_formats: [], eda_applications: [] }),
     },
   };
 });
@@ -67,6 +70,10 @@ describe("App shell", () => {
       complete: 1,
       incomplete: 0,
     });
+    mockApi.partDetail.mockResolvedValue(DETAIL);
+    mockApi.partDossier.mockResolvedValue(makeDossier());
+    mockApi.landPattern.mockResolvedValue({ pads: [], graphics: [] } as never);
+    mockApi.symbolGeometry.mockResolvedValue({ pins: [] } as never);
     mockApi.partDetail.mockResolvedValue(DETAIL);
     mockApi.partDossier.mockResolvedValue(makeDossier());
 
@@ -206,7 +213,14 @@ describe("App shell", () => {
     expect(await screen.findByText("STM32F407VETx")).toBeInTheDocument();
   });
 
-  it("mounts the production onboarding gate from its registered fixture scenario", async () => {
+  it("mounts every bootstrap scenario through existing production components", async () => {
+    mockApi.listParts.mockResolvedValue({ parts: [SUMMARY], count: 1 });
+    mockApi.facets.mockResolvedValue({
+      by_category: { ICs: 1 },
+      by_manufacturer: {},
+      complete: 1,
+      incomplete: 0,
+    });
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       status: 200,
@@ -235,12 +249,45 @@ describe("App shell", () => {
     );
 
     await waitFor(() => expect(activateScenario).toBeDefined());
-    fetchMock.mockClear();
-    await act(async () => activateScenario?.("global.onboarding.open"));
+    async function activate(id: string) {
+      fetchMock.mockClear();
+      await act(async () => activateScenario?.(id));
+    }
 
+    await activate("global.onboarding.open");
     expect(await screen.findByRole("heading", { name: "Set Up Your Components" })).toBeInTheDocument();
     expect(screen.getByLabelText("Components Folder")).toBeInTheDocument();
     expect(document.querySelector('[data-dev-id="onboarding.gate"]')).toBeInTheDocument();
     expect(fetchMock).not.toHaveBeenCalled();
-  });
+
+    await activate("global.onboarding.create");
+    expect(screen.getByRole("button", { name: "Create New" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByLabelText(/New Components Folder/)).toBeInTheDocument();
+
+    await activate("global.onboarding.clone");
+    expect(screen.getByRole("button", { name: "Clone From Git" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByLabelText("Git URL")).toBeInTheDocument();
+
+    await activate("global.onboarding.error");
+    expect(document.querySelector('[data-dev-id="onboarding.error"]')).toHaveTextContent("Could not set up the components");
+
+    await activate("global.about.open");
+    expect(await screen.findByRole("dialog", { name: "About Stockroom" })).toBeInTheDocument();
+    await userEvent.setup().click(screen.getByRole("button", { name: "Close About" }));
+
+    await activate("global.update.available");
+    expect((await screen.findAllByText("Update Available")).length).toBeGreaterThan(0);
+    expect(document.querySelector('[data-dev-id="rail.update"]')).toBeInTheDocument();
+
+    await activate("global.search.open");
+    expect(await screen.findByLabelText("Search components")).toBeInTheDocument();
+    expect(document.querySelector('[data-dev-id="search.query"]')).toBeInTheDocument();
+
+    await activate("global.service-error");
+    expect(await screen.findByText("Stockroom is not answering on this machine.")).toBeInTheDocument();
+    expect(document.querySelector('[data-dev-id="components.list-unreachable"]')).toBeInTheDocument();
+
+    await activate("global.real-data");
+    expect(document.querySelector('[data-dev-id="shell.root"]')).toBeInTheDocument();
+  }, 20_000);
 });

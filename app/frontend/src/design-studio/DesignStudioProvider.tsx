@@ -27,6 +27,7 @@ import {
 } from "./requestAdapter";
 import type { DesignScenario } from "./scenario";
 import { scenarioById } from "./scenarios";
+import { ScenarioUiProvider } from "./scenarioState";
 
 export interface DesignStudioContextValue {
   open: () => void;
@@ -131,6 +132,7 @@ function DesignStudioBridge({ children }: { children: ReactNode }) {
   );
   const applyingDraft = useRef<string | null>(null);
   const [activeScenario, setActiveScenario] = useState<DesignScenario | null>(null);
+  const [scenarioUiState, setScenarioUiState] = useState<DesignScenario["initialUi"]>({});
   const restoreAdapter = useRef<(() => void) | null>(null);
   const realRouteContext = useRef<RealRouteContext | null>(null);
   const transition = useRef<Promise<void> | undefined>(undefined);
@@ -238,6 +240,7 @@ function DesignStudioBridge({ children }: { children: ReactNode }) {
           };
         }
         restoreAdapter.current = installApiRequestAdapter(previewAdapter(scenario));
+        setScenarioUiState(scenario.initialUi);
         setActiveScenario(scenario);
         mountScenarioRoute(scenario.route);
         await refreshActiveProductQueries();
@@ -254,6 +257,7 @@ function DesignStudioBridge({ children }: { children: ReactNode }) {
         clearInactiveProductQueries();
         restoreAdapter.current?.();
         restoreAdapter.current = null;
+        setScenarioUiState({});
         setActiveScenario(null);
         const real = realRouteContext.current;
         realRouteContext.current = null;
@@ -302,7 +306,11 @@ function DesignStudioBridge({ children }: { children: ReactNode }) {
     ],
   );
 
-  return <DesignStudioContext.Provider value={value}>{children}</DesignStudioContext.Provider>;
+  return (
+    <DesignStudioContext.Provider value={value}>
+      <ScenarioUiProvider state={scenarioUiState}>{children}</ScenarioUiProvider>
+    </DesignStudioContext.Provider>
+  );
 }
 
 /** Installs the existing Dev Mode provider and adds machine-local document orchestration around it. */

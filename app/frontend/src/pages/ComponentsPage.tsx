@@ -26,6 +26,7 @@ import { useCapture } from "../lib/capture";
 import { Finder } from "../components/Finder";
 import { PartsList } from "../components/PartsList";
 import { SearchOverlay } from "../components/SearchOverlay";
+import { useScenarioUiState } from "../design-studio/scenarioState";
 import { AddPartIcon } from "../components/icons";
 import {
   Button,
@@ -119,6 +120,9 @@ export function ComponentsPage() {
   const [searchOpen, setSearchOpen] = useState(
     () => readUiSession().open_surface === "search",
   );
+  const scenarioSearchOpen = useScenarioUiState().search?.open;
+  const scenarioServiceError = useScenarioUiState().service?.error;
+  const priorSearchOpen = useRef<boolean | null>(null);
   const [listScrollElement, setListScrollElement] =
     useState<HTMLDivElement | null>(null);
 
@@ -130,6 +134,16 @@ export function ComponentsPage() {
   const { toast } = useToast();
   const { open: openAddPart } = useAddPart();
   const { onReopen } = useCapture();
+
+  useEffect(() => {
+    if (scenarioSearchOpen === undefined) {
+      if (priorSearchOpen.current !== null) setSearchOpen(priorSearchOpen.current);
+      priorSearchOpen.current = null;
+      return;
+    }
+    if (priorSearchOpen.current === null) priorSearchOpen.current = searchOpen;
+    setSearchOpen(scenarioSearchOpen);
+  }, [scenarioSearchOpen]);
 
   // Persist the exact primary Library view as one bounded document. This runs
   // only when a value changed, so mounting from an injected snapshot does not
@@ -324,7 +338,7 @@ export function ComponentsPage() {
           duplicateIds={duplicateIds}
           onOpenSearch={() => setSearchOpen(true)}
           isLoading={partsQuery.isLoading}
-          error={partsQuery.error}
+          error={scenarioServiceError ? new ApiError(0, scenarioServiceError) : partsQuery.error}
           parts={parts}
           selectedId={selectedId}
           onSelect={openComponent}
@@ -454,7 +468,7 @@ function PickerBody({
     return (
       <div className="mt-2">
         {status === 0 ? (
-          <ErrorState id="components.list-unreachable" onRetry={onRetry}>
+          <ErrorState id="components.list-unreachable" devId="components.list-unreachable" onRetry={onRetry}>
             Stockroom is not answering on this machine.
           </ErrorState>
         ) : status === 401 ? (

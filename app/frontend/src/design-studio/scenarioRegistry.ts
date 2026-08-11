@@ -5,11 +5,13 @@ import type {
   ScenarioCoverageTag,
   ScenarioFixture,
 } from "./scenario";
+import { bootstrapFixtureValidators, type ScenarioFixtureValidatorRegistry } from "./scenarioFixtureValidation";
 
 export type ScenarioRegistryIssueCode =
   | "duplicate-scenario"
   | "unknown-route"
   | "malformed-fixture"
+  | "invalid-fixture-shape"
   | "missing-local-outcome"
   | "missing-targets"
   | "missing-coverage"
@@ -87,17 +89,20 @@ function coverageIssues(scenario: DesignScenario): ScenarioRegistryIssue[] {
  * Validates and indexes supplied scenarios without side effects. Invalid scenarios stay out of
  * the lookup indexes so callers cannot accidentally activate a malformed preview.
  */
-export function registerScenarios(items: readonly DesignScenario[]): ScenarioRegistry {
+export function registerScenarios(
+  items: readonly DesignScenario[],
+  fixtureValidators: ScenarioFixtureValidatorRegistry = bootstrapFixtureValidators,
+): ScenarioRegistry {
   const issues: ScenarioRegistryIssue[] = [];
-  const seen = new Set<string>();
+  const counts = new Map<string, number>();
+  for (const scenario of items) counts.set(scenario.id, (counts.get(scenario.id) ?? 0) + 1);
   const valid: DesignScenario[] = [];
 
   for (const scenario of items) {
     const scenarioIssues: ScenarioRegistryIssue[] = [];
-    if (seen.has(scenario.id)) {
+    if ((counts.get(scenario.id) ?? 0) > 1) {
       scenarioIssues.push({ code: "duplicate-scenario", scenarioId: scenario.id, value: scenario.id });
     }
-    seen.add(scenario.id);
     if (!KNOWN_ROUTES.has(scenario.route)) {
       scenarioIssues.push({ code: "unknown-route", scenarioId: scenario.id, value: String(scenario.route) });
     }
@@ -109,6 +114,9 @@ export function registerScenarios(items: readonly DesignScenario[]): ScenarioReg
       if (!isFixture(fixture)) {
         scenarioIssues.push({ code: "malformed-fixture", scenarioId: scenario.id });
         continue;
+      }
+      if (!fixtureValidators.validate(fixture)) {
+        scenarioIssues.push({ code: "invalid-fixture-shape", scenarioId: scenario.id, value: fixture.path });
       }
       if (isMutation(fixture) && !hasLocalOutcome(fixture)) {
         scenarioIssues.push({ code: "missing-local-outcome", scenarioId: scenario.id, value: fixture.path });

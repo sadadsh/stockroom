@@ -14,6 +14,13 @@ export interface ScenarioLocalOutcome {
   detail?: string;
 }
 
+export interface ScenarioUiState {
+  onboarding?: { mode?: "open" | "create" | "clone"; error?: string };
+  rail?: { aboutOpen?: boolean };
+  search?: { open?: boolean };
+  service?: { error?: string };
+}
+
 /** One typed API response used while a scenario preview is active. */
 export interface ScenarioFixture<TResponse = unknown, TBody = unknown>
   extends ApiRequestDescriptor {
@@ -30,7 +37,7 @@ export interface DesignScenario {
   group: string;
   route: Route;
   fixtures: readonly ScenarioFixture[];
-  initialUi: Readonly<Record<string, unknown>>;
+  initialUi: Readonly<ScenarioUiState>;
   expectedTargets: readonly string[];
   coverage: readonly ScenarioCoverageTag[];
 }

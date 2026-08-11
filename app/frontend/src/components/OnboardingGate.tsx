@@ -7,13 +7,14 @@
  * Interactive labels are Title Case; prose is sentence case; no em dashes; 8/6 radii;
  * colors are tokens only (owner design contract).
  */
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button, Card, Eyebrow } from "./primitives";
 import { useCompleteOnboarding, useSetLibrary } from "../api/queries";
 import { Text, useCopyFormatter, useText } from "../lib/copy";
 import { useToast } from "../lib/toast";
 import { ApiError } from "../api/client";
 import type { OnboardingStatus, SetLibraryBody } from "../api/types";
+import { useScenarioUiState } from "../design-studio/scenarioState";
 
 type Mode = "open" | "create" | "clone";
 
@@ -28,7 +29,10 @@ const INPUT =
   "outline-none focus:border-acc disabled:opacity-50";
 
 export function OnboardingGate({ status }: { status: OnboardingStatus }) {
-  const [mode, setMode] = useState<Mode>("open");
+  const scenarioUi = useScenarioUiState();
+  const scenarioMode = scenarioUi.onboarding?.mode;
+  const scenarioError = scenarioUi.onboarding?.error;
+  const [mode, setMode] = useState<Mode>(() => scenarioMode ?? "open");
   const [path, setPath] = useState("");
   const [url, setUrl] = useState("");
   const [dest, setDest] = useState("");
@@ -58,6 +62,10 @@ export function OnboardingGate({ status }: { status: OnboardingStatus }) {
     "onboarding.toast-setup-failed",
     "Could not set up the components",
   );
+
+  useEffect(() => {
+    setMode(scenarioMode ?? "open");
+  }, [scenarioMode]);
 
   // Each mode has its own required field: open needs a path, clone needs a URL; create
   // can fall back to the default location, so its path is optional.
@@ -99,6 +107,9 @@ export function OnboardingGate({ status }: { status: OnboardingStatus }) {
         <p className="mt-2 text-sm text-t2">
           <Text id="onboarding.lede">The components live in a Git checkout with one JSON record per part and their shared catalog assets. Tell Stockroom where that checkout lives to get started.</Text>
         </p>
+        {scenarioError ? (
+          <p data-dev-id="onboarding.error" className="mt-3 text-sm text-err-text">{scenarioError}</p>
+        ) : null}
 
         <div className="mt-5 grid grid-cols-3 gap-2">
           {MODES.map((m) => (
