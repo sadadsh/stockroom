@@ -87,9 +87,13 @@ import {
   WORKSPACE_COLUMN_REGION,
   workspaceColumnFractions,
 } from "../../layout/defaultWorkspaceLayout";
-import type { LayoutDocument } from "../../layout/document";
+import { findRegion, type LayoutDocument } from "../../layout/document";
 import {
+  positionPlacement,
+  resizePlacement,
+  restorePlacement,
   setPlacementCollapsed,
+  setPlacementGridSlot,
   setPlacementHidden,
   setPlacementStyleRole,
   setRegionSize,
@@ -148,13 +152,40 @@ interface ArrangeSurfaceValue {
   dragging: string | null;
   beginDrag: (placementId: string) => void;
   endDrag: () => void;
+  snapGrid: number;
+  beginResize: (
+    placementId: string,
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+  ) => void;
   menu: ArrangeMenuState | null;
   openMenu: (next: ArrangeMenuState | null) => void;
   /** Bumped when everything on screen has to be measured again. */
   tick: number;
 }
 
+interface ResizeState {
+  placementId: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 const ArrangeSurfaceContext = createContext<ArrangeSurfaceValue | null>(null);
+const ArrangeSnapContext = createContext(8);
+
+export function ArrangePreferencesProvider({
+  snap,
+  children,
+}: {
+  snap: boolean;
+  children: ReactNode;
+}) {
+  return <ArrangeSnapContext.Provider value={snap ? 8 : 1}>{children}</ArrangeSnapContext.Provider>;
+}
 
 /** The arrange surface, or `null` when arrange is off. Everything here degrades to nothing on null. */
 export function useArrangeSurface(): ArrangeSurfaceValue | null {
@@ -178,24 +209,41 @@ function pieceDisplayName(pieceId: string): string {
   return (devId ? DEV_ID_BY_ID.get(devId)?.label : undefined) ?? pieceId;
 }
 
+function finiteInputValue(raw: string, fallback: number): number {
+  if (raw.trim() === "") return fallback;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
 export function ArrangeSurfaceProvider({
   active,
   layout,
   onLayout,
   children,
+  snapGrid,
 }: {
   active: boolean;
   layout: LayoutDocument;
   onLayout: (next: LayoutDocument) => void;
   children: ReactNode;
+  snapGrid?: number;
 }) {
+  const inheritedSnapGrid = useContext(ArrangeSnapContext);
+  const effectiveSnapGrid = snapGrid ?? inheritedSnapGrid;
   const [dragging, setDragging] = useState<string | null>(null);
   const [menu, setMenu] = useState<ArrangeMenuState | null>(null);
   const [tick, setTick] = useState(0);
+  const [resizing, setResizing] = useState<ResizeState | null>(null);
 
   const beginDrag = useCallback((placementId: string) => setDragging(placementId), []);
   const endDrag = useCallback(() => setDragging(null), []);
   const openMenu = useCallback((next: ArrangeMenuState | null) => setMenu(next), []);
+  const beginResize = useCallback(
+    (placementId: string, x: number, y: number, width: number, height: number) => {
+      setResizing({ placementId, x, y, width, height });
+    },
+    [],
+  );
 
   const edit = useCallback(
     (next: LayoutDocument) => {
@@ -241,6 +289,30 @@ export function ArrangeSurfaceProvider({
     };
   }, [active, dragging]);
 
+  useEffect(() => {
+    if (!active || !resizing) return;
+    const finish = (event: PointerEvent) => {
+      const next = resizePlacement(
+        layout,
+        resizing.placementId,
+        {
+          width: resizing.width + event.clientX - resizing.x,
+          height: resizing.height + event.clientY - resizing.y,
+        },
+        { grid: effectiveSnapGrid },
+      );
+      edit(next);
+      setResizing(null);
+    };
+    const cancel = () => setResizing(null);
+    window.addEventListener("pointerup", finish);
+    window.addEventListener("pointercancel", cancel);
+    return () => {
+      window.removeEventListener("pointerup", finish);
+      window.removeEventListener("pointercancel", cancel);
+    };
+  }, [active, edit, effectiveSnapGrid, layout, resizing]);
+
   // Right-click, by capture-phase delegation. `DevInspector`'s pattern: the 25 wrappers stay pure
   // markup and one listener answers for all of them, and it is removed the moment arrange is off.
   useEffect(() => {
@@ -283,9 +355,32 @@ export function ArrangeSurfaceProvider({
   const value = useMemo<ArrangeSurfaceValue | null>(
     () =>
       active
-        ? { layout, edit, dragging, beginDrag, endDrag, menu, openMenu, tick }
+        ? {
+            layout,
+            edit,
+            dragging,
+            beginDrag,
+            endDrag,
+            snapGrid: effectiveSnapGrid,
+            beginResize,
+            menu,
+            openMenu,
+            tick,
+          }
         : null,
-    [active, layout, edit, dragging, beginDrag, endDrag, menu, openMenu, tick],
+    [
+      active,
+      layout,
+      edit,
+      dragging,
+      beginDrag,
+      endDrag,
+      effectiveSnapGrid,
+      beginResize,
+      menu,
+      openMenu,
+      tick,
+    ],
   );
 
   return (
@@ -434,6 +529,7 @@ function PlacementAffordance({
   const [hovered, setHovered] = useState(false);
   const name = pieceDisplayName(pieceId);
   const handleLabel = useText("design.handle", "Move {piece}", { piece: name });
+  const resizeLabel = useText("design.resize", "Resize {piece}", { piece: name });
   const dragged = surface.dragging === placementId;
   const opened = surface.menu?.placementId === placementId;
   const receiving = surface.dragging !== null && !dragged;
@@ -490,6 +586,47 @@ function PlacementAffordance({
         }
       >
         <span aria-hidden="true">{"⠿"}</span>
+      </button>
+      <button
+        type="button"
+        data-design-meaningful
+        data-dev-id="design.placement-resize"
+        data-arrange-resize={placementId}
+        aria-label={resizeLabel}
+        title={resizeLabel}
+        onPointerDown={(event) => {
+          if (event.button !== 0) return;
+          event.preventDefault();
+          const placement = placementSeat(surface.layout, placementId)?.placement;
+          surface.beginResize(
+            placementId,
+            event.clientX,
+            event.clientY,
+            placement?.size?.width ?? rect.width,
+            placement?.size?.height ?? rect.height,
+          );
+        }}
+        onKeyDown={(event) => {
+          const placement = placementSeat(surface.layout, placementId)?.placement;
+          const width = placement?.size?.width ?? rect.width;
+          const height = placement?.size?.height ?? rect.height;
+          const delta = surface.snapGrid;
+          const patch = event.key === "ArrowRight"
+            ? { width: width + delta }
+            : event.key === "ArrowLeft"
+              ? { width: width - delta }
+              : event.key === "ArrowDown"
+                ? { height: height + delta }
+                : event.key === "ArrowUp"
+                  ? { height: height - delta }
+                  : null;
+          if (!patch) return;
+          event.preventDefault();
+          surface.edit(resizePlacement(surface.layout, placementId, patch, { grid: delta }));
+        }}
+        className="pointer-events-auto absolute bottom-0 right-0 h-3.5 w-3.5 rounded-[3px] border border-line2 bg-popover text-2xs text-t2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-focus"
+      >
+        <span aria-hidden="true">{"↘"}</span>
       </button>
       {receiving ? (
         <>
@@ -601,6 +738,15 @@ function PieceMenu({ state }: { state: ArrangeMenuState }) {
     "design.text-role-note",
     "A role set here binds this one placement and is listed as an exception in Issues. Editing a role for all of them is the Tokens and Box tabs.",
   );
+  const flowNote = useText(
+    "design.position-flow-note",
+    "This region uses structural flow. Use Move Up, Move Down, or Move Into instead.",
+  );
+  const xLabel = useText("design.position-x", "Position X");
+  const yLabel = useText("design.position-y", "Position Y");
+  const columnLabel = useText("design.grid-column", "Grid Column");
+  const rowLabel = useText("design.grid-row", "Grid Row");
+  const restoreLabel = useText("design.restore-placement", "Restore Placement");
   if (!surface) return null;
   const seat = placementSeat(surface.layout, state.placementId);
   if (!seat) return null;
@@ -608,6 +754,9 @@ function PieceMenu({ state }: { state: ArrangeMenuState }) {
   const collapsed = placement.collapsed === true;
   const hidden = placement.hidden === true;
   const regions = arrangeRegionChoices(surface.layout, state.placementId);
+  const parentRegion = findRegion(surface.layout, seat.regionId);
+  const freePosition = parentRegion?.positioning === "free";
+  const grid = parentRegion?.grid;
 
   return (
     <div
@@ -647,6 +796,12 @@ function PieceMenu({ state }: { state: ArrangeMenuState }) {
           }
         />
       </div>
+      <MenuButton
+        devId="design.piece-restore"
+        label={restoreLabel}
+        disabled={!collapsed && !hidden && !placement.size && !placement.position && !placement.gridSlot}
+        onClick={() => surface.edit(restorePlacement(surface.layout, state.placementId))}
+      />
       <p className="text-2xs leading-relaxed text-t3">{collapseNote}</p>
       <div className="flex gap-1">
         <MenuButton
@@ -679,6 +834,82 @@ function PieceMenu({ state }: { state: ArrangeMenuState }) {
           </option>
         ))}
       </select>
+      {freePosition ? (
+        <div className="flex gap-1" data-dev-id="design.piece-position">
+          <input
+            type="number"
+            aria-label={xLabel}
+            value={placement.position?.x ?? 0}
+            onChange={(event) =>
+              surface.edit(
+                positionPlacement(
+                  surface.layout,
+                  state.placementId,
+                  { x: finiteInputValue(event.target.value, placement.position?.x ?? 0) },
+                  { grid: surface.snapGrid },
+                ),
+              )
+            }
+            className="min-w-0 flex-1 rounded-control border border-line bg-field px-1.5 py-1 text-2xs text-t1"
+          />
+          <input
+            type="number"
+            aria-label={yLabel}
+            value={placement.position?.y ?? 0}
+            onChange={(event) =>
+              surface.edit(
+                positionPlacement(
+                  surface.layout,
+                  state.placementId,
+                  { y: finiteInputValue(event.target.value, placement.position?.y ?? 0) },
+                  { grid: surface.snapGrid },
+                ),
+              )
+            }
+            className="min-w-0 flex-1 rounded-control border border-line bg-field px-1.5 py-1 text-2xs text-t1"
+          />
+        </div>
+      ) : (
+        <p data-dev-id="design.piece-position-note" className="text-2xs leading-relaxed text-t3">{flowNote}</p>
+      )}
+      {grid ? (
+        <div className="flex gap-1" data-dev-id="design.piece-grid-slot">
+          <select
+            aria-label={columnLabel}
+            value={placement.gridSlot?.column ?? 1}
+            onChange={(event) =>
+              surface.edit(
+                setPlacementGridSlot(surface.layout, state.placementId, {
+                  column: finiteInputValue(event.target.value, placement.gridSlot?.column ?? 1),
+                  row: placement.gridSlot?.row ?? 1,
+                }),
+              )
+            }
+            className="min-w-0 flex-1 rounded-control border border-line bg-field px-1 py-1 text-2xs text-t1"
+          >
+            {Array.from({ length: grid.columns }, (_, index) => index + 1).map((value) => (
+              <option key={value} value={value}>{value}</option>
+            ))}
+          </select>
+          <select
+            aria-label={rowLabel}
+            value={placement.gridSlot?.row ?? 1}
+            onChange={(event) =>
+              surface.edit(
+                setPlacementGridSlot(surface.layout, state.placementId, {
+                  column: placement.gridSlot?.column ?? 1,
+                  row: finiteInputValue(event.target.value, placement.gridSlot?.row ?? 1),
+                }),
+              )
+            }
+            className="min-w-0 flex-1 rounded-control border border-line bg-field px-1 py-1 text-2xs text-t1"
+          >
+            {Array.from({ length: grid.rows ?? 1 }, (_, index) => index + 1).map((value) => (
+              <option key={value} value={value}>{value}</option>
+            ))}
+          </select>
+        </div>
+      ) : null}
       <div className="flex gap-1">
         <select
           data-dev-id="design.piece-text-role"

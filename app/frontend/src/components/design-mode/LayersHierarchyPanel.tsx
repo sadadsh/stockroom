@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useDesignStudio } from "../../design-studio/DesignStudioProvider";
 import { DEV_IDS } from "../../lib/devIds";
+import { targetLayersFor } from "../../design-studio/targetCoverage";
 import { useDevMode } from "../../lib/devMode";
 import { useText } from "../../lib/copy";
 
@@ -18,8 +19,8 @@ export function LayersHierarchyPanel() {
   const hierarchyLabel = useText("design-studio.hierarchy", "Structure");
   const variations = Object.values(studio.document.variations);
   const targets = useMemo(
-    () => DEV_IDS.filter((entry) => !studio.activeScenario || studio.activeScenario.expectedTargets.includes(entry.id)),
-    [studio.activeScenario],
+    () => targetLayersFor(document, DEV_IDS),
+    [studio.activeScenario, studio.document, dev.selectedDevId],
   );
 
   return (
@@ -69,17 +70,20 @@ export function LayersHierarchyPanel() {
         <div className="p-2">
           {targets.map((entry) => (
             <button
-              key={entry.id}
+              key={entry.key}
               type="button"
-              onClick={() => dev.selectDevId(entry.id)}
+              data-target-key={entry.key}
+              data-target-depth={entry.depth}
+              onClick={() => entry.ownerDevId && dev.selectDevId(entry.ownerDevId)}
               className={
                 "block w-full truncate rounded-control py-1 text-left text-xs hover:bg-raise2 " +
-                (view === "hierarchy" ? "pl-4 pr-2" : "px-2") +
-                (dev.selectedDevId === entry.id ? " bg-acc-soft text-t1" : " text-t2")
+                (view === "hierarchy" ? "pr-2" : "px-2") +
+                (dev.selectedDevId === entry.ownerDevId ? " bg-acc-soft text-t1" : " text-t2")
               }
+              style={view === "hierarchy" ? { paddingLeft: `${8 + entry.depth * 12}px` } : undefined}
               title={entry.id}
             >
-              {entry.label}
+              {entry.label}{entry.occurrences > 1 ? ` (${entry.occurrences})` : ""}
             </button>
           ))}
         </div>

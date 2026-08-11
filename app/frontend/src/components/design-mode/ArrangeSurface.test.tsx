@@ -59,7 +59,8 @@ import {
   type LayoutBindings,
   type PiecePartProps,
 } from "../../layout/LayoutRenderer";
-import { ArrangePlacementChrome, ArrangeSurfaceProvider } from "./ArrangeSurface";
+import { ArrangePlacementChrome, ArrangePreferencesProvider, ArrangeSurfaceProvider } from "./ArrangeSurface";
+import { RESPONSIVE_VIEWPORT_PRESETS } from "../../design-studio/responsiveViewports";
 
 /* -------------------------------------------------------------------------- */
 /*  a document, and three pieces to put in it                                  */
@@ -148,12 +149,15 @@ function order(document_: LayoutDocument, regionId: string): string[] {
 function Surface({
   active,
   start = baseDocument(),
+  snap = true,
 }: {
   active: boolean;
   start?: LayoutDocument;
+  snap?: boolean;
 }) {
   const [document_, setDocument] = useState(start);
   return (
+    <ArrangePreferencesProvider snap={snap}>
     <ArrangeSurfaceProvider active={active} layout={document_} onLayout={setDocument}>
       <LayoutPlacementChromeProvider chrome={active ? ArrangePlacementChrome : null}>
         <LayoutDocumentView document={document_} bindings={BINDINGS} />
@@ -176,12 +180,23 @@ function Surface({
           .map((visit) => `${visit.node.id}:${JSON.stringify(visit.node.styleRoles)}`)
           .join(" ")}
       </output>
+      <output data-testid="sizes">
+        {layoutPlacements(document_)
+          .map((visit) => `${visit.node.id}:${visit.node.size?.width ?? "-"}`)
+          .join(" ")}
+      </output>
+      <output data-testid="positions">
+        {layoutPlacements(document_)
+          .map((visit) => `${visit.node.id}:${visit.node.position?.x ?? "-"},${visit.node.position?.y ?? "-"}`)
+          .join(" ")}
+      </output>
     </ArrangeSurfaceProvider>
+    </ArrangePreferencesProvider>
   );
 }
 
 /** A real mouse event under a pointer type name - see the file header for why not `fireEvent.pointerDown`. */
-function pointer(node: Element, type: string, init: MouseEventInit = {}): void {
+function pointer(node: Node | Window, type: string, init: MouseEventInit = {}): void {
   fireEvent(
     node,
     new MouseEvent(type, { bubbles: true, cancelable: true, button: 0, ...init }),
@@ -241,6 +256,15 @@ describe("arrange off", () => {
 /* -------------------------------------------------------------------------- */
 
 describe("arrange on", () => {
+  it("defines the exact responsive desktop presets and a custom width", () => {
+    expect(RESPONSIVE_VIEWPORT_PRESETS).toEqual([
+      { id: "desktop-1366", label: "1366 px", width: 1366 },
+      { id: "desktop-1600", label: "1600 px", width: 1600 },
+      { id: "desktop-1920", label: "1920 px", width: 1920 },
+      { id: "custom", label: "Custom", width: null },
+    ]);
+  });
+
   /**
    * FAILS IF: the wrapper stops being `display: contents` (which would give the piece a box of its
    * own and change every flex layout it sits in), the handle is drawn inside the piece's subtree
@@ -274,6 +298,27 @@ describe("arrange on", () => {
     render(<Surface active start={baseDocument({ beta: { hidden: true } })} />);
     expect(handles().sort()).toEqual(["alpha", "gamma"]);
     expect(screen.queryByTestId("part-beta")).toBeNull();
+  });
+});
+
+describe("direct resize parity", () => {
+  it("snaps the same placement resize from keyboard and pointer without rebinding it", () => {
+    render(<Surface active start={baseDocument({ alpha: { size: { width: 480 } } })} />);
+    const resize = document.querySelector<HTMLElement>('[data-arrange-resize="alpha"]')!;
+
+    fireEvent.keyDown(resize, { key: "ArrowRight" });
+    expect(screen.getByTestId("sizes")).toHaveTextContent("alpha:488");
+
+    pointer(resize, "pointerdown", { clientX: 488 });
+    pointer(window, "pointerup", { clientX: 503 });
+    expect(screen.getByTestId("sizes")).toHaveTextContent("alpha:504");
+    expect(screen.getByTestId("part-alpha")).toHaveAttribute("data-placement", "alpha");
+  });
+
+  it("uses single-pixel movement when shell snap is off", () => {
+    render(<Surface active snap={false} start={baseDocument({ alpha: { size: { width: 480 } } })} />);
+    fireEvent.keyDown(document.querySelector('[data-arrange-resize="alpha"]')!, { key: "ArrowRight" });
+    expect(screen.getByTestId("sizes")).toHaveTextContent("alpha:481");
   });
 });
 
@@ -504,6 +549,27 @@ describe("right-clicking a placement", () => {
     fireEvent.keyDown(window, { key: "Escape" });
     expect(document.querySelector('[data-dev-id="design.piece-menu"]')).toBeNull();
     expect(screen.getByTestId("left-order").textContent).toBe("alpha beta");
+  });
+
+  it("restores direct arrangement overrides from the keyboard-reachable piece menu", () => {
+    render(<Surface active start={baseDocument({ alpha: { size: { width: 480 } } })} />);
+    fireEvent.contextMenu(screen.getByTestId("part-alpha"), { clientX: 10, clientY: 12 });
+    const restore = document.querySelector<HTMLButtonElement>('[data-dev-id="design.piece-restore"]');
+    expect(restore).not.toBeNull();
+    restore?.focus();
+    expect(restore).toHaveFocus();
+    fireEvent.click(restore!);
+    expect(screen.getByTestId("sizes")).toHaveTextContent("alpha:-");
+  });
+
+  it("ignores an empty free-position input instead of moving the piece to zero", () => {
+    const start = baseDocument({ alpha: { position: { x: 16, y: 24 } } });
+    const left = start.root.slots[0]?.content as LayoutRegion;
+    left.positioning = "free";
+    render(<Surface active start={start} />);
+    fireEvent.contextMenu(screen.getByTestId("part-alpha"));
+    fireEvent.change(screen.getByLabelText("Position X"), { target: { value: "" } });
+    expect(screen.getByTestId("positions")).toHaveTextContent("alpha:16,24");
   });
 });
 

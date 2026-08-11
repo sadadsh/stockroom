@@ -36,7 +36,7 @@ import {
   LAYOUT_DRAFT_NAME_MAX,
 } from "../../lib/layoutDrafts";
 import { layoutPlacements } from "../../layout/document";
-import { setPlacementCollapsed, setPlacementHidden } from "../../layout/editOperations";
+import { restorePlacement } from "../../layout/editOperations";
 import { resolveWorkspaceLayout } from "../../layout/resolveWorkspaceLayout";
 import { SectionHeader } from "../productState";
 
@@ -109,10 +109,7 @@ export function ArrangeSection({
 
   const restore = useCallback(
     (entry: OffScreenPlacement) => {
-      let next = layout;
-      const ref = { placement: entry.placementId };
-      if (entry.hidden) next = setPlacementHidden(next, ref, false);
-      if (entry.collapsed) next = setPlacementCollapsed(next, ref, false);
+      const next = restorePlacement(layout, { placement: entry.placementId });
       if (next !== layout) setLayoutDraft(next);
     },
     [layout, setLayoutDraft],

@@ -365,6 +365,132 @@ export function setPlacementHidden(
   return setPlacementFlag(document, ref, "hidden", value);
 }
 
+export interface PlacementResizePatch {
+  width?: number | null;
+  height?: number | null;
+}
+
+export interface PlacementPositionPatch {
+  x?: number | null;
+  y?: number | null;
+}
+
+export interface SnapOptions {
+  grid: number;
+}
+
+function snapped(value: number, options?: SnapOptions): number | null {
+  if (!Number.isFinite(value)) return null;
+  const grid = options?.grid;
+  if (grid === undefined) return Math.max(0, value);
+  if (!Number.isFinite(grid) || grid <= 0) return null;
+  return Math.max(0, Math.round(value / grid) * grid);
+}
+
+function patchedPlacementNumber(
+  current: number | undefined,
+  requested: number | null | undefined,
+  options?: SnapOptions,
+): number | undefined {
+  if (requested === undefined) return current;
+  if (requested === null) return undefined;
+  return snapped(requested, options) ?? current;
+}
+
+/** Resize one placement without changing its piece binding. */
+export function resizePlacement(
+  document: LayoutDocument,
+  ref: PlacementRef,
+  patch: PlacementResizePatch,
+  options?: SnapOptions,
+): LayoutDocument {
+  const resolved = resolvePlacement(document, ref);
+  if (!resolved) return document;
+  const current = resolved.placement.size;
+  const width = patchedPlacementNumber(current?.width, patch.width, options);
+  const height = patchedPlacementNumber(current?.height, patch.height, options);
+  if (width === current?.width && height === current?.height) return document;
+  const size: NonNullable<PiecePlacement["size"]> = { ...(current ?? {}) };
+  if (width === undefined) delete size.width;
+  else size.width = width;
+  if (height === undefined) delete size.height;
+  else size.height = height;
+  const next = { ...resolved.placement };
+  if (Object.keys(size).length === 0) delete next.size;
+  else next.size = size;
+  return replacePlacement(document, resolved.placement, next);
+}
+
+/** Position one placement only when its parent region explicitly opts into free positioning. */
+export function positionPlacement(
+  document: LayoutDocument,
+  ref: PlacementRef,
+  patch: PlacementPositionPatch,
+  options?: SnapOptions,
+): LayoutDocument {
+  const resolved = resolvePlacement(document, ref);
+  if (!resolved || findRegion(document, resolved.regionId)?.positioning !== "free") return document;
+  const current = resolved.placement.position;
+  const x = patchedPlacementNumber(current?.x, patch.x, options);
+  const y = patchedPlacementNumber(current?.y, patch.y, options);
+  if (x === current?.x && y === current?.y) return document;
+  const next = { ...resolved.placement };
+  if (x === undefined && y === undefined) delete next.position;
+  else next.position = { x: x ?? 0, y: y ?? 0 };
+  return replacePlacement(document, resolved.placement, next);
+}
+
+/** Assign a placement to a declared grid cell; out-of-range slots are refused. */
+export function setPlacementGridSlot(
+  document: LayoutDocument,
+  ref: PlacementRef,
+  slot: { column: number; row: number } | null,
+): LayoutDocument {
+  const resolved = resolvePlacement(document, ref);
+  if (!resolved) return document;
+  const grid = findRegion(document, resolved.regionId)?.grid;
+  if (!grid) return document;
+  if (slot) {
+    if (!Number.isInteger(slot.column) || !Number.isInteger(slot.row)) return document;
+    if (
+      slot.column < 1 ||
+      slot.column > grid.columns ||
+      slot.row < 1 ||
+      slot.row > (grid.rows ?? Number.MAX_SAFE_INTEGER)
+    ) return document;
+  }
+  const current = resolved.placement.gridSlot;
+  if (
+    (current?.column ?? null) === (slot?.column ?? null) &&
+    (current?.row ?? null) === (slot?.row ?? null)
+  ) return document;
+  const next = { ...resolved.placement };
+  if (slot) next.gridSlot = { ...slot };
+  else delete next.gridSlot;
+  return replacePlacement(document, resolved.placement, next);
+}
+
+/** Return a placement to structural-flow defaults without ever changing what piece it binds. */
+export function restorePlacement(document: LayoutDocument, ref: PlacementRef): LayoutDocument {
+  const resolved = resolvePlacement(document, ref);
+  if (!resolved) return document;
+  const placement = resolved.placement;
+  if (
+    !placement.hidden &&
+    !placement.collapsed &&
+    !placement.size &&
+    !placement.position &&
+    !placement.gridSlot
+  ) return document;
+  const next = { ...placement };
+  delete next.hidden;
+  delete next.collapsed;
+  delete next.size;
+  delete next.position;
+  delete next.gridSlot;
+  return replacePlacement(document, placement, next);
+}
+
 /* -------------------------------------------------------------------------- */
 /*  3. region size                                                             */
 /* -------------------------------------------------------------------------- */

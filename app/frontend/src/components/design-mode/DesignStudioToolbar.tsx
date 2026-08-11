@@ -4,8 +4,11 @@ import type { StudioMode } from "../../lib/devMode";
 import { useText } from "../../lib/copy";
 import { useTheme } from "../../lib/theme";
 import { Button } from "../primitives";
-
-export type StudioViewport = "fit" | "desktop" | "tablet" | "mobile";
+import {
+  finiteViewportWidth,
+  RESPONSIVE_VIEWPORT_PRESETS,
+  type StudioViewport,
+} from "../../design-studio/responsiveViewports";
 
 interface DesignStudioToolbarProps {
   mode: StudioMode;
@@ -14,6 +17,8 @@ interface DesignStudioToolbarProps {
   onPresentationChange: (presentation: boolean) => void;
   viewport: StudioViewport;
   onViewportChange: (viewport: StudioViewport) => void;
+  customViewportWidth: number;
+  onCustomViewportWidthChange: (width: number) => void;
   zoom: number;
   onZoomChange: (zoom: number) => void;
   grid: boolean;
@@ -36,6 +41,8 @@ export function DesignStudioToolbar({
   onPresentationChange,
   viewport,
   onViewportChange,
+  customViewportWidth,
+  onCustomViewportWidthChange,
   zoom,
   onZoomChange,
   grid,
@@ -57,10 +64,7 @@ export function DesignStudioToolbar({
   const lightLabel = useText("design-studio.theme.light", "Light");
   const switchThemeLabel = useText("design-studio.theme.switch", "Switch Preview Theme");
   const viewportLabel = useText("design-studio.viewport", "Viewport");
-  const fitLabel = useText("design-studio.viewport.fit", "Fit");
-  const desktopLabel = useText("design-studio.viewport.desktop", "Desktop");
-  const tabletLabel = useText("design-studio.viewport.tablet", "Tablet");
-  const mobileLabel = useText("design-studio.viewport.mobile", "Mobile");
+  const customViewportLabel = useText("design-studio.viewport.custom-width", "Custom Viewport Width");
   const zoomLabel = useText("design-studio.zoom", "Zoom");
   const gridLabel = useText("design-studio.grid", "Grid");
   const snapLabel = useText("design-studio.snap", "Snap");
@@ -114,12 +118,27 @@ export function DesignStudioToolbar({
           onChange={(event) => onViewportChange(event.target.value as StudioViewport)}
           className="h-[22px] rounded-control border border-line bg-field px-1.5 text-xs text-t1"
         >
-          <option value="fit">{fitLabel}</option>
-          <option value="desktop">{desktopLabel}</option>
-          <option value="tablet">{tabletLabel}</option>
-          <option value="mobile">{mobileLabel}</option>
+          {RESPONSIVE_VIEWPORT_PRESETS.map((preset) => (
+            <option key={preset.id} value={preset.id}>{preset.label}</option>
+          ))}
         </select>
       </label>
+      {viewport === "custom" ? (
+        <input
+          type="number"
+          aria-label={customViewportLabel}
+          min={320}
+          max={3840}
+          step={1}
+          value={customViewportWidth}
+          onChange={(event) =>
+            onCustomViewportWidthChange(
+              finiteViewportWidth(event.target.value, customViewportWidth),
+            )
+          }
+          className="h-[22px] w-20 rounded-control border border-line bg-field px-1.5 text-xs text-t1"
+        />
+      ) : null}
 
       <label className="flex items-center gap-1 text-xs text-t2">
         <span>{zoomLabel}</span>

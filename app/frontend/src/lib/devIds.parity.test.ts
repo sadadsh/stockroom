@@ -259,6 +259,7 @@ const KNOWN_PROP_PASSED: readonly string[] = [
   // half-edited arrangement has to be able to name one at a time.
   "design.piece-collapse",
   "design.piece-hide",
+  "design.piece-restore",
   "design.piece-move-up",
   "design.piece-move-down",
 ]; // 85
@@ -471,6 +472,21 @@ describe("panel header band height", () => {
       }
     }
     expect(offenders).toEqual([]);
+  });
+});
+
+describe("meaningful Design Studio target coverage", () => {
+  it("gives every declared meaningful production boundary a stable registry identity", () => {
+    const uncovered: string[] = [];
+    for (const [path, src] of SOURCE) {
+      for (const match of src.matchAll(/<[^>]*\bdata-design-meaningful\b[^>]*>/gs)) {
+        const tag = match[0];
+        if (!/\bdata-(?:dev-id|dev-role|copy-id|icon-id|layout-piece)=/.test(tag)) {
+          uncovered.push(`${path}: ${tag.replace(/\s+/g, " ")}`);
+        }
+      }
+    }
+    expect(uncovered).toEqual([]);
   });
 });
 

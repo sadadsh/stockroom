@@ -231,7 +231,7 @@ function LayoutPlacementView({ placement }: { placement: PiecePlacement }) {
   // ONE placement is one arrangement unit even when it repeats, so a repeated placement is wrapped
   // ONCE around the whole run rather than once per item - a chrome per row would offer a handle
   // that moves nothing, since the document places the collection and not its members.
-  const drawn = items ? (
+  const content = items ? (
     <>
       {items.map((item, index) => (
         <Part key={item.key} placement={placement} item={item.value} index={index} />
@@ -240,6 +240,23 @@ function LayoutPlacementView({ placement }: { placement: PiecePlacement }) {
   ) : (
     <Part placement={placement} />
   );
+  const hasBox =
+    placement.size?.width !== undefined ||
+    placement.size?.height !== undefined ||
+    placement.position !== undefined ||
+    placement.gridSlot !== undefined;
+  const style = hasBox ? {
+    width: placement.size?.width,
+    height: placement.size?.height,
+    position: placement.position ? "absolute" as const : undefined,
+    left: placement.position?.x,
+    top: placement.position?.y,
+    gridColumn: placement.gridSlot?.column,
+    gridRow: placement.gridSlot?.row,
+  } : undefined;
+  const drawn = style ? (
+    <div data-layout-piece={placement.piece} style={style}>{content}</div>
+  ) : content;
   return Chrome ? <Chrome placement={placement}>{drawn}</Chrome> : drawn;
 }
 
@@ -252,11 +269,27 @@ function LayoutRegionView({ region }: { region: LayoutRegion }) {
     // shift the identity of the ones after it.
     content: slot.content ? <LayoutNodeView key={slot.id} node={slot.content} /> : null,
   }));
-  return (
+  const renderedRegion = (
     <Chrome region={region} slots={rendered}>
       {rendered.map((entry) => entry.content)}
     </Chrome>
   );
+  if (region.positioning === "free" || region.grid) {
+    return (
+      <div
+        style={{
+          position: region.positioning === "free" ? "relative" : undefined,
+          display: region.grid ? "grid" : undefined,
+          gridTemplateColumns: region.grid
+            ? `repeat(${region.grid.columns}, minmax(0, 1fr))`
+            : undefined,
+        }}
+      >
+        {renderedRegion}
+      </div>
+    );
+  }
+  return renderedRegion;
 }
 
 /** One node of the tree, whichever of the two drawable kinds it is. */

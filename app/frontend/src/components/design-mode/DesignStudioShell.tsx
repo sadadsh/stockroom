@@ -5,8 +5,13 @@ import { useText } from "../../lib/copy";
 import { openEscapeLayerCount } from "../../lib/useEscapeDismiss";
 import { flushPendingUiPrefs, readPref, writePref } from "../../lib/uiPrefs";
 import { DevPanel } from "../DevPanel";
-import { DesignStudioToolbar, type StudioViewport } from "./DesignStudioToolbar";
+import { DesignStudioToolbar } from "./DesignStudioToolbar";
+import {
+  RESPONSIVE_VIEWPORT_PRESETS,
+  type StudioViewport,
+} from "../../design-studio/responsiveViewports";
 import { LayersHierarchyPanel } from "./LayersHierarchyPanel";
+import { ArrangePreferencesProvider } from "./ArrangeSurface";
 import { ScenarioCatalog } from "./ScenarioCatalog";
 
 const LEFT_COLLAPSED_KEY = "stockroom.design-studio.left-collapsed";
@@ -79,7 +84,8 @@ export function DesignStudioShell({ children }: { children: ReactNode }) {
   const studio = useDesignStudio();
   const dev = useDevMode();
   const [presentation, setPresentation] = useState(false);
-  const [viewport, setViewport] = useState<StudioViewport>("fit");
+  const [viewport, setViewport] = useState<StudioViewport>("desktop-1366");
+  const [customViewportWidth, setCustomViewportWidth] = useState(1366);
   const [zoom, setZoom] = useState(100);
   const [grid, setGrid] = useState(false);
   const [snap, setSnap] = useState(true);
@@ -156,9 +162,10 @@ export function DesignStudioShell({ children }: { children: ReactNode }) {
     setRightWidth(width);
     writePref("design_studio_right_width", width, RIGHT_WIDTH_KEY);
   };
-  const viewportWidth = viewport === "desktop" ? 1440 : viewport === "tablet" ? 900 : viewport === "mobile" ? 430 : undefined;
+  const presetWidth = RESPONSIVE_VIEWPORT_PRESETS.find((preset) => preset.id === viewport)?.width;
+  const viewportWidth = presetWidth ?? Math.min(3840, Math.max(320, customViewportWidth || 320));
   const previewStyle: CSSProperties = {
-    width: viewportWidth ? `${viewportWidth}px` : "100%",
+    width: `${viewportWidth}px`,
     transform: `scale(${zoom / 100})`,
     transformOrigin: "top center",
   };
@@ -176,6 +183,8 @@ export function DesignStudioShell({ children }: { children: ReactNode }) {
           onPresentationChange={changePresentation}
           viewport={viewport}
           onViewportChange={setViewport}
+          customViewportWidth={customViewportWidth}
+          onCustomViewportWidthChange={setCustomViewportWidth}
           zoom={zoom}
           onZoomChange={setZoom}
           grid={grid}
@@ -239,7 +248,7 @@ export function DesignStudioShell({ children }: { children: ReactNode }) {
             className={studio.enabled ? "mx-auto min-h-full overflow-hidden border border-line bg-surface shadow-pop" : "contents"}
             style={studio.enabled ? previewStyle : undefined}
           >
-            {children}
+            <ArrangePreferencesProvider snap={snap}>{children}</ArrangePreferencesProvider>
           </div>
         </div>
 

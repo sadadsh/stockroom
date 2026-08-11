@@ -525,14 +525,19 @@ export const DEV_IDS: DevIdEntry[] = [
   // rendered placement, so each is a SHARED role in the same sense a part row is: an edit keyed on
   // it is meant to reach all of them.
   { id: "design.placement-handle", label: "One placement's drag handle", area: "design" },
+  { id: "design.placement-resize", label: "One placement's resize handle", area: "design" },
   { id: "design.drop-target", label: "One legal drop position", area: "design" },
   { id: "design.piece-menu", label: "Piece settings menu", area: "design" },
   { id: "design.piece-name", label: "Which piece the menu is about", area: "design" },
   { id: "design.piece-collapse", label: "Collapse or expand one placement", area: "design" },
   { id: "design.piece-hide", label: "Hide or show one placement", area: "design" },
+  { id: "design.piece-restore", label: "Restore one placement", area: "design" },
   { id: "design.piece-move-up", label: "One position earlier", area: "design" },
   { id: "design.piece-move-down", label: "One position later", area: "design" },
   { id: "design.piece-move-into", label: "Send a placement to another region", area: "design" },
+  { id: "design.piece-position", label: "Free placement coordinates", area: "design" },
+  { id: "design.piece-position-note", label: "Structural positioning restriction", area: "design" },
+  { id: "design.piece-grid-slot", label: "Declared grid slot", area: "design" },
   // The narrow style scope (plan 1.5). The WIDE scope - a role everywhere it appears - is the Tokens
   // rows and the Box tab, which are outside the id system with the panel's other chrome; these two
   // are on the canvas beside the move controls and belong with them.

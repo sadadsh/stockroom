@@ -168,6 +168,36 @@ describe("DesignStudioShell", () => {
     ).toBeVisible();
   });
 
+  it("previews the exact desktop presets and an explicit custom width", async () => {
+    await renderStudio();
+    const preview = screen.getByRole("region", { name: "Stockroom Preview" });
+    const frame = preview.firstElementChild as HTMLElement;
+    const viewport = screen.getByLabelText("Viewport");
+
+    expect(viewport).toHaveValue("desktop-1366");
+    expect(frame.style.width).toBe("1366px");
+    await userEvent.setup().selectOptions(viewport, "desktop-1920");
+    expect(frame.style.width).toBe("1920px");
+    await userEvent.setup().selectOptions(viewport, "custom");
+    const custom = screen.getByLabelText("Custom Viewport Width");
+    fireEvent.change(custom, { target: { value: "1472" } });
+    expect(frame.style.width).toBe("1472px");
+    fireEvent.change(custom, { target: { value: "" } });
+    expect(frame.style.width).toBe("1472px");
+  });
+
+  it("lists only rendered stable targets and exposes their hierarchy without index keys", async () => {
+    await renderStudio();
+    const sidebar = screen.getByRole("complementary", { name: "Screens And States" });
+    const rail = within(sidebar).getByRole("button", { name: "Navigation rail" });
+    expect(rail).toHaveAttribute("data-target-key", "dev:rail.root");
+    expect(within(sidebar).queryByRole("button", { name: "About dialog" })).toBeNull();
+
+    await userEvent.setup().click(within(sidebar).getByRole("button", { name: "Structure" }));
+    expect(rail.getAttribute("data-target-depth")).toMatch(/^\d+$/);
+    expect(sidebar.innerHTML).not.toContain("data-target-index");
+  });
+
   it("collapses every editor region without hiding Stockroom chrome", async () => {
     const { container } = await renderStudio();
     await userEvent.setup().click(

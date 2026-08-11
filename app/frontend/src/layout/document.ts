@@ -106,6 +106,10 @@ export interface LayoutRegion {
   /** Set only where this region is the scroll owner. Most regions own nothing. */
   scroll?: ScrollAxis;
   splitters?: readonly SplitterSpec[];
+  /** Only an explicitly declared free region accepts x/y placement edits. */
+  positioning?: "free";
+  /** Optional finite grid contract for placements assigned to a grid slot. */
+  grid?: { columns: number; rows?: number };
   slots: readonly LayoutSlot[];
 }
 
@@ -151,7 +155,9 @@ export interface PiecePlacement {
   piece: string;
   collapsed?: boolean;
   hidden?: boolean;
-  size?: AxisSize;
+  size?: AxisSize & { width?: number; height?: number };
+  position?: { x: number; y: number };
+  gridSlot?: { column: number; row: number };
   /** Style-role overrides scoped to this placement, keyed by the role this piece exposes. */
   styleRoles?: Readonly<Record<string, string>>;
   /** Parameters that distinguish sibling placements of one piece, e.g. which CAD asset kind. */

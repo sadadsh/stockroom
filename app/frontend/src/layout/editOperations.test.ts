@@ -49,6 +49,10 @@ import {
   isStyleRole,
   MIN_REGION_FRACTION,
   movePlacement,
+  positionPlacement,
+  resizePlacement,
+  restorePlacement,
+  setPlacementGridSlot,
   setPlacementCollapsed,
   setPlacementHidden,
   setPlacementStyleRole,
@@ -114,6 +118,17 @@ function twoColumns(): LayoutDocument {
         slots: [slot("slot.right.d", place("place.d", "piece.d"))],
       }),
     ],
+  });
+}
+
+function freeCanvas(): LayoutDocument {
+  return documentOf({
+    kind: "region",
+    id: "canvas",
+    mode: "stack",
+    positioning: "free",
+    grid: { columns: 4, rows: 3 },
+    slots: [slot("slot.canvas.a", place("place.a", "piece.a"))],
   });
 }
 
@@ -526,6 +541,48 @@ describe("per-placement settings", () => {
   });
 });
 
+describe("direct placement transforms", () => {
+  it("snaps a direct resize without changing the underlying piece binding", () => {
+    const document = twoColumns();
+    const next = resizePlacement(document, "place.a", { width: 481 }, { grid: 8 });
+
+    expect(findPlacement(next, "place.a")?.piece).toBe("piece.a");
+    expect(findPlacement(next, "place.a")?.size?.width).toBe(480);
+    expect(findPlacement(document, "place.a")?.size).toBeUndefined();
+  });
+
+  it("allows snapped free positioning only in a region that declares it", () => {
+    const structured = twoColumns();
+    expect(positionPlacement(structured, "place.a", { x: 19, y: 34 }, { grid: 8 })).toBe(
+      structured,
+    );
+
+    const free = freeCanvas();
+    const next = positionPlacement(free, "place.a", { x: 19, y: 34 }, { grid: 8 });
+    expect(findPlacement(next, "place.a")?.position).toEqual({ x: 16, y: 32 });
+    expect(findPlacement(next, "place.a")?.piece).toBe("piece.a");
+  });
+
+  it("sets only valid declared grid slots and restores every arrangement override", () => {
+    const free = freeCanvas();
+    const gridded = setPlacementGridSlot(free, "place.a", { column: 4, row: 3 });
+    expect(findPlacement(gridded, "place.a")?.gridSlot).toEqual({ column: 4, row: 3 });
+    expect(setPlacementGridSlot(free, "place.a", { column: 5, row: 1 })).toBe(free);
+
+    const changed = setPlacementHidden(
+      resizePlacement(gridded, "place.a", { width: 320, height: 200 }, { grid: 8 }),
+      "place.a",
+      true,
+    );
+    const next = restorePlacement(changed, "place.a");
+    expect(findPlacement(next, "place.a")).toEqual({
+      kind: "placement",
+      id: "place.a",
+      piece: "piece.a",
+    });
+  });
+});
+
 /* -------------------------------------------------------------------------- */
 /*  setPlacementStyleRole                                                      */
 /* -------------------------------------------------------------------------- */
@@ -746,6 +803,7 @@ const BATTERY: readonly (() => LayoutDocument)[] = [
   scrollConflict,
   cyclic,
   futureSchema,
+  freeCanvas,
 ];
 
 /**
@@ -794,6 +852,10 @@ function everyOperation(
     add(`role ${ref} on a name that is not a role`, () =>
       setPlacementStyleRole(document, ref, "heading", "machineText"),
     );
+    add(`resize ${ref}`, () => resizePlacement(document, ref, { width: 481, height: 239 }, { grid: 8 }));
+    add(`position ${ref}`, () => positionPlacement(document, ref, { x: 19, y: 34 }, { grid: 8 }));
+    add(`grid ${ref}`, () => setPlacementGridSlot(document, ref, { column: 1, row: 1 }));
+    add(`restore ${ref}`, () => restorePlacement(document, ref));
   }
   for (const region of [...new Set([...regions, "nowhere"])]) {
     for (const patch of [
