@@ -32,6 +32,10 @@ export interface ScenarioUiState {
     preview?: "symbol" | "footprint" | "model";
     confirmDelete?: boolean;
   };
+  projects?: {
+    selectedId?: string | null;
+    activeTab?: "overview" | "bom" | "build" | "activity";
+  };
   /** Native provider chrome is rendered by WindowHost, not duplicated in the React app tree. */
   provider?: {
     state: string;

@@ -20,6 +20,7 @@ import { useObjectUrl } from "../../lib/useObjectUrl";
 import { usePanZoom } from "../../lib/usePanZoom";
 import { Badge, Button, SegmentedControl } from "../primitives";
 import { AdaptiveChoice } from "../AdaptiveChoice";
+import { useScenarioUiState } from "../../design-studio/scenarioState";
 
 type PlacementStateByReference = Record<string, AssemblyPlacementState | undefined>;
 
@@ -71,6 +72,7 @@ export function ProjectPlacementStage({
   unavailable?: boolean;
   className?: string;
 }) {
+  const fixturePreview = useScenarioUiState().projects !== undefined;
   const mapLabel = useText("projects.placement-map.aria", "PCB view");
   // The stage's accessible name states the gestures, which nothing visible does.
   const stageName = useCopyFormatter(
@@ -181,7 +183,8 @@ export function ProjectPlacementStage({
         placements={scene.boardPlacements}
         nativeBoardUrl={nativeBoardUrl}
         nativeRenderPending={nativeRenderPending}
-        renderNote={visuals.data?.detail || visuals.error?.message}
+        renderNote={refreshVisuals.error?.message || visuals.data?.detail || visuals.error?.message}
+        fixturePreview={fixturePreview}
         rerendering={refreshVisuals.isPending}
         onRerender={() => refreshVisuals.mutate()}
         onBoard={(nextBoard) => {
@@ -450,6 +453,7 @@ function PlacementStageToolbar({
   nativeBoardUrl,
   nativeRenderPending,
   renderNote,
+  fixturePreview,
   rerendering,
   onRerender,
   onBoard,
@@ -469,6 +473,7 @@ function PlacementStageToolbar({
   nativeBoardUrl: string | null;
   nativeRenderPending: boolean;
   renderNote: string | undefined;
+  fixturePreview: boolean;
   rerendering: boolean;
   onRerender: () => void;
   onBoard: (board: string) => void;
@@ -542,10 +547,18 @@ function PlacementStageToolbar({
           <Button
             small
             disabled={rerendering}
+            aria-describedby={fixturePreview ? "projects-native-render-preview-help" : undefined}
             onClick={onRerender}
           >
             {rerendering ? renderingBoardLabel : renderBoardLabel}
           </Button>
+        ) : null}
+        {fixturePreview ? (
+          <span id="projects-native-render-preview-help" className="sr-only">
+            <Text id="projects.preview.native-render-help">
+              Fixture Preview blocks native rendering. Return to Real Data to render the PCB.
+            </Text>
+          </span>
         ) : null}
         {/* The board picker's strip is a DIV, not a label. The control inside carries its own
             accessible name, which wins over a wrapping label's text, so the `<label>` it used to
@@ -688,7 +701,7 @@ function PlacementStageScene({
           <Text id="projects.placement-map.loading">Loading placement map...</Text>
         </StageMessage>
       ) : (unavailable || geometry?.status !== "ready") && !nativeBoardUrl ? (
-        <StageMessage tone="warn">
+        <StageMessage tone="warn" devId="projects.placement-blocked">
           <div>
             <p>{blockedMessage}</p>
             {onRetry ? (
@@ -1592,12 +1605,15 @@ function fileName(path: string) {
 function StageMessage({
   children,
   tone = "neutral",
+  devId,
 }: {
   children: React.ReactNode;
   tone?: "neutral" | "warn";
+  devId?: string;
 }) {
   return (
     <div
+      data-dev-id={devId}
       className={`absolute inset-0 z-10 flex items-center justify-center p-6 text-center text-sm ${
         tone === "warn" ? "text-warn" : "text-t3"
       }`}

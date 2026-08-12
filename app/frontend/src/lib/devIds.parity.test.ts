@@ -114,6 +114,18 @@ const KNOWN_DERIVED: readonly string[] = [
 // (2) Passed as a plain string prop and rendered by a child as data-dev-id={devId}. The
 // id string is present in source (verified below), just not on a data-dev-id attribute.
 const KNOWN_PROP_PASSED: readonly string[] = [
+  // Projects routes loading, failure, blocked-placement, and conditional repository states through
+  // shared product-state/stage shells. Each state id is spelled out at its production call site and
+  // the child shell emits it as data-dev-id={devId} (or the repository badge emits the conditional
+  // expression), keeping the real workbench state addressable without adding wrapper markup.
+  "projects.loading",
+  "projects.empty",
+  "projects.picker.loading",
+  "projects.picker.failed",
+  "projects.workspace.loading",
+  "projects.workspace.error",
+  "projects.placement-blocked",
+  "projects.repository-diverged",
   // ComponentsPage passes state-specific ids through productState's shared `devId` prop. The
   // loading, failed, and filtered-empty frames are separate states of the real picker body.
   "components.list-loading",
@@ -267,7 +279,7 @@ const KNOWN_PROP_PASSED: readonly string[] = [
   "design.piece-restore",
   "design.piece-move-up",
   "design.piece-move-down",
-]; // 85
+]; // 93
 
 describe("devIds catalogue <-> code parity (IDSYS-02)", () => {
   const catalogueIds = new Set(DEV_IDS.map((e) => e.id));

@@ -663,7 +663,11 @@ function PlacementRecorder({
             </div>
           </div>
           {progress.resolved === progress.total ? (
-            <Panel title={buildCompleteTitle} className="mt-5">
+            <Panel
+              data-dev-id="projects.build-complete"
+              title={buildCompleteTitle}
+              className="mt-5"
+            >
               <p className="text-xs leading-5 text-t3">
                 <Text id="projects.build.complete-detail">
                   Create a receipt from the saved placement events.

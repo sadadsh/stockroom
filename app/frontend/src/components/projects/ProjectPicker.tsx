@@ -118,12 +118,12 @@ export function ProjectPicker({
       </div>
       <div className="mt-2 min-h-0 flex-1 overflow-y-auto px-3 pb-3">
         {loading ? (
-          <LoadingState className="mt-2" id="projects.picker.loading">
+          <LoadingState className="mt-2" id="projects.picker.loading" devId="projects.picker.loading">
             Loading this machine's linked projects...
           </LoadingState>
         ) : error ? (
           // A written sentence and the shared retry, not `error.message` and a bare button.
-          <ErrorState className="mt-2" id="projects.picker.failed" onRetry={onRetry}>
+          <ErrorState className="mt-2" id="projects.picker.failed" devId="projects.picker.failed" onRetry={onRetry}>
             This machine's linked projects could not be listed.
           </ErrorState>
         ) : projects.length === 0 ? (

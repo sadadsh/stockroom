@@ -491,7 +491,10 @@ function RepositoryStanding({
     <div className="ml-auto flex items-center gap-2 text-xs text-t2">
       <GitIcon />
       <span className="font-mono">{repo.branch}</span>
-      <Badge tone={synced ? "ok" : "warn"}>
+      <Badge
+        data-dev-id={repo.ahead > 0 && repo.behind > 0 ? "projects.repository-diverged" : undefined}
+        tone={synced ? "ok" : "warn"}
+      >
         {synced
           ? <Text id="projects.activity.synced">Aligned</Text>
           : !repo.clean
@@ -814,7 +817,11 @@ function ReviewInspector({
     !approve.isPending;
 
   return (
-    <aside className="min-h-0 overflow-y-auto p-5" aria-label={reviewAria}>
+    <aside
+      data-dev-id="projects.shared-review"
+      className="min-h-0 overflow-y-auto p-5"
+      aria-label={reviewAria}
+    >
       <div className="flex items-start gap-3">
         <div className="min-w-0 flex-1">
           <p className="text-xs font-semibold text-t3">

@@ -28,6 +28,8 @@ import {
 import { Text, useText } from "../lib/copy";
 import { readUiSession, updateUiSession } from "../lib/uiSession";
 import type { ProjectSummary } from "../api/types";
+import { useScenarioUiState } from "../design-studio/scenarioState";
+import type { ScenarioUiState } from "../design-studio/scenario";
 
 type ProjectTool = "overview" | "bom" | "build" | "activity";
 
@@ -37,9 +39,15 @@ type ProjectTool = "overview" | "bom" | "build" | "activity";
 const NO_PROJECTS: ProjectSummary[] = [];
 
 export function ProjectsPage() {
+  const preview = useScenarioUiState().projects;
+  const previewKey = `${preview?.selectedId ?? "real"}:${preview?.activeTab ?? "overview"}`;
+  return <ProjectsPageContent key={previewKey} preview={preview} />;
+}
+
+function ProjectsPageContent({ preview }: { preview: ScenarioUiState["projects"] }) {
   const projects = useProjects();
   const [selectedId, setSelectedId] = useState<string | null>(
-    () => readUiSession().selected_ids.project,
+    () => preview?.selectedId === undefined ? readUiSession().selected_ids.project : preview.selectedId,
   );
   const summaries = projects.data ?? NO_PROJECTS;
 
@@ -80,15 +88,15 @@ export function ProjectsPage() {
       />
       <main className="min-h-0 min-w-0 flex-1 overflow-hidden border-l border-line">
         {selectedId ? (
-          <SelectedProject key={selectedId} projectId={selectedId} />
+          <SelectedProject key={selectedId} projectId={selectedId} initialTool={preview?.activeTab} />
         ) : (
           <div className="flex h-full items-center justify-center p-8 text-center">
             {projects.isLoading ? (
-              <LoadingState dense id="projects.loading">
+              <LoadingState dense id="projects.loading" devId="projects.loading">
                 Loading this machine's linked projects...
               </LoadingState>
             ) : (
-              <EmptyState dense id="projects.empty">
+              <EmptyState dense id="projects.empty" devId="projects.empty">
                 Link a project or select one from the list.
               </EmptyState>
             )}
@@ -99,10 +107,16 @@ export function ProjectsPage() {
   );
 }
 
-function SelectedProject({ projectId }: { projectId: string }) {
+function SelectedProject({
+  projectId,
+  initialTool = "overview",
+}: {
+  projectId: string;
+  initialTool?: ProjectTool;
+}) {
   const workspace = useProjectWorkspace(projectId);
   const collaboration = useProjectCollaboration(projectId);
-  const [tool, setTool] = useState<ProjectTool>("overview");
+  const [tool, setTool] = useState<ProjectTool>(initialTool);
   const overviewLabel = useText("projects.tab.overview", "Overview");
   const bomLabel = useText("projects.tab.bom", "BOM");
   const buildLabel = useText("projects.tab.build", "Build");
@@ -115,7 +129,7 @@ function SelectedProject({ projectId }: { projectId: string }) {
   if (workspace.isLoading) {
     return (
       <WorkspaceMessage>
-        <LoadingState dense id="projects.workspace.loading">
+        <LoadingState dense id="projects.workspace.loading" devId="projects.workspace.loading">
           Loading this project...
         </LoadingState>
       </WorkspaceMessage>
@@ -126,7 +140,7 @@ function SelectedProject({ projectId }: { projectId: string }) {
       <WorkspaceMessage>
         {/* A written sentence and one retry. `workspace.error.message` is a transport string
             (a status line, a stack) and was shown to the person verbatim. */}
-        <ErrorState id="projects.workspace.error" onRetry={() => workspace.refetch()}>
+        <ErrorState id="projects.workspace.error" devId="projects.workspace.error" onRetry={() => workspace.refetch()}>
           This project could not be opened.
         </ErrorState>
       </WorkspaceMessage>
@@ -187,7 +201,7 @@ function SelectedProject({ projectId }: { projectId: string }) {
               </span>
             </span>
           ) : (
-            <span className="whitespace-nowrap text-2xs text-warn">
+            <span data-dev-id="projects.no-repository" className="whitespace-nowrap text-2xs text-warn">
               <Text id="projects.no-repository">No Git checkout</Text>
             </span>
           )}
@@ -265,9 +279,11 @@ function RuntimeBadge({
   }
   if (status === "unavailable" || status === "not-installed") {
     return (
-      <Badge size="sm" tone="warn">
-        {editor} {neededLabel}
-      </Badge>
+      <span data-dev-id="projects.runtime-missing">
+        <Badge size="sm" tone="warn">
+          {editor} {neededLabel}
+        </Badge>
+      </span>
     );
   }
   return (

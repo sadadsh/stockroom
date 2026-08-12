@@ -16,6 +16,7 @@ import { BoardIcon, GitIcon } from "../icons";
 import { ProjectPlacementStage } from "./ProjectPlacementStage";
 import { ProjectInspectorFacts } from "./ProjectInspectorFacts";
 import { AdaptiveChoice } from "../AdaptiveChoice";
+import { useScenarioUiState } from "../../design-studio/scenarioState";
 
 export function ProjectDesignWorkbench({
   workspace,
@@ -259,6 +260,7 @@ function DocumentInspector({
   workspace: ProjectWorkspace;
 }) {
   const openDocument = useOpenProjectDocument(workspace.project.id);
+  const fixturePreview = useScenarioUiState().projects !== undefined;
   const { toast } = useToast();
   const typeLabel = useText("projects.overview.field.type", "Kind");
   const pathLabel = useText("projects.overview.field.path", "Path");
@@ -337,6 +339,7 @@ function DocumentInspector({
         variant="accent"
         className="mt-4 w-full justify-center"
         disabled={!document.exists || openDocument.isPending}
+        aria-describedby={fixturePreview ? "projects-native-open-preview-help" : undefined}
         onClick={() =>
           openDocument.mutate(document.document_id, {
             onSuccess: () => toast(`${openedLabel} ${editorName}`, "ok"),
@@ -354,6 +357,17 @@ function DocumentInspector({
           openLabel
         )}
       </Button>
+      {fixturePreview ? (
+        <p
+          id="projects-native-open-preview-help"
+          data-dev-id="projects.native-action-blocked"
+          className="mt-2 text-xs leading-5 text-warn"
+        >
+          <Text id="projects.preview.native-action-help">
+            Fixture Preview blocks native actions. Return to Real Data to open or render project files.
+          </Text>
+        </p>
+      ) : null}
       <p className="mt-4 text-xs leading-5 text-t3">
         {document.lock_required ? (
           <Text id="projects.overview.claim">Claim this file in Recent Work before editing.</Text>

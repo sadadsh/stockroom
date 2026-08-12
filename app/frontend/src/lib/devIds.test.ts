@@ -189,7 +189,9 @@ import { DEV_IDS, DEV_ID_AREAS, DEV_ID_BY_ID } from "./devIds";
 // 474 with the onboarding and toast targets used by Design Studio's real-component scenarios.
 // 482 with the Components list's loading, failed, and filtered-empty states exposed to the same
 // stable target contract as the rest of the production picker.
-const EXPECTED_ENTRIES = 482;
+// 495 with the Projects scenario states that distinguish loading, failures, native/runtime
+// blockers, repository collaboration, shared review, and build completion in the real workbenches.
+const EXPECTED_ENTRIES = 495;
 
 describe("devIds catalogue", () => {
   // The count is asserted from a single constant so bumping it is one edit, and so the test NAME can
