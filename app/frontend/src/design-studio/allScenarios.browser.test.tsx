@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { bootstrapScenarioRegistry } from "./scenarios";
 import { mountScenario } from "./scenarios/testHarness";
+import { scenarioStateSignature } from "./scenario";
 
 /**
  * Browser-floor coverage over the one production scenario registry. The external Playwright
@@ -15,6 +16,10 @@ describe("all production Design Studio scenarios", () => {
       expect(
         document.querySelector(`[data-scenario-id="${scenario.id}"]`),
       ).toBeInTheDocument();
+      expect(document.querySelector(`[data-scenario-id="${scenario.id}"]`)).toHaveAttribute(
+        "data-scenario-state",
+        scenarioStateSignature(scenario),
+      );
       for (const target of scenario.expectedTargets) {
         expect(
           document.querySelector(`[data-dev-id="${target}"], [data-dev-role="${target}"]`),

@@ -8,7 +8,7 @@ export const stmScenarioIds = [
 type StmScenarioId = (typeof stmScenarioIds)[number];
 
 function scenario(id: StmScenarioId, title: string, fixtures: StmFixtureOptions = {}, initialUi: ScenarioUiState = {}, expectedTargets = ["stm.root"]): DesignScenario {
-  return { id, title, area: "stm", group: "STM Viewer", route: "stm", fixtures: stmReadFixtures(fixtures), initialUi, expectedTargets, coverage: ["route:stm", `state:${id.slice(4)}`] };
+  return { id, title, area: "stm", group: "STM Viewer", route: "stm", fixtures: stmReadFixtures(fixtures), initialUi, expectedTargets };
 }
 
 const unavailable = { ...STM_STATUS, built: false, source_present: false };

@@ -1,8 +1,8 @@
 import { api, ApiError } from "../api/client";
 import type {
-  DevPublishResult,
+  DevPromoteBody,
+  DevPromoteResult,
   DevSaveBody,
-  DevSaveResult,
   DevWorkspaceStatus,
 } from "../api/types";
 import { isApprovedDynamicDevId } from "../lib/componentDevIds";
@@ -156,10 +156,47 @@ export function promotionPlan(
   };
 }
 
+/** Preserve the base plus every named variation as independently validated dark/light projections. */
+export function promotionTransactionPlan(
+  document: DesignDocument,
+  message: string,
+  activeTheme: Theme = "dark",
+  targetRoot: ParentNode | null = typeof window === "undefined" ? null : window.document,
+): DevPromoteBody {
+  const translated = (variationId: string, theme: Theme): DevSaveBody => promotionPlan(
+    { ...document, activeVariationId: variationId },
+    theme,
+    targetRoot,
+  );
+  const base = {
+    dark: translated("", "dark"),
+    light: translated("", "light"),
+  };
+  const variations = Object.fromEntries(Object.values(document.variations).map((variation) => [
+    variation.id,
+    {
+      title: variation.title,
+      extends: variation.extends,
+      themes: {
+        dark: translated(variation.id, "dark"),
+        light: translated(variation.id, "light"),
+      },
+    },
+  ]));
+  const activePair = document.activeVariationId
+    ? variations[document.activeVariationId]?.themes
+    : base;
+  if (!activePair) throw new PromotionValidationError([{ code: "unknown-active-variation", source: "design" }]);
+  return {
+    message,
+    source: structuredClone(activePair[activeTheme]),
+    translations: { base, variations },
+  };
+}
+
 export interface PromotionClient {
   devStatus(): Promise<DevWorkspaceStatus>;
-  devSave(body: DevSaveBody): Promise<DevSaveResult>;
-  devPublish(message: string): Promise<DevPublishResult>;
+  devPromote(body: DevPromoteBody): Promise<DevPromoteResult>;
 }
 
 export interface RunPromotionOptions {
@@ -198,9 +235,9 @@ export async function runPersonalDesignPromotion({
     };
   }
 
-  let body: DevSaveBody;
+  let body: DevPromoteBody;
   try {
-    body = promotionPlan(document, theme, targetRoot);
+    body = promotionTransactionPlan(document, message, theme, targetRoot);
   } catch (error) {
     return { state: "blocked", message: failureMessage(error) };
   }
@@ -209,8 +246,7 @@ export async function runPersonalDesignPromotion({
     const status = await client.devStatus();
     const blocker = preSaveStatusBlocker(status);
     if (blocker) return { state: "blocked", message: blocker };
-    await client.devSave(body);
-    const published = await client.devPublish(message);
+    const published = await client.devPromote(body);
     return {
       state: "success",
       message: `Promoted personal design at ${published.commit}.`,

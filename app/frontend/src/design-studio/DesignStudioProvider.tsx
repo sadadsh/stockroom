@@ -14,6 +14,7 @@ import { DevModeProvider, useDevMode } from "../lib/devMode";
 import { committedDevModeDraft, type DevModeDraft } from "../lib/devModeDraft";
 import {
   DESIGN_DOCUMENT_SCHEMA_VERSION,
+  builtInVariationDocument,
   diffDesignDraft,
   resolveDesign,
   type DesignDocument,
@@ -27,6 +28,7 @@ import {
   previewAdapter,
 } from "./requestAdapter";
 import type { DesignScenario } from "./scenario";
+import { installPreviewEffectGuard } from "./previewEffects";
 import { bootstrapScenarioRegistry } from "./scenarios";
 import type { ScenarioRegistry } from "./scenarioRegistry";
 import { ScenarioUiProvider } from "./scenarioState";
@@ -39,7 +41,7 @@ import {
 
 export interface DesignStudioContextValue {
   open: () => void;
-  close: () => void;
+  close: () => Promise<void>;
   enabled: boolean;
   document: DesignDocument;
   replaceDocument: (document: DesignDocument) => void;
@@ -63,8 +65,8 @@ function initialDocument(): DesignDocument {
   return {
     schemaVersion: DESIGN_DOCUMENT_SCHEMA_VERSION,
     base: committedDevModeDraft(),
-    variations: {},
-    activeVariationId: "",
+    variations: builtInVariationDocument(),
+    activeVariationId: "full-data",
     targetScopes: {},
   };
 }
@@ -184,6 +186,7 @@ function DesignStudioBridge({
     message: "Checking source promotion availability.",
   });
   const restoreAdapter = useRef<(() => void) | null>(null);
+  const restoreEffectGuard = useRef<(() => void) | null>(null);
   const realRouteContext = useRef<RealRouteContext | null>(null);
   const transition = useRef<Promise<void> | undefined>(undefined);
   const mounted = useRef(false);
@@ -193,6 +196,14 @@ function DesignStudioBridge({
     controller.activate();
     void controller.hydrate();
     return () => controller.dispose();
+  }, [controller]);
+
+  useEffect(() => {
+    const flushForPageExit = () => {
+      void controller.flush();
+    };
+    window.addEventListener("pagehide", flushForPageExit);
+    return () => window.removeEventListener("pagehide", flushForPageExit);
   }, [controller]);
 
   useEffect(
@@ -211,6 +222,8 @@ function DesignStudioBridge({
       lifecycleGeneration.current += 1;
       restoreAdapter.current?.();
       restoreAdapter.current = null;
+      restoreEffectGuard.current?.();
+      restoreEffectGuard.current = null;
       const real = realRouteContext.current;
       if (real) replaceBrowserLocation(real.href, real.historyState);
       realRouteContext.current = null;
@@ -244,9 +257,6 @@ function DesignStudioBridge({
 
   const open = useCallback(() => {
     if (!devMode.enabled) devMode.toggle();
-  }, [devMode.enabled, devMode.toggle]);
-  const close = useCallback(() => {
-    if (devMode.enabled) devMode.toggle();
   }, [devMode.enabled, devMode.toggle]);
   const replaceDocument = useCallback(
     (document: DesignDocument) => {
@@ -361,12 +371,14 @@ function DesignStudioBridge({
         if (!mounted.current || lifecycleGeneration.current !== generation) return;
         clearInactiveProductQueries();
         restoreAdapter.current?.();
+        restoreEffectGuard.current?.();
         if (!realRouteContext.current && typeof window !== "undefined") {
           realRouteContext.current = {
             href: window.location.href,
             historyState: window.history.state,
           };
         }
+        restoreEffectGuard.current = installPreviewEffectGuard(scenario.id);
         restoreAdapter.current = installApiRequestAdapter(previewAdapter(scenario));
         setScenarioUiState(scenario.initialUi);
         setActiveScenario(scenario);
@@ -388,6 +400,8 @@ function DesignStudioBridge({
         clearInactiveProductQueries();
         restoreAdapter.current?.();
         restoreAdapter.current = null;
+        restoreEffectGuard.current?.();
+        restoreEffectGuard.current = null;
         setScenarioUiState({});
         setActiveScenario(null);
         const real = realRouteContext.current;
@@ -397,6 +411,11 @@ function DesignStudioBridge({
       }),
     [beginTransition, clearInactiveProductQueries, queryClient, refreshActiveProductQueries],
   );
+  const close = useCallback(async () => {
+    if (activeScenario) await exitScenario();
+    await controller.flush();
+    if (devMode.enabled) devMode.toggle();
+  }, [activeScenario, controller, devMode.enabled, devMode.toggle, exitScenario]);
   const activateScenario = useCallback(
     (scenarioId: string) => {
       if (scenarioId === "global.real-data") return exitScenario();

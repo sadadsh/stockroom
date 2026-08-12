@@ -54,7 +54,6 @@ function scenario(
     fixtures: projectReadFixtures(options.fixtures),
     initialUi: options.initialUi ?? {},
     expectedTargets: options.expectedTargets,
-    coverage: ["route:projects", `state:${id.slice("projects.".length)}`],
   };
 }
 

@@ -186,6 +186,55 @@ describe("DesignStudioShell", () => {
     expect(frame.style.width).toBe("1472px");
   });
 
+  it("restores the last case, viewport, mode, zoom, grid, snap, and presentation preference", async () => {
+    window.__STOCKROOM_UI__ = {
+      rail_collapsed: false,
+      design_studio_last_scenario: "global.onboarding.open",
+      design_studio_viewport: "desktop-1920",
+      design_studio_custom_viewport_width: 1777,
+      design_studio_mode: "inspect",
+      design_studio_zoom: 75,
+      design_studio_grid: true,
+      design_studio_snap: false,
+      design_studio_presentation: false,
+    };
+    await renderStudio();
+
+    await waitFor(() => expect(document.querySelector('[data-scenario-id="global.onboarding.open"]')).toBeInTheDocument());
+    expect(screen.getByLabelText("Viewport")).toHaveValue("desktop-1920");
+    expect(screen.getByLabelText("Zoom")).toHaveValue("75");
+    expect(within(screen.getByLabelText("Studio Mode")).getByRole("button", { name: "Inspect" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "Grid" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "Snap" })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByRole("button", { name: "Presentation Mode" })).toHaveAttribute("aria-pressed", "false");
+  });
+
+  it("fits and visibly frames a wide canvas with keyboard and pointer panning", async () => {
+    await renderStudio();
+    await userEvent.setup().selectOptions(screen.getByLabelText("Viewport"), "desktop-1920");
+    await userEvent.setup().selectOptions(screen.getByLabelText("Zoom"), "0");
+    const preview = screen.getByRole("region", { name: "Stockroom Preview" });
+    const frame = preview.firstElementChild as HTMLElement;
+
+    expect(frame.style.width).toBe("1920px");
+    expect(frame.style.transform).toMatch(/^scale\(/);
+    expect(screen.getByText("Fit · Drag canvas or press arrow controls to pan")).toBeVisible();
+
+    preview.scrollLeft = 0;
+    fireEvent.keyDown(preview, { key: "ArrowRight" });
+    expect(preview.scrollLeft).toBe(80);
+    const pointer = (type: string, clientX: number) => {
+      const event = new Event(type, { bubbles: true });
+      Object.defineProperties(event, {
+        clientX: { value: clientX }, clientY: { value: 20 }, pointerId: { value: 1 },
+      });
+      fireEvent(preview, event);
+    };
+    pointer("pointerdown", 100);
+    pointer("pointermove", 20);
+    expect(preview.scrollLeft).toBe(160);
+  });
+
   it("lists only rendered stable targets and exposes their hierarchy without index keys", async () => {
     await renderStudio();
     const sidebar = screen.getByRole("complementary", { name: "Screens And States" });
@@ -322,18 +371,59 @@ describe("DesignStudioShell", () => {
     ).toHaveLength(0);
 
     await userEvent.setup().click(screen.getByRole("button", { name: "Real Data" }));
-    await waitFor(() =>
-      expect(
-        fetchMock.mock.calls.filter(
-          ([input, init]) => String(input).includes("/api/settings") && init?.method === "PATCH",
-        ),
-      ).toHaveLength(1),
-    );
+    await waitFor(() => expect(fetchMock.mock.calls.some(
+      ([input, init]) => String(input).includes("/api/settings") && init?.method === "PATCH" &&
+        String(init.body).includes("design_studio_left_width"),
+    )).toBe(true));
     const settingsCall = fetchMock.mock.calls.find(
-      ([input, init]) => String(input).includes("/api/settings") && init?.method === "PATCH",
+      ([input, init]) => String(input).includes("/api/settings") && init?.method === "PATCH" &&
+        String(init.body).includes("design_studio_left_width"),
     );
     expect(settingsCall?.[1]?.body).toBe(
       JSON.stringify({ ui: { design_studio_left_width: queuedWidth } }),
     );
+  });
+
+  it("blocks a real Settings picker control before either native bridge and explains recovery", async () => {
+    const managedPicker = vi.fn().mockResolvedValue("C:\\CubeMX");
+    const legacyPicker = vi.fn().mockResolvedValue("C:\\LegacyCubeMX");
+    const bridges = window as unknown as {
+      __STOCKROOM_HOST__?: { pickFolder: typeof managedPicker };
+      pywebview?: { api: { pick_folder: typeof legacyPicker } };
+    };
+    bridges.__STOCKROOM_HOST__ = { pickFolder: managedPicker };
+    bridges.pywebview = { api: { pick_folder: legacyPicker } };
+    await renderStudio();
+
+    await userEvent.setup().click(screen.getByRole("button", { name: /^cubemx picker/i }));
+    const pickerCase = await waitFor(() => {
+      const element = document.querySelector<HTMLElement>('[data-scenario-picker="cubemx"]');
+      expect(element).toBeVisible();
+      return element!;
+    });
+    await userEvent.setup().click(within(pickerCase).getByRole("button", { name: "Choose Folder" }));
+
+    expect(await screen.findByText(
+      /Fixture preview blocked choosing a CubeMX folder\. Return to Real Data/,
+    )).toBeInTheDocument();
+    expect(managedPicker).not.toHaveBeenCalled();
+    expect(legacyPicker).not.toHaveBeenCalled();
+  });
+
+  it("shows the six built-in variations and manages custom inheritance and deletion", async () => {
+    await renderStudio();
+    for (const title of ["Full Data", "Compact", "Purchasing", "CAD Review", "Minimal", "Custom"]) {
+      expect(screen.getByRole("button", { name: new RegExp(`^${title}$`) })).toBeInTheDocument();
+    }
+
+    await userEvent.setup().click(screen.getByRole("button", { name: "New Variation" }));
+    await userEvent.setup().type(screen.getByRole("textbox", { name: "Variation Name" }), "Bench Review");
+    await userEvent.setup().click(screen.getByRole("button", { name: "Create" }));
+
+    expect(screen.getByRole("button", { name: "Bench Review" })).toHaveAttribute("aria-pressed", "true");
+    await userEvent.setup().selectOptions(screen.getByRole("combobox", { name: "Variation Parent" }), "compact");
+    expect(screen.getByRole("combobox", { name: "Variation Parent" })).toHaveValue("compact");
+    await userEvent.setup().click(screen.getByRole("button", { name: "Delete" }));
+    expect(screen.queryByRole("button", { name: "Bench Review" })).not.toBeInTheDocument();
   });
 });

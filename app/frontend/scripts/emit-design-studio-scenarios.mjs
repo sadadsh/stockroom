@@ -16,6 +16,7 @@ const chunk = generated.output.find((item) => item.type === "chunk" && item.isEn
 if (!chunk) throw new Error("Design Studio scenario registry did not produce an entry chunk.");
 const moduleUrl = `data:text/javascript;base64,${Buffer.from(chunk.code).toString("base64")}`;
 const registryModule = await import(moduleUrl);
+const scenarioModule = registryModule;
 const scenarios = registryModule.bootstrapScenarioRegistry.scenarios.map((scenario) => ({
   id: scenario.id,
   title: scenario.title,
@@ -23,7 +24,7 @@ const scenarios = registryModule.bootstrapScenarioRegistry.scenarios.map((scenar
   group: scenario.group,
   route: scenario.route,
   expectedTargets: [...scenario.expectedTargets],
-  coverage: [...scenario.coverage],
+  stateSignature: scenarioModule.scenarioStateSignature(scenario),
 }));
 
 await mkdir(path.dirname(output), { recursive: true });

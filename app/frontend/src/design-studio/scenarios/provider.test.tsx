@@ -62,7 +62,7 @@ describe("provider-download Design Studio scenarios", () => {
     expect(liveRequest).not.toHaveBeenCalled();
   });
 
-  it("recovers a selected download through the real host chooser and an in-memory outcome", async () => {
+  it("blocks selected-file recovery before the real host chooser while previewing", async () => {
     const host = window as unknown as {
       __STOCKROOM_HOST__?: { pickFiles: (purpose: string) => Promise<string[]> };
     };
@@ -72,12 +72,10 @@ describe("provider-download Design Studio scenarios", () => {
       const { user, liveRequest } = await mountScenario("provider.selected-file-recovery");
       const dialog = await screen.findByRole("dialog", { name: "Review CAD Sources" });
       await user.click(within(dialog).getByRole("button", { name: "Import Downloaded Files" }));
-      expect(pickFiles).toHaveBeenCalledWith("cad-recovery");
-      await waitFor(() =>
-        expect(document.querySelector('[data-dev-id="toast.status"]')).toHaveTextContent(
-          /Attached 2 CAD roles/i,
-        ),
-      );
+      expect(pickFiles).not.toHaveBeenCalled();
+      await waitFor(() => expect(document.querySelector('[data-dev-id="toast.status"]')).toHaveTextContent(
+        /Fixture preview blocked choosing CAD recovery files/i,
+      ));
       expect(document.querySelector('[data-dev-id="shell.root"]')).toBeInTheDocument();
       expect(liveRequest).not.toHaveBeenCalled();
     } finally {

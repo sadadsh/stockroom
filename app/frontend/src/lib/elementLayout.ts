@@ -87,6 +87,15 @@ export function isValidGridSlot(value: string): boolean {
 // would delete a tweak that was legitimately committed.
 
 export const EDITABLE_ELEMENT_PROPS = [
+  "position",
+  "inset",
+  "top",
+  "right",
+  "bottom",
+  "left",
+  "overflow",
+  "overflow-x",
+  "overflow-y",
   "width",
   "height",
   "min-width",
@@ -116,16 +125,28 @@ export const EDITABLE_ELEMENT_PROPS = [
   "background-color",
   "border-color",
   "border-radius",
+  "border-style",
+  "border-width",
+  "box-shadow",
+  "background-image",
   "font-size",
   "font-weight",
   "line-height",
   "letter-spacing",
   "text-align",
+  "font-family",
+  "text-transform",
+  "white-space",
+  "text-overflow",
+  "overflow-wrap",
   "flex-direction",
   "flex-wrap",
   "justify-content",
   "align-items",
   "align-content",
+  "grid-template-columns",
+  "grid-template-rows",
+  "grid-auto-flow",
 ] as const;
 
 const EDITABLE_PROPS: ReadonlySet<string> = new Set(EDITABLE_ELEMENT_PROPS);
@@ -147,6 +168,14 @@ const COLOR_RE = /^(?:#[0-9a-fA-F]{3,8}|var\(--[a-z0-9-]+\)|transparent|currentC
 const NUMBER_RE = /^(?:0|1|0?\.\d{1,3})$/;
 const LINE_HEIGHT_RE = /^(?:0|[1-9](?:\.\d{1,3})?|0?\.\d{1,3})$/;
 const FONT_WEIGHT_RE = /^(?:[1-9]00|normal|bold)$/;
+const FONT_FAMILY_RE = /^(?:system-ui|sans-serif|serif|monospace|ui-sans-serif|ui-serif|ui-monospace)$/;
+const SHADOW_RE = /^(?:none|(?:-?(?:\d+|\d*\.\d+)(?:px|rem|em)\s+){2,3}(?:-?(?:\d+|\d*\.\d+)(?:px|rem|em)\s+)?(?:#[0-9a-fA-F]{3,8}|var\(--[a-z0-9-]+\)|transparent))$/;
+const GRADIENT_RE = /^linear-gradient\((?:to (?:top|right|bottom|left),\s*)?(?:#[0-9a-fA-F]{3,8}|var\(--[a-z0-9-]+\)|transparent),\s*(?:#[0-9a-fA-F]{3,8}|var\(--[a-z0-9-]+\)|transparent)\)$/;
+const GRID_TRACK_RE = new RegExp(
+  "^(?:none|repeat\\([1-9]\\d?,\\s*(?:minmax\\(0,\\s*1fr\\)|1fr)\\)|" +
+  "(?:minmax\\(0,\\s*1fr\\)|1fr|auto|(?:\\d+|\\d*\\.\\d+)(?:px|rem|em|%))" +
+  "(?:\\s+(?:minmax\\(0,\\s*1fr\\)|1fr|auto|(?:\\d+|\\d*\\.\\d+)(?:px|rem|em|%))){0,11})$",
+);
 const ENUMS: Record<string, ReadonlySet<string>> = {
   display: new Set(["block", "inline", "inline-block", "flex", "inline-flex", "grid", "none"]),
   visibility: new Set(["visible", "hidden"]),
@@ -172,6 +201,16 @@ const ENUMS: Record<string, ReadonlySet<string>> = {
     "space-between",
     "space-around",
   ]),
+  position: new Set(["static", "relative", "absolute", "fixed", "sticky"]),
+  overflow: new Set(["visible", "hidden", "clip", "auto", "scroll"]),
+  "overflow-x": new Set(["visible", "hidden", "clip", "auto", "scroll"]),
+  "overflow-y": new Set(["visible", "hidden", "clip", "auto", "scroll"]),
+  "border-style": new Set(["none", "solid", "dashed", "dotted"]),
+  "text-transform": new Set(["none", "uppercase", "lowercase", "capitalize"]),
+  "white-space": new Set(["normal", "nowrap", "pre-wrap"]),
+  "text-overflow": new Set(["clip", "ellipsis"]),
+  "overflow-wrap": new Set(["normal", "anywhere", "break-word"]),
+  "grid-auto-flow": new Set(["row", "column", "dense", "row dense", "column dense"]),
 };
 
 function backendGridSlot(value: string): boolean {
@@ -200,6 +239,11 @@ export function isSafeElementValue(prop: string, value: string): boolean {
   }
   if (name === "opacity") return NUMBER_RE.test(v);
   if (name === "font-weight") return FONT_WEIGHT_RE.test(v);
+  if (name === "font-family") return FONT_FAMILY_RE.test(v);
+  if (name === "box-shadow") return SHADOW_RE.test(v);
+  if (name === "background-image") return low === "none" || GRADIENT_RE.test(v);
+  if (name === "grid-template-columns" || name === "grid-template-rows") return GRID_TRACK_RE.test(v);
+  if (name === "border-width") return v === "0" || LENGTH_RE.test(v) || LENGTH_LIST_RE.test(v);
   if (name === "border-radius") return v === "0" || LENGTH_RE.test(v) || LENGTH_LIST_RE.test(v);
   if (name === "line-height") return low === "normal" || LENGTH_RE.test(v) || LINE_HEIGHT_RE.test(v);
   if (name === "letter-spacing") return low === "normal" || v === "0" || LENGTH_RE.test(v);

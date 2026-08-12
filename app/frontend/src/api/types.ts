@@ -1684,6 +1684,10 @@ export interface AltiumSetupResult {
 export interface DevIconOverride {
   body?: string;
   swapToId?: string;
+  strokeWidth?: number;
+  treatment?: "line" | "solid" | "muted";
+  a11yLabel?: string;
+  alignment?: "baseline" | "middle" | "text-top" | "text-bottom";
 }
 
 // POST /api/dev/save (dev mode, owner-only): persist the nudged design tokens, reworded UI copy,
@@ -1760,6 +1764,26 @@ export interface DevPublishResult {
   message: string;
   checks: string[];
   pushed: boolean;
+}
+
+export interface DevPromotionTranslation {
+  title: string;
+  extends?: string;
+  themes: { dark: DevSaveBody; light: DevSaveBody };
+}
+
+export interface DevPromoteBody {
+  message: string;
+  source: DevSaveBody;
+  translations: {
+    base: { dark: DevSaveBody; light: DevSaveBody };
+    variations: Record<string, DevPromotionTranslation>;
+  };
+}
+
+export interface DevPromoteResult extends DevPublishResult {
+  themes: ["dark", "light"];
+  variations: number;
 }
 
 // --- STM Viewer DTOs (Phase 3 contract, consumed verbatim; INTERFACES.md section 4) ---

@@ -1,3 +1,5 @@
+import { guardPreviewEffect } from "../design-studio/previewEffects";
+
 export type HostFilePurpose = "cad-recovery";
 
 type LegacyHostApi = {
@@ -16,6 +18,11 @@ export class HostFilePickerUnavailableError extends Error {
 }
 
 export async function pickHostFiles(purpose: HostFilePurpose): Promise<string[]> {
+  guardPreviewEffect({
+    kind: "host-file-picker",
+    action: "choosing CAD recovery files",
+    instruction: "choose CAD recovery files",
+  });
   const bridges = window as unknown as {
     __STOCKROOM_HOST__?: ManagedHostApi;
     pywebview?: { api?: LegacyHostApi };

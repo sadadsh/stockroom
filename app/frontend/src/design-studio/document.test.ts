@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { DevModeDraft } from "../lib/devModeDraft";
 import {
   BUILT_IN_VARIATIONS,
+  builtInVariationDocument,
   DESIGN_DOCUMENT_SCHEMA_VERSION,
   parseDesignDocument,
   resolveDesign,
@@ -72,6 +73,21 @@ describe("Design Studio document", () => {
       { id: "minimal", title: "Minimal" },
       { id: "custom", title: "Custom" },
     ]);
+  });
+
+  it("seeds all six named variations with closed inheritance", () => {
+    const variations = builtInVariationDocument();
+
+    expect(Object.values(variations).map(({ id, title }) => ({ id, title }))).toEqual(BUILT_IN_VARIATIONS);
+    expect(variations.minimal?.extends).toBe("compact");
+    expect(variations.custom?.extends).toBe("full-data");
+    expect(parseDesignDocument({
+      schemaVersion: 1,
+      base: emptyDraft(),
+      variations,
+      activeVariationId: "full-data",
+      targetScopes: {},
+    }).ok).toBe(true);
   });
 
   it("resolves shipped base, personal base, variation, theme, role, and instance in order", () => {
@@ -213,6 +229,18 @@ describe("Design Studio document", () => {
     ],
   ])("returns %s as parse data", (value, code) => {
     expect(parseDesignDocument(value)).toEqual({ ok: false, error: expect.objectContaining({ code }) });
+  });
+
+  it.each([
+    ["variation patch", { patch: { layout: { schemaVersion: 1, id: "workspace", root: { kind: "html" } } } }],
+    ["variation theme", { patch: {}, themes: { dark: { layout: { schemaVersion: 1, id: "workspace", root: { kind: "script" } } } } }],
+  ])("directly rejects malformed layout in a %s", (_label, variationFields) => {
+    const result = parseDesignDocument({
+      schemaVersion: 1,
+      base: emptyDraft(),
+      variations: { bad: { id: "bad", title: "Bad", ...variationFields } },
+    });
+    expect(result).toEqual({ ok: false, error: expect.objectContaining({ code: "invalid-layout" }) });
   });
 
   it("applies sparse patches and explicit deletions without mutating the document", () => {

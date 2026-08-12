@@ -1,9 +1,10 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type FormEvent } from "react";
 import { useDesignStudio } from "../../design-studio/DesignStudioProvider";
 import { DEV_IDS } from "../../lib/devIds";
 import { targetLayersFor } from "../../design-studio/targetCoverage";
 import { useDevMode } from "../../lib/devMode";
 import { useText } from "../../lib/copy";
+import { BUILT_IN_VARIATIONS } from "../../design-studio/document";
 
 type TreeView = "layers" | "hierarchy";
 
@@ -11,17 +12,90 @@ export function LayersHierarchyPanel() {
   const studio = useDesignStudio();
   const dev = useDevMode();
   const [view, setView] = useState<TreeView>("layers");
+  const [creatingVariation, setCreatingVariation] = useState(false);
+  const [variationTitle, setVariationTitle] = useState("");
   const variationsLabel = useText("design-studio.variations", "Variations");
   const baseLabel = useText("design-studio.variations.base", "Base");
   const noVariationsLabel = useText("design-studio.variations.empty", "No Variations Yet");
+  const extendsLabel = useText("design-studio.variations.extends", "Extends");
+  const variationParentLabel = useText("design-studio.variations.parent", "Variation Parent");
+  const noneLabel = useText("design-studio.variations.none", "None");
+  const deleteLabel = useText("design-studio.variations.delete", "Delete");
+  const variationNameLabel = useText("design-studio.variations.name", "Variation Name");
+  const createLabel = useText("design-studio.variations.create", "Create");
+  const newVariationLabel = useText("design-studio.variations.new", "New Variation");
   const structureLabel = useText("design-studio.structure", "Layers And Structure");
   const layersLabel = useText("design-studio.layers", "Layers");
   const hierarchyLabel = useText("design-studio.hierarchy", "Structure");
   const variations = Object.values(studio.document.variations);
+  const parentVariations = variations.filter((variation) => variation.id !== studio.activeVariationId);
+  const builtInIds = useMemo<Set<string>>(() => new Set(BUILT_IN_VARIATIONS.map((variation) => variation.id)), []);
   const targets = useMemo(
     () => targetLayersFor(document, DEV_IDS),
     [studio.activeScenario, studio.document, dev.selectedDevId],
   );
+
+  const createVariation = (event: FormEvent) => {
+    event.preventDefault();
+    const title = variationTitle.trim();
+    if (!title) return;
+    const baseId = title.toLocaleLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "variation";
+    let id = baseId;
+    let suffix = 2;
+    while (studio.document.variations[id]) id = `${baseId}-${suffix++}`;
+    studio.replaceDocument({
+      ...studio.document,
+      variations: {
+        ...studio.document.variations,
+        [id]: {
+          id,
+          title,
+          extends: studio.activeVariationId || "full-data",
+          patch: {},
+        },
+      },
+      activeVariationId: id,
+    });
+    setVariationTitle("");
+    setCreatingVariation(false);
+  };
+
+  const deleteActiveVariation = () => {
+    const id = studio.activeVariationId;
+    const removed = studio.document.variations[id];
+    if (!removed || builtInIds.has(id)) return;
+    const nextEntries: [string, (typeof studio.document.variations)[string]][] = [];
+    for (const [candidate, variation] of Object.entries(studio.document.variations)) {
+      if (candidate === id) continue;
+      nextEntries.push([candidate, variation.extends === id
+        ? { ...variation, extends: removed.extends }
+        : variation]);
+    }
+    const variations = Object.fromEntries(nextEntries);
+    studio.replaceDocument({
+      ...studio.document,
+      variations,
+      activeVariationId: removed.extends && variations[removed.extends] ? removed.extends : "full-data",
+    });
+  };
+
+  const setActiveParent = (parentId: string) => {
+    const id = studio.activeVariationId;
+    const active = studio.document.variations[id];
+    if (!active || parentId === id) return;
+    let cursor = parentId;
+    while (cursor) {
+      if (cursor === id) return;
+      cursor = studio.document.variations[cursor]?.extends ?? "";
+    }
+    studio.replaceDocument({
+      ...studio.document,
+      variations: {
+        ...studio.document.variations,
+        [id]: { ...active, extends: parentId || undefined },
+      },
+    });
+  };
 
   return (
     <div className="min-h-0 flex-1 overflow-y-auto">
@@ -47,6 +121,45 @@ export function LayersHierarchyPanel() {
           </button>
         ))}
         {variations.length === 0 ? <p className="px-2 py-1 text-2xs text-t3">{noVariationsLabel}</p> : null}
+        {studio.activeVariationId ? (
+          <div className="mt-2 flex items-center gap-1 px-2">
+            <label className="min-w-0 flex-1 text-2xs text-t3">
+              {extendsLabel}
+              <select
+                aria-label={variationParentLabel}
+                value={studio.document.variations[studio.activeVariationId]?.extends ?? ""}
+                onChange={(event) => setActiveParent(event.target.value)}
+                className="mt-0.5 w-full rounded-control border border-line bg-field px-1 py-0.5 text-xs text-t1"
+              >
+                <option value="">{noneLabel}</option>
+                {parentVariations.map((variation) => (
+                  <option key={variation.id} value={variation.id}>{variation.title}</option>
+                ))}
+              </select>
+            </label>
+            {!builtInIds.has(studio.activeVariationId) ? (
+              <button type="button" onClick={deleteActiveVariation} className="self-end rounded-control px-2 py-1 text-xs text-err-text hover:bg-err-soft">
+                {deleteLabel}
+              </button>
+            ) : null}
+          </div>
+        ) : null}
+        {creatingVariation ? (
+          <form onSubmit={createVariation} className="mt-2 flex gap-1 px-2">
+            <input
+              aria-label={variationNameLabel}
+              autoFocus
+              value={variationTitle}
+              onChange={(event) => setVariationTitle(event.target.value)}
+              className="min-w-0 flex-1 rounded-control border border-line bg-field px-1.5 py-1 text-xs text-t1"
+            />
+            <button type="submit" className="rounded-control bg-acc px-2 py-1 text-xs text-acc-on">{createLabel}</button>
+          </form>
+        ) : (
+          <button type="button" onClick={() => setCreatingVariation(true)} className="mt-2 block w-full rounded-control px-2 py-1 text-left text-xs text-acc hover:bg-acc/10">
+            {newVariationLabel}
+          </button>
+        )}
       </section>
 
       <section aria-labelledby="studio-structure-heading">

@@ -193,7 +193,7 @@ import { DEV_IDS, DEV_ID_AREAS, DEV_ID_BY_ID } from "./devIds";
 // blockers, repository collaboration, shared review, and build completion in the real workbenches.
 // 496 with the STM target-definition rules surface used by the real Bench scenario.
 // 497 with the background guided-capture status exposed to global scenario coverage.
-const EXPECTED_ENTRIES = 497;
+const EXPECTED_ENTRIES = 498;
 
 describe("devIds catalogue", () => {
   // The count is asserted from a single constant so bumping it is one edit, and so the test NAME can

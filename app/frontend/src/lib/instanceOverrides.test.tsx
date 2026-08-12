@@ -201,7 +201,7 @@ describe("a stale committed override is ignored, not applied", () => {
       "components.row": {
         width: "240px",
         // No longer editable: never in the whitelist, so it cannot be applied or re-saved.
-        position: "absolute",
+        transform: "translateX(10px)",
         // Editable property, value outside the grammar (a second declaration attempt).
         padding: "8px; color: red",
         // Editable property, value too far outside the length grammar.
@@ -215,17 +215,17 @@ describe("a stale committed override is ignored, not applied", () => {
     document.body.innerHTML = '<div data-dev-id="components.row"></div>';
     expect(() =>
       applyElementOverrides({
-        "components.row": { width: "240px", position: "absolute", padding: "}{" },
+        "components.row": { width: "240px", transform: "translateX(10px)", padding: "}{" },
       }),
     ).not.toThrow();
     const row = nodesForDevId("components.row")[0];
     expect(row.style.getPropertyValue("width")).toBe("240px");
-    expect(row.style.getPropertyValue("position")).toBe("");
+    expect(row.style.getPropertyValue("transform")).toBe("");
     expect(row.style.getPropertyValue("padding")).toBe("");
   });
 
   it("drops an id whose every property is invalid rather than keeping an empty entry", () => {
-    expect(applicableOverrides({ "components.row": { position: "absolute" } })).toEqual({});
+    expect(applicableOverrides({ "components.row": { transform: "translateX(10px)" } })).toEqual({});
   });
 });
 
@@ -266,11 +266,11 @@ describe("saved dynamic overrides survive a restart", () => {
   });
 
   it("ignores a committed override that is no longer valid, without failing the boot", () => {
-    MOCK_ELEMENT_OVERRIDES[candidateDevId("b")] = { position: "absolute", width: "240px" };
+    MOCK_ELEMENT_OVERRIDES[candidateDevId("b")] = { transform: "translateX(10px)", width: "240px" };
 
     expect(() => renderHook(() => useDevMode(), { wrapper })).not.toThrow();
     const node = nodeFor(candidateDevId("b"));
     expect(node.style.getPropertyValue("width")).toBe("240px");
-    expect(node.style.getPropertyValue("position")).toBe("");
+    expect(node.style.getPropertyValue("transform")).toBe("");
   });
 });

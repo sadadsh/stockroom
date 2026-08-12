@@ -18,7 +18,6 @@ function scenarioWith(fixtures: readonly ScenarioFixture[]): DesignScenario {
     fixtures,
     initialUi: {},
     expectedTargets: ["shell.root"],
-    coverage: ["route:components"],
   };
 }
 
@@ -69,7 +68,7 @@ describe("preview request adapter", () => {
     expect(live).not.toHaveBeenCalled();
   });
 
-  it("uses an explicit local mutation outcome before applying the product-write guard", async () => {
+  it("blocks a product mutation even when a scenario declares a local outcome", async () => {
     const live = vi.fn();
     const adapter = previewAdapter(
       scenarioWith([
@@ -93,11 +92,11 @@ describe("preview request adapter", () => {
         },
         live,
       ),
-    ).resolves.toEqual({ saved: false, id: "fixture-part" });
+    ).rejects.toBeInstanceOf(PreviewMutationError);
     expect(live).not.toHaveBeenCalled();
   });
 
-  it("allows personal persistence and read-only source status but blocks source writes", async () => {
+  it("allows personal persistence but keeps source status and writes off the live seam", async () => {
     const live = vi.fn().mockResolvedValue({ ok: true });
     const adapter = previewAdapter(scenarioWith([]));
 
@@ -117,14 +116,14 @@ describe("preview request adapter", () => {
         { method: "GET", path: "/api/dev/status", params: {}, body: undefined },
         live,
       ),
-    ).resolves.toEqual({ ok: true });
+    ).rejects.toBeInstanceOf(MissingScenarioFixtureError);
 
     for (const path of ["/api/dev/save", "/api/dev/publish"]) {
       await expect(
         adapter.handle({ method: "POST", path, params: {}, body: {} }, live),
       ).rejects.toBeInstanceOf(PreviewMutationError);
     }
-    expect(live).toHaveBeenCalledTimes(2);
+    expect(live).toHaveBeenCalledOnce();
   });
 
   it("routes the API client through the installed adapter and restores the exact live adapter", async () => {

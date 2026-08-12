@@ -79,7 +79,6 @@ function scenario(id: GlobalScenarioId): DesignScenario {
   return {
     id, title: id === "global.real-data" ? "Real Data" : id.split(".").slice(1).join(" ").replace(/(^|[ -])\w/g, (letter) => letter.toUpperCase()), area: "global", group: "Global", route: "components",
     fixtures: globalFixtures(id), initialUi: uiFor(id), expectedTargets: [targetFor(id)],
-    coverage: ["route:components", `state:${id.split(".").slice(1).join("-")}`],
   };
 }
 

@@ -37,11 +37,11 @@ export const componentScenarioIds = [
   "components.complete-part-partial",
   "components.complete-part-blocked",
   "components.bulk-import",
-  "components.passive-intake",
+  "components.offers-open",
   "components.variant-alternatives",
   "components.variant-pending",
   "components.diff-open",
-  "components.clear-cad",
+  "components.pinout-open",
   "components.delete-confirm",
 ] as const;
 
@@ -73,7 +73,6 @@ function scenario(
     fixtures: componentReadFixtures(options),
     initialUi: options.initialUi ?? {},
     expectedTargets: options.expectedTargets ?? ["components.root"],
-    coverage: ["route:components", `state:${id.slice("components.".length)}`],
   };
 }
 
@@ -181,19 +180,19 @@ export const componentScenarios: readonly DesignScenario[] = [
   scenario("components.offer-failure", { title: "Offer Failure", dossier: offerFailure }),
   scenario("components.documents-empty", { title: "Documents Empty", dossier: documentsEmpty }),
   scenario("components.related-empty", { title: "Related Empty", dossier: relatedEmpty }),
-  scenario("components.provenance-conflict", { title: "Provenance Conflict" }),
+  scenario("components.provenance-conflict", { title: "Provenance Conflict", initialUi: { components: { surface: "provenance" } }, expectedTargets: ["component-browser.sources-sheet"] }),
   scenario("components.preview-3d", { title: "3D Preview", initialUi: { components: { preview: "model" } } }),
   scenario("components.preview-symbol", { title: "Symbol Preview", initialUi: { components: { preview: "symbol" } } }),
   scenario("components.preview-footprint", { title: "Footprint Preview", initialUi: { components: { preview: "footprint" } } }),
   scenario("components.complete-part-ready", { title: "Complete Part Ready", initialUi: { components: { surface: "cad-sources" } }, expectedTargets: ["component-browser.complete-component"] }),
   scenario("components.complete-part-partial", { title: "Complete Part Partial", dossier: partialProvider, initialUi: { components: { surface: "cad-sources" } }, expectedTargets: ["component-browser.complete-component"] }),
   scenario("components.complete-part-blocked", { title: "Complete Part Blocked", dossier: blockedProvider, initialUi: { components: { surface: "cad-sources" } }, expectedTargets: ["component-browser.complete-component"] }),
-  scenario("components.bulk-import", { title: "Bulk Import" }),
-  scenario("components.passive-intake", { title: "Passive Intake" }),
+  scenario("components.bulk-import", { title: "Bulk Import", initialUi: { addParts: { state: "empty" } }, expectedTargets: ["ingest.bulk"] }),
+  scenario("components.offers-open", { title: "Price Breaks Open", initialUi: { components: { surface: "offers" } }, expectedTargets: ["component-browser.sourcing-sheet"] }),
   scenario("components.variant-alternatives", { title: "Variant Alternatives", initialUi: { components: { surface: "cad-sources" } }, expectedTargets: ["component-browser.complete-component"] }),
   scenario("components.variant-pending", { title: "Variant Pending", initialUi: { components: { surface: "cad-sources" } }, expectedTargets: ["component-browser.complete-component"] }),
   scenario("components.diff-open", { title: "Diff Open", initialUi: { components: { surface: "provenance" } }, expectedTargets: ["component-browser.sources-sheet"] }),
-  scenario("components.clear-cad", { title: "Clear CAD" }),
+  scenario("components.pinout-open", { title: "Pinout Open", initialUi: { components: { surface: "pinout" } }, expectedTargets: ["component-browser.pinout-table"] }),
   scenario("components.delete-confirm", { title: "Delete Confirmation", initialUi: { components: { confirmDelete: true } } }),
 ];
 

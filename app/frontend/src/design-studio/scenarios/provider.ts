@@ -56,6 +56,5 @@ export const providerScenarios: readonly DesignScenario[] = providerScenarioIds.
       },
     },
     expectedTargets: ["component-browser.complete-component", "component-browser.provider-browser"],
-    coverage: ["route:components", `state:provider-${state}`],
   } satisfies DesignScenario;
 });

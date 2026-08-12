@@ -2,10 +2,10 @@ import { PRODUCTION_ROUTES, type Route } from "../lib/router";
 import type {
   DesignScenario,
   ScenarioArea,
-  ScenarioCoverageTag,
   ScenarioFixture,
 } from "./scenario";
 import { bootstrapFixtureValidators, type ScenarioFixtureValidatorRegistry } from "./scenarioFixtureValidation";
+import type { ScenarioStateContract } from "./scenarioStateContracts";
 
 export type ScenarioRegistryIssueCode =
   | "duplicate-scenario"
@@ -14,7 +14,10 @@ export type ScenarioRegistryIssueCode =
   | "invalid-fixture-shape"
   | "missing-local-outcome"
   | "missing-targets"
-  | "missing-coverage"
+  | "duplicate-state-contract"
+  | "missing-state-contract"
+  | "state-contract-mismatch"
+  | "missing-scenario"
   | "missing-route";
 
 export interface ScenarioRegistryIssue {
@@ -75,16 +78,6 @@ function hasLocalOutcome(fixture: ScenarioFixture): boolean {
   );
 }
 
-function coverageIssues(scenario: DesignScenario): ScenarioRegistryIssue[] {
-  const tags = scenario.coverage as readonly ScenarioCoverageTag[];
-  const hasRoute = tags.some((tag) => tag === `route:${scenario.route}`);
-  const hasState = tags.some((tag) => tag.startsWith("state:") && tag.length > "state:".length);
-  return [
-    ...(hasRoute ? [] : [{ code: "missing-coverage" as const, scenarioId: scenario.id, value: "route" }]),
-    ...(hasState ? [] : [{ code: "missing-coverage" as const, scenarioId: scenario.id, value: "state" }]),
-  ];
-}
-
 /**
  * Validates and indexes supplied scenarios without side effects. Invalid scenarios stay out of
  * the lookup indexes so callers cannot accidentally activate a malformed preview.
@@ -92,11 +85,24 @@ function coverageIssues(scenario: DesignScenario): ScenarioRegistryIssue[] {
 export function registerScenarios(
   items: readonly DesignScenario[],
   fixtureValidators: ScenarioFixtureValidatorRegistry = bootstrapFixtureValidators,
+  stateContracts?: readonly ScenarioStateContract[],
 ): ScenarioRegistry {
   const issues: ScenarioRegistryIssue[] = [];
   const counts = new Map<string, number>();
   for (const scenario of items) counts.set(scenario.id, (counts.get(scenario.id) ?? 0) + 1);
+  const contractCounts = new Map<string, number>();
+  for (const contract of stateContracts ?? []) {
+    contractCounts.set(contract.id, (contractCounts.get(contract.id) ?? 0) + 1);
+  }
+  const contractById = new Map<string, ScenarioStateContract>();
+  for (const contract of stateContracts ?? []) {
+    if (contractCounts.get(contract.id) === 1) contractById.set(contract.id, contract);
+  }
   const valid: DesignScenario[] = [];
+
+  for (const [id, count] of contractCounts) {
+    if (count > 1) issues.push({ code: "duplicate-state-contract", scenarioId: id, value: id });
+  }
 
   for (const scenario of items) {
     const scenarioIssues: ScenarioRegistryIssue[] = [];
@@ -109,7 +115,18 @@ export function registerScenarios(
     if (!Array.isArray(scenario.expectedTargets) || scenario.expectedTargets.length === 0) {
       scenarioIssues.push({ code: "missing-targets", scenarioId: scenario.id });
     }
-    scenarioIssues.push(...coverageIssues(scenario));
+    if (stateContracts) {
+      const contract = contractById.get(scenario.id);
+      if (!contract) {
+        scenarioIssues.push({ code: "missing-state-contract", scenarioId: scenario.id });
+      } else if (contract.area !== scenario.area || contract.route !== scenario.route) {
+        scenarioIssues.push({
+          code: "state-contract-mismatch",
+          scenarioId: scenario.id,
+          value: `${contract.area}/${contract.route}`,
+        });
+      }
+    }
     for (const fixture of scenario.fixtures) {
       if (!isFixture(fixture)) {
         scenarioIssues.push({ code: "malformed-fixture", scenarioId: scenario.id });
@@ -124,6 +141,15 @@ export function registerScenarios(
     }
     issues.push(...scenarioIssues);
     if (scenarioIssues.length === 0) valid.push(scenario);
+  }
+
+  if (stateContracts) {
+    const scenarioIds = new Set(items.map((scenario) => scenario.id));
+    for (const contract of stateContracts) {
+      if (!scenarioIds.has(contract.id)) {
+        issues.push({ code: "missing-scenario", scenarioId: contract.id, value: contract.id });
+      }
+    }
   }
 
   const byId = new Map(valid.map((scenario) => [scenario.id, scenario]));
@@ -148,8 +174,9 @@ export function registerScenarios(
 /** Reports route gaps from the one production route registry, never a test-maintained list. */
 export function routeCoverageIssues(registry: ScenarioRegistry): ScenarioRegistryIssue[] {
   const covered = new Set(registry.scenarios.map((scenario) => scenario.route));
-  return PRODUCTION_ROUTES.filter((route) => !covered.has(route)).map((route: Route) => ({
-    code: "missing-route",
-    value: route,
-  }));
+  const issues: ScenarioRegistryIssue[] = [];
+  for (const route of PRODUCTION_ROUTES) {
+    if (!covered.has(route)) issues.push({ code: "missing-route", value: route as Route });
+  }
+  return issues;
 }

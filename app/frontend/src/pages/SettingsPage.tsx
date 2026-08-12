@@ -1099,6 +1099,16 @@ function KiCadSection() {
   const cfgValue = cfgDraft ?? cfgSaved;
   const cliValue = cliDraft ?? cliSaved;
   const dirty = cfgValue.trim() !== cfgSaved || cliValue.trim() !== cliSaved;
+  const scenarioPicker = useScenarioUiState().settings?.picker === "kicad";
+
+  async function chooseConfigFolder() {
+    try {
+      const folder = await pickHostFolder("kicad-config");
+      if (folder) setCfgDraft(folder);
+    } catch (error) {
+      toast(errMsg(error), "err");
+    }
+  }
 
   function onSave() {
     if (!dirty || save.isPending) return;
@@ -1222,7 +1232,11 @@ function KiCadSection() {
         </div>
       ) : null}
 
-      <div className="mt-3.5 flex flex-col gap-2.5" data-dev-id="settings.kicad-overrides">
+      <div
+        className="mt-3.5 flex flex-col gap-2.5"
+        data-dev-id="settings.kicad-overrides"
+        data-scenario-picker={scenarioPicker ? "kicad" : undefined}
+      >
         <div className="flex flex-wrap items-center gap-2.5">
           <label htmlFor="kicad-config-override" className="w-52 flex-none text-xs text-t3">
             <Text id="settings.kicad.config-label">Config Folder Override</Text>
@@ -1234,6 +1248,9 @@ function KiCadSection() {
             placeholder={configPlaceholder}
             className={INPUT_CLS}
           />
+          <Button onClick={chooseConfigFolder}>
+            <Text id="settings.kicad.choose-config">Choose Folder</Text>
+          </Button>
         </div>
         <div className="flex flex-wrap items-center gap-2.5">
           <label htmlFor="kicad-cli-override" className="w-52 flex-none text-xs text-t3">
@@ -1269,6 +1286,7 @@ function CubeMxSection() {
   const saved = settings.data?.stm_cubemx_source ?? "";
   const value = draft ?? saved;
   const dirty = value.trim() !== saved;
+  const scenarioPicker = useScenarioUiState().settings?.picker === "cubemx";
   const folderPlaceholder = useText(
     "settings.cubemx.folder-placeholder",
     "Choose the CubeMX data folder",
@@ -1309,7 +1327,7 @@ function CubeMxSection() {
   }
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-3" data-scenario-picker={scenarioPicker ? "cubemx" : undefined}>
       <p className="text-sm text-t2">
         <Text id="settings.cubemx.lede">
           Stockroom uses the STM32CubeMX MCU data as the native source for its spec matrix, pinouts, and compatibility tools.

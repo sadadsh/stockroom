@@ -19,7 +19,7 @@ describe("preview mutation guard", () => {
     ).toBe("studio-live");
   });
 
-  it("allows only read-only dev status from the source-owned dev API", () => {
+  it("keeps every source-owned dev action inside the fixture boundary", () => {
     expect(
       classifyPreviewRequest({
         method: "GET",
@@ -27,7 +27,7 @@ describe("preview mutation guard", () => {
         params: {},
         body: undefined,
       }),
-    ).toBe("studio-live");
+    ).toBe("fixture-only");
     expect(
       classifyPreviewRequest({ method: "POST", path: "/api/dev/save", params: {}, body: {} }),
     ).toBe("block");

@@ -26,6 +26,7 @@ import "react-pdf/dist/Page/TextLayer.css";
 import { api, ApiError } from "../../api/client";
 import type { DocumentView } from "../../api/dossierTypes";
 import { Text, useCopyFormatter, useText } from "../../lib/copy";
+import { openExternalUrl } from "../../lib/externalNavigation";
 import { Button, ModalShell, StatusText } from "../primitives";
 import { ExternalIcon } from "../icons";
 import { openKindFor, type DatasheetTarget } from "./datasheetWorkflow";
@@ -127,7 +128,7 @@ function DatasheetPageResource({ document }: { document: DocumentView }) {
             small
             data-dev-id="component-browser.datasheet-open-page"
             icon={<ExternalIcon className="h-3.5 w-3.5" />}
-            onClick={() => window.open(document.remoteUrl, "_blank", "noreferrer")}
+            onClick={() => openExternalUrl(document.remoteUrl)}
           >
             {openLabel({ host: document.host || document.sourceLabel })}
           </Button>
@@ -162,7 +163,7 @@ function DatasheetUnavailable({
             small
             data-dev-id="component-browser.datasheet-open-source"
             icon={<ExternalIcon className="h-3.5 w-3.5" />}
-            onClick={() => window.open(document.remoteUrl, "_blank", "noreferrer")}
+            onClick={() => openExternalUrl(document.remoteUrl)}
           >
             {openSource}
           </Button>
@@ -429,7 +430,7 @@ function DatasheetToolbar({
             aria-label={externalLabel}
             title={externalLabel}
             icon={<ExternalIcon className="h-3.5 w-3.5" />}
-            onClick={() => window.open(document.remoteUrl, "_blank", "noreferrer")}
+            onClick={() => openExternalUrl(document.remoteUrl)}
           >
             <Text id="component-browser.datasheet-open-external-short">Open</Text>
           </Button>
@@ -481,7 +482,7 @@ function DatasheetFailure({
             small
             data-dev-id="component-browser.datasheet-open-source"
             icon={<ExternalIcon className="h-3.5 w-3.5" />}
-            onClick={() => window.open(document.remoteUrl, "_blank", "noreferrer")}
+            onClick={() => openExternalUrl(document.remoteUrl)}
           >
             {openSource}
           </Button>

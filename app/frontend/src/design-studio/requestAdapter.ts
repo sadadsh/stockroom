@@ -1,5 +1,6 @@
 import type { DesignScenario, ScenarioFixture } from "./scenario";
 import { guardPreviewRequest } from "./mutationGuard";
+import { guardPreviewLiveApiRequest } from "./previewEffects";
 
 export type { DesignScenario, ScenarioFixture } from "./scenario";
 
@@ -81,14 +82,19 @@ function sameRequest(fixture: ScenarioFixture, descriptor: ApiRequestDescriptor)
 export function previewAdapter(scenario: DesignScenario): ApiRequestAdapter {
   return {
     async handle<T>(descriptor: ApiRequestDescriptor, live: () => Promise<T>): Promise<T> {
+      const classification = guardPreviewRequest(descriptor);
       const fixture = scenario.fixtures.find((candidate) => sameRequest(candidate, descriptor));
       if (fixture?.behavior?.state === "pending") return new Promise<T>(() => {});
       if (fixture?.behavior?.state === "error") {
         throw new ScenarioFixtureError(fixture.behavior.status, fixture.behavior.message);
       }
-      if (fixture) return fixture.response as T;
+      if (
+        fixture &&
+        (classification === "fixture-only" || descriptor.method.toUpperCase() === "GET")
+      ) {
+        return fixture.response as T;
+      }
 
-      const classification = guardPreviewRequest(descriptor);
       if (classification === "studio-live") return live();
       throw new MissingScenarioFixtureError(scenario.id, descriptor);
     },
@@ -125,5 +131,8 @@ export function dispatchApiRequest<T>(
   descriptor: ApiRequestDescriptor,
   live: () => Promise<T>,
 ): Promise<T> {
-  return currentAdapter()?.handle(descriptor, live) ?? live();
+  const adapter = currentAdapter();
+  if (adapter) return adapter.handle(descriptor, live);
+  guardPreviewLiveApiRequest(descriptor);
+  return live();
 }

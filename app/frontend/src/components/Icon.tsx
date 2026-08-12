@@ -46,11 +46,17 @@ export function Icon({ id, className, title }: IconProps) {
   if (!resolved) return null;
 
   const { entry, body } = resolved;
-  const inner = sanitizeIconMarkup(body, title);
+  const override = resolveIconOverride(id);
+  const accessibleTitle = override?.a11yLabel || title;
+  const inner = sanitizeIconMarkup(body, accessibleTitle);
   // A titled icon is announced (role="img" + aria-label); an untitled one is decorative. Primary
   // glyphs default to aria-hidden (as the source `Svg` helper did); the bespoke/art/brand sources
   // set no aria attribute, so an untitled non-primary icon stays bare - a faithful refactor.
-  const namedA11y = title ? ({ role: "img" as const, "aria-label": title }) : {};
+  const namedA11y = accessibleTitle ? ({ role: "img" as const, "aria-label": accessibleTitle }) : {};
+  const presentationStyle = {
+    verticalAlign: override?.alignment,
+    opacity: override?.treatment === "muted" ? 0.55 : undefined,
+  };
   // D-02 / D-03: in dev mode the <svg> advertises which registry glyph it draws (the icon analog of
   // <Text>'s data-copy-id), so the Selection pane can map a selected element to its icon id. Gated
   // on `enabled` exactly like <Text> only wraps in dev mode: OFF dev mode this is the empty object,
@@ -64,12 +70,13 @@ export function Icon({ id, className, title }: IconProps) {
       <svg
         className={`ico ${className ?? "h-3.5 w-3.5"}`}
         viewBox={entry.viewBox}
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={entry.strokeWidth}
+        fill={override?.treatment === "solid" ? "currentColor" : "none"}
+        stroke={override?.treatment === "solid" ? "none" : "currentColor"}
+        strokeWidth={override?.strokeWidth ?? entry.strokeWidth}
+        style={presentationStyle}
         strokeLinecap="round"
         strokeLinejoin="round"
-        aria-hidden={title ? undefined : true}
+        aria-hidden={accessibleTitle ? undefined : true}
         {...namedA11y}
         {...devId}
         dangerouslySetInnerHTML={{ __html: inner }}
@@ -80,18 +87,19 @@ export function Icon({ id, className, title }: IconProps) {
   // Bespoke / art / brand: reproduce the source svg's own root presentation exactly. Undefined
   // props are dropped by React, so an entry only emits the attributes its source actually set.
   const { width, height } = sizeAttrs(entry.size);
+  const solid = override?.treatment === "solid";
   return (
     <svg
       className={className}
       width={width}
       height={height}
       viewBox={entry.viewBox}
-      fill={entry.fill}
-      stroke={entry.stroke}
-      strokeWidth={entry.strokeWidth}
+      fill={solid ? "currentColor" : entry.fill}
+      stroke={solid ? "none" : entry.stroke}
+      strokeWidth={override?.strokeWidth ?? entry.strokeWidth}
       strokeLinecap={entry.strokeLinecap}
       strokeLinejoin={entry.strokeLinejoin}
-      style={entry.style}
+      style={{ ...entry.style, ...presentationStyle }}
       {...namedA11y}
       {...devId}
       dangerouslySetInnerHTML={{ __html: inner }}

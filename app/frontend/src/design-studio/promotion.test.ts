@@ -5,6 +5,7 @@ import {
   PromotionValidationError,
   collectDesignIssues,
   promotionPlan,
+  promotionTransactionPlan,
   runPersonalDesignPromotion,
 } from "./promotion";
 
@@ -71,6 +72,25 @@ describe("personal design source promotion", () => {
     });
   });
 
+  it("preserves base, both themes, and every supported variation in the atomic plan", () => {
+    const document = personalDocument();
+    document.variations.custom = {
+      id: "custom",
+      title: "Custom",
+      patch: { copy: { "rail.components": "Custom Components" } },
+      themes: { light: { copy: { "rail.components": "Light Custom Components" } } },
+    };
+    document.activeVariationId = "custom";
+
+    const plan = promotionTransactionPlan(document, "Promote", "light", null);
+
+    expect(Object.keys(plan.translations.base)).toEqual(["dark", "light"]);
+    expect(Object.keys(plan.translations.variations)).toEqual(["custom"]);
+    expect(plan.translations.variations.custom?.themes.dark.copy["rail.components"]).toBe("Custom Components");
+    expect(plan.translations.variations.custom?.themes.light.copy["rail.components"]).toBe("Light Custom Components");
+    expect(plan.source.copy["rail.components"]).toBe("Light Custom Components");
+  });
+
   it("collects every issue and refuses promotion when a target remains unresolved", () => {
     const document = documentWithIssue("missing-target");
     expect(collectDesignIssues(document, "dark", null).map((issue) => issue.code)).toEqual([
@@ -85,8 +105,7 @@ describe("personal design source promotion", () => {
   it("never invokes source APIs while a fixture scenario is active", async () => {
     const client = {
       devStatus: vi.fn(),
-      devSave: vi.fn(),
-      devPublish: vi.fn(),
+      devPromote: vi.fn(),
     };
 
     const result = await runPersonalDesignPromotion({
@@ -103,8 +122,7 @@ describe("personal design source promotion", () => {
       message: "Return to Real Data before making this design the app default.",
     });
     expect(client.devStatus).not.toHaveBeenCalled();
-    expect(client.devSave).not.toHaveBeenCalled();
-    expect(client.devPublish).not.toHaveBeenCalled();
+    expect(client.devPromote).not.toHaveBeenCalled();
   });
 
   it("reports the exact source blocker without saving or publishing", async () => {
@@ -113,8 +131,7 @@ describe("personal design source promotion", () => {
         available: false,
         publish_blocker: "Dev Mode needs a managed Stockroom source checkout.",
       })),
-      devSave: vi.fn(),
-      devPublish: vi.fn(),
+      devPromote: vi.fn(),
     };
 
     const result = await runPersonalDesignPromotion({
@@ -130,31 +147,18 @@ describe("personal design source promotion", () => {
       state: "blocked",
       message: "Dev Mode needs a managed Stockroom source checkout.",
     });
-    expect(client.devSave).not.toHaveBeenCalled();
-    expect(client.devPublish).not.toHaveBeenCalled();
+    expect(client.devPromote).not.toHaveBeenCalled();
   });
 
-  it("calls status, save, and publish in order and returns the published result", async () => {
+  it("calls status and the one atomic promotion endpoint in order", async () => {
     const calls: string[] = [];
     const client = {
       devStatus: vi.fn(async () => {
         calls.push("status");
         return readyStatus();
       }),
-      devSave: vi.fn(async () => {
-        calls.push("save");
-        return {
-          ok: true,
-          written: [],
-          tokens: 2,
-          copy: 1,
-          icons: 1,
-          elements: 1,
-          behaviors: 1,
-        };
-      }),
-      devPublish: vi.fn(async () => {
-        calls.push("publish");
+      devPromote: vi.fn(async () => {
+        calls.push("promote");
         return {
           ok: true,
           commit: "b".repeat(40),
@@ -162,6 +166,8 @@ describe("personal design source promotion", () => {
           message: "Promote personal design",
           checks: ["typecheck", "production build"],
           pushed: true,
+          themes: ["dark", "light"] as ["dark", "light"],
+          variations: 0,
         };
       }),
     };
@@ -175,8 +181,10 @@ describe("personal design source promotion", () => {
       targetRoot: null,
     });
 
-    expect(calls).toEqual(["status", "save", "publish"]);
-    expect(client.devSave).toHaveBeenCalledWith(promotionPlan(personalDocument(), "light", null));
+    expect(calls).toEqual(["status", "promote"]);
+    expect(client.devPromote).toHaveBeenCalledWith(
+      promotionTransactionPlan(personalDocument(), "Promote personal design", "light", null),
+    );
     expect(result).toEqual({
       state: "success",
       message: "Promoted personal design at " + "b".repeat(40) + ".",
@@ -184,11 +192,10 @@ describe("personal design source promotion", () => {
     });
   });
 
-  it("retains the source refusal message after save without attempting publish", async () => {
+  it("retains the backend recovery message after an atomic promotion failure", async () => {
     const client = {
       devStatus: vi.fn().mockResolvedValue(readyStatus()),
-      devSave: vi.fn().mockRejectedValue(new Error("Source write rolled back.")),
-      devPublish: vi.fn(),
+      devPromote: vi.fn().mockRejectedValue(new Error("Source and dist snapshot restored.")),
     };
 
     const result = await runPersonalDesignPromotion({
@@ -200,7 +207,6 @@ describe("personal design source promotion", () => {
       targetRoot: null,
     });
 
-    expect(result).toEqual({ state: "failure", message: "Source write rolled back." });
-    expect(client.devPublish).not.toHaveBeenCalled();
+    expect(result).toEqual({ state: "failure", message: "Source and dist snapshot restored." });
   });
 });

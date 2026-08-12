@@ -51,7 +51,6 @@ function scenarioWith(fixtures: readonly ScenarioFixture[]): DesignScenario {
     fixtures,
     initialUi: {},
     expectedTargets: ["shell.root"],
-    coverage: ["route:components"],
   };
 }
 

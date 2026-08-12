@@ -32,11 +32,11 @@ const EXPECTED_COMPONENT_CASES = [
   "components.complete-part-partial",
   "components.complete-part-blocked",
   "components.bulk-import",
-  "components.passive-intake",
+  "components.offers-open",
   "components.variant-alternatives",
   "components.variant-pending",
   "components.diff-open",
-  "components.clear-cad",
+  "components.pinout-open",
   "components.delete-confirm",
 ] as const;
 

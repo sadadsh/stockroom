@@ -11,10 +11,22 @@ function fixture(markup: string): HTMLElement {
 
 describe("target coverage", () => {
   it("fails when a meaningful interactive or visual boundary has no stable target", () => {
-    const root = fixture("<section data-design-meaningful><button>Save</button></section>");
+    const root = fixture("<section><button>Save</button></section>");
     expect(coverageIssuesFor(root, DEV_IDS)).toEqual([
       expect.objectContaining({ code: "missing-target" }),
     ]);
+  });
+
+  it("derives text, icon, layout, and interactive boundaries without opt-in markers", () => {
+    const root = fixture(`
+      <button data-dev-id="rail.about">About</button>
+      <h2 data-copy-id="design-studio.title">Design Studio</h2>
+      <svg data-icon-id="action.add"></svg>
+      <section data-layout-piece="workspace.header-identity"></section>
+    `);
+
+    expect(coverageIssuesFor(root, DEV_IDS)).toEqual([]);
+    expect(root.querySelector("[data-design-meaningful]")).toBeNull();
   });
 
   it("accepts registered dev, copy, icon, layout-piece, and approved dynamic identities", () => {

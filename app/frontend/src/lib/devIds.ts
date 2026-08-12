@@ -572,6 +572,7 @@ export const DEV_IDS: DevIdEntry[] = [
   // panel's own chrome and outside the id system; this line is the exception because it is the one
   // part of it that states a RULE about the product rather than a control of the editor.
   { id: "design.letter-rule-warn", label: "Live letter-rule warning on a reworded label", area: "design" },
+  { id: "design.pan-cue", label: "Canvas framing and pan cue", area: "design" },
 ];
 
 // The areas in first-appearance order, for grouping the catalogue.

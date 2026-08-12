@@ -10,10 +10,7 @@
       "expectedTargets": [
         "shell.root"
       ],
-      "coverage": [
-        "route:components",
-        "state:real-data"
-      ]
+      "stateSignature": "real-data"
     },
     {
       "id": "global.onboarding.open",
@@ -24,10 +21,7 @@
       "expectedTargets": [
         "onboarding.gate"
       ],
-      "coverage": [
-        "route:components",
-        "state:onboarding-open"
-      ]
+      "stateSignature": "state-c5a5ae06"
     },
     {
       "id": "global.onboarding.create",
@@ -38,10 +32,7 @@
       "expectedTargets": [
         "onboarding.gate"
       ],
-      "coverage": [
-        "route:components",
-        "state:onboarding-create"
-      ]
+      "stateSignature": "state-6d98d022"
     },
     {
       "id": "global.onboarding.clone",
@@ -52,10 +43,7 @@
       "expectedTargets": [
         "onboarding.gate"
       ],
-      "coverage": [
-        "route:components",
-        "state:onboarding-clone"
-      ]
+      "stateSignature": "state-bf5b77c9"
     },
     {
       "id": "global.onboarding.error",
@@ -66,10 +54,7 @@
       "expectedTargets": [
         "toast.status"
       ],
-      "coverage": [
-        "route:components",
-        "state:onboarding-error"
-      ]
+      "stateSignature": "state-27639c28"
     },
     {
       "id": "global.onboarding.create-error",
@@ -80,10 +65,7 @@
       "expectedTargets": [
         "toast.status"
       ],
-      "coverage": [
-        "route:components",
-        "state:onboarding-create-error"
-      ]
+      "stateSignature": "state-99bb01c4"
     },
     {
       "id": "global.onboarding.clone-error",
@@ -94,10 +76,7 @@
       "expectedTargets": [
         "toast.status"
       ],
-      "coverage": [
-        "route:components",
-        "state:onboarding-clone-error"
-      ]
+      "stateSignature": "state-28874ab9"
     },
     {
       "id": "global.about.open",
@@ -108,10 +87,7 @@
       "expectedTargets": [
         "about.root"
       ],
-      "coverage": [
-        "route:components",
-        "state:about-open"
-      ]
+      "stateSignature": "state-67298e75"
     },
     {
       "id": "global.about.current",
@@ -122,10 +98,7 @@
       "expectedTargets": [
         "about.root"
       ],
-      "coverage": [
-        "route:components",
-        "state:about-current"
-      ]
+      "stateSignature": "state-67298e75"
     },
     {
       "id": "global.about.update-available",
@@ -136,10 +109,7 @@
       "expectedTargets": [
         "about.root"
       ],
-      "coverage": [
-        "route:components",
-        "state:about-update-available"
-      ]
+      "stateSignature": "state-baf28d3d"
     },
     {
       "id": "global.about.stale",
@@ -150,10 +120,7 @@
       "expectedTargets": [
         "about.root"
       ],
-      "coverage": [
-        "route:components",
-        "state:about-stale"
-      ]
+      "stateSignature": "state-65f11ae2"
     },
     {
       "id": "global.rail.expanded",
@@ -164,10 +131,7 @@
       "expectedTargets": [
         "shell.root"
       ],
-      "coverage": [
-        "route:components",
-        "state:rail-expanded"
-      ]
+      "stateSignature": "state-d074f74b"
     },
     {
       "id": "global.rail.collapsed",
@@ -178,10 +142,7 @@
       "expectedTargets": [
         "shell.root"
       ],
-      "coverage": [
-        "route:components",
-        "state:rail-collapsed"
-      ]
+      "stateSignature": "state-cb569591"
     },
     {
       "id": "global.theme.dark",
@@ -192,10 +153,7 @@
       "expectedTargets": [
         "shell.root"
       ],
-      "coverage": [
-        "route:components",
-        "state:theme-dark"
-      ]
+      "stateSignature": "state-8b2c4192"
     },
     {
       "id": "global.theme.light",
@@ -206,10 +164,7 @@
       "expectedTargets": [
         "shell.root"
       ],
-      "coverage": [
-        "route:components",
-        "state:theme-light"
-      ]
+      "stateSignature": "state-409a6834"
     },
     {
       "id": "global.update.current",
@@ -220,10 +175,7 @@
       "expectedTargets": [
         "shell.root"
       ],
-      "coverage": [
-        "route:components",
-        "state:update-current"
-      ]
+      "stateSignature": "state-5eb0779f"
     },
     {
       "id": "global.update.available",
@@ -234,10 +186,7 @@
       "expectedTargets": [
         "rail.update"
       ],
-      "coverage": [
-        "route:components",
-        "state:update-available"
-      ]
+      "stateSignature": "state-ba12d962"
     },
     {
       "id": "global.update.updating",
@@ -248,10 +197,7 @@
       "expectedTargets": [
         "rail.update"
       ],
-      "coverage": [
-        "route:components",
-        "state:update-updating"
-      ]
+      "stateSignature": "state-be7a8e0c"
     },
     {
       "id": "global.update.error",
@@ -262,10 +208,7 @@
       "expectedTargets": [
         "shell.root"
       ],
-      "coverage": [
-        "route:components",
-        "state:update-error"
-      ]
+      "stateSignature": "state-5eb0779f"
     },
     {
       "id": "global.add-parts.empty",
@@ -276,10 +219,7 @@
       "expectedTargets": [
         "addpart.root"
       ],
-      "coverage": [
-        "route:components",
-        "state:add-parts-empty"
-      ]
+      "stateSignature": "state-de427e2a"
     },
     {
       "id": "global.add-parts.validating",
@@ -290,10 +230,7 @@
       "expectedTargets": [
         "addpart.root"
       ],
-      "coverage": [
-        "route:components",
-        "state:add-parts-validating"
-      ]
+      "stateSignature": "state-597f5454"
     },
     {
       "id": "global.add-parts.exact",
@@ -304,10 +241,7 @@
       "expectedTargets": [
         "addpart.root"
       ],
-      "coverage": [
-        "route:components",
-        "state:add-parts-exact"
-      ]
+      "stateSignature": "state-4206e4d8"
     },
     {
       "id": "global.add-parts.mismatch",
@@ -318,10 +252,7 @@
       "expectedTargets": [
         "addpart.root"
       ],
-      "coverage": [
-        "route:components",
-        "state:add-parts-mismatch"
-      ]
+      "stateSignature": "state-5ec3a29f"
     },
     {
       "id": "global.add-parts.duplicate",
@@ -332,10 +263,7 @@
       "expectedTargets": [
         "addpart.root"
       ],
-      "coverage": [
-        "route:components",
-        "state:add-parts-duplicate"
-      ]
+      "stateSignature": "state-90284b8e"
     },
     {
       "id": "global.add-parts.failure",
@@ -346,10 +274,7 @@
       "expectedTargets": [
         "addpart.root"
       ],
-      "coverage": [
-        "route:components",
-        "state:add-parts-failure"
-      ]
+      "stateSignature": "state-f84964cb"
     },
     {
       "id": "global.search.initial",
@@ -360,10 +285,7 @@
       "expectedTargets": [
         "search.root"
       ],
-      "coverage": [
-        "route:components",
-        "state:search-initial"
-      ]
+      "stateSignature": "state-e43534e6"
     },
     {
       "id": "global.search.filtered",
@@ -374,10 +296,7 @@
       "expectedTargets": [
         "search.root"
       ],
-      "coverage": [
-        "route:components",
-        "state:search-filtered"
-      ]
+      "stateSignature": "state-e43534e6"
     },
     {
       "id": "global.search.empty",
@@ -388,10 +307,7 @@
       "expectedTargets": [
         "search.root"
       ],
-      "coverage": [
-        "route:components",
-        "state:search-empty"
-      ]
+      "stateSignature": "state-b0fc9e16"
     },
     {
       "id": "global.search.error",
@@ -402,10 +318,7 @@
       "expectedTargets": [
         "search.root"
       ],
-      "coverage": [
-        "route:components",
-        "state:search-error"
-      ]
+      "stateSignature": "state-0a3b8f38"
     },
     {
       "id": "global.confirmation.neutral",
@@ -416,10 +329,7 @@
       "expectedTargets": [
         "confirm.root"
       ],
-      "coverage": [
-        "route:components",
-        "state:confirmation-neutral"
-      ]
+      "stateSignature": "state-2cf2a1b0"
     },
     {
       "id": "global.confirmation.destructive",
@@ -430,10 +340,7 @@
       "expectedTargets": [
         "confirm.root"
       ],
-      "coverage": [
-        "route:components",
-        "state:confirmation-destructive"
-      ]
+      "stateSignature": "state-dba18269"
     },
     {
       "id": "global.toast.neutral",
@@ -444,10 +351,7 @@
       "expectedTargets": [
         "toast.status"
       ],
-      "coverage": [
-        "route:components",
-        "state:toast-neutral"
-      ]
+      "stateSignature": "state-e12d288e"
     },
     {
       "id": "global.toast.success",
@@ -458,10 +362,7 @@
       "expectedTargets": [
         "toast.status"
       ],
-      "coverage": [
-        "route:components",
-        "state:toast-success"
-      ]
+      "stateSignature": "state-ddf13823"
     },
     {
       "id": "global.toast.error",
@@ -472,10 +373,7 @@
       "expectedTargets": [
         "toast.status"
       ],
-      "coverage": [
-        "route:components",
-        "state:toast-error"
-      ]
+      "stateSignature": "state-0f96682f"
     },
     {
       "id": "global.capture.active",
@@ -486,10 +384,7 @@
       "expectedTargets": [
         "shell.root"
       ],
-      "coverage": [
-        "route:components",
-        "state:capture-active"
-      ]
+      "stateSignature": "state-a668b7c5"
     },
     {
       "id": "global.capture.backgrounded",
@@ -500,10 +395,7 @@
       "expectedTargets": [
         "capture.status"
       ],
-      "coverage": [
-        "route:components",
-        "state:capture-backgrounded"
-      ]
+      "stateSignature": "state-d7baba0d"
     },
     {
       "id": "global.capture.complete",
@@ -514,10 +406,7 @@
       "expectedTargets": [
         "capture.status"
       ],
-      "coverage": [
-        "route:components",
-        "state:capture-complete"
-      ]
+      "stateSignature": "state-c23ae76c"
     },
     {
       "id": "global.capture.error",
@@ -528,10 +417,7 @@
       "expectedTargets": [
         "capture.status"
       ],
-      "coverage": [
-        "route:components",
-        "state:capture-error"
-      ]
+      "stateSignature": "state-7316edea"
     },
     {
       "id": "global.offline",
@@ -542,10 +428,7 @@
       "expectedTargets": [
         "shell.root"
       ],
-      "coverage": [
-        "route:components",
-        "state:offline"
-      ]
+      "stateSignature": "state-cfee88bc"
     },
     {
       "id": "global.service-error",
@@ -556,10 +439,7 @@
       "expectedTargets": [
         "components.list-unreachable"
       ],
-      "coverage": [
-        "route:components",
-        "state:service-error"
-      ]
+      "stateSignature": "state-a79184a6"
     },
     {
       "id": "global.stale",
@@ -570,10 +450,7 @@
       "expectedTargets": [
         "shell.root"
       ],
-      "coverage": [
-        "route:components",
-        "state:stale"
-      ]
+      "stateSignature": "state-ce104fea"
     },
     {
       "id": "global.source-promotion.unavailable",
@@ -584,10 +461,7 @@
       "expectedTargets": [
         "shell.root"
       ],
-      "coverage": [
-        "route:components",
-        "state:source-promotion-unavailable"
-      ]
+      "stateSignature": "state-66f78032"
     },
     {
       "id": "global.source-promotion.ready",
@@ -598,10 +472,7 @@
       "expectedTargets": [
         "shell.root"
       ],
-      "coverage": [
-        "route:components",
-        "state:source-promotion-ready"
-      ]
+      "stateSignature": "state-f015aca1"
     },
     {
       "id": "global.source-promotion.blocked",
@@ -612,10 +483,7 @@
       "expectedTargets": [
         "shell.root"
       ],
-      "coverage": [
-        "route:components",
-        "state:source-promotion-blocked"
-      ]
+      "stateSignature": "state-e7a72340"
     },
     {
       "id": "global.source-promotion.success",
@@ -626,10 +494,7 @@
       "expectedTargets": [
         "shell.root"
       ],
-      "coverage": [
-        "route:components",
-        "state:source-promotion-success"
-      ]
+      "stateSignature": "state-09092b5d"
     },
     {
       "id": "global.source-promotion.failure",
@@ -640,10 +505,7 @@
       "expectedTargets": [
         "shell.root"
       ],
-      "coverage": [
-        "route:components",
-        "state:source-promotion-failure"
-      ]
+      "stateSignature": "state-74564f16"
     },
     {
       "id": "components.full-data",
@@ -659,10 +521,7 @@
         "component-browser.related",
         "component-browser.provenance"
       ],
-      "coverage": [
-        "route:components",
-        "state:full-data"
-      ]
+      "stateSignature": "state-127bee0c"
     },
     {
       "id": "components.empty",
@@ -673,10 +532,7 @@
       "expectedTargets": [
         "components.empty"
       ],
-      "coverage": [
-        "route:components",
-        "state:empty"
-      ]
+      "stateSignature": "state-717cff79"
     },
     {
       "id": "components.loading",
@@ -687,10 +543,7 @@
       "expectedTargets": [
         "components.list-loading"
       ],
-      "coverage": [
-        "route:components",
-        "state:loading"
-      ]
+      "stateSignature": "state-e9f1c69a"
     },
     {
       "id": "components.server-error",
@@ -701,10 +554,7 @@
       "expectedTargets": [
         "components.list-failed"
       ],
-      "coverage": [
-        "route:components",
-        "state:server-error"
-      ]
+      "stateSignature": "state-fb30803d"
     },
     {
       "id": "components.no-selection",
@@ -715,10 +565,7 @@
       "expectedTargets": [
         "component-browser.empty"
       ],
-      "coverage": [
-        "route:components",
-        "state:no-selection"
-      ]
+      "stateSignature": "state-300ee20b"
     },
     {
       "id": "components.no-matches",
@@ -729,10 +576,7 @@
       "expectedTargets": [
         "components.list-no-match"
       ],
-      "coverage": [
-        "route:components",
-        "state:no-matches"
-      ]
+      "stateSignature": "state-ab508fdc"
     },
     {
       "id": "components.complete-only",
@@ -743,10 +587,7 @@
       "expectedTargets": [
         "components.root"
       ],
-      "coverage": [
-        "route:components",
-        "state:complete-only"
-      ]
+      "stateSignature": "state-2ec286a7"
     },
     {
       "id": "components.duplicates-only",
@@ -757,10 +598,7 @@
       "expectedTargets": [
         "components.root"
       ],
-      "coverage": [
-        "route:components",
-        "state:duplicates-only"
-      ]
+      "stateSignature": "state-d3cab630"
     },
     {
       "id": "components.category-filter",
@@ -771,10 +609,7 @@
       "expectedTargets": [
         "components.root"
       ],
-      "coverage": [
-        "route:components",
-        "state:category-filter"
-      ]
+      "stateSignature": "state-b1b8f7e8"
     },
     {
       "id": "components.incomplete",
@@ -785,10 +620,7 @@
       "expectedTargets": [
         "components.root"
       ],
-      "coverage": [
-        "route:components",
-        "state:incomplete"
-      ]
+      "stateSignature": "state-f321a699"
     },
     {
       "id": "components.missing-model",
@@ -799,10 +631,7 @@
       "expectedTargets": [
         "components.root"
       ],
-      "coverage": [
-        "route:components",
-        "state:missing-model"
-      ]
+      "stateSignature": "state-bd202582"
     },
     {
       "id": "components.missing-symbol",
@@ -813,10 +642,7 @@
       "expectedTargets": [
         "components.root"
       ],
-      "coverage": [
-        "route:components",
-        "state:missing-symbol"
-      ]
+      "stateSignature": "state-7f5add40"
     },
     {
       "id": "components.missing-footprint",
@@ -827,10 +653,7 @@
       "expectedTargets": [
         "components.root"
       ],
-      "coverage": [
-        "route:components",
-        "state:missing-footprint"
-      ]
+      "stateSignature": "state-d9dd0848"
     },
     {
       "id": "components.cad-source-conflict",
@@ -841,10 +664,7 @@
       "expectedTargets": [
         "components.root"
       ],
-      "coverage": [
-        "route:components",
-        "state:cad-source-conflict"
-      ]
+      "stateSignature": "state-8678982f"
     },
     {
       "id": "components.spec-conflict",
@@ -855,10 +675,7 @@
       "expectedTargets": [
         "components.root"
       ],
-      "coverage": [
-        "route:components",
-        "state:spec-conflict"
-      ]
+      "stateSignature": "state-7043de2b"
     },
     {
       "id": "components.pinout-absent",
@@ -869,10 +686,7 @@
       "expectedTargets": [
         "components.root"
       ],
-      "coverage": [
-        "route:components",
-        "state:pinout-absent"
-      ]
+      "stateSignature": "state-8a2dc4f7"
     },
     {
       "id": "components.sourcing-sparse",
@@ -883,10 +697,7 @@
       "expectedTargets": [
         "components.root"
       ],
-      "coverage": [
-        "route:components",
-        "state:sourcing-sparse"
-      ]
+      "stateSignature": "state-49c56ae6"
     },
     {
       "id": "components.offer-failure",
@@ -897,10 +708,7 @@
       "expectedTargets": [
         "components.root"
       ],
-      "coverage": [
-        "route:components",
-        "state:offer-failure"
-      ]
+      "stateSignature": "state-13db627f"
     },
     {
       "id": "components.documents-empty",
@@ -911,10 +719,7 @@
       "expectedTargets": [
         "components.root"
       ],
-      "coverage": [
-        "route:components",
-        "state:documents-empty"
-      ]
+      "stateSignature": "state-76b11712"
     },
     {
       "id": "components.related-empty",
@@ -925,10 +730,7 @@
       "expectedTargets": [
         "components.root"
       ],
-      "coverage": [
-        "route:components",
-        "state:related-empty"
-      ]
+      "stateSignature": "state-5460465d"
     },
     {
       "id": "components.provenance-conflict",
@@ -937,12 +739,9 @@
       "group": "Components",
       "route": "components",
       "expectedTargets": [
-        "components.root"
+        "component-browser.sources-sheet"
       ],
-      "coverage": [
-        "route:components",
-        "state:provenance-conflict"
-      ]
+      "stateSignature": "state-bb0db593"
     },
     {
       "id": "components.preview-3d",
@@ -953,10 +752,7 @@
       "expectedTargets": [
         "components.root"
       ],
-      "coverage": [
-        "route:components",
-        "state:preview-3d"
-      ]
+      "stateSignature": "state-db4c418e"
     },
     {
       "id": "components.preview-symbol",
@@ -967,10 +763,7 @@
       "expectedTargets": [
         "components.root"
       ],
-      "coverage": [
-        "route:components",
-        "state:preview-symbol"
-      ]
+      "stateSignature": "state-b3086807"
     },
     {
       "id": "components.preview-footprint",
@@ -981,10 +774,7 @@
       "expectedTargets": [
         "components.root"
       ],
-      "coverage": [
-        "route:components",
-        "state:preview-footprint"
-      ]
+      "stateSignature": "state-c2693af4"
     },
     {
       "id": "components.complete-part-ready",
@@ -995,10 +785,7 @@
       "expectedTargets": [
         "component-browser.complete-component"
       ],
-      "coverage": [
-        "route:components",
-        "state:complete-part-ready"
-      ]
+      "stateSignature": "state-5ddb8f74"
     },
     {
       "id": "components.complete-part-partial",
@@ -1009,10 +796,7 @@
       "expectedTargets": [
         "component-browser.complete-component"
       ],
-      "coverage": [
-        "route:components",
-        "state:complete-part-partial"
-      ]
+      "stateSignature": "state-4ebbf7f4"
     },
     {
       "id": "components.complete-part-blocked",
@@ -1023,10 +807,7 @@
       "expectedTargets": [
         "component-browser.complete-component"
       ],
-      "coverage": [
-        "route:components",
-        "state:complete-part-blocked"
-      ]
+      "stateSignature": "state-db46d591"
     },
     {
       "id": "components.bulk-import",
@@ -1035,26 +816,20 @@
       "group": "Components",
       "route": "components",
       "expectedTargets": [
-        "components.root"
+        "ingest.bulk"
       ],
-      "coverage": [
-        "route:components",
-        "state:bulk-import"
-      ]
+      "stateSignature": "state-86d989ee"
     },
     {
-      "id": "components.passive-intake",
-      "title": "Passive Intake",
+      "id": "components.offers-open",
+      "title": "Price Breaks Open",
       "area": "components",
       "group": "Components",
       "route": "components",
       "expectedTargets": [
-        "components.root"
+        "component-browser.sourcing-sheet"
       ],
-      "coverage": [
-        "route:components",
-        "state:passive-intake"
-      ]
+      "stateSignature": "state-948886f1"
     },
     {
       "id": "components.variant-alternatives",
@@ -1065,10 +840,7 @@
       "expectedTargets": [
         "component-browser.complete-component"
       ],
-      "coverage": [
-        "route:components",
-        "state:variant-alternatives"
-      ]
+      "stateSignature": "state-5ddb8f74"
     },
     {
       "id": "components.variant-pending",
@@ -1079,10 +851,7 @@
       "expectedTargets": [
         "component-browser.complete-component"
       ],
-      "coverage": [
-        "route:components",
-        "state:variant-pending"
-      ]
+      "stateSignature": "state-5ddb8f74"
     },
     {
       "id": "components.diff-open",
@@ -1093,24 +862,18 @@
       "expectedTargets": [
         "component-browser.sources-sheet"
       ],
-      "coverage": [
-        "route:components",
-        "state:diff-open"
-      ]
+      "stateSignature": "state-bb0db593"
     },
     {
-      "id": "components.clear-cad",
-      "title": "Clear CAD",
+      "id": "components.pinout-open",
+      "title": "Pinout Open",
       "area": "components",
       "group": "Components",
       "route": "components",
       "expectedTargets": [
-        "components.root"
+        "component-browser.pinout-table"
       ],
-      "coverage": [
-        "route:components",
-        "state:clear-cad"
-      ]
+      "stateSignature": "state-4b96b2bf"
     },
     {
       "id": "components.delete-confirm",
@@ -1121,10 +884,7 @@
       "expectedTargets": [
         "components.root"
       ],
-      "coverage": [
-        "route:components",
-        "state:delete-confirm"
-      ]
+      "stateSignature": "state-c9f8f8e8"
     },
     {
       "id": "provider.loading",
@@ -1136,10 +896,7 @@
         "component-browser.complete-component",
         "component-browser.provider-browser"
       ],
-      "coverage": [
-        "route:components",
-        "state:provider-loading"
-      ]
+      "stateSignature": "state-eef681ba"
     },
     {
       "id": "provider.ready",
@@ -1151,10 +908,7 @@
         "component-browser.complete-component",
         "component-browser.provider-browser"
       ],
-      "coverage": [
-        "route:components",
-        "state:provider-ready"
-      ]
+      "stateSignature": "state-486e1baf"
     },
     {
       "id": "provider.sign-in",
@@ -1166,10 +920,7 @@
         "component-browser.complete-component",
         "component-browser.provider-browser"
       ],
-      "coverage": [
-        "route:components",
-        "state:provider-sign-in"
-      ]
+      "stateSignature": "state-20ddfdbf"
     },
     {
       "id": "provider.waiting-for-person",
@@ -1181,10 +932,7 @@
         "component-browser.complete-component",
         "component-browser.provider-browser"
       ],
-      "coverage": [
-        "route:components",
-        "state:provider-waiting-for-person"
-      ]
+      "stateSignature": "state-08642f31"
     },
     {
       "id": "provider.format-selection",
@@ -1196,10 +944,7 @@
         "component-browser.complete-component",
         "component-browser.provider-browser"
       ],
-      "coverage": [
-        "route:components",
-        "state:provider-format-selection"
-      ]
+      "stateSignature": "state-e3d4e711"
     },
     {
       "id": "provider.download-armed",
@@ -1211,10 +956,7 @@
         "component-browser.complete-component",
         "component-browser.provider-browser"
       ],
-      "coverage": [
-        "route:components",
-        "state:provider-download-armed"
-      ]
+      "stateSignature": "state-d6ee3d8b"
     },
     {
       "id": "provider.one-file",
@@ -1226,10 +968,7 @@
         "component-browser.complete-component",
         "component-browser.provider-browser"
       ],
-      "coverage": [
-        "route:components",
-        "state:provider-one-file"
-      ]
+      "stateSignature": "state-6fbd9584"
     },
     {
       "id": "provider.multiple-files",
@@ -1241,10 +980,7 @@
         "component-browser.complete-component",
         "component-browser.provider-browser"
       ],
-      "coverage": [
-        "route:components",
-        "state:provider-multiple-files"
-      ]
+      "stateSignature": "state-87475e21"
     },
     {
       "id": "provider.partial-retained",
@@ -1256,10 +992,7 @@
         "component-browser.complete-component",
         "component-browser.provider-browser"
       ],
-      "coverage": [
-        "route:components",
-        "state:provider-partial-retained"
-      ]
+      "stateSignature": "state-e0c13f2b"
     },
     {
       "id": "provider.unavailable",
@@ -1271,10 +1004,7 @@
         "component-browser.complete-component",
         "component-browser.provider-browser"
       ],
-      "coverage": [
-        "route:components",
-        "state:provider-unavailable"
-      ]
+      "stateSignature": "state-fbcefd87"
     },
     {
       "id": "provider.timeout",
@@ -1286,10 +1016,7 @@
         "component-browser.complete-component",
         "component-browser.provider-browser"
       ],
-      "coverage": [
-        "route:components",
-        "state:provider-timeout"
-      ]
+      "stateSignature": "state-4c42c2b1"
     },
     {
       "id": "provider.canceled",
@@ -1301,10 +1028,7 @@
         "component-browser.complete-component",
         "component-browser.provider-browser"
       ],
-      "coverage": [
-        "route:components",
-        "state:provider-canceled"
-      ]
+      "stateSignature": "state-dfc90bb3"
     },
     {
       "id": "provider.error",
@@ -1316,10 +1040,7 @@
         "component-browser.complete-component",
         "component-browser.provider-browser"
       ],
-      "coverage": [
-        "route:components",
-        "state:provider-error"
-      ]
+      "stateSignature": "state-b7078c7b"
     },
     {
       "id": "provider.selected-file-recovery",
@@ -1331,10 +1052,7 @@
         "component-browser.complete-component",
         "component-browser.provider-browser"
       ],
-      "coverage": [
-        "route:components",
-        "state:provider-selected-file-recovery"
-      ]
+      "stateSignature": "state-0694f42f"
     },
     {
       "id": "provider.returned-to-stockroom",
@@ -1346,10 +1064,7 @@
         "component-browser.complete-component",
         "component-browser.provider-browser"
       ],
-      "coverage": [
-        "route:components",
-        "state:provider-returned-to-stockroom"
-      ]
+      "stateSignature": "state-2c1200cf"
     },
     {
       "id": "provider.complete",
@@ -1361,10 +1076,7 @@
         "component-browser.complete-component",
         "component-browser.provider-browser"
       ],
-      "coverage": [
-        "route:components",
-        "state:provider-complete"
-      ]
+      "stateSignature": "state-87a78207"
     },
     {
       "id": "projects.loading",
@@ -1376,10 +1088,7 @@
         "projects.picker.loading",
         "projects.loading"
       ],
-      "coverage": [
-        "route:projects",
-        "state:loading"
-      ]
+      "stateSignature": "state-26e7359a"
     },
     {
       "id": "projects.empty",
@@ -1390,10 +1099,7 @@
       "expectedTargets": [
         "projects.empty"
       ],
-      "coverage": [
-        "route:projects",
-        "state:empty"
-      ]
+      "stateSignature": "state-c9ef5baf"
     },
     {
       "id": "projects.list-error",
@@ -1404,10 +1110,7 @@
       "expectedTargets": [
         "projects.picker.failed"
       ],
-      "coverage": [
-        "route:projects",
-        "state:list-error"
-      ]
+      "stateSignature": "state-bb6292e1"
     },
     {
       "id": "projects.workspace-error",
@@ -1418,10 +1121,7 @@
       "expectedTargets": [
         "projects.workspace.error"
       ],
-      "coverage": [
-        "route:projects",
-        "state:workspace-error"
-      ]
+      "stateSignature": "state-70b8f966"
     },
     {
       "id": "projects.kicad.overview",
@@ -1432,10 +1132,7 @@
       "expectedTargets": [
         "projects.overview"
       ],
-      "coverage": [
-        "route:projects",
-        "state:kicad.overview"
-      ]
+      "stateSignature": "state-6c8e3a53"
     },
     {
       "id": "projects.kicad.bom",
@@ -1446,10 +1143,7 @@
       "expectedTargets": [
         "projects.bom"
       ],
-      "coverage": [
-        "route:projects",
-        "state:kicad.bom"
-      ]
+      "stateSignature": "state-01cddf99"
     },
     {
       "id": "projects.kicad.build",
@@ -1460,10 +1154,7 @@
       "expectedTargets": [
         "projects.build"
       ],
-      "coverage": [
-        "route:projects",
-        "state:kicad.build"
-      ]
+      "stateSignature": "state-b83de3e5"
     },
     {
       "id": "projects.kicad.activity",
@@ -1474,10 +1165,7 @@
       "expectedTargets": [
         "projects.activity"
       ],
-      "coverage": [
-        "route:projects",
-        "state:kicad.activity"
-      ]
+      "stateSignature": "state-da9160e7"
     },
     {
       "id": "projects.altium.overview",
@@ -1488,10 +1176,7 @@
       "expectedTargets": [
         "projects.overview"
       ],
-      "coverage": [
-        "route:projects",
-        "state:altium.overview"
-      ]
+      "stateSignature": "state-d84b99b5"
     },
     {
       "id": "projects.altium.bom",
@@ -1502,10 +1187,7 @@
       "expectedTargets": [
         "projects.bom"
       ],
-      "coverage": [
-        "route:projects",
-        "state:altium.bom"
-      ]
+      "stateSignature": "state-23d5b1e7"
     },
     {
       "id": "projects.altium.build",
@@ -1516,10 +1198,7 @@
       "expectedTargets": [
         "projects.build"
       ],
-      "coverage": [
-        "route:projects",
-        "state:altium.build"
-      ]
+      "stateSignature": "state-9a0978e3"
     },
     {
       "id": "projects.altium.activity",
@@ -1530,10 +1209,7 @@
       "expectedTargets": [
         "projects.activity"
       ],
-      "coverage": [
-        "route:projects",
-        "state:altium.activity"
-      ]
+      "stateSignature": "state-25147cc9"
     },
     {
       "id": "projects.render-blocked",
@@ -1545,10 +1221,7 @@
         "projects.overview",
         "projects.native-action-blocked"
       ],
-      "coverage": [
-        "route:projects",
-        "state:render-blocked"
-      ]
+      "stateSignature": "state-2701b15e"
     },
     {
       "id": "projects.native-render-ready",
@@ -1560,10 +1233,7 @@
         "projects.overview",
         "projects.native-board-render"
       ],
-      "coverage": [
-        "route:projects",
-        "state:native-render-ready"
-      ]
+      "stateSignature": "state-d2f1715a"
     },
     {
       "id": "projects.missing-kicad",
@@ -1575,10 +1245,7 @@
         "projects.overview",
         "projects.runtime-missing"
       ],
-      "coverage": [
-        "route:projects",
-        "state:missing-kicad"
-      ]
+      "stateSignature": "state-1f4cdb6b"
     },
     {
       "id": "projects.missing-altium",
@@ -1590,10 +1257,7 @@
         "projects.overview",
         "projects.runtime-missing"
       ],
-      "coverage": [
-        "route:projects",
-        "state:missing-altium"
-      ]
+      "stateSignature": "state-5b6cf382"
     },
     {
       "id": "projects.overlay-blocked",
@@ -1605,10 +1269,7 @@
         "projects.overview",
         "projects.placement-blocked"
       ],
-      "coverage": [
-        "route:projects",
-        "state:overlay-blocked"
-      ]
+      "stateSignature": "state-012193e4"
     },
     {
       "id": "projects.no-repository",
@@ -1620,10 +1281,7 @@
         "projects.activity",
         "projects.no-repository"
       ],
-      "coverage": [
-        "route:projects",
-        "state:no-repository"
-      ]
+      "stateSignature": "state-ac604398"
     },
     {
       "id": "projects.diverged",
@@ -1635,10 +1293,7 @@
         "projects.activity",
         "projects.repository-diverged"
       ],
-      "coverage": [
-        "route:projects",
-        "state:diverged"
-      ]
+      "stateSignature": "state-b8218d44"
     },
     {
       "id": "projects.shared-review",
@@ -1650,10 +1305,7 @@
         "projects.activity",
         "projects.shared-review"
       ],
-      "coverage": [
-        "route:projects",
-        "state:shared-review"
-      ]
+      "stateSignature": "state-86fa4044"
     },
     {
       "id": "projects.build-complete",
@@ -1665,10 +1317,7 @@
         "projects.build",
         "projects.build-complete"
       ],
-      "coverage": [
-        "route:projects",
-        "state:build-complete"
-      ]
+      "stateSignature": "state-7e2d72ab"
     },
     {
       "id": "stm.index-missing",
@@ -1679,10 +1328,7 @@
       "expectedTargets": [
         "stm.root"
       ],
-      "coverage": [
-        "route:stm",
-        "state:index-missing"
-      ]
+      "stateSignature": "state-e0357a0f"
     },
     {
       "id": "stm.index-building",
@@ -1693,10 +1339,7 @@
       "expectedTargets": [
         "stm.root"
       ],
-      "coverage": [
-        "route:stm",
-        "state:index-building"
-      ]
+      "stateSignature": "state-bf473230"
     },
     {
       "id": "stm.index-error",
@@ -1707,10 +1350,7 @@
       "expectedTargets": [
         "stm.root"
       ],
-      "coverage": [
-        "route:stm",
-        "state:index-error"
-      ]
+      "stateSignature": "state-ff439dd7"
     },
     {
       "id": "stm.explorer-loading",
@@ -1721,10 +1361,7 @@
       "expectedTargets": [
         "stm.root"
       ],
-      "coverage": [
-        "route:stm",
-        "state:explorer-loading"
-      ]
+      "stateSignature": "state-4ea2f08d"
     },
     {
       "id": "stm.explorer-error",
@@ -1735,10 +1372,7 @@
       "expectedTargets": [
         "stm.root"
       ],
-      "coverage": [
-        "route:stm",
-        "state:explorer-error"
-      ]
+      "stateSignature": "state-624d9e97"
     },
     {
       "id": "stm.explorer-empty",
@@ -1749,10 +1383,7 @@
       "expectedTargets": [
         "stm.root"
       ],
-      "coverage": [
-        "route:stm",
-        "state:explorer-empty"
-      ]
+      "stateSignature": "state-131d2599"
     },
     {
       "id": "stm.explorer-matrix",
@@ -1763,10 +1394,7 @@
       "expectedTargets": [
         "stm.root"
       ],
-      "coverage": [
-        "route:stm",
-        "state:explorer-matrix"
-      ]
+      "stateSignature": "state-95523469"
     },
     {
       "id": "stm.explorer-selected-mcu",
@@ -1777,10 +1405,7 @@
       "expectedTargets": [
         "stm.root"
       ],
-      "coverage": [
-        "route:stm",
-        "state:explorer-selected-mcu"
-      ]
+      "stateSignature": "state-32131ca4"
     },
     {
       "id": "stm.explorer-selected-package",
@@ -1791,10 +1416,7 @@
       "expectedTargets": [
         "stm.root"
       ],
-      "coverage": [
-        "route:stm",
-        "state:explorer-selected-package"
-      ]
+      "stateSignature": "state-c8034838"
     },
     {
       "id": "stm.explorer-selected-pin",
@@ -1805,10 +1427,7 @@
       "expectedTargets": [
         "stm.root"
       ],
-      "coverage": [
-        "route:stm",
-        "state:explorer-selected-pin"
-      ]
+      "stateSignature": "state-91756073"
     },
     {
       "id": "stm.explorer-pinout",
@@ -1819,10 +1438,7 @@
       "expectedTargets": [
         "stm.root"
       ],
-      "coverage": [
-        "route:stm",
-        "state:explorer-pinout"
-      ]
+      "stateSignature": "state-2cd01f3a"
     },
     {
       "id": "stm.explorer-af-options",
@@ -1833,10 +1449,7 @@
       "expectedTargets": [
         "stm.root"
       ],
-      "coverage": [
-        "route:stm",
-        "state:explorer-af-options"
-      ]
+      "stateSignature": "state-91756073"
     },
     {
       "id": "stm.target-definition",
@@ -1848,10 +1461,7 @@
         "stm.root",
         "stm.target-definition"
       ],
-      "coverage": [
-        "route:stm",
-        "state:target-definition"
-      ]
+      "stateSignature": "state-2a2b062e"
     },
     {
       "id": "stm.target-evidence",
@@ -1863,10 +1473,7 @@
         "stm.root",
         "stm.target-definition"
       ],
-      "coverage": [
-        "route:stm",
-        "state:target-evidence"
-      ]
+      "stateSignature": "state-2a2b062e"
     },
     {
       "id": "stm.target-policy",
@@ -1879,10 +1486,7 @@
         "stm.bench",
         "stm.target-policy"
       ],
-      "coverage": [
-        "route:stm",
-        "state:target-policy"
-      ]
+      "stateSignature": "state-347fb4ca"
     },
     {
       "id": "stm.target-package-map",
@@ -1895,10 +1499,7 @@
         "stm.target-definition",
         "stm.target-map"
       ],
-      "coverage": [
-        "route:stm",
-        "state:target-package-map"
-      ]
+      "stateSignature": "state-77b5671c"
     },
     {
       "id": "stm.compatibility-ready",
@@ -1909,10 +1510,7 @@
       "expectedTargets": [
         "stm.root"
       ],
-      "coverage": [
-        "route:stm",
-        "state:compatibility-ready"
-      ]
+      "stateSignature": "state-4723687a"
     },
     {
       "id": "stm.compatibility-conflict",
@@ -1923,10 +1521,7 @@
       "expectedTargets": [
         "stm.root"
       ],
-      "coverage": [
-        "route:stm",
-        "state:compatibility-conflict"
-      ]
+      "stateSignature": "state-4723687a"
     },
     {
       "id": "stm.bench-part-selection",
@@ -1937,10 +1532,7 @@
       "expectedTargets": [
         "stm.root"
       ],
-      "coverage": [
-        "route:stm",
-        "state:bench-part-selection"
-      ]
+      "stateSignature": "state-4723687a"
     },
     {
       "id": "stm.bench-socket-solution",
@@ -1951,10 +1543,7 @@
       "expectedTargets": [
         "stm.root"
       ],
-      "coverage": [
-        "route:stm",
-        "state:bench-socket-solution"
-      ]
+      "stateSignature": "state-4723687a"
     },
     {
       "id": "stm.bench-blocked",
@@ -1965,10 +1554,7 @@
       "expectedTargets": [
         "stm.root"
       ],
-      "coverage": [
-        "route:stm",
-        "state:bench-blocked"
-      ]
+      "stateSignature": "state-fadd032a"
     },
     {
       "id": "settings.appearance.ready",
@@ -1979,10 +1565,7 @@
       "expectedTargets": [
         "settings.appearance"
       ],
-      "coverage": [
-        "route:settings",
-        "state:ready"
-      ]
+      "stateSignature": "state-fafb74d3"
     },
     {
       "id": "settings.libraries.ready",
@@ -1993,10 +1576,7 @@
       "expectedTargets": [
         "settings.profiles"
       ],
-      "coverage": [
-        "route:settings",
-        "state:ready"
-      ]
+      "stateSignature": "state-6e22a804"
     },
     {
       "id": "settings.libraries.attention",
@@ -2007,10 +1587,7 @@
       "expectedTargets": [
         "settings.profiles"
       ],
-      "coverage": [
-        "route:settings",
-        "state:attention"
-      ]
+      "stateSignature": "state-c215243e"
     },
     {
       "id": "settings.libraries.error",
@@ -2021,10 +1598,7 @@
       "expectedTargets": [
         "settings.profiles"
       ],
-      "coverage": [
-        "route:settings",
-        "state:error"
-      ]
+      "stateSignature": "state-31dd8f6a"
     },
     {
       "id": "settings.libraries.create",
@@ -2035,10 +1609,7 @@
       "expectedTargets": [
         "settings.profiles"
       ],
-      "coverage": [
-        "route:settings",
-        "state:create"
-      ]
+      "stateSignature": "state-6e22a804"
     },
     {
       "id": "settings.libraries.clone",
@@ -2049,10 +1620,7 @@
       "expectedTargets": [
         "settings.profiles"
       ],
-      "coverage": [
-        "route:settings",
-        "state:clone"
-      ]
+      "stateSignature": "state-6e22a804"
     },
     {
       "id": "settings.libraries.current",
@@ -2063,10 +1631,7 @@
       "expectedTargets": [
         "settings.profiles"
       ],
-      "coverage": [
-        "route:settings",
-        "state:current"
-      ]
+      "stateSignature": "state-6e22a804"
     },
     {
       "id": "settings.sync.ready",
@@ -2077,10 +1642,7 @@
       "expectedTargets": [
         "settings.sync"
       ],
-      "coverage": [
-        "route:settings",
-        "state:ready"
-      ]
+      "stateSignature": "state-64aa1639"
     },
     {
       "id": "settings.sync.attention",
@@ -2091,10 +1653,7 @@
       "expectedTargets": [
         "settings.sync"
       ],
-      "coverage": [
-        "route:settings",
-        "state:attention"
-      ]
+      "stateSignature": "state-d3b3663d"
     },
     {
       "id": "settings.sync.error",
@@ -2105,10 +1664,7 @@
       "expectedTargets": [
         "settings.sync"
       ],
-      "coverage": [
-        "route:settings",
-        "state:error"
-      ]
+      "stateSignature": "state-a3fed00b"
     },
     {
       "id": "settings.sync.syncing",
@@ -2119,10 +1675,7 @@
       "expectedTargets": [
         "settings.sync"
       ],
-      "coverage": [
-        "route:settings",
-        "state:syncing"
-      ]
+      "stateSignature": "state-c910db89"
     },
     {
       "id": "settings.sync.diverged",
@@ -2133,10 +1686,7 @@
       "expectedTargets": [
         "settings.sync"
       ],
-      "coverage": [
-        "route:settings",
-        "state:diverged"
-      ]
+      "stateSignature": "state-58f51d89"
     },
     {
       "id": "settings.kicad.ready",
@@ -2147,10 +1697,7 @@
       "expectedTargets": [
         "settings.kicad"
       ],
-      "coverage": [
-        "route:settings",
-        "state:ready"
-      ]
+      "stateSignature": "state-b50c9aed"
     },
     {
       "id": "settings.kicad.attention",
@@ -2161,10 +1708,7 @@
       "expectedTargets": [
         "settings.kicad"
       ],
-      "coverage": [
-        "route:settings",
-        "state:attention"
-      ]
+      "stateSignature": "state-3f14e86f"
     },
     {
       "id": "settings.kicad.error",
@@ -2175,10 +1719,7 @@
       "expectedTargets": [
         "settings.kicad"
       ],
-      "coverage": [
-        "route:settings",
-        "state:error"
-      ]
+      "stateSignature": "state-75ff345f"
     },
     {
       "id": "settings.kicad.picker",
@@ -2189,10 +1730,7 @@
       "expectedTargets": [
         "settings.kicad"
       ],
-      "coverage": [
-        "route:settings",
-        "state:picker"
-      ]
+      "stateSignature": "state-4602747b"
     },
     {
       "id": "settings.altium.ready",
@@ -2203,10 +1741,7 @@
       "expectedTargets": [
         "settings.altium"
       ],
-      "coverage": [
-        "route:settings",
-        "state:ready"
-      ]
+      "stateSignature": "state-fdd6662d"
     },
     {
       "id": "settings.altium.attention",
@@ -2217,10 +1752,7 @@
       "expectedTargets": [
         "settings.altium"
       ],
-      "coverage": [
-        "route:settings",
-        "state:attention"
-      ]
+      "stateSignature": "state-80a197af"
     },
     {
       "id": "settings.altium.error",
@@ -2231,10 +1763,7 @@
       "expectedTargets": [
         "settings.altium"
       ],
-      "coverage": [
-        "route:settings",
-        "state:error"
-      ]
+      "stateSignature": "state-3da83437"
     },
     {
       "id": "settings.altium.setup-dialog",
@@ -2245,10 +1774,7 @@
       "expectedTargets": [
         "altiumdb.setup-modal"
       ],
-      "coverage": [
-        "route:settings",
-        "state:setup-dialog"
-      ]
+      "stateSignature": "state-7092f14c"
     },
     {
       "id": "settings.altium.dblib-dialog",
@@ -2259,10 +1785,7 @@
       "expectedTargets": [
         "altiumdb.modal"
       ],
-      "coverage": [
-        "route:settings",
-        "state:dblib-dialog"
-      ]
+      "stateSignature": "state-fa8eccf4"
     },
     {
       "id": "settings.cubemx.ready",
@@ -2273,10 +1796,7 @@
       "expectedTargets": [
         "settings.cubemx"
       ],
-      "coverage": [
-        "route:settings",
-        "state:ready"
-      ]
+      "stateSignature": "state-3620ad81"
     },
     {
       "id": "settings.cubemx.attention",
@@ -2287,10 +1807,7 @@
       "expectedTargets": [
         "settings.cubemx"
       ],
-      "coverage": [
-        "route:settings",
-        "state:attention"
-      ]
+      "stateSignature": "state-49f5a4cb"
     },
     {
       "id": "settings.cubemx.error",
@@ -2301,10 +1818,7 @@
       "expectedTargets": [
         "settings.cubemx"
       ],
-      "coverage": [
-        "route:settings",
-        "state:error"
-      ]
+      "stateSignature": "state-a3f6443f"
     },
     {
       "id": "settings.cubemx.picker",
@@ -2315,10 +1829,7 @@
       "expectedTargets": [
         "settings.cubemx"
       ],
-      "coverage": [
-        "route:settings",
-        "state:picker"
-      ]
+      "stateSignature": "state-ecc4f173"
     },
     {
       "id": "settings.distributors.ready",
@@ -2329,10 +1840,7 @@
       "expectedTargets": [
         "settings.distributor"
       ],
-      "coverage": [
-        "route:settings",
-        "state:ready"
-      ]
+      "stateSignature": "state-1b2e4496"
     },
     {
       "id": "settings.distributors.attention",
@@ -2343,10 +1851,7 @@
       "expectedTargets": [
         "settings.distributor"
       ],
-      "coverage": [
-        "route:settings",
-        "state:attention"
-      ]
+      "stateSignature": "state-2c0d18be"
     },
     {
       "id": "settings.distributors.error",
@@ -2357,10 +1862,7 @@
       "expectedTargets": [
         "settings.distributor"
       ],
-      "coverage": [
-        "route:settings",
-        "state:error"
-      ]
+      "stateSignature": "state-5457dc20"
     },
     {
       "id": "settings.distributors.credentials-partial",
@@ -2371,10 +1873,7 @@
       "expectedTargets": [
         "settings.distributor"
       ],
-      "coverage": [
-        "route:settings",
-        "state:credentials-partial"
-      ]
+      "stateSignature": "state-6921d2b5"
     },
     {
       "id": "settings.distributors.credentials-refresh",
@@ -2385,10 +1884,7 @@
       "expectedTargets": [
         "settings.distributor"
       ],
-      "coverage": [
-        "route:settings",
-        "state:credentials-refresh"
-      ]
+      "stateSignature": "state-1b2e4496"
     },
     {
       "id": "settings.vendor-logins.ready",
@@ -2399,10 +1895,7 @@
       "expectedTargets": [
         "settings.vendor-login-row"
       ],
-      "coverage": [
-        "route:settings",
-        "state:ready"
-      ]
+      "stateSignature": "state-03c9154c"
     },
     {
       "id": "settings.vendor-logins.attention",
@@ -2413,10 +1906,7 @@
       "expectedTargets": [
         "settings.vendor-login-row"
       ],
-      "coverage": [
-        "route:settings",
-        "state:attention"
-      ]
+      "stateSignature": "state-b9f89618"
     },
     {
       "id": "settings.vendor-logins.error",
@@ -2427,10 +1917,7 @@
       "expectedTargets": [
         "settings.vendor-login-row"
       ],
-      "coverage": [
-        "route:settings",
-        "state:error"
-      ]
+      "stateSignature": "state-d76c7f22"
     },
     {
       "id": "settings.github.ready",
@@ -2441,10 +1928,7 @@
       "expectedTargets": [
         "settings.github"
       ],
-      "coverage": [
-        "route:settings",
-        "state:ready"
-      ]
+      "stateSignature": "state-078d2505"
     },
     {
       "id": "settings.github.attention",
@@ -2455,10 +1939,7 @@
       "expectedTargets": [
         "settings.github"
       ],
-      "coverage": [
-        "route:settings",
-        "state:attention"
-      ]
+      "stateSignature": "state-c8938581"
     },
     {
       "id": "settings.github.error",
@@ -2469,10 +1950,7 @@
       "expectedTargets": [
         "settings.github"
       ],
-      "coverage": [
-        "route:settings",
-        "state:error"
-      ]
+      "stateSignature": "state-99123e07"
     },
     {
       "id": "settings.updates.ready",
@@ -2483,10 +1961,7 @@
       "expectedTargets": [
         "settings.update"
       ],
-      "coverage": [
-        "route:settings",
-        "state:ready"
-      ]
+      "stateSignature": "state-e47f6078"
     },
     {
       "id": "settings.updates.attention",
@@ -2497,10 +1972,7 @@
       "expectedTargets": [
         "settings.update"
       ],
-      "coverage": [
-        "route:settings",
-        "state:attention"
-      ]
+      "stateSignature": "state-d9e853e0"
     },
     {
       "id": "settings.updates.error",
@@ -2511,10 +1983,7 @@
       "expectedTargets": [
         "settings.update"
       ],
-      "coverage": [
-        "route:settings",
-        "state:error"
-      ]
+      "stateSignature": "state-df309a7a"
     },
     {
       "id": "settings.maintenance.ready",
@@ -2525,10 +1994,7 @@
       "expectedTargets": [
         "settings.completion"
       ],
-      "coverage": [
-        "route:settings",
-        "state:ready"
-      ]
+      "stateSignature": "state-0b8d7658"
     },
     {
       "id": "settings.maintenance.attention",
@@ -2539,10 +2005,7 @@
       "expectedTargets": [
         "settings.completion"
       ],
-      "coverage": [
-        "route:settings",
-        "state:attention"
-      ]
+      "stateSignature": "state-38b52a1e"
     },
     {
       "id": "settings.maintenance.error",
@@ -2553,10 +2016,7 @@
       "expectedTargets": [
         "settings.completion"
       ],
-      "coverage": [
-        "route:settings",
-        "state:error"
-      ]
+      "stateSignature": "state-03015bce"
     },
     {
       "id": "settings.completion.ready",
@@ -2567,10 +2027,7 @@
       "expectedTargets": [
         "settings.completion"
       ],
-      "coverage": [
-        "route:settings",
-        "state:ready"
-      ]
+      "stateSignature": "state-0b8d7658"
     },
     {
       "id": "settings.completion.attention",
@@ -2581,10 +2038,7 @@
       "expectedTargets": [
         "settings.completion"
       ],
-      "coverage": [
-        "route:settings",
-        "state:attention"
-      ]
+      "stateSignature": "state-38b52a1e"
     },
     {
       "id": "settings.completion.error",
@@ -2595,10 +2049,7 @@
       "expectedTargets": [
         "settings.completion"
       ],
-      "coverage": [
-        "route:settings",
-        "state:error"
-      ]
+      "stateSignature": "state-e8d4f9de"
     },
     {
       "id": "settings.health.ready",
@@ -2609,10 +2060,7 @@
       "expectedTargets": [
         "settings.health"
       ],
-      "coverage": [
-        "route:settings",
-        "state:ready"
-      ]
+      "stateSignature": "state-01ef70f0"
     },
     {
       "id": "settings.health.attention",
@@ -2623,10 +2071,7 @@
       "expectedTargets": [
         "settings.health"
       ],
-      "coverage": [
-        "route:settings",
-        "state:attention"
-      ]
+      "stateSignature": "state-c9f48726"
     },
     {
       "id": "settings.health.error",
@@ -2637,10 +2082,7 @@
       "expectedTargets": [
         "settings.health"
       ],
-      "coverage": [
-        "route:settings",
-        "state:error"
-      ]
+      "stateSignature": "state-ef540986"
     },
     {
       "id": "settings.rescan.ready",
@@ -2651,10 +2093,7 @@
       "expectedTargets": [
         "settings.rescan"
       ],
-      "coverage": [
-        "route:settings",
-        "state:ready"
-      ]
+      "stateSignature": "state-5aa0837f"
     },
     {
       "id": "settings.rescan.attention",
@@ -2665,10 +2104,7 @@
       "expectedTargets": [
         "settings.rescan"
       ],
-      "coverage": [
-        "route:settings",
-        "state:attention"
-      ]
+      "stateSignature": "state-7ee8a835"
     },
     {
       "id": "settings.rescan.error",
@@ -2679,10 +2115,7 @@
       "expectedTargets": [
         "settings.rescan"
       ],
-      "coverage": [
-        "route:settings",
-        "state:error"
-      ]
+      "stateSignature": "state-5ecee46d"
     },
     {
       "id": "settings.reset-cad.confirmation",
@@ -2693,10 +2126,7 @@
       "expectedTargets": [
         "confirm.root"
       ],
-      "coverage": [
-        "route:settings",
-        "state:confirmation"
-      ]
+      "stateSignature": "state-a4113284"
     }
   ]
 }

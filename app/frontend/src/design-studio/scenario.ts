@@ -5,9 +5,6 @@ import type { TargetDefinitionDTO } from "../api/types";
 /** The product surface a scenario belongs to. Route-specific areas grow with the product routes. */
 export type ScenarioArea = "global" | Route;
 
-/** Coverage is explicit so an editor cannot silently omit a state or route it needs to exercise. */
-export type ScenarioCoverageTag = `route:${Route}` | `state:${string}`;
-
 /** A local result for a fixture that represents a product mutation. */
 export interface ScenarioLocalOutcome {
   state: "succeeded" | "failed";
@@ -89,5 +86,33 @@ export interface DesignScenario {
   fixtures: readonly ScenarioFixture[];
   initialUi: Readonly<ScenarioUiState>;
   expectedTargets: readonly string[];
-  coverage: readonly ScenarioCoverageTag[];
+}
+
+function canonicalScenarioValue(value: unknown): string {
+  if (value === undefined) return '"<undefined>"';
+  if (value === null || typeof value !== "object") return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map(canonicalScenarioValue).join(",")}]`;
+  return `{${Object.entries(value as Record<string, unknown>)
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([key, item]) => `${JSON.stringify(key)}:${canonicalScenarioValue(item)}`)
+    .join(",")}}`;
+}
+
+/** Exact non-title state fingerprint shared by production DOM, jsdom, and the browser projection. */
+export function scenarioStateSignature(scenario: DesignScenario): string {
+  if (scenario.id === "global.real-data") return "real-data";
+  const material = canonicalScenarioValue({
+    route: scenario.route,
+    initialUi: scenario.initialUi,
+    expectedTargets: scenario.expectedTargets,
+    fixtures: scenario.fixtures.map(({ method, path, params, body, behavior, response, localOutcome }) => ({
+      method: method.toUpperCase(), path, params, body, behavior, response, localOutcome,
+    })),
+  });
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < material.length; index += 1) {
+    hash ^= material.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return `state-${(hash >>> 0).toString(16).padStart(8, "0")}`;
 }

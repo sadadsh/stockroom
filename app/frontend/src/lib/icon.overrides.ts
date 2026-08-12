@@ -12,6 +12,11 @@ export interface IconOverride {
   body?: string;
   // Another registry icon id whose glyph to render instead (a glyph swap).
   swapToId?: string;
+  /** Closed per-icon presentation properties; raw style and event markup are never accepted. */
+  strokeWidth?: number;
+  treatment?: "line" | "solid" | "muted";
+  a11yLabel?: string;
+  alignment?: "baseline" | "middle" | "text-top" | "text-bottom";
 }
 
 export const ICON_OVERRIDES: Record<string, IconOverride> = {};

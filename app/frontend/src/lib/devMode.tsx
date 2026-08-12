@@ -77,6 +77,7 @@ export interface DevModeContextValue {
   isIconOverridden: (id: string) => boolean;
   setIconBody: (id: string, body: string) => void;
   setIconSwap: (id: string, swapToId: string) => void;
+  setIconPresentation: (id: string, patch: IconOverride) => void;
   resetIcon: (id: string) => void;
   // --- per-element overrides (ELEM-01: a data-dev-id -> CSS-prop map applied as inline style) ---
   // The working prop map held for an id (the Box tab's read), or undefined when none. Reads the
@@ -190,6 +191,7 @@ const DEFAULT: DevModeContextValue = {
   isIconOverridden: () => false,
   setIconBody: noop,
   setIconSwap: noop,
+  setIconPresentation: noop,
   resetIcon: noop,
   // No provider: committed element overrides still resolve (so the Box tab reads what shipped), and
   // the setters are inert - mirrors iconOverrideFor -> ICON_OVERRIDES[id].

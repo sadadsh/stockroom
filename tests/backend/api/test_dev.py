@@ -8,6 +8,8 @@ import os
 import subprocess
 from types import SimpleNamespace
 
+import pytest
+
 import stockroom.api.routers.dev as dev_mod
 
 
@@ -193,6 +195,47 @@ def test_dev_save_rejects_bad_icon_swap_id(client, tmp_path, monkeypatch):
     assert res.status_code == 400
 
 
+def test_dev_save_writes_closed_icon_presentation_properties(client, tmp_path, monkeypatch):
+    src = _src_with_lib(tmp_path, monkeypatch)
+    res = client.post(
+        "/api/dev/save",
+        json={
+            "tokens": {"root": {}, "light": {}},
+            "copy": {},
+            "icons": {
+                "nav.parts": {
+                    "strokeWidth": 2.5,
+                    "treatment": "muted",
+                    "a11yLabel": "Parts navigation",
+                    "alignment": "middle",
+                }
+            },
+        },
+    )
+    assert res.status_code == 200
+    icon_ts = (src / "lib" / "icon.overrides.ts").read_text(encoding="utf-8")
+    assert '"strokeWidth": 2.5' in icon_ts
+    assert '"treatment": "muted"' in icon_ts
+    assert '"a11yLabel": "Parts navigation"' in icon_ts
+    assert '"alignment": "middle"' in icon_ts
+
+
+def test_dev_save_rejects_open_ended_icon_presentation_before_any_write(client, tmp_path, monkeypatch):
+    src = _src_with_lib(tmp_path, monkeypatch)
+    for patch in (
+        {"strokeWidth": 10},
+        {"treatment": "filter:blur(3px)"},
+        {"a11yLabel": "<script>bad()</script>"},
+        {"alignment": "position:absolute"},
+    ):
+        res = client.post(
+            "/api/dev/save",
+            json={"tokens": {"root": {}, "light": {}}, "copy": {}, "icons": {"nav.parts": patch}},
+        )
+        assert res.status_code == 400
+        assert not (src / "lib" / "icon.overrides.ts").exists()
+
+
 # --- dev-mode v2: per-element overrides -------------------------------------------------------
 
 
@@ -232,6 +275,26 @@ def test_dev_save_writes_validated_element_overrides(client, tmp_path, monkeypat
     assert '"border-radius": "4px 8px 12px 16px"' in elem_ts
     assert '"line-height": "1.4"' in elem_ts
     assert "bad id!" not in elem_ts
+
+
+def test_dev_save_writes_complete_closed_box_and_text_grammar(client, tmp_path, monkeypatch):
+    src = _src_with_lib(tmp_path, monkeypatch)
+    properties = {
+        "position": "absolute", "inset": "8px", "overflow": "hidden",
+        "background-image": "linear-gradient(to right, #112233, var(--c-acc))",
+        "border-style": "solid", "border-width": "1px", "box-shadow": "0px 2px 8px #11223344",
+        "grid-template-columns": "repeat(3, minmax(0, 1fr))", "grid-auto-flow": "row dense",
+        "font-family": "system-ui", "text-transform": "uppercase", "white-space": "nowrap",
+        "text-overflow": "ellipsis", "overflow-wrap": "anywhere",
+    }
+    res = client.post(
+        "/api/dev/save",
+        json={"tokens": {"root": {}, "light": {}}, "copy": {}, "elements": {"detail.title::text": properties}},
+    )
+    assert res.status_code == 200, res.text
+    element_ts = (src / "lib" / "element.overrides.ts").read_text(encoding="utf-8")
+    for property, value in properties.items():
+        assert f'"{property}": "{value}"' in element_ts
 
 
 def test_dev_save_empty_elements_reproduces_the_committed_file(client, tmp_path, monkeypatch):
@@ -484,6 +547,110 @@ def test_dev_publish_refuses_foreign_dirty_source_before_running_build(tmp_path,
         assert "unrelated files" in exc.detail
     else:
         raise AssertionError("foreign source must block Dev Mode publish")
+
+
+def _promotion_body():
+    source = {
+        "tokens": {"root": {"--r-card": "18px"}, "light": {"--c-t1": "#111111"}},
+        "copy": {},
+    }
+    return {
+        "message": "Promote personal design",
+        "source": source,
+        "translations": {
+            "base": {"dark": source, "light": source},
+            "variations": {
+                "full-data": {
+                    "title": "Full Data",
+                    "extends": None,
+                    "themes": {"dark": source, "light": source},
+                },
+                "custom": {
+                    "title": "Custom",
+                    "extends": "full-data",
+                    "themes": {"dark": source, "light": source},
+                },
+            },
+        },
+    }
+
+
+@pytest.mark.parametrize("location", ["variation", "theme"])
+def test_design_promotion_directly_rejects_malformed_variation_and_theme_layout(location):
+    body = _promotion_body()
+    malformed = {
+        "workspace": {
+            "schemaVersion": 1,
+            "id": "workspace",
+            "root": {"kind": "script", "id": "root"},
+        }
+    }
+    target = body["translations"]["variations"]["custom"]["themes"]
+    target["dark" if location == "theme" else "light"] = {
+        "tokens": {"root": {}, "light": {}},
+        "copy": {},
+        "layout": malformed,
+    }
+    with pytest.raises(dev_mod.ApiError) as caught:
+        dev_mod._clean_promotion_translations(body["translations"])
+    assert caught.value.status == 400
+    assert "root must be a region" in caught.value.detail
+
+
+def test_design_promotion_is_one_backend_transaction_and_preserves_themes_and_variations(tmp_path, monkeypatch):
+    root = tmp_path / "repo"
+    src = root / "app" / "frontend" / "src"
+    (src / "lib").mkdir(parents=True)
+    (root / "app" / "frontend-dist").mkdir(parents=True)
+    monkeypatch.setattr(dev_mod, "_FRONTEND_SRC", src)
+    checks = []
+    monkeypatch.setattr(dev_mod, "_run_frontend", lambda repo, command: checks.append(command))
+    repo = _PublishRepo(root, [])
+
+    result = dev_mod._promote(_publish_request(repo), _promotion_body())
+
+    assert result["pushed"] is True
+    assert result["themes"] == ["dark", "light"]
+    assert result["variations"] == 2
+    assert checks == ["install", "typecheck", "build"]
+    generated = (src / "lib" / "design.variations.ts").read_text(encoding="utf-8")
+    assert '"dark"' in generated and '"light"' in generated
+    assert '"full-data"' in generated and '"custom"' in generated
+
+
+def test_design_promotion_restores_pre_source_and_dist_snapshot_when_build_fails(tmp_path, monkeypatch):
+    root = tmp_path / "repo"
+    src = root / "app" / "frontend" / "src"
+    lib = src / "lib"
+    dist = root / "app" / "frontend-dist"
+    lib.mkdir(parents=True)
+    dist.mkdir(parents=True)
+    monkeypatch.setattr(dev_mod, "_FRONTEND_SRC", src)
+    for rel in dev_mod._DEV_SOURCE_PATHS:
+        target = root / rel
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(f"before:{rel}", encoding="utf-8")
+    (dist / "asset.js").write_text("before-dist", encoding="utf-8")
+    before = {rel: (root / rel).read_bytes() for rel in dev_mod._DEV_SOURCE_PATHS}
+
+    def fail_build(repo, command):
+        if command == "build":
+            (dist / "asset.js").write_text("broken-dist", encoding="utf-8")
+            raise dev_mod.ApiError(409, "Frontend build failed.")
+
+    monkeypatch.setattr(dev_mod, "_run_frontend", fail_build)
+    repo = _PublishRepo(root, [])
+
+    try:
+        dev_mod._promote(_publish_request(repo), _promotion_body())
+    except dev_mod.ApiError as exc:
+        assert "build failed" in exc.detail
+    else:
+        raise AssertionError("failed build must abort promotion")
+
+    assert {rel: (root / rel).read_bytes() for rel in dev_mod._DEV_SOURCE_PATHS} == before
+    assert (dist / "asset.js").read_text(encoding="utf-8") == "before-dist"
+    assert repo.committed == []
 
 
 def test_dev_save_accepts_approved_dynamic_element_ids(client, tmp_path, monkeypatch):

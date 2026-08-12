@@ -36,6 +36,8 @@ import type {
   DevSaveResult,
   DevWorkspaceStatus,
   DevPublishResult,
+  DevPromoteBody,
+  DevPromoteResult,
   AltiumStatus,
   OdbcStatus,
   CadSourceResponse,
@@ -678,6 +680,10 @@ export const api = {
 
   devPublish(message: string): Promise<DevPublishResult> {
     return request<DevPublishResult>("POST", "/api/dev/publish", { body: { message } });
+  },
+
+  devPromote(body: DevPromoteBody): Promise<DevPromoteResult> {
+    return request<DevPromoteResult>("POST", "/api/dev/promote", { body });
   },
 
   // Filter dimensions generated from the parts' spec bags (the modular search rail), scoped by the

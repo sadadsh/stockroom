@@ -60,6 +60,21 @@ describe("Icon - default rendering", () => {
 });
 
 describe("Icon - overrides", () => {
+  it("applies per-icon stroke, solid treatment, alignment, and accessibility to every category", () => {
+    ICON_OVERRIDES["action.search"] = {
+      strokeWidth: 3,
+      treatment: "solid",
+      alignment: "middle",
+      a11yLabel: "Search inventory",
+    };
+    const svg = renderIcon({ id: "action.search" });
+    expect(svg).toHaveAttribute("stroke-width", "3");
+    expect(svg).toHaveAttribute("fill", "currentColor");
+    expect(svg).toHaveAttribute("stroke", "none");
+    expect(svg).toHaveStyle({ verticalAlign: "middle" });
+    expect(svg).toHaveAttribute("aria-label", "Search inventory");
+    expect(svg?.querySelector("title")).toHaveTextContent("Search inventory");
+  });
   it("renders swapToId's glyph instead of the id's own", () => {
     ICON_OVERRIDES["action.add"] = { swapToId: "action.trash" };
     const svg = renderIcon({ id: "action.add" });

@@ -214,11 +214,16 @@ function draftReducer(state: DevModeDraft, action: DraftAction): DevModeDraft {
       delete copy[action.id];
       return { ...state, copy };
     }
-    case "patchIcon":
-      return {
-        ...state,
-        icons: { ...state.icons, [action.id]: { ...state.icons[action.id], ...action.patch } },
-      };
+    case "patchIcon": {
+      const icons = { ...state.icons };
+      const next = { ...icons[action.id], ...action.patch };
+      for (const key of Object.keys(next) as (keyof IconOverride)[]) {
+        if (next[key] === undefined) delete next[key];
+      }
+      if (Object.keys(next).length === 0) delete icons[action.id];
+      else icons[action.id] = next;
+      return { ...state, icons };
+    }
     case "resetIcon": {
       const icons = { ...state.icons };
       delete icons[action.id];
@@ -363,7 +368,7 @@ export function useDevModeDraft(theme: Theme) {
   const isIconOverridden = useCallback(
     (id: string): boolean => {
       const ov = icons[id];
-      return ov != null && (ov.body != null || ov.swapToId != null);
+      return ov != null && Object.keys(ov).length > 0;
     },
     [icons],
   );
@@ -372,6 +377,9 @@ export function useDevModeDraft(theme: Theme) {
   }, []);
   const setIconSwap = useCallback((id: string, swapToId: string) => {
     dispatch({ type: "patchIcon", id, patch: { swapToId } });
+  }, []);
+  const setIconPresentation = useCallback((id: string, patch: IconOverride) => {
+    dispatch({ type: "patchIcon", id, patch });
   }, []);
   const resetIcon = useCallback((id: string) => {
     dispatch({ type: "resetIcon", id });
@@ -448,6 +456,7 @@ export function useDevModeDraft(theme: Theme) {
       isIconOverridden,
       setIconBody,
       setIconSwap,
+      setIconPresentation,
       resetIcon,
       elementOverridesFor,
       isElementPropOverridden,
@@ -479,6 +488,7 @@ export function useDevModeDraft(theme: Theme) {
       isIconOverridden,
       setIconBody,
       setIconSwap,
+      setIconPresentation,
       resetIcon,
       elementOverridesFor,
       isElementPropOverridden,

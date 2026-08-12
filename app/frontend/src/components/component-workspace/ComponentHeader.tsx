@@ -26,6 +26,7 @@
  */
 import { createContext, useContext, useMemo } from "react";
 import { Text, useCopyFormatter, useText } from "../../lib/copy";
+import { openExternalUrl } from "../../lib/externalNavigation";
 import { Button, StatusText } from "../primitives";
 import { ExternalIcon } from "../icons";
 import { LayoutRuntimeScope, type RegionChromeProps } from "../../layout/LayoutRenderer";
@@ -301,7 +302,7 @@ export function HeaderActionsPart() {
           data-dev-id="component-browser.header-manufacturer-page"
           aria-label={manufacturerPageLabel}
           icon={<ExternalIcon className="h-3.5 w-3.5" />}
-          onClick={() => window.open(page.url, "_blank", "noreferrer")}
+          onClick={() => openExternalUrl(page.url)}
         >
           <Text id="component-browser.header-manufacturer-page">Manufacturer Page</Text>
         </Button>

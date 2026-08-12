@@ -9,6 +9,7 @@ import { providerScenarioIds } from "./scenarios/provider";
 import { stmScenarioIds } from "./scenarios/stm";
 import { settingsScenarioIds } from "./scenarios/settings";
 import { settingsFixtureValidators } from "./fixtures/settingsFixtures";
+import { defineScenarioStateContracts } from "./scenarioStateContracts";
 
 function scenario(id: string): DesignScenario {
   return {
@@ -36,29 +37,38 @@ function scenario(id: string): DesignScenario {
     ],
     initialUi: {},
     expectedTargets: ["shell.root"],
-    coverage: ["route:components", "state:ready"],
   };
 }
 
 describe("registerScenarios", () => {
-  it("rejects duplicate IDs and missing route/state coverage tags", () => {
+  it("rejects duplicate scenario IDs", () => {
     const duplicate = scenario("global.onboarding.open");
-    const missingCoverage = {
-      ...scenario("global.missing-coverage"),
-      coverage: [],
-    };
-
-    const result = registerScenarios([duplicate, duplicate, missingCoverage]);
+    const result = registerScenarios([duplicate, duplicate]);
 
     expect(result.issues).toContainEqual(
       expect.objectContaining({ code: "duplicate-scenario", value: duplicate.id }),
     );
-    expect(result.issues).toContainEqual(
-      expect.objectContaining({ code: "missing-coverage", value: "route" }),
+  });
+
+  it("requires exact scenario parity with explicit domain state contracts", () => {
+    const contracted = scenario("global.onboarding.open");
+    const uncontracted = scenario("global.uncontracted");
+    const contracts = defineScenarioStateContracts("settings", "settings", [
+      contracted.id,
+      "global.missing-scenario",
+    ] as const);
+
+    const result = registerScenarios(
+      [contracted, uncontracted],
+      settingsFixtureValidators,
+      contracts,
     );
-    expect(result.issues).toContainEqual(
-      expect.objectContaining({ code: "missing-coverage", value: "state" }),
-    );
+
+    expect(result.issues).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: "missing-state-contract", scenarioId: uncontracted.id }),
+      expect.objectContaining({ code: "missing-scenario", scenarioId: "global.missing-scenario" }),
+      expect.objectContaining({ code: "state-contract-mismatch", scenarioId: contracted.id }),
+    ]));
   });
 
   it("rejects unknown routes, malformed fixture descriptors, mutation fixtures without outcomes, and missing targets", () => {

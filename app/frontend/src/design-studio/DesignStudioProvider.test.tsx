@@ -31,6 +31,7 @@ vi.mock("../api/client", async (importActual) => {
       designStudioPut: vi.fn(),
       designStudioDelete: vi.fn(),
       devStatus: vi.fn(),
+      devPromote: vi.fn(),
       devSave: vi.fn(),
       devPublish: vi.fn(),
     },
@@ -87,7 +88,6 @@ const DUPLICATE_ONBOARDING_SCENARIO: DesignScenario = {
   }],
   initialUi: { onboarding: { mode: "open" } },
   expectedTargets: ["onboarding.gate"],
-  coverage: ["route:components", "state:onboarding-open"],
 };
 
 function themedVariationDocument(): DesignDocument {
@@ -137,6 +137,8 @@ function historyDocument(): DesignDocument {
 }
 
 interface StudioCommands {
+  open: () => void;
+  close: () => Promise<void>;
   setCopy: (id: string, text: string) => void;
   setVariation: (id: string) => void;
   activateScenario: (scenarioId: string) => Promise<void>;
@@ -153,6 +155,8 @@ function Probe({ expose }: { expose: (commands: StudioCommands) => void }) {
   const studio = useDesignStudio();
   useEffect(() => {
     expose({
+      open: studio.open,
+      close: studio.close,
       setCopy: devMode.setCopy,
       setVariation: studio.setVariation,
       activateScenario: studio.activateScenario,
@@ -169,7 +173,9 @@ function Probe({ expose }: { expose: (commands: StudioCommands) => void }) {
     devMode.undo,
     expose,
     studio.activateScenario,
+    studio.close,
     studio.exitScenario,
+    studio.open,
     studio.replaceDocumentAtomically,
     studio.replaceResolvedDraftAtomically,
     studio.setVariation,
@@ -206,6 +212,12 @@ function renderStudio(options: { scenarioRegistry?: ScenarioRegistry; includeOnb
   );
   return {
     ...result,
+    open() {
+      act(() => commands.open?.());
+    },
+    close() {
+      return act(async () => commands.close?.());
+    },
     setCopy(id: string, text: string) {
       act(() => commands.setCopy?.(id, text));
     },
@@ -246,6 +258,7 @@ describe("DesignStudioProvider", () => {
     mockApi.designStudioPut.mockReset();
     mockApi.designStudioDelete.mockReset();
     mockApi.devStatus.mockReset();
+    mockApi.devPromote.mockReset();
     mockApi.devSave.mockReset();
     mockApi.devPublish.mockReset();
   });
@@ -267,8 +280,8 @@ describe("DesignStudioProvider", () => {
     expect(mockApi.designStudioPut).not.toHaveBeenCalled();
   });
 
-  it.each(["success", "publish-failure"] as const)(
-    "promotes from Real Data in source order and retains the personal document after %s",
+  it.each(["success", "promotion-failure"] as const)(
+    "promotes through one backend transaction and retains the personal document after %s",
     async (outcome) => {
       const personal = personalDocument();
       const calls: string[] = [];
@@ -284,21 +297,9 @@ describe("DesignStudioProvider", () => {
           publish_blocker: "Save a Dev Mode change before publishing.",
         };
       });
-      mockApi.devSave.mockImplementation(async () => {
-        calls.push("save");
-        return {
-          ok: true,
-          written: [],
-          tokens: 0,
-          copy: 1,
-          icons: 0,
-          elements: 0,
-          behaviors: 0,
-        };
-      });
-      mockApi.devPublish.mockImplementation(async () => {
-        calls.push("publish");
-        if (outcome === "publish-failure") throw new Error("GitHub push refused.");
+      mockApi.devPromote.mockImplementation(async () => {
+        calls.push("promote");
+        if (outcome === "promotion-failure") throw new Error("Source recovered after GitHub push refusal.");
         return {
           ok: true,
           commit: "b".repeat(40),
@@ -306,6 +307,8 @@ describe("DesignStudioProvider", () => {
           message: "Promote personal design",
           checks: ["typecheck", "production build"],
           pushed: true,
+          themes: ["dark", "light"],
+          variations: Object.keys(personal.variations).length,
         };
       });
       const studio = renderStudio();
@@ -314,11 +317,11 @@ describe("DesignStudioProvider", () => {
 
       const result = await studio.promotePersonalDesign("Promote personal design");
 
-      expect(calls).toEqual(["status", "save", "publish"]);
+      expect(calls).toEqual(["status", "promote"]);
       expect(result).toEqual(
         outcome === "success"
           ? expect.objectContaining({ state: "success", commit: "b".repeat(40) })
-          : { state: "failure", message: "GitHub push refused." },
+          : { state: "failure", message: "Source recovered after GitHub push refusal." },
       );
       expect(screen.getByTestId("studio-document").textContent).toBe(before);
       expect(screen.getByTestId("resolved-copy")).toHaveTextContent("My Components");
@@ -348,6 +351,36 @@ describe("DesignStudioProvider", () => {
     });
   });
 
+  it("flushes an accepted edit before an immediate close and restores it after restart", async () => {
+    vi.useFakeTimers();
+    let stored = fixtureDocument();
+    let revision = "r1";
+    mockApi.designStudioGet.mockImplementation(async () => ({ revision, document: stored }));
+    mockApi.designStudioPut.mockImplementation(async ({ document, expected_revision }) => {
+      expect(expected_revision).toBe(revision);
+      stored = document;
+      revision = "r2";
+      return { revision, document: stored };
+    });
+    const first = renderStudio();
+    await act(async () => Promise.resolve());
+    first.open();
+
+    first.setCopy("rail.about", "Restart Safe");
+    await first.close();
+    expect(mockApi.designStudioPut).toHaveBeenCalledOnce();
+    expect(stored.base.copy["rail.about"]).toBe("Restart Safe");
+    first.unmount();
+
+    const second = renderStudio();
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(screen.getByTestId("studio-document")).toHaveTextContent("Restart Safe");
+    second.unmount();
+  });
+
   it("keeps a pre-hydration edit instead of applying a late server draft over it", async () => {
     vi.useFakeTimers();
     let resolveHydration!: (value: { revision: string; document: DesignDocument }) => void;
@@ -373,8 +406,12 @@ describe("DesignStudioProvider", () => {
     await vi.advanceTimersByTimeAsync(400);
     expect(mockApi.designStudioPut).toHaveBeenCalledWith({
       document: expect.objectContaining({
-        base: expect.objectContaining({
-          copy: expect.objectContaining({ "rail.components": "Local Components" }),
+        variations: expect.objectContaining({
+          "full-data": expect.objectContaining({
+            patch: expect.objectContaining({
+              copy: expect.objectContaining({ "rail.components": "Local Components" }),
+            }),
+          }),
         }),
       }),
       expected_revision: "r1",

@@ -66,6 +66,7 @@ export function DesignStudioToolbar({
   const viewportLabel = useText("design-studio.viewport", "Viewport");
   const customViewportLabel = useText("design-studio.viewport.custom-width", "Custom Viewport Width");
   const zoomLabel = useText("design-studio.zoom", "Zoom");
+  const fitLabel = useText("design-studio.zoom.fit", "Fit");
   const gridLabel = useText("design-studio.grid", "Grid");
   const snapLabel = useText("design-studio.snap", "Snap");
   const undoLabel = useText("design-studio.undo", "Undo");
@@ -149,8 +150,8 @@ export function DesignStudioToolbar({
           onChange={(event) => onZoomChange(Number(event.target.value))}
           className="h-[22px] rounded-control border border-line bg-field px-1.5 text-xs text-t1"
         >
-          {[50, 75, 100, 125].map((value) => (
-            <option key={value} value={value}>{value}%</option>
+          {[0, 50, 75, 100, 125].map((value) => (
+            <option key={value} value={value}>{value === 0 ? fitLabel : `${value}%`}</option>
           ))}
         </select>
       </label>

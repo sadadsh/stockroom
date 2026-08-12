@@ -92,6 +92,23 @@ export const BUILT_IN_VARIATIONS = [
   { id: "custom", title: "Custom" },
 ] as const;
 
+/** Fresh built-in records; callers may edit the returned document without mutating shipped data. */
+export function builtInVariationDocument(): Record<string, DesignVariation> {
+  return Object.fromEntries(BUILT_IN_VARIATIONS.map(({ id, title }) => [
+    id,
+    {
+      id,
+      title,
+      extends: id === "full-data"
+        ? undefined
+        : id === "minimal"
+          ? "compact"
+          : "full-data",
+      patch: {},
+    },
+  ]));
+}
+
 type UnknownRecord = Record<string, unknown>;
 
 function isRecord(value: unknown): value is UnknownRecord {

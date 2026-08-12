@@ -4,6 +4,7 @@ import {
   gridColumnsOf,
   isValidGridSlot,
   isValidOrder,
+  isSafeElementValue,
   reorderSiblings,
   reorderSiblingsOf,
 } from "./elementLayout";
@@ -164,5 +165,31 @@ describe("isValidOrder", () => {
     for (const v of ["", "1 / 2", "1200", "abc", "99999", "1.5", " 2", "12px"]) {
       expect(isValidOrder(v)).toBe(false);
     }
+  });
+});
+
+describe("closed Box and Text value grammar", () => {
+  it("accepts every newly approved family through the same runtime grammar", () => {
+    const approved = {
+      position: "absolute", inset: "8px", overflow: "hidden",
+      "background-image": "linear-gradient(to right, #112233, var(--c-acc))",
+      "border-style": "solid", "border-width": "1px", "box-shadow": "0px 2px 8px #11223344",
+      "grid-template-columns": "repeat(3, minmax(0, 1fr))", "grid-auto-flow": "row dense",
+      "font-family": "system-ui", "text-transform": "uppercase", "white-space": "nowrap",
+      "text-overflow": "ellipsis", "overflow-wrap": "anywhere",
+    } as const;
+    for (const [property, value] of Object.entries(approved)) {
+      expect(isSafeElementValue(property, value), `${property}: ${value}`).toBe(true);
+    }
+  });
+
+  it("rejects executable, remote, raw HTML, and open-ended CSS values", () => {
+    for (const [property, value] of [
+      ["background-image", "url(https://evil.invalid/a.png)"],
+      ["box-shadow", "0 0 1px red; display:none"],
+      ["font-family", "'Custom Font'"],
+      ["grid-template-columns", "subgrid<script>"],
+      ["position", "expression(alert(1))"],
+    ]) expect(isSafeElementValue(property, value)).toBe(false);
   });
 });

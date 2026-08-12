@@ -3,6 +3,7 @@ import type {
   TargetDefinitionPolicy,
   TargetDefinitionPosition,
 } from "../api/types";
+import { downloadBlob } from "./download";
 
 export type StmTargetExportKind = "request" | "definition" | "pin-plan" | "access-plan";
 
@@ -466,11 +467,5 @@ export function stmTargetExportFilename(
 }
 
 export function downloadTextFile(filename: string, content: string, type: string): void {
-  const blob = new Blob([content], { type });
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = filename;
-  anchor.click();
-  URL.revokeObjectURL(url);
+  downloadBlob(filename, new Blob([content], { type }));
 }

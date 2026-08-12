@@ -320,7 +320,7 @@ function CopyEditor() {
   );
 }
 
-type Facet = "tokens" | "copy" | "icon" | "box" | "behavior";
+type Facet = "tokens" | "copy" | "text" | "icon" | "box" | "behavior";
 
 // A small pressed-state toolbar toggle (Inspect / Show IDs / Arrange).
 //
@@ -619,6 +619,59 @@ function IconTab() {
         })}
       </div>
 
+      <div className="mb-3 grid grid-cols-2 gap-2">
+        <label className="text-2xs text-t2">
+          Stroke Width
+          <input
+            type="number"
+            aria-label="Icon stroke width"
+            min={0.5}
+            max={4}
+            step={0.25}
+            value={dev.iconOverrideFor(iconId)?.strokeWidth ?? entry.strokeWidth ?? 1.5}
+            onChange={(event) => {
+              const strokeWidth = event.currentTarget.valueAsNumber;
+              if (Number.isFinite(strokeWidth) && strokeWidth >= 0.5 && strokeWidth <= 4) {
+                dev.setIconPresentation(iconId, { strokeWidth });
+              }
+            }}
+            className="mt-1 w-full rounded-control border border-line bg-field px-2 py-1 font-mono text-2xs text-t1"
+          />
+        </label>
+        <label className="text-2xs text-t2">
+          Treatment
+          <select
+            aria-label="Icon treatment"
+            value={dev.iconOverrideFor(iconId)?.treatment ?? "line"}
+            onChange={(event) => dev.setIconPresentation(iconId, { treatment: event.target.value as "line" | "solid" | "muted" })}
+            className="mt-1 w-full rounded-control border border-line bg-field px-2 py-1 text-2xs text-t1"
+          >
+            <option value="line">Line</option><option value="solid">Solid</option><option value="muted">Muted</option>
+          </select>
+        </label>
+        <label className="text-2xs text-t2">
+          Alignment
+          <select
+            aria-label="Icon alignment"
+            value={dev.iconOverrideFor(iconId)?.alignment ?? "baseline"}
+            onChange={(event) => dev.setIconPresentation(iconId, { alignment: event.target.value as "baseline" | "middle" | "text-top" | "text-bottom" })}
+            className="mt-1 w-full rounded-control border border-line bg-field px-2 py-1 text-2xs text-t1"
+          >
+            <option value="baseline">Baseline</option><option value="middle">Middle</option><option value="text-top">Text Top</option><option value="text-bottom">Text Bottom</option>
+          </select>
+        </label>
+        <label className="text-2xs text-t2">
+          Accessibility Label
+          <input
+            type="text"
+            aria-label="Icon accessibility label"
+            value={dev.iconOverrideFor(iconId)?.a11yLabel ?? ""}
+            onChange={(event) => dev.setIconPresentation(iconId, { a11yLabel: event.target.value || undefined })}
+            className="mt-1 w-full rounded-control border border-line bg-field px-2 py-1 text-2xs text-t1"
+          />
+        </label>
+      </div>
+
       {/* (b) the raw-SVG EDITOR: the icon body + a live, sanitiser-vetted preview (D-04 / D-05). The
           preview renders sanitizeIconBody(draft) through the entry's own frame, so what the owner
           sees is exactly what the sanitiser will keep. Restricted to line icons (D-03). */}
@@ -674,6 +727,11 @@ const BOX_RESIZE_PROPS: readonly { prop: string; label: string }[] = [
   { prop: "max-width", label: "Max Width" },
   { prop: "max-height", label: "Max Height" },
 ];
+const BOX_POSITION_PROPS: readonly { prop: string; label: string }[] = [
+  { prop: "position", label: "Position" }, { prop: "inset", label: "Inset" },
+  { prop: "top", label: "Top" }, { prop: "right", label: "Right" },
+  { prop: "bottom", label: "Bottom" }, { prop: "left", label: "Left" },
+];
 const BOX_SPACING_PROPS: readonly { prop: string; label: string }[] = [
   { prop: "margin", label: "Margin" },
   { prop: "margin-top", label: "Margin Top" },
@@ -693,8 +751,15 @@ const BOX_APPEARANCE_PROPS: readonly { prop: string; label: string }[] = [
   { prop: "opacity", label: "Opacity" },
   { prop: "color", label: "Text Color" },
   { prop: "background-color", label: "Fill Color" },
+  { prop: "background-image", label: "Gradient" },
   { prop: "border-color", label: "Border Color" },
   { prop: "border-radius", label: "Corner Radius" },
+  { prop: "border-style", label: "Border Style" },
+  { prop: "border-width", label: "Border Width" },
+  { prop: "box-shadow", label: "Shadow" },
+  { prop: "overflow", label: "Overflow" },
+  { prop: "overflow-x", label: "Overflow X" },
+  { prop: "overflow-y", label: "Overflow Y" },
   { prop: "font-size", label: "Font Size" },
   { prop: "font-weight", label: "Font Weight" },
   { prop: "line-height", label: "Line Height" },
@@ -707,7 +772,40 @@ const BOX_ALIGNMENT_PROPS: readonly { prop: string; label: string }[] = [
   { prop: "justify-content", label: "Justify" },
   { prop: "align-items", label: "Align Items" },
   { prop: "align-content", label: "Align Content" },
+  { prop: "grid-template-columns", label: "Grid Columns" },
+  { prop: "grid-template-rows", label: "Grid Rows" },
+  { prop: "grid-auto-flow", label: "Grid Flow" },
 ];
+
+const TEXT_PROPS: readonly { prop: string; label: string }[] = [
+  { prop: "font-family", label: "Font Family" }, { prop: "font-size", label: "Font Size" },
+  { prop: "font-weight", label: "Font Weight" }, { prop: "line-height", label: "Line Height" },
+  { prop: "letter-spacing", label: "Letter Spacing" }, { prop: "text-align", label: "Text Align" },
+  { prop: "text-transform", label: "Text Transform" }, { prop: "white-space", label: "White Space" },
+  { prop: "text-overflow", label: "Text Overflow" }, { prop: "overflow-wrap", label: "Overflow Wrap" },
+];
+
+function TextTab() {
+  const dev = useDevMode();
+  const id = dev.selectedDevId ? `${dev.selectedDevId}::text` : null;
+  if (!id) return <div className="px-3.5 py-3 text-2xs text-t3">Select an element to edit its text presentation.</div>;
+  const node = nodeForDevId(dev.selectedDevId!);
+  const computed = node ? getComputedStyle(node) : null;
+  const preset = (kind: "wrap" | "truncate") => {
+    dev.setElementProp(id, "white-space", kind === "wrap" ? "normal" : "nowrap");
+    dev.setElementProp(id, "overflow-wrap", kind === "wrap" ? "anywhere" : "normal");
+    dev.setElementProp(id, "overflow", kind === "wrap" ? "visible" : "hidden");
+    dev.setElementProp(id, "text-overflow", kind === "wrap" ? "clip" : "ellipsis");
+  };
+  return <div className="px-3.5 py-2">
+    <SectionHeader title="Text" className="mb-1" />
+    <div className="mb-2 flex gap-1">
+      <button type="button" onClick={() => preset("wrap")} className="rounded-control border border-line px-2 py-1 text-2xs text-t2">Wrap</button>
+      <button type="button" onClick={() => preset("truncate")} className="rounded-control border border-line px-2 py-1 text-2xs text-t2">Truncate</button>
+    </div>
+    {TEXT_PROPS.map(({ prop, label }) => <BoxRow key={prop} id={id} prop={prop} label={label} placeholder={computed?.getPropertyValue(prop) ?? ""} />)}
+  </div>;
+}
 
 // One box-property row (D-04): reuses the ColorRow/ScaleRow shape - a truncating label, an optional
 // ResetDot, and the mono value field styled like the token fields. The field's value is the working
@@ -1020,6 +1118,10 @@ function BoxTab() {
             </button>
           ))}
         </div>
+      </section>
+      <section className="py-1.5">
+        <SectionHeader title="Position And Insets" className="mb-1" />
+        {BOX_POSITION_PROPS.map((p) => <BoxRow key={p.prop} id={targetId} prop={p.prop} label={p.label} placeholder={placeholderFor(p.prop)} />)}
       </section>
       <section className="py-1.5">
         <SectionHeader title="Resize" className="mb-1" />
@@ -1361,6 +1463,9 @@ function SelectionPane({
         <FacetTab id="copy" active={facet} onSelect={setFacet}>
           Copy
         </FacetTab>
+        <FacetTab id="text" active={facet} onSelect={setFacet}>
+          Text
+        </FacetTab>
         <FacetTab id="icon" active={facet} onSelect={setFacet}>
           Icon
         </FacetTab>
@@ -1372,6 +1477,7 @@ function SelectionPane({
 
       {facet === "tokens" ? <TokensTab showAll={showAll} setShowAll={setShowAll} /> : null}
       {facet === "copy" ? <CopyTab /> : null}
+      {facet === "text" ? <TextTab /> : null}
       {facet === "icon" ? <IconTab /> : null}
       {facet === "box" ? <BoxTab /> : null}
       {facet === "behavior" ? <BehaviorTab /> : null}

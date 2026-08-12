@@ -65,6 +65,14 @@ describe("the shape of UiPrefs", () => {
       "design_studio_right_collapsed",
       "design_studio_left_width",
       "design_studio_right_width",
+      "design_studio_last_scenario",
+      "design_studio_viewport",
+      "design_studio_custom_viewport_width",
+      "design_studio_mode",
+      "design_studio_zoom",
+      "design_studio_grid",
+      "design_studio_snap",
+      "design_studio_presentation",
     ]);
   });
 

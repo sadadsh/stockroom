@@ -242,12 +242,30 @@ describe("DevPanel inspect-first shell", () => {
 
     // The raw-SVG editor is present (nav.components is a primary line icon, so raw editing is allowed).
     expect(screen.getByLabelText("Edit icon SVG body")).toBeInTheDocument();
+    expect(screen.getByLabelText("Icon stroke width")).toBeInTheDocument();
+    expect(screen.getByLabelText("Icon treatment")).toBeInTheDocument();
+    expect(screen.getByLabelText("Icon alignment")).toBeInTheDocument();
+    expect(screen.getByLabelText("Icon accessibility label")).toBeInTheDocument();
     // The picker offers other primary glyphs (same category), and marks the current glyph active.
     expect(screen.getByRole("button", { name: "Swap to nav.stm" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Swap to nav.components" })).toHaveAttribute(
       "aria-pressed",
       "true",
     );
+  });
+
+  it("the Text tab exposes editable family, transform, wrapping, and truncation controls", () => {
+    render(<Harness />);
+    toggleDevMode();
+    inspectClick(screen.getByText("Original Title"));
+    fireEvent.click(screen.getAllByRole("tab", { name: "Text" })[0]);
+
+    for (const name of ["Font Family value", "Text Transform value", "White Space value", "Text Overflow value", "Overflow Wrap value"]) {
+      expect(screen.getByLabelText(name)).toBeInTheDocument();
+    }
+    fireEvent.click(screen.getByRole("button", { name: "Truncate" }));
+    expect(screen.getByLabelText("White Space value")).toHaveValue("nowrap");
+    expect(screen.getByLabelText("Text Overflow value")).toHaveValue("ellipsis");
   });
 
   it("clicking a picker glyph swaps the icon (the panel preview follows the resolved target)", () => {

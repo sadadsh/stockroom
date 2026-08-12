@@ -1,4 +1,6 @@
-export type HostFolderPurpose = "project" | "stm-cubemx";
+import { guardPreviewEffect } from "../design-studio/previewEffects";
+
+export type HostFolderPurpose = "project" | "stm-cubemx" | "kicad-config";
 
 type HostFolderApi = {
   pick_folder?: (purpose: HostFolderPurpose) => Promise<string[]>;
@@ -17,6 +19,12 @@ export class HostFolderPickerUnavailableError extends Error {
 }
 
 export async function pickHostFolder(purpose: HostFolderPurpose): Promise<string> {
+  const label = purpose === "project" ? "project" : purpose === "stm-cubemx" ? "CubeMX" : "KiCad config";
+  guardPreviewEffect({
+    kind: "host-folder-picker",
+    action: `choosing a ${label} folder`,
+    instruction: `choose a ${label} folder`,
+  });
   const bridges = window as unknown as {
     __STOCKROOM_HOST__?: ManagedHostApi;
     pywebview?: { api?: HostFolderApi };

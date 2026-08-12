@@ -25,17 +25,48 @@ export interface TargetLayer {
 }
 
 const STABLE_COPY_ID = /^[A-Za-z][A-Za-z0-9]*(?:[.-][A-Za-z0-9]+)*$/;
+const MEANINGFUL_BOUNDARY_SELECTOR = [
+  "button",
+  "a[href]",
+  "input:not([type='hidden'])",
+  "select",
+  "textarea",
+  "[role='button']",
+  "[role='dialog']",
+  "[role='tab']",
+  "[role='menuitem']",
+  "[role='option']",
+  "[role='slider']",
+  "[role='separator'][tabindex]",
+  "[data-copy-id]",
+  "[data-icon-id]",
+  "[data-layout-piece]",
+  "[data-design-meaningful]",
+].join(", ");
+
+const TARGET_IDENTITY_SELECTOR = "[data-dev-id], [data-copy-id], [data-icon-id], [data-layout-piece]";
+
+function identityOwner(element: Element): Element | null {
+  if (element.matches(TARGET_IDENTITY_SELECTOR)) return element;
+  return element.closest(TARGET_IDENTITY_SELECTOR);
+}
 
 /** Report explicitly meaningful boundaries that cannot be addressed by a production registry. */
 export function coverageIssuesFor(root: ParentNode, registry: DevIdEntry[]): TargetCoverageIssue[] {
   const registeredDevIds = new Set(registry.map((entry) => entry.id));
   const issues: TargetCoverageIssue[] = [];
-  for (const element of root.querySelectorAll("[data-design-meaningful]")) {
+  for (const element of root.querySelectorAll(MEANINGFUL_BOUNDARY_SELECTOR)) {
+    if (element.closest('[data-design-technical-content="true"]')) continue;
+    const owner = identityOwner(element);
+    if (!owner) {
+      issues.push({ code: "missing-target", element });
+      continue;
+    }
     const identities = [
-      ["dev", element.getAttribute("data-dev-id")],
-      ["copy", element.getAttribute("data-copy-id")],
-      ["icon", element.getAttribute("data-icon-id")],
-      ["layout-piece", element.getAttribute("data-layout-piece")],
+      ["dev", owner.getAttribute("data-dev-id")],
+      ["copy", owner.getAttribute("data-copy-id")],
+      ["icon", owner.getAttribute("data-icon-id")],
+      ["layout-piece", owner.getAttribute("data-layout-piece")],
     ] as const;
     const present = identities.filter((entry): entry is readonly [typeof entry[0], string] => Boolean(entry[1]));
     if (present.length === 0) {

@@ -13,7 +13,6 @@ function scenario(route: Route): DesignScenario {
     fixtures: [],
     initialUi: {},
     expectedTargets: ["shell.root"],
-    coverage: [`route:${route}`, "state:ready"],
   };
 }
 

@@ -46,6 +46,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
 import subprocess
 import tempfile
 import xml.etree.ElementTree as ET
@@ -157,6 +158,10 @@ export interface IconOverride {
   body?: string;
   // Another registry icon id whose glyph to render instead (a glyph swap).
   swapToId?: string;
+  strokeWidth?: number;
+  treatment?: "line" | "solid" | "muted";
+  a11yLabel?: string;
+  alignment?: "baseline" | "middle" | "text-top" | "text-bottom";
 }
 
 export const ICON_OVERRIDES: Record<string, IconOverride> = """
@@ -558,12 +563,32 @@ def _clean_icons(block: object) -> dict:
         result: dict = {}
         body = entry.get("body")
         swap = entry.get("swapToId")
+        stroke_width = entry.get("strokeWidth")
+        treatment = entry.get("treatment")
+        a11y_label = entry.get("a11yLabel")
+        alignment = entry.get("alignment")
         if body is not None:
             result["body"] = _sanitize_svg_body(body)
         if swap is not None:
             if not isinstance(swap, str) or not _DEV_ID_RE.match(swap):
                 raise ApiError(400, f"Icon swap target '{swap}' is not a valid icon id.")
             result["swapToId"] = swap
+        if stroke_width is not None:
+            if not isinstance(stroke_width, (int, float)) or isinstance(stroke_width, bool) or not 0.5 <= float(stroke_width) <= 4:
+                raise ApiError(400, "Icon stroke width must be between 0.5 and 4.")
+            result["strokeWidth"] = float(stroke_width)
+        if treatment is not None:
+            if treatment not in {"line", "solid", "muted"}:
+                raise ApiError(400, "Icon treatment must be line, solid, or muted.")
+            result["treatment"] = treatment
+        if a11y_label is not None:
+            if not isinstance(a11y_label, str) or not a11y_label.strip() or len(a11y_label.strip()) > 120 or any(ch in a11y_label for ch in "<>\r\n"):
+                raise ApiError(400, "Icon accessibility label is invalid.")
+            result["a11yLabel"] = a11y_label.strip()
+        if alignment is not None:
+            if alignment not in {"baseline", "middle", "text-top", "text-bottom"}:
+                raise ApiError(400, "Icon alignment is invalid.")
+            result["alignment"] = alignment
         if result:
             out[key] = result
     return out
@@ -574,6 +599,15 @@ def _clean_icons(block: object) -> dict:
 # CSS: any value carrying `;`, `<`, `{`, `}`, `url(`, `expression(`, `/*` or a newline is rejected.
 
 _ELEM_ALLOWED_PROPS = {
+    "position",
+    "inset",
+    "top",
+    "right",
+    "bottom",
+    "left",
+    "overflow",
+    "overflow-x",
+    "overflow-y",
     # size
     "width",
     "height",
@@ -607,17 +641,29 @@ _ELEM_ALLOWED_PROPS = {
     "background-color",
     "border-color",
     "border-radius",
+    "border-style",
+    "border-width",
+    "box-shadow",
+    "background-image",
     "font-size",
     "font-weight",
     "line-height",
     "letter-spacing",
     "text-align",
+    "font-family",
+    "text-transform",
+    "white-space",
+    "text-overflow",
+    "overflow-wrap",
     # container alignment
     "flex-direction",
     "flex-wrap",
     "justify-content",
     "align-items",
     "align-content",
+    "grid-template-columns",
+    "grid-template-rows",
+    "grid-auto-flow",
 }
 _ELEM_FORBIDDEN = (";", "<", ">", "{", "}", "url(", "expression(", "/*", "*/", "\\", "@")
 _LENGTH_KEYWORDS = {"auto", "none", "0", "min-content", "max-content", "fit-content"}
@@ -635,6 +681,14 @@ _COLOR_RE = re.compile(r"^(?:#[0-9a-fA-F]{3,8}|var\(--[a-z0-9-]+\)|transparent|c
 _NUMBER_RE = re.compile(r"^(?:0|1|0?\.\d{1,3})$")
 _LINE_HEIGHT_RE = re.compile(r"^(?:0|[1-9](?:\.\d{1,3})?|0?\.\d{1,3})$")
 _FONT_WEIGHT_RE = re.compile(r"^(?:[1-9]00|normal|bold)$")
+_FONT_FAMILY_RE = re.compile(r"^(?:system-ui|sans-serif|serif|monospace|ui-sans-serif|ui-serif|ui-monospace)$")
+_SHADOW_RE = re.compile(r"^(?:none|(?:-?(?:\d+|\d*\.\d+)(?:px|rem|em)\s+){2,3}(?:-?(?:\d+|\d*\.\d+)(?:px|rem|em)\s+)?(?:#[0-9a-fA-F]{3,8}|var\(--[a-z0-9-]+\)|transparent))$")
+_GRADIENT_RE = re.compile(r"^linear-gradient\((?:to (?:top|right|bottom|left),\s*)?(?:#[0-9a-fA-F]{3,8}|var\(--[a-z0-9-]+\)|transparent),\s*(?:#[0-9a-fA-F]{3,8}|var\(--[a-z0-9-]+\)|transparent)\)$")
+_GRID_TRACK_RE = re.compile(
+    r"^(?:none|repeat\([1-9]\d?,\s*(?:minmax\(0,\s*1fr\)|1fr)\)|"
+    r"(?:minmax\(0,\s*1fr\)|1fr|auto|(?:\d+|\d*\.\d+)(?:px|rem|em|%))"
+    r"(?:\s+(?:minmax\(0,\s*1fr\)|1fr|auto|(?:\d+|\d*\.\d+)(?:px|rem|em|%))){0,11})$"
+)
 _APPEARANCE_ENUMS = {
     "display": {"block", "inline", "inline-block", "flex", "inline-flex", "grid", "none"},
     "visibility": {"visible", "hidden"},
@@ -653,6 +707,16 @@ _APPEARANCE_ENUMS = {
         "space-between",
         "space-around",
     },
+    "position": {"static", "relative", "absolute", "fixed", "sticky"},
+    "overflow": {"visible", "hidden", "clip", "auto", "scroll"},
+    "overflow-x": {"visible", "hidden", "clip", "auto", "scroll"},
+    "overflow-y": {"visible", "hidden", "clip", "auto", "scroll"},
+    "border-style": {"none", "solid", "dashed", "dotted"},
+    "text-transform": {"none", "uppercase", "lowercase", "capitalize"},
+    "white-space": {"normal", "nowrap", "pre-wrap"},
+    "text-overflow": {"clip", "ellipsis"},
+    "overflow-wrap": {"normal", "anywhere", "break-word"},
+    "grid-auto-flow": {"row", "column", "dense", "row dense", "column dense"},
 }
 
 
@@ -686,6 +750,16 @@ def _valid_css_value(prop: str, value: str) -> bool:
         return bool(_NUMBER_RE.match(v))
     if prop == "font-weight":
         return bool(_FONT_WEIGHT_RE.match(v))
+    if prop == "font-family":
+        return bool(_FONT_FAMILY_RE.match(v))
+    if prop == "box-shadow":
+        return bool(_SHADOW_RE.match(v))
+    if prop == "background-image":
+        return low == "none" or bool(_GRADIENT_RE.match(v))
+    if prop in ("grid-template-columns", "grid-template-rows"):
+        return bool(_GRID_TRACK_RE.match(v))
+    if prop == "border-width":
+        return v == "0" or bool(_LENGTH_RE.match(v)) or bool(_LENGTH_LIST_RE.match(v))
     if prop == "border-radius":
         return v == "0" or bool(_LENGTH_RE.match(v)) or bool(_LENGTH_LIST_RE.match(v))
     if prop == "line-height":
@@ -1196,6 +1270,100 @@ def _render_layout(overrides: dict, issues: dict) -> str:
     )
 
 
+_DESIGN_VARIATIONS_HEADER = """/**
+ * Full Design Studio promotion layers. Generated atomically with the six legacy override modules.
+ * The legacy modules remain the active shipped projection; this record preserves both themes and
+ * every supported variation so a later promotion never flattens the owner's source document.
+ */
+export const DESIGN_VARIATION_OVERRIDES = """
+
+
+def _clean_save_payload(body: object) -> tuple[dict[str, str], dict, dict]:
+    if not isinstance(body, dict):
+        raise ApiError(400, "Dev Mode save body must be an object.")
+    tokens = body.get("tokens")
+    copy = body.get("copy")
+    icons = body.get("icons")
+    elements = body.get("elements")
+    behaviors = body.get("behaviors")
+    layout = body.get("layout")
+    committed_issues = body.get("committedIssues")
+    owner_authored = body.get("ownerAuthoredCopy")
+    declared = _clean_declared_placeholders(body.get("copyPlaceholders"))
+    root = _clean_tokens((tokens or {}).get("root") if isinstance(tokens, dict) else None)
+    light = _clean_tokens((tokens or {}).get("light") if isinstance(tokens, dict) else None)
+    clean_copy = _clean_copy(copy, declared)
+    clean_icons = _clean_icons(icons)
+    clean_elements = _clean_elements(elements)
+    clean_behaviors = _clean_behaviors(behaviors)
+    clean_layout = _clean_layout(layout)
+    clean_issues = _clean_committed_issues(committed_issues)
+    clean_owner_authored = _clean_owner_authored_copy(owner_authored, clean_copy)
+    cleaned = {
+        "tokens": {"root": root, "light": light},
+        "copy": clean_copy,
+        "icons": clean_icons,
+        "elements": clean_elements,
+        "behaviors": clean_behaviors,
+        "layout": clean_layout,
+        "committedIssues": clean_issues,
+        "ownerAuthoredCopy": clean_owner_authored,
+    }
+    modules = {
+        "token.overrides.ts": _render(_TOKENS_HEADER, cleaned["tokens"]),
+        "copy.overrides.ts": _render_copy(clean_copy, clean_owner_authored),
+        "icon.overrides.ts": _render(_ICONS_HEADER, clean_icons),
+        "element.overrides.ts": _render(_ELEMENTS_HEADER, clean_elements),
+        "behavior.overrides.ts": _render(_BEHAVIORS_HEADER, clean_behaviors),
+        "layout.overrides.ts": _render_layout(clean_layout, clean_issues),
+    }
+    report = {
+        "tokens": len(root) + len(light),
+        "copy": len(clean_copy),
+        "icons": len(clean_icons),
+        "elements": len(clean_elements),
+        "behaviors": len(clean_behaviors),
+        "layouts": sum(1 for document in clean_layout.values() if document is not None),
+        "committedIssues": sum(len(rows) for rows in clean_issues.values()),
+        "ownerAuthoredCopy": len(clean_owner_authored),
+    }
+    return modules, cleaned, report
+
+
+def _clean_promotion_translations(value: object) -> dict:
+    if not isinstance(value, dict) or not isinstance(value.get("base"), dict) or not isinstance(value.get("variations"), dict):
+        raise ApiError(400, "Design promotion translations must contain base and variations.")
+
+    def clean_pair(raw: object, label: str) -> dict:
+        if not isinstance(raw, dict) or set(raw) != {"dark", "light"}:
+            raise ApiError(400, f"{label} must preserve exactly dark and light themes.")
+        return {
+            theme: _clean_save_payload(raw[theme])[1]
+            for theme in ("dark", "light")
+        }
+
+    variations: dict[str, dict] = {}
+    for variation_id, raw in value["variations"].items():
+        if not isinstance(variation_id, str) or not _DEV_ID_RE.fullmatch(variation_id) or not isinstance(raw, dict):
+            raise ApiError(400, "Design promotion contains a malformed variation.")
+        title = raw.get("title")
+        parent = raw.get("extends")
+        if not isinstance(title, str) or not title.strip() or len(title) > 80:
+            raise ApiError(400, f"Variation '{variation_id}' has an invalid title.")
+        if parent is not None and (not isinstance(parent, str) or not _DEV_ID_RE.fullmatch(parent)):
+            raise ApiError(400, f"Variation '{variation_id}' has an invalid parent.")
+        variations[variation_id] = {
+            "title": title.strip(),
+            "extends": parent,
+            "themes": clean_pair(raw.get("themes"), f"Variation '{variation_id}'"),
+        }
+    for variation_id, variation in variations.items():
+        parent = variation["extends"]
+        if parent is not None and parent not in variations:
+            raise ApiError(400, f"Variation '{variation_id}' extends missing '{parent}'.")
+    return {"base": clean_pair(value["base"], "Base design"), "variations": variations}
+
+
 def _write_dev_modules_atomically(lib: Path, modules: dict[str, str]) -> None:
     """Replace all generated modules as one recoverable write or restore every previous byte."""
     targets = {name: lib / name for name in modules}
@@ -1241,6 +1409,7 @@ _DEV_SOURCE_PATHS = (
     "app/frontend/src/lib/element.overrides.ts",
     "app/frontend/src/lib/behavior.overrides.ts",
     "app/frontend/src/lib/layout.overrides.ts",
+    "app/frontend/src/lib/design.variations.ts",
 )
 
 
@@ -1395,6 +1564,122 @@ def _publish(request: Request, body: object) -> dict:
     }
 
 
+def _snapshot_promotion_paths(repo, snapshot: Path, paths: list[Path]) -> set[str]:
+    existing: set[str] = set()
+    for target in paths:
+        rel = target.relative_to(repo.root).as_posix()
+        if not target.exists():
+            continue
+        existing.add(rel)
+        backup = snapshot / rel
+        backup.parent.mkdir(parents=True, exist_ok=True)
+        if target.is_dir():
+            shutil.copytree(target, backup)
+        else:
+            shutil.copy2(target, backup)
+    return existing
+
+
+def _restore_promotion_paths(repo, snapshot: Path, paths: list[Path], existing: set[str]) -> None:
+    for target in paths:
+        resolved = target.resolve()
+        try:
+            resolved.relative_to(repo.root.resolve())
+        except ValueError as exc:
+            raise ApiError(500, "Promotion recovery target escaped the managed checkout.") from exc
+        if target.is_dir():
+            shutil.rmtree(target, ignore_errors=True)
+        elif target.exists():
+            target.unlink()
+        rel = target.relative_to(repo.root).as_posix()
+        if rel not in existing:
+            continue
+        backup = snapshot / rel
+        target.parent.mkdir(parents=True, exist_ok=True)
+        if backup.is_dir():
+            shutil.copytree(backup, target)
+        else:
+            shutil.copy2(backup, target)
+
+
+def _promote(request: Request, body: object) -> dict:
+    """Validate, snapshot, save, build, commit and push as one recoverable backend transaction."""
+    repo = _app_repo(request)
+    if repo.current_branch() != "main":
+        raise ApiError(409, "Design promotion runs only from main.")
+    if not isinstance(body, dict):
+        raise ApiError(400, "Design promotion body must be an object.")
+    raw_message = body.get("message")
+    if not isinstance(raw_message, str) or not raw_message.strip() or len(raw_message.strip()) > 120 or "\n" in raw_message:
+        raise ApiError(400, "Commit message must be one non-empty line of at most 120 characters.")
+    foreign = _foreign_dev_paths(repo)
+    if foreign:
+        raise ApiError(409, "Promotion refused because unrelated files are changed: " + ", ".join(foreign[:8]))
+
+    modules, _active, report = _clean_save_payload(body.get("source"))
+    translations = _clean_promotion_translations(body.get("translations"))
+    modules["design.variations.ts"] = _render(_DESIGN_VARIATIONS_HEADER, translations)
+
+    ok, reason = repo.fetch()
+    if not ok:
+        raise ApiError(503, f"Could not refresh origin before promotion: {reason}")
+    try:
+        remote = repo.resolve_ref("origin/main")
+    except GitError as exc:
+        raise ApiError(409, f"Could not resolve origin/main: {exc}") from exc
+    if remote != repo.head():
+        raise ApiError(409, "Main changed on GitHub. Update Stockroom before promoting this design.")
+
+    paths = [repo.root / rel for rel in _DEV_SOURCE_PATHS]
+    paths.append(repo.root / "app" / "frontend-dist")
+    revision: str | None = None
+    with tempfile.TemporaryDirectory(prefix="stockroom-design-promotion-") as raw_snapshot:
+        snapshot = Path(raw_snapshot)
+        existing = _snapshot_promotion_paths(repo, snapshot, paths)
+        try:
+            _write_dev_modules_atomically(_FRONTEND_SRC / "lib", modules)
+            _run_frontend(repo, "install")
+            _run_frontend(repo, "typecheck")
+            _run_frontend(repo, "build")
+            foreign = _foreign_dev_paths(repo)
+            if foreign:
+                raise ApiError(409, "Build changed files outside the promotion boundary: " + ", ".join(foreign[:8]))
+            revision = repo.commit(raw_message.strip(), paths)
+        except Exception:
+            if hasattr(repo, "restore_paths"):
+                try:
+                    repo.restore_paths(paths)
+                except Exception:
+                    pass
+            _restore_promotion_paths(repo, snapshot, paths, existing)
+            raise
+
+    pushed = repo.push()
+    if not pushed.ok:
+        try:
+            recovery = repo.revert(revision)
+        except Exception as recovery_error:
+            raise ApiError(
+                503,
+                f"Promotion commit {revision} could not be pushed ({pushed.reason}); automatic recovery failed: {recovery_error}",
+            ) from recovery_error
+        raise ApiError(
+            503,
+            f"Promotion push failed ({pushed.reason}); source was recovered by {recovery} and the personal design was retained.",
+        )
+    return {
+        "ok": True,
+        "commit": revision,
+        "branch": "main",
+        "message": raw_message.strip(),
+        "checks": ["locked dependency install", "typecheck", "production build"],
+        "pushed": True,
+        "themes": ["dark", "light"],
+        "variations": len(translations["variations"]),
+        **report,
+    }
+
+
 def dev_router(require_token) -> APIRouter:
     r = APIRouter(prefix="/api/dev", dependencies=[Depends(require_token)])
 
@@ -1408,57 +1693,13 @@ def dev_router(require_token) -> APIRouter:
                 409,
                 "Dev mode needs the frontend source tree; it is not available in a packaged build.",
             )
-        tokens = body.get("tokens") if isinstance(body, dict) else None
-        copy = body.get("copy") if isinstance(body, dict) else None
-        icons = body.get("icons") if isinstance(body, dict) else None
-        elements = body.get("elements") if isinstance(body, dict) else None
-        behaviors = body.get("behaviors") if isinstance(body, dict) else None
-        layout = body.get("layout") if isinstance(body, dict) else None
-        committed_issues = body.get("committedIssues") if isinstance(body, dict) else None
-        owner_authored = body.get("ownerAuthoredCopy") if isinstance(body, dict) else None
-
-        # Validate every block up front: a malicious icon / CSS value, or a layout that is not a
-        # document, raises here before any file is written, so a bad payload can never leave the six
-        # override files half-updated.
-        declared = _clean_declared_placeholders(
-            body.get("copyPlaceholders") if isinstance(body, dict) else None
-        )
-
-        root = _clean_tokens((tokens or {}).get("root") if isinstance(tokens, dict) else None)
-        light = _clean_tokens((tokens or {}).get("light") if isinstance(tokens, dict) else None)
-        clean_copy = _clean_copy(copy, declared)
-        clean_icons = _clean_icons(icons)
-        clean_elements = _clean_elements(elements)
-        clean_behaviors = _clean_behaviors(behaviors)
-        clean_layout = _clean_layout(layout)
-        clean_issues = _clean_committed_issues(committed_issues)
-        clean_owner_authored = _clean_owner_authored_copy(owner_authored, clean_copy)
-
-        _write_dev_modules_atomically(
-            lib,
-            {
-                "token.overrides.ts": _render(_TOKENS_HEADER, {"root": root, "light": light}),
-                "copy.overrides.ts": _render_copy(clean_copy, clean_owner_authored),
-                "icon.overrides.ts": _render(_ICONS_HEADER, clean_icons),
-                "element.overrides.ts": _render(_ELEMENTS_HEADER, clean_elements),
-                "behavior.overrides.ts": _render(_BEHAVIORS_HEADER, clean_behaviors),
-                "layout.overrides.ts": _render_layout(clean_layout, clean_issues),
-            },
-        )
+        modules, _cleaned, report = _clean_save_payload(body)
+        _write_dev_modules_atomically(lib, modules)
 
         return {
             "ok": True,
-            "written": list(_DEV_SOURCE_PATHS),
-            "tokens": len(root) + len(light),
-            "copy": len(clean_copy),
-            "icons": len(clean_icons),
-            "elements": len(clean_elements),
-            "behaviors": len(clean_behaviors),
-            # How many surfaces carry a committed arrangement, and how many known issues travel with
-            # them - the deviation list is part of the commit, so the save reports it.
-            "layouts": sum(1 for document in clean_layout.values() if document is not None),
-            "committedIssues": sum(len(rows) for rows in clean_issues.values()),
-            "ownerAuthoredCopy": len(clean_owner_authored),
+            "written": list(_DEV_SOURCE_PATHS[:-1]),
+            **report,
         }
 
     @r.get("/status")
@@ -1468,5 +1709,9 @@ def dev_router(require_token) -> APIRouter:
     @r.post("/publish")
     def publish(request: Request, body: dict) -> dict:
         return _publish(request, body)
+
+    @r.post("/promote")
+    def promote(request: Request, body: dict) -> dict:
+        return _promote(request, body)
 
     return r

@@ -15,6 +15,7 @@ import type {
   ProjectWorkspace,
 } from "../../api/types";
 import { Text, useCopyFormatter, useText } from "../../lib/copy";
+import { downloadBlob } from "../../lib/download";
 import { useToast } from "../../lib/toast";
 import { useJob } from "../../lib/useJob";
 import { DownloadIcon, RefreshIcon, SearchIcon } from "../icons";
@@ -104,12 +105,7 @@ export function ProjectBomWorkbench({
   async function download() {
     try {
       const file = await exportBom.mutateAsync(boards);
-      const url = URL.createObjectURL(file.blob);
-      const anchor = document.createElement("a");
-      anchor.href = url;
-      anchor.download = file.filename;
-      anchor.click();
-      URL.revokeObjectURL(url);
+      downloadBlob(file.filename, file.blob);
       toast(exportedToast, "ok");
     } catch (error) {
       toast(error instanceof Error ? error.message : exportFailed, "err");

@@ -139,7 +139,10 @@ function createStudio(page, baseUrl) {
 }
 
 async function assertVisibleTargets(page, scenario) {
-  await page.locator(`[data-scenario-id="${scenario.id}"]`).waitFor({ state: "attached" });
+  const root = page.locator(`[data-scenario-id="${scenario.id}"]`);
+  await root.waitFor({ state: "attached" });
+  assert.equal(await root.getAttribute("data-scenario-state"), scenario.stateSignature,
+    `${scenario.id} did not render its exact distinguishing state`);
   for (const target of scenario.expectedTargets) {
     const locator = page.locator(`[data-dev-id="${target}"], [data-dev-role="${target}"]`).first();
     await locator.waitFor({ state: "visible", timeout: 15_000 });
@@ -226,6 +229,7 @@ try {
 
   // Prove the debounced personal design survives a real service stop/start, using the same
   // task-owned machine-config root and an edit made through the product UI.
+  await studio.open("global.real-data");
   await studio.setTheme("dark");
   await page.getByRole("tab", { name: "Tokens", exact: true }).click();
   const showAll = page.getByRole("button", { name: "Show All", exact: true });
@@ -238,7 +242,7 @@ try {
   });
   await page.getByLabel("Accent value", { exact: true }).fill(persistedAccent);
   const saved = await (await saveResponse).json();
-  assert.equal(saved.document.base.tokens.root["--c-acc"], persistedAccent);
+  assert.equal(saved.document.variations["full-data"].patch.tokens.root["--c-acc"], persistedAccent);
   await writeFile(
     path.join(evidenceRoot, "autosave-before-restart.json"),
     JSON.stringify({ revision: saved.revision, persistedAccent }, null, 2) + "\n",

@@ -54,7 +54,6 @@ function scenario(id: SettingsScenarioId): DesignScenario {
       credentialsPartial: id.endsWith("credentials-partial"),
     }),
     initialUi: { settings: initialSettings }, expectedTargets: [state.target],
-    coverage: ["route:settings", `state:${id.split(".").slice(2).join("-")}`],
   };
 }
 
