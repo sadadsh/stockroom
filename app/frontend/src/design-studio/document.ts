@@ -251,6 +251,22 @@ function parseAxisSize(value: unknown): AxisSize | null {
   return out;
 }
 
+function parsePlacementSize(value: unknown): PiecePlacement["size"] | null {
+  const base = parseAxisSize(value);
+  if (!base || !isRecord(value)) return null;
+  const out: NonNullable<PiecePlacement["size"]> = { ...base };
+  for (const dimension of ["width", "height"] as const) {
+    const entry = value[dimension];
+    if (entry !== undefined && !isFiniteNumber(entry)) return null;
+    if (entry !== undefined) out[dimension] = entry;
+  }
+  return out;
+}
+
+function positiveLayoutInteger(value: unknown): value is number {
+  return isFiniteNumber(value) && Number.isInteger(value) && value >= 1 && value <= 1000;
+}
+
 function parseSplitter(value: unknown): SplitterSpec | null {
   if (!isRecord(value) || typeof value.id !== "string" || !Array.isArray(value.between)) return null;
   const [before, after] = value.between;
@@ -311,6 +327,18 @@ function parseLayoutRegion(value: unknown, ancestors: WeakSet<object>): LayoutRe
     }
     out.splitters = splitters;
   }
+  if (value.positioning !== undefined) {
+    if (value.positioning !== "free") return null;
+    out.positioning = "free";
+  }
+  if (value.grid !== undefined) {
+    if (!isRecord(value.grid) || !positiveLayoutInteger(value.grid.columns)) return null;
+    if (value.grid.rows !== undefined && !positiveLayoutInteger(value.grid.rows)) return null;
+    out.grid = {
+      columns: value.grid.columns,
+      ...(value.grid.rows === undefined ? {} : { rows: value.grid.rows }),
+    };
+  }
   return out;
 }
 
@@ -331,9 +359,25 @@ function parseLayoutPlacement(value: unknown): PiecePlacement | null {
   if (value.hidden !== undefined && typeof value.hidden !== "boolean") return null;
   if (value.hidden !== undefined) out.hidden = value.hidden;
   if (value.size !== undefined) {
-    const size = parseAxisSize(value.size);
+    const size = parsePlacementSize(value.size);
     if (!size) return null;
     out.size = size;
+  }
+  if (value.position !== undefined) {
+    if (
+      !isRecord(value.position) ||
+      !isFiniteNumber(value.position.x) ||
+      !isFiniteNumber(value.position.y)
+    ) return null;
+    out.position = { x: value.position.x, y: value.position.y };
+  }
+  if (value.gridSlot !== undefined) {
+    if (
+      !isRecord(value.gridSlot) ||
+      !positiveLayoutInteger(value.gridSlot.column) ||
+      !positiveLayoutInteger(value.gridSlot.row)
+    ) return null;
+    out.gridSlot = { column: value.gridSlot.column, row: value.gridSlot.row };
   }
   if (value.styleRoles !== undefined) {
     const styleRoles = parseStringRecord(value.styleRoles);
@@ -350,7 +394,12 @@ function parseLayoutPlacement(value: unknown): PiecePlacement | null {
     out.params = params;
   }
   if (value.visibility !== undefined) {
-    if (!isRecord(value.visibility) || !Array.isArray(value.visibility.anyOf)) return null;
+    if (
+      !isRecord(value.visibility) ||
+      !Array.isArray(value.visibility.anyOf) ||
+      value.visibility.anyOf.length === 0 ||
+      value.visibility.anyOf.length > 100
+    ) return null;
     const anyOf: string[] = [];
     for (const id of value.visibility.anyOf) {
       if (typeof id !== "string") return null;

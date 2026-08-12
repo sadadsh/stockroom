@@ -30,6 +30,12 @@ import type { DesignScenario } from "./scenario";
 import { bootstrapScenarioRegistry } from "./scenarios";
 import type { ScenarioRegistry } from "./scenarioRegistry";
 import { ScenarioUiProvider } from "./scenarioState";
+import {
+  runPersonalDesignPromotion,
+  sourcePromotionStatus,
+  type PromotionResult,
+  type PromotionStatus,
+} from "./promotion";
 
 export interface DesignStudioContextValue {
   open: () => void;
@@ -44,8 +50,11 @@ export interface DesignStudioContextValue {
   personalState: PersonalDesignState;
   lastValidDocument: DesignDocument;
   activeScenario: DesignScenario | null;
+  activeScenarioId: string | null;
   activateScenario: (scenarioId: string) => Promise<void>;
   exitScenario: () => Promise<void>;
+  promotionStatus: PromotionStatus;
+  promotePersonalDesign: (message: string) => Promise<PromotionResult>;
 }
 
 const DesignStudioContext = createContext<DesignStudioContextValue | null>(null);
@@ -170,6 +179,10 @@ function DesignStudioBridge({
   const applyingDraft = useRef<string | null>(null);
   const [activeScenario, setActiveScenario] = useState<DesignScenario | null>(null);
   const [scenarioUiState, setScenarioUiState] = useState<DesignScenario["initialUi"]>({});
+  const [promotionStatus, setPromotionStatus] = useState<PromotionStatus>({
+    state: "checking",
+    message: "Checking source promotion availability.",
+  });
   const restoreAdapter = useRef<(() => void) | null>(null);
   const realRouteContext = useRef<RealRouteContext | null>(null);
   const transition = useRef<Promise<void> | undefined>(undefined);
@@ -270,6 +283,54 @@ function DesignStudioBridge({
     [controller, snapshot.document],
   );
 
+  useEffect(() => {
+    const simulated = activeScenario?.initialUi.sourcePromotion?.state;
+    if (activeScenario) {
+      const status: PromotionStatus = simulated === "ready"
+        ? { state: "ready", message: "Fixture preview simulates a ready source checkout." }
+        : simulated === "success"
+          ? { state: "success", message: "Fixture preview simulates a successful promotion." }
+          : simulated === "failure"
+            ? { state: "failure", message: "Fixture preview simulates a failed promotion." }
+            : simulated === "blocked"
+              ? { state: "blocked", message: "Fixture preview simulates a blocked source checkout." }
+              : { state: "blocked", message: "Return to Real Data to check source promotion." };
+      setPromotionStatus(status);
+      return;
+    }
+    if (!devMode.enabled) return;
+    let current = true;
+    setPromotionStatus({ state: "checking", message: "Checking source promotion availability." });
+    void sourcePromotionStatus().then((status) => {
+      if (current) setPromotionStatus(status);
+    });
+    return () => {
+      current = false;
+    };
+  }, [activeScenario, devMode.enabled]);
+
+  const promotePersonalDesign = useCallback(
+    async (message: string): Promise<PromotionResult> => {
+      const activeScenarioId = activeScenario?.id ?? null;
+      if (activeScenarioId !== null) {
+        return {
+          state: "blocked",
+          message: "Return to Real Data before making this design the app default.",
+        };
+      }
+      setPromotionStatus({ state: "running", message: "Making this design the app default." });
+      const result = await runPersonalDesignPromotion({
+        document: snapshot.document,
+        activeScenarioId,
+        theme: devMode.theme,
+        message,
+      });
+      setPromotionStatus({ state: result.state, message: result.message });
+      return result;
+    },
+    [activeScenario, devMode.theme, snapshot.document],
+  );
+
   const beginTransition = useCallback(
     (operation: () => Promise<void>): Promise<void> => {
       const pending = (transition.current ?? Promise.resolve()).then(operation, operation);
@@ -357,8 +418,11 @@ function DesignStudioBridge({
       personalState: snapshot.personalState,
       lastValidDocument: snapshot.lastValidDocument,
       activeScenario,
+      activeScenarioId: activeScenario?.id ?? null,
       activateScenario,
       exitScenario,
+      promotionStatus,
+      promotePersonalDesign,
     }),
     [
       open,
@@ -374,6 +438,8 @@ function DesignStudioBridge({
       activeScenario,
       activateScenario,
       exitScenario,
+      promotionStatus,
+      promotePersonalDesign,
     ],
   );
 

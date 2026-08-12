@@ -164,6 +164,45 @@ def test_dev_save_round_trips_a_committed_layout_document(client, tmp_path, monk
     }
 
 
+def test_dev_save_round_trips_approved_arrange_visibility_and_grid_fields(
+    client, tmp_path, monkeypatch
+):
+    src = _src_with_lib(tmp_path, monkeypatch)
+    document = _layout_document()
+    document["root"]["positioning"] = "free"
+    document["root"]["grid"] = {"columns": 4, "rows": 3}
+    placement = document["root"]["slots"][0]["content"]
+    placement["size"].update({"width": 360, "height": 180})
+    placement["position"] = {"x": 24, "y": -16}
+    placement["gridSlot"] = {"column": 2, "row": 3}
+
+    res = client.post(
+        "/api/dev/save",
+        json={
+            "tokens": {"root": {}, "light": {}},
+            "copy": {},
+            "layout": {"workspace": document},
+        },
+    )
+
+    assert res.status_code == 200, res.text
+    written = _emitted_json(
+        (src / "lib" / "layout.overrides.ts").read_text(encoding="utf-8"),
+        "LAYOUT_OVERRIDES",
+    )["workspace"]
+    assert written["root"]["positioning"] == "free"
+    assert written["root"]["grid"] == {"columns": 4, "rows": 3}
+    written_placement = written["root"]["slots"][0]["content"]
+    assert written_placement["size"] == {
+        "min": 120,
+        "preferred": 240,
+        "width": 360,
+        "height": 180,
+    }
+    assert written_placement["position"] == {"x": 24, "y": -16}
+    assert written_placement["gridSlot"] == {"column": 2, "row": 3}
+
+
 def test_dev_save_with_no_layout_reproduces_the_committed_file(client, tmp_path, monkeypatch):
     # An omitted layout block is "nothing committed", written as the shipped-default state - the same
     # state the lib/layout.overrides.ts in the repository is in, so a save that touched no arrangement

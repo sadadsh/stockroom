@@ -76,6 +76,7 @@ export function DesignStudioToolbar({
   const makeDefaultLabel = useText("design-studio.make-default", "Make App Default");
   const makeDefaultFixtureTitle = useText("design-studio.make-default.fixture-help", "Return To Real Data To Make App Default");
   const makeDefaultTitle = useText("design-studio.make-default.help", "Save This Design To Source");
+  const promotionStatusLabel = useText("design-studio.promotion-status", "Source Promotion Status");
   const presentationLabel = useText("design-studio.presentation", "Presentation Mode");
   const closeLabel = useText("design-studio.close", "Close Design Studio");
 
@@ -168,12 +169,26 @@ export function DesignStudioToolbar({
       >
         {fixturePreview ? fixtureLabel : realDataLabel}
       </span>
+      <span
+        aria-label={promotionStatusLabel}
+        title={studio.promotionStatus.message}
+        className={
+          "max-w-64 truncate text-xs " +
+          (studio.promotionStatus.state === "ready" || studio.promotionStatus.state === "success"
+            ? "text-ok-text"
+            : studio.promotionStatus.state === "checking" || studio.promotionStatus.state === "running"
+              ? "text-t3"
+              : "text-warn")
+        }
+      >
+        {studio.promotionStatus.message}
+      </span>
       <Button
         small
         variant="accent"
-        disabled={fixturePreview || !dev.dirty || dev.saving}
+        disabled={fixturePreview || studio.promotionStatus.state !== "ready"}
         title={fixturePreview ? makeDefaultFixtureTitle : makeDefaultTitle}
-        onClick={() => void dev.save()}
+        onClick={() => void studio.promotePersonalDesign("Promote personal Stockroom design")}
       >
         {makeDefaultLabel}
       </Button>

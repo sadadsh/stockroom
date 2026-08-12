@@ -138,6 +138,8 @@ describe("Design Studio document", () => {
         kind: "region",
         id: "root",
         mode: "row",
+        positioning: "free",
+        grid: { columns: 4, rows: 3 },
         size: { fraction: 1, when: { narrow: { min: 240 } } },
         slots: [
           {
@@ -147,6 +149,9 @@ describe("Design Studio document", () => {
               kind: "placement",
               id: "offers",
               piece: "component-browser.offers",
+              size: { min: 120, width: 360, height: 180 },
+              position: { x: 24, y: -16 },
+              gridSlot: { column: 2, row: 3 },
               params: { page: 1, visible: true },
               styleRoles: { heading: "section" },
               visibility: { anyOf: ["offers.present"] },

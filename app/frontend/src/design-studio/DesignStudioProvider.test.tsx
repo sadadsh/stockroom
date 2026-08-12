@@ -30,6 +30,9 @@ vi.mock("../api/client", async (importActual) => {
       designStudioGet: vi.fn(),
       designStudioPut: vi.fn(),
       designStudioDelete: vi.fn(),
+      devStatus: vi.fn(),
+      devSave: vi.fn(),
+      devPublish: vi.fn(),
     },
   };
 });
@@ -142,6 +145,7 @@ interface StudioCommands {
   replaceResolvedDraftAtomically: (draft: DevModeDraft) => void;
   replaceDocumentAtomically: (document: DesignDocument) => void;
   undo: () => void;
+  promotePersonalDesign: (message: string) => Promise<unknown>;
 }
 
 function Probe({ expose }: { expose: (commands: StudioCommands) => void }) {
@@ -157,6 +161,7 @@ function Probe({ expose }: { expose: (commands: StudioCommands) => void }) {
       replaceResolvedDraftAtomically: studio.replaceResolvedDraftAtomically,
       replaceDocumentAtomically: studio.replaceDocumentAtomically,
       undo: devMode.undo,
+      promotePersonalDesign: studio.promotePersonalDesign,
     });
   }, [
     devMode.replaceDraft,
@@ -168,6 +173,7 @@ function Probe({ expose }: { expose: (commands: StudioCommands) => void }) {
     studio.replaceDocumentAtomically,
     studio.replaceResolvedDraftAtomically,
     studio.setVariation,
+    studio.promotePersonalDesign,
   ]);
   return (
     <>
@@ -227,6 +233,9 @@ function renderStudio(options: { scenarioRegistry?: ScenarioRegistry; includeOnb
     undo() {
       act(() => commands.undo?.());
     },
+    promotePersonalDesign(message: string) {
+      return act(async () => commands.promotePersonalDesign?.(message));
+    },
     queryClient,
   };
 }
@@ -236,6 +245,9 @@ describe("DesignStudioProvider", () => {
     mockApi.designStudioGet.mockReset();
     mockApi.designStudioPut.mockReset();
     mockApi.designStudioDelete.mockReset();
+    mockApi.devStatus.mockReset();
+    mockApi.devSave.mockReset();
+    mockApi.devPublish.mockReset();
   });
 
   afterEach(() => {
@@ -254,6 +266,65 @@ describe("DesignStudioProvider", () => {
     expect(screen.getByTestId("personal-state")).toHaveTextContent("ready");
     expect(mockApi.designStudioPut).not.toHaveBeenCalled();
   });
+
+  it.each(["success", "publish-failure"] as const)(
+    "promotes from Real Data in source order and retains the personal document after %s",
+    async (outcome) => {
+      const personal = personalDocument();
+      const calls: string[] = [];
+      mockApi.designStudioGet.mockResolvedValue({ revision: "r1", document: personal });
+      mockApi.devStatus.mockImplementation(async () => {
+        calls.push("status");
+        return {
+          available: true,
+          branch: "main",
+          revision: "a".repeat(40),
+          dirty: [],
+          can_publish: false,
+          publish_blocker: "Save a Dev Mode change before publishing.",
+        };
+      });
+      mockApi.devSave.mockImplementation(async () => {
+        calls.push("save");
+        return {
+          ok: true,
+          written: [],
+          tokens: 0,
+          copy: 1,
+          icons: 0,
+          elements: 0,
+          behaviors: 0,
+        };
+      });
+      mockApi.devPublish.mockImplementation(async () => {
+        calls.push("publish");
+        if (outcome === "publish-failure") throw new Error("GitHub push refused.");
+        return {
+          ok: true,
+          commit: "b".repeat(40),
+          branch: "main",
+          message: "Promote personal design",
+          checks: ["typecheck", "production build"],
+          pushed: true,
+        };
+      });
+      const studio = renderStudio();
+      await waitFor(() => expect(screen.getByTestId("personal-state")).toHaveTextContent("ready"));
+      const before = screen.getByTestId("studio-document").textContent;
+
+      const result = await studio.promotePersonalDesign("Promote personal design");
+
+      expect(calls).toEqual(["status", "save", "publish"]);
+      expect(result).toEqual(
+        outcome === "success"
+          ? expect.objectContaining({ state: "success", commit: "b".repeat(40) })
+          : { state: "failure", message: "GitHub push refused." },
+      );
+      expect(screen.getByTestId("studio-document").textContent).toBe(before);
+      expect(screen.getByTestId("resolved-copy")).toHaveTextContent("My Components");
+      expect(mockApi.designStudioDelete).not.toHaveBeenCalled();
+    },
+  );
 
   it("debounces edits and saves the complete document with the current revision", async () => {
     vi.useFakeTimers();

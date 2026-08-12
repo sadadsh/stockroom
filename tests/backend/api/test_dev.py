@@ -4,6 +4,7 @@ no source tree. The write path is redirected to a tmp dir so the suite never tou
 
 from __future__ import annotations
 
+import os
 import subprocess
 from types import SimpleNamespace
 
@@ -319,6 +320,43 @@ def test_dev_save_rejects_unknown_behavior_preset(client, tmp_path, monkeypatch)
     )
     assert res.status_code == 400
     assert not (src / "lib" / "behavior.overrides.ts").exists()
+
+
+def test_dev_save_rolls_back_every_generated_module_when_a_filesystem_replace_fails(
+    client, tmp_path, monkeypatch
+):
+    src = _src_with_lib(tmp_path, monkeypatch)
+    lib = src / "lib"
+    originals = {}
+    for relative in dev_mod._DEV_SOURCE_PATHS:
+        name = relative.rsplit("/", 1)[-1]
+        path = lib / name
+        original = f"original {name}\n".encode()
+        path.write_bytes(original)
+        originals[path] = original
+
+    real_replace = os.replace
+    calls = 0
+
+    def fail_third_replace(source, destination):
+        nonlocal calls
+        calls += 1
+        if calls == 3:
+            raise OSError("disk refused replacement")
+        return real_replace(source, destination)
+
+    monkeypatch.setattr(dev_mod.os, "replace", fail_third_replace)
+    res = client.post(
+        "/api/dev/save",
+        json={
+            "tokens": {"root": {"--r-card": "20px"}, "light": {}},
+            "copy": {"rail.components": "My Components"},
+        },
+    )
+
+    assert res.status_code == 500, res.text
+    assert "rolled back" in res.json()["detail"]
+    assert {path: path.read_bytes() for path in originals} == originals
 
 
 def test_dev_status_is_honest_without_matching_managed_application_checkout(

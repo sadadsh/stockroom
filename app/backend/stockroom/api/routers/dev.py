@@ -44,8 +44,10 @@ Two things the writer is the authority on beyond raw safety:
 from __future__ import annotations
 
 import json
+import os
 import re
 import subprocess
+import tempfile
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
@@ -834,6 +836,16 @@ def _axis_size(block: object, what: str) -> dict:
     return out
 
 
+def _placement_size(block: object, placement_id: str) -> dict:
+    out = _axis_size(block, f"placement '{placement_id}' size")
+    assert isinstance(block, dict)  # _axis_size raised otherwise
+    for dimension in ("width", "height"):
+        value = block.get(dimension)
+        if value is not None:
+            out[dimension] = _layout_number(value, f"placement '{placement_id}' size.{dimension}")
+    return out
+
+
 def _splitters(block: object, region_id: str) -> list:
     if not isinstance(block, list):
         raise ApiError(400, f"Layout region '{region_id}' splitters must be a list.")
@@ -917,6 +929,28 @@ def _layout_region(node: dict, depth: int, counter: list[int]) -> dict:
         clean["scroll"] = node["scroll"]
     if node.get("splitters") is not None:
         clean["splitters"] = _splitters(node["splitters"], region_id)
+    if node.get("positioning") is not None:
+        if node["positioning"] != "free":
+            raise ApiError(400, f"Layout region '{region_id}' names an unknown positioning mode.")
+        clean["positioning"] = "free"
+    if node.get("grid") is not None:
+        grid = node["grid"]
+        if not isinstance(grid, dict):
+            raise ApiError(400, f"Layout region '{region_id}' grid must be an object.")
+        columns = grid.get("columns")
+        rows = grid.get("rows")
+        if isinstance(columns, bool) or not isinstance(columns, int) or not 1 <= columns <= 1000:
+            raise ApiError(
+                400, f"Layout region '{region_id}' grid columns must be from 1 through 1000."
+            )
+        clean_grid = {"columns": columns}
+        if rows is not None:
+            if isinstance(rows, bool) or not isinstance(rows, int) or not 1 <= rows <= 1000:
+                raise ApiError(
+                    400, f"Layout region '{region_id}' grid rows must be from 1 through 1000."
+                )
+            clean_grid["rows"] = rows
+        clean["grid"] = clean_grid
     for slot in slots:
         counter[0] += 1
         if counter[0] > _MAX_LAYOUT_NODES:
@@ -950,7 +984,30 @@ def _layout_placement(node: dict) -> dict:
                 )
             clean[flag] = node[flag]
     if node.get("size") is not None:
-        clean["size"] = _axis_size(node["size"], f"placement '{placement_id}' size")
+        clean["size"] = _placement_size(node["size"], placement_id)
+    if node.get("position") is not None:
+        position = node["position"]
+        if not isinstance(position, dict):
+            raise ApiError(400, f"Layout placement '{placement_id}' position must be an object.")
+        clean["position"] = {
+            "x": _layout_number(position.get("x"), f"placement '{placement_id}' position.x"),
+            "y": _layout_number(position.get("y"), f"placement '{placement_id}' position.y"),
+        }
+    if node.get("gridSlot") is not None:
+        grid_slot = node["gridSlot"]
+        if not isinstance(grid_slot, dict):
+            raise ApiError(400, f"Layout placement '{placement_id}' gridSlot must be an object.")
+        clean_slot = {}
+        for coordinate in ("column", "row"):
+            value = grid_slot.get(coordinate)
+            if isinstance(value, bool) or not isinstance(value, int) or not 1 <= value <= 1000:
+                raise ApiError(
+                    400,
+                    f"Layout placement '{placement_id}' gridSlot {coordinate} must be "
+                    "from 1 through 1000.",
+                )
+            clean_slot[coordinate] = value
+        clean["gridSlot"] = clean_slot
     if node.get("styleRoles") is not None:
         roles = node["styleRoles"]
         if not isinstance(roles, dict):
@@ -964,7 +1021,7 @@ def _layout_placement(node: dict) -> dict:
     if node.get("visibility") is not None:
         visibility = node["visibility"]
         any_of = visibility.get("anyOf") if isinstance(visibility, dict) else None
-        if not isinstance(any_of, list):
+        if not isinstance(any_of, list) or not any_of or len(any_of) > 100:
             raise ApiError(400, f"Layout placement '{placement_id}' visibility must carry anyOf.")
         clean["visibility"] = {"anyOf": [_layout_str(c, "visibility condition") for c in any_of]}
     if node.get("repeat") is not None:
@@ -1113,34 +1170,68 @@ def _json_block(data) -> str:
     return json.dumps(data, indent=2, ensure_ascii=False, sort_keys=True)
 
 
-def _emit(path: Path, header: str, data) -> None:
-    path.write_text(header + _json_block(data) + ";\n", encoding="utf-8")
+def _render(header: str, data) -> str:
+    return header + _json_block(data) + ";\n"
 
 
-def _emit_copy(path: Path, overrides: dict, owner_authored: list[str]) -> None:
-    """copy.overrides.ts: the rewordings, then the owner-authored provenance record beside them."""
-    path.write_text(
+def _render_copy(overrides: dict, owner_authored: list[str]) -> str:
+    return (
         _COPY_HEADER
         + _json_block(overrides)
         + ";\n\n"
         + _OWNER_AUTHORED_COPY_HEADER
         + _json_block(owner_authored)
-        + ";\n",
-        encoding="utf-8",
+        + ";\n"
     )
 
 
-def _emit_layout(path: Path, overrides: dict, issues: dict) -> None:
-    """layout.overrides.ts: the committed documents, then the deviation list they were committed with."""
-    path.write_text(
+def _render_layout(overrides: dict, issues: dict) -> str:
+    return (
         _LAYOUT_HEADER
         + _json_block(overrides)
         + ";\n\n"
         + _LAYOUT_ISSUES_HEADER
         + _json_block(issues)
-        + ";\n",
-        encoding="utf-8",
+        + ";\n"
     )
+
+
+def _write_dev_modules_atomically(lib: Path, modules: dict[str, str]) -> None:
+    """Replace all generated modules as one recoverable write or restore every previous byte."""
+    targets = {name: lib / name for name in modules}
+    originals = {
+        name: target.read_bytes() if target.exists() else None for name, target in targets.items()
+    }
+    try:
+        with tempfile.TemporaryDirectory(prefix=".dev-save-", dir=lib) as raw_stage:
+            stage = Path(raw_stage)
+            staged: dict[str, Path] = {}
+            for name, content in modules.items():
+                path = stage / name
+                path.write_text(content, encoding="utf-8")
+                staged[name] = path
+            for name, target in targets.items():
+                os.replace(staged[name], target)
+    except OSError as exc:
+        rollback_errors: list[str] = []
+        for name, target in targets.items():
+            try:
+                original = originals[name]
+                if original is None:
+                    target.unlink(missing_ok=True)
+                else:
+                    target.write_bytes(original)
+            except OSError as rollback_exc:
+                rollback_errors.append(f"{name}: {rollback_exc}")
+        if rollback_errors:
+            raise ApiError(
+                500,
+                "Dev Mode source write failed and rollback could not restore: "
+                + ", ".join(rollback_errors),
+            ) from exc
+        raise ApiError(
+            500, "Dev Mode source write failed and every generated module was rolled back."
+        ) from exc
 
 
 _DEV_SOURCE_PATHS = (
@@ -1343,12 +1434,17 @@ def dev_router(require_token) -> APIRouter:
         clean_issues = _clean_committed_issues(committed_issues)
         clean_owner_authored = _clean_owner_authored_copy(owner_authored, clean_copy)
 
-        _emit(lib / "token.overrides.ts", _TOKENS_HEADER, {"root": root, "light": light})
-        _emit_copy(lib / "copy.overrides.ts", clean_copy, clean_owner_authored)
-        _emit(lib / "icon.overrides.ts", _ICONS_HEADER, clean_icons)
-        _emit(lib / "element.overrides.ts", _ELEMENTS_HEADER, clean_elements)
-        _emit(lib / "behavior.overrides.ts", _BEHAVIORS_HEADER, clean_behaviors)
-        _emit_layout(lib / "layout.overrides.ts", clean_layout, clean_issues)
+        _write_dev_modules_atomically(
+            lib,
+            {
+                "token.overrides.ts": _render(_TOKENS_HEADER, {"root": root, "light": light}),
+                "copy.overrides.ts": _render_copy(clean_copy, clean_owner_authored),
+                "icon.overrides.ts": _render(_ICONS_HEADER, clean_icons),
+                "element.overrides.ts": _render(_ELEMENTS_HEADER, clean_elements),
+                "behavior.overrides.ts": _render(_BEHAVIORS_HEADER, clean_behaviors),
+                "layout.overrides.ts": _render_layout(clean_layout, clean_issues),
+            },
+        )
 
         return {
             "ok": True,
