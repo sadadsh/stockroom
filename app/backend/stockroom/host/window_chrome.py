@@ -1,59 +1,35 @@
-"""Window chrome for the source host's single WebView: a real tab strip and page controls.
+"""Provider-browser controller for the source host's single WebView.
 
-WHY THIS EXISTS SEPARATELY FROM THE NATIVE HOST'S STRIP
--------------------------------------------------------
-``app/desktop/Stockroom.WindowHost`` carries a WPF tab strip (``WindowTabStrip.cs``). That host
-runs only when a frozen release owns the native window. The host the owner actually launches is
-``python -m stockroom.host.run``, which opens a pywebview/WinForms window - a window that had no
-strip, no page controls, and pywebview's default new-window behaviour. So the chrome existed and
-was tested, and the person still saw a bare provider page. This module puts the same chrome on the
-window that actually opens.
+WHY THIS CONTROLLER REMAINS
+---------------------------
+The source host still needs task-bound provider state, history safeguards, and in-window new-page
+handling. Visible navigation moved into CAD Models > Manage Models, so this controller binds to
+the source-host form only for thread dispatch and never creates global controls.
 
 WHAT IS DELIBERATELY PURE
 -------------------------
 ``ProviderChromeState``, ``resolve_provider_tab_label`` and ``new_window_url_allowed`` hold every
-rule about what a person sees and what a link is allowed to do. They touch no WinForms object, so
-they are tested directly rather than described by a test that constructs the chrome and asserts on
-the chrome. ``WindowChrome`` is the thin renderer over that state, and every interop call inside it
-is guarded: a window that cannot mount chrome must still be a usable window.
+rule about provider state and allowed navigation. ``WindowChrome`` retains that controller for
+source-host compatibility, but it mounts no window-level tabs or page controls; those controls
+belong only to the component-scoped Manage Models workspace.
 
-THE TWO-TAB MODEL
------------------
-One Stockroom tab, always. One provider tab, only while a provider route is open, because the
-single-lease design is what makes a download provably belong to one component. There are no
-per-component tabs and no second provider tab.
+The remaining tab-named state is an internal rolling-compatibility contract, not visible chrome.
 """
 
 from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
+from typing import Any
 from urllib.parse import urlsplit
 
 _log = logging.getLogger("stockroom.host.window_chrome")
-
-#: The strip is exactly as tall as the native host's, so the two hosts do not disagree about how
-#: much of the window belongs to chrome.
-STRIP_HEIGHT = 44
 
 #: Long enough for a real provider name and a page title, short enough that the tab never eats
 #: the address box.
 MAXIMUM_TAB_LENGTH = 40
 
 PROVIDER_TAB_FALLBACK = "Provider"
-STOCKROOM_TAB_LABEL = "Stockroom"
-
-# Same palette as WindowTabStrip.cs. Duplicated rather than shared because one is WPF and one is
-# WinForms; ``test_window_chrome.py`` pins the values so the two strips cannot drift apart.
-SURFACE_COLOR = (17, 21, 29)
-IDLE_TAB_COLOR = (23, 28, 37)
-SELECTED_TAB_COLOR = (38, 46, 60)
-IDLE_TEXT_COLOR = (148, 160, 176)
-SELECTED_TEXT_COLOR = (233, 238, 245)
-CONTROL_TEXT_COLOR = (205, 214, 225)
-CONTROL_SURFACE_COLOR = (27, 33, 44)
-EDGE_COLOR = (55, 65, 81)
-STATUS_TEXT_COLOR = (132, 145, 162)
 
 
 def _collapse(value: str | None) -> str:
@@ -219,32 +195,19 @@ class ProviderChromeState:
 
 
 class WindowChrome:
-    """The WinForms strip, mounted above the WebView in the pywebview window.
-
-    Every interop call is guarded. Chrome is what makes the window usable, not what makes it
-    exist: a WinForms surface this cannot decorate is still a window the person can work in.
-    """
+    """Provider route controller retained without global window chrome."""
 
     def __init__(self, state: ProviderChromeState | None = None) -> None:
         self.state = state if state is not None else ProviderChromeState()
-        self._form = None
-        self._strip = None
-        self._stockroom_tab = None
-        self._provider_tab = None
-        self._back = None
-        self._forward = None
-        self._refresh = None
-        self._address = None
-        self._status = None
+        self._form: Any = None
         self._show_provider = None
         self._hide_provider = None
         self._core = None
 
     # -- the route the capture package owns ------------------------------------------------
     #
-    # Capture runs on its own worker threads, and a WinForms control may only be touched from the
-    # thread that created it. Every route notification is therefore marshalled onto the window's
-    # thread; the state itself is updated there too, so a reader never sees a half-applied route.
+    # Capture runs on worker threads, while the source-host form owns navigation. Every route
+    # notification is marshalled onto that thread so readers never see half-applied state.
 
     def open_provider_route(self, *, label: str, show, hide) -> None:
         """A provider route opened: the tab appears and knows how to switch to and from itself."""
@@ -287,7 +250,7 @@ class WindowChrome:
         form = self._form
         try:
             if form is not None and bool(getattr(form, "InvokeRequired", False)):
-                from System import Action
+                from System import Action  # ty: ignore[unresolved-import]
 
                 form.Invoke(Action(action))
                 return
@@ -445,185 +408,20 @@ class WindowChrome:
         except Exception:  # noqa: BLE001 - an unhandled accelerator is still not an escape
             _log.debug("window chrome could not consume an accelerator", exc_info=True)
 
-    # -- the WinForms surface --------------------------------------------------------------
+    # -- source-host binding ---------------------------------------------------------------
 
     def mount(self, form) -> bool:
-        """Put the strip above the WebView. Returns whether the person will actually see it."""
+        """Bind thread dispatch without creating window-level tabs or controls."""
 
-        try:
-            import System.Windows.Forms as WinForms
-            from System.Drawing import Color, ContentAlignment, Font, FontStyle, Size
-        except Exception:  # noqa: BLE001 - a non-WinForms backend simply has no strip
-            _log.debug("window chrome needs the WinForms backend", exc_info=True)
-            return False
-
-        def color(rgb):
-            return Color.FromArgb(255, rgb[0], rgb[1], rgb[2])
-
-        try:
-            strip = WinForms.Panel()
-            strip.Height = STRIP_HEIGHT
-            strip.BackColor = color(SURFACE_COLOR)
-
-            row = WinForms.TableLayoutPanel()
-            row.Dock = WinForms.DockStyle.Fill
-            row.RowCount = 1
-            row.ColumnCount = 7
-            row.BackColor = color(SURFACE_COLOR)
-            row.Padding = WinForms.Padding(10, 0, 10, 0)
-            # Five sized columns for the tabs and the three page controls, one that takes the
-            # remaining width for the address box, and one sized column for the status text.
-            for _column in range(5):
-                row.ColumnStyles.Add(WinForms.ColumnStyle(WinForms.SizeType.AutoSize))
-            row.ColumnStyles.Add(WinForms.ColumnStyle(WinForms.SizeType.Percent, 100.0))
-            row.ColumnStyles.Add(WinForms.ColumnStyle(WinForms.SizeType.AutoSize))
-
-            tab_font = Font("Segoe UI", 8.5, FontStyle.Bold)
-            body_font = Font("Segoe UI", 8.5)
-
-            def tab(label: str, accessible: str):
-                button = WinForms.RadioButton()
-                button.Appearance = WinForms.Appearance.Button
-                button.FlatStyle = WinForms.FlatStyle.Flat
-                button.Text = label
-                button.Font = tab_font
-                button.AutoSize = False
-                button.Size = Size(112, 26)
-                button.TextAlign = ContentAlignment.MiddleCenter
-                button.Anchor = WinForms.AnchorStyles.Left
-                button.Margin = WinForms.Padding(0, 0, 6, 0)
-                button.AccessibleName = accessible
-                button.BackColor = color(IDLE_TAB_COLOR)
-                button.ForeColor = color(IDLE_TEXT_COLOR)
-                button.FlatAppearance.BorderColor = color(EDGE_COLOR)
-                return button
-
-            def control(label: str):
-                button = WinForms.Button()
-                button.Text = label
-                button.Font = body_font
-                button.AutoSize = False
-                button.Size = Size(64, 26)
-                button.FlatStyle = WinForms.FlatStyle.Flat
-                button.Anchor = WinForms.AnchorStyles.Left
-                button.Margin = WinForms.Padding(0, 0, 6, 0)
-                button.AccessibleName = label
-                button.BackColor = color(CONTROL_SURFACE_COLOR)
-                button.ForeColor = color(CONTROL_TEXT_COLOR)
-                button.FlatAppearance.BorderColor = color(EDGE_COLOR)
-                return button
-
-            self._stockroom_tab = tab(STOCKROOM_TAB_LABEL, "Show Stockroom")
-            self._provider_tab = tab(PROVIDER_TAB_FALLBACK, "Show the open provider page")
-            self._back = control("Back")
-            self._forward = control("Forward")
-            self._refresh = control("Refresh")
-
-            address = WinForms.TextBox()
-            address.ReadOnly = True
-            address.BorderStyle = WinForms.BorderStyle.FixedSingle
-            address.Font = body_font
-            address.Anchor = WinForms.AnchorStyles.Left | WinForms.AnchorStyles.Right
-            address.Margin = WinForms.Padding(2, 0, 8, 0)
-            address.BackColor = color(CONTROL_SURFACE_COLOR)
-            address.ForeColor = color(CONTROL_TEXT_COLOR)
-            address.AccessibleName = "Provider Page Address"
-            self._address = address
-
-            status = WinForms.Label()
-            status.AutoSize = True
-            status.Font = body_font
-            status.Anchor = WinForms.AnchorStyles.Right
-            status.Margin = WinForms.Padding(0, 0, 2, 0)
-            status.ForeColor = color(STATUS_TEXT_COLOR)
-            status.AccessibleName = "Provider Page Status"
-            status.Text = ""
-            self._status = status
-
-            self._stockroom_tab.Click += self._on_stockroom_tab_click
-            self._provider_tab.Click += self._on_provider_tab_click
-            self._back.Click += lambda _sender, _args: self.go_back()
-            self._forward.Click += lambda _sender, _args: self.go_forward()
-            self._refresh.Click += lambda _sender, _args: self.reload()
-
-            for column, element in enumerate(
-                (
-                    self._stockroom_tab,
-                    self._provider_tab,
-                    self._back,
-                    self._forward,
-                    self._refresh,
-                    self._address,
-                    self._status,
-                )
-            ):
-                row.Controls.Add(element, column, 0)
-
-            strip.Controls.Add(row)
-            # The WebView is already docked Fill at z-order 0. WinForms lays docked children out
-            # from the last index to the first, so a Top strip appended after it takes the top
-            # band and the WebView keeps exactly the rest. Nothing overlaps and nothing is hidden.
-            form.Controls.Add(strip)
-            strip.Dock = WinForms.DockStyle.Top
-            self._strip = strip
-            self._form = form
-        except Exception:  # noqa: BLE001 - a window without chrome still works
-            _log.debug("window chrome could not be mounted", exc_info=True)
-            self._strip = None
-            return False
-
-        self.render()
+        self._form = form
         return True
 
     @property
     def mounted(self) -> bool:
-        return self._strip is not None
+        return self._form is not None
 
     def render(self) -> None:
-        """Push the state onto the strip. Safe before and after mounting."""
-
-        if self._strip is None:
-            return
-        try:
-            from System.Drawing import Color
-
-            def color(rgb):
-                return Color.FromArgb(255, rgb[0], rgb[1], rgb[2])
-
-            state = self.state
-            self._stockroom_tab.Checked = state.is_stockroom_selected
-            self._stockroom_tab.BackColor = color(
-                SELECTED_TAB_COLOR if state.is_stockroom_selected else IDLE_TAB_COLOR
-            )
-            self._stockroom_tab.ForeColor = color(
-                SELECTED_TEXT_COLOR if state.is_stockroom_selected else IDLE_TEXT_COLOR
-            )
-            self._provider_tab.Visible = state.has_provider_tab
-            self._provider_tab.Text = state.provider_tab_text
-            self._provider_tab.AccessibleName = state.provider_tab_text
-            self._provider_tab.Checked = state.is_provider_selected
-            self._provider_tab.BackColor = color(
-                SELECTED_TAB_COLOR if state.is_provider_selected else IDLE_TAB_COLOR
-            )
-            self._provider_tab.ForeColor = color(
-                SELECTED_TEXT_COLOR if state.is_provider_selected else IDLE_TEXT_COLOR
-            )
-            for element, enabled in (
-                (self._back, state.back_enabled),
-                (self._forward, state.forward_enabled),
-                (self._refresh, state.refresh_enabled),
-            ):
-                element.Visible = state.controls_visible
-                element.Enabled = enabled
-                element.ForeColor = color(
-                    CONTROL_TEXT_COLOR if enabled else IDLE_TEXT_COLOR
-                )
-            self._address.Visible = state.controls_visible
-            self._address.Text = state.url
-            self._status.Visible = state.controls_visible
-            self._status.Text = state.status
-        except Exception:  # noqa: BLE001 - a strip that cannot repaint must not stop the app
-            _log.debug("window chrome could not be rendered", exc_info=True)
+        """Keep compatibility call sites harmless; React owns visible browser state."""
 
     def _on_stockroom_tab_click(self, _sender, _args) -> None:
         hide = self._hide_provider

@@ -55,7 +55,8 @@ function globalFixtures(id: GlobalScenarioId): ScenarioFixture[] {
 function uiFor(id: GlobalScenarioId): Readonly<ScenarioUiState> {
   if (id.startsWith("global.onboarding.")) {
     const mode = id.includes("clone") ? "clone" : id.includes("create") ? "create" : "open";
-    return { onboarding: { mode, setupError: id.includes("error") ? "Could not set up the catalog." : undefined } };
+    const setupError = id.includes("error") ? "Could not set up the catalog." : undefined;
+    return { onboarding: { mode, setupError } };
   }
   if (id.startsWith("global.about.")) return { rail: { aboutOpen: true, aboutNote: id.endsWith(".current") ? "Stockroom is current." : undefined } };
   if (id === "global.rail.collapsed" || id === "global.rail.expanded") return { railState: id.endsWith("collapsed") ? "collapsed" : "expanded" };

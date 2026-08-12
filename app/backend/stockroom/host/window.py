@@ -32,7 +32,7 @@ _FETCH_WINDOW = None
 #: The loopback SPA origin of the running host, known before the window opens. A new-window
 #: request from a document on this origin is Stockroom's own; anything else is a provider page.
 _APP_ORIGIN = ""
-#: The window's tab strip and page controls, once mounted.
+#: The source host's provider-route controller, once bound to the window thread.
 _WINDOW_CHROME = None
 _NATIVE_DOWNLOAD_GUARD = threading.RLock()
 _NATIVE_DOWNLOAD_LEASE: str | None = None
@@ -65,7 +65,7 @@ def active_window():
 
 
 def window_chrome():
-    """The mounted tab strip, or None on a host that has not opened a window."""
+    """The bound provider-route controller, or None before the window opens."""
 
     return _WINDOW_CHROME
 
@@ -1273,7 +1273,7 @@ def _subscribe_window_event(window, name: str, handler) -> bool:
 
 
 def _mount_window_chrome(window) -> None:
-    """Put the tab strip and page controls on the window, on the window's own thread."""
+    """Bind provider-route state to the window thread without global controls."""
 
     global _WINDOW_CHROME
     from stockroom.host.window_chrome import WindowChrome

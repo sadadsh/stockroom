@@ -1,8 +1,8 @@
 /**
  * The Manage menu: everything that changes the component, in one place, off the reading surface.
  *
- * The header used to carry these as buttons - Complete Component, Edit Identity, Resolve Source
- * Conflict, Delete Part - which meant four controls competed with the part number for the top of
+ * The header used to carry completion, identity, source-conflict, and deletion as separate
+ * buttons, which meant four controls competed with the part number for the top of
  * the screen and the destructive one sat inches from the one people press most. A menu puts the
  * whole inventory one click away, orders it by what it touches, and gives the destructive item the
  * only place it belongs: the bottom, behind a separator, and named for the thing it destroys.

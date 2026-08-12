@@ -886,18 +886,20 @@ def _axis_size_override(block: object, what: str) -> dict:
         raise ApiError(400, f"Layout {what} must be an object.")
     out: dict = {}
     for key in ("min", "preferred", "fraction"):
-        if block.get(key) is not None:
-            out[key] = _layout_number(block[key], f"{what}.{key}")
+        value = block.get(key)
+        if value is not None:
+            out[key] = _layout_number(value, f"{what}.{key}")
     return out
 
 
 def _axis_size(block: object, what: str) -> dict:
     out = _axis_size_override(block, what)
     assert isinstance(block, dict)  # _axis_size_override raised otherwise
-    if block.get("grow") is not None:
-        if not isinstance(block["grow"], bool):
+    grow = block.get("grow")
+    if grow is not None:
+        if not isinstance(grow, bool):
             raise ApiError(400, f"Layout {what}.grow must be true or false.")
-        out["grow"] = block["grow"]
+        out["grow"] = grow
     when = block.get("when")
     if when is not None:
         if not isinstance(when, dict):
@@ -942,8 +944,9 @@ def _splitters(block: object, region_id: str) -> list:
             "lineThickness": _layout_number(spec.get("lineThickness"), "splitter lineThickness"),
             "grabWidth": _layout_number(spec.get("grabWidth"), "splitter grabWidth"),
         }
-        if spec.get("persistenceKey") is not None:
-            clean["persistenceKey"] = _layout_str(spec["persistenceKey"], "splitter persistenceKey")
+        persistence_key = spec.get("persistenceKey")
+        if persistence_key is not None:
+            clean["persistenceKey"] = _layout_str(persistence_key, "splitter persistenceKey")
         out.append(clean)
     return out
 
@@ -1211,12 +1214,14 @@ def _clean_committed_issues(block: object) -> dict:
                 },
                 "subject": _issue_subject(issue.get("subject")),
             }
-            if issue.get("detail") is not None:
-                clean["detail"] = _issue_detail(issue["detail"])
-            if issue.get("path") is not None:
-                if not isinstance(issue["path"], list):
+            detail = issue.get("detail")
+            if detail is not None:
+                clean["detail"] = _issue_detail(detail)
+            path = issue.get("path")
+            if path is not None:
+                if not isinstance(path, list):
                     raise ApiError(400, "A committed issue's path must be a list of node ids.")
-                clean["path"] = [_layout_str(step, "issue path step") for step in issue["path"]]
+                clean["path"] = [_layout_str(step, "issue path step") for step in path]
             issues.append(clean)
         out[slice_name] = issues
     return out
@@ -1338,12 +1343,14 @@ def _clean_promotion_translations(value: object) -> dict:
         if not isinstance(raw, dict) or set(raw) != {"dark", "light"}:
             raise ApiError(400, f"{label} must preserve exactly dark and light themes.")
         return {
-            theme: _clean_save_payload(raw[theme])[1]
+            theme: _clean_save_payload(raw.get(theme))[1]
             for theme in ("dark", "light")
         }
 
     variations: dict[str, dict] = {}
-    for variation_id, raw in value["variations"].items():
+    raw_variations = value.get("variations")
+    assert isinstance(raw_variations, dict)
+    for variation_id, raw in raw_variations.items():
         if not isinstance(variation_id, str) or not _DEV_ID_RE.fullmatch(variation_id) or not isinstance(raw, dict):
             raise ApiError(400, "Design promotion contains a malformed variation.")
         title = raw.get("title")
@@ -1361,7 +1368,7 @@ def _clean_promotion_translations(value: object) -> dict:
         parent = variation["extends"]
         if parent is not None and parent not in variations:
             raise ApiError(400, f"Variation '{variation_id}' extends missing '{parent}'.")
-    return {"base": clean_pair(value["base"], "Base design"), "variations": variations}
+    return {"base": clean_pair(value.get("base"), "Base design"), "variations": variations}
 
 
 def _write_dev_modules_atomically(lib: Path, modules: dict[str, str]) -> None:

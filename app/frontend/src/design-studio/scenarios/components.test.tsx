@@ -99,4 +99,22 @@ describe("Components Design Studio scenarios", () => {
     expect(document.querySelector('[data-dev-id="shell.root"]')).toBeInTheDocument();
     expect(liveRequest).not.toHaveBeenCalled();
   });
+
+  it("shows complete and partial provider choices together in Manage Models", async () => {
+    const { liveRequest } = await mountScenario("components.manage-models-ready");
+    const providers = within(screen.getByRole("radiogroup", { name: "CAD model providers" }))
+      .getAllByRole("radio");
+    expect(providers.map((provider) => provider.textContent)).toEqual([
+      expect.stringContaining("Ultra Librarian"),
+      expect.stringContaining("SnapMagic"),
+      expect.stringContaining("SamacSys"),
+      expect.stringContaining("TraceParts"),
+      expect.stringContaining("CADENAS"),
+    ]);
+    expect(providers[0]).toHaveTextContent("Complete Set");
+    expect(providers[1]).toHaveTextContent("Complete Set");
+    expect(providers[2]).toHaveTextContent("Missing 3D Model");
+    expect(providers[4]).toBeDisabled();
+    expect(liveRequest).not.toHaveBeenCalled();
+  });
 });

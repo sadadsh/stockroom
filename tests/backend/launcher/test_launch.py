@@ -404,6 +404,7 @@ def test_supervise_guarantees_webview2_after_clone_before_sync(tmp_path):
         webview2=lambda: order.append("webview2"),
         cad_converter=lambda: order.append("cad_converter"),
         uv_sync=lambda _wd: order.append("sync"),
+        ensure_browsers=lambda _wd: None,
         spawn=lambda _wd: (order.append("spawn"), 0)[1],
     )
     assert order == ["ensure", "webview2", "cad_converter", "sync", "spawn"]
@@ -635,5 +636,6 @@ def test_supervise_ensures_before_first_run(tmp_path):
         spawn=lambda _wd: (order.append("spawn"), 0)[1],
         uv_sync=lambda _wd: order.append("sync"),
         ensure=lambda _wd: order.append("ensure"),
+        ensure_browsers=lambda _wd: None,
     )
     assert order == ["ensure", "sync", "spawn"]

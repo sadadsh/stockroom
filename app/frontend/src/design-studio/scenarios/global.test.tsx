@@ -79,4 +79,5 @@ describe("global Design Studio scenarios", () => {
     expect(document.querySelector(`[data-dev-id="${target}"], [data-dev-role="${target}"]`)).toBeInTheDocument();
     expect(mounted.liveRequest).not.toHaveBeenCalled();
   });
+
 });

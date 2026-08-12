@@ -6,8 +6,8 @@ from pathlib import Path
 import pytest
 
 from stockroom.design_studio.personal import (
-    MAX_PERSONAL_DESIGN_BYTES,
     MAX_PAGE_EXIT_DESIGN_BYTES,
+    MAX_PERSONAL_DESIGN_BYTES,
     PERSONAL_DESIGN_FILENAME,
     PersonalDesignConflict,
     PersonalDesignValidationError,

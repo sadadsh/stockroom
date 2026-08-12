@@ -1,4 +1,4 @@
-import { Text } from "../../lib/copy";
+import { Text, useText } from "../../lib/copy";
 import type { ManageModelsProvider } from "./manageModelsModel";
 
 const ARTIFACT_LABELS = {
@@ -8,9 +8,10 @@ const ARTIFACT_LABELS = {
 } as const;
 
 function artifactSummary(provider: ManageModelsProvider): string {
+  const supplied = new Set(provider.supplied);
   return (Object.keys(ARTIFACT_LABELS) as Array<keyof typeof ARTIFACT_LABELS>)
     .map((artifact) =>
-      `${ARTIFACT_LABELS[artifact]} ${provider.supplied.includes(artifact) ? "✓" : "—"}`,
+      `${ARTIFACT_LABELS[artifact]} ${supplied.has(artifact) ? "✓" : "—"}`,
     )
     .join(" · ");
 }
@@ -26,6 +27,11 @@ export function ProviderList({
   disabled?: boolean;
   onSelect: (providerId: string) => void;
 }) {
+  const providerListLabel = useText(
+    "component-browser.manage-models-providers-aria",
+    "CAD model providers",
+  );
+
   return (
     <aside
       data-dev-id="component-browser.provider-list"
@@ -43,7 +49,7 @@ export function ProviderList({
       </div>
       <div
         role="radiogroup"
-        aria-label="CAD model providers"
+        aria-label={providerListLabel}
         className="min-h-0 flex-1 space-y-1 overflow-y-auto p-2"
       >
         {providers.map((provider) => (

@@ -1,10 +1,12 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { OnboardingGate } from "./OnboardingGate";
 import { ApiError, api } from "../api/client";
 import { ToastProvider } from "../lib/toast";
 import type { OnboardingStatus } from "../api/types";
+import type { ScenarioUiState } from "../design-studio/scenario";
+import { ScenarioUiProvider } from "../design-studio/scenarioState";
 
 vi.mock("../api/client", async (importActual) => {
   const actual = await importActual<typeof import("../api/client")>();
@@ -23,12 +25,14 @@ const STATUS: OnboardingStatus = {
   libraries: [],
 };
 
-function renderGate() {
+function renderGate(scenario: ScenarioUiState = {}) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={qc}>
       <ToastProvider>
-        <OnboardingGate status={STATUS} />
+        <ScenarioUiProvider state={scenario}>
+          <OnboardingGate status={STATUS} />
+        </ScenarioUiProvider>
       </ToastProvider>
     </QueryClientProvider>,
   );
@@ -113,5 +117,17 @@ describe("OnboardingGate", () => {
       screen.getByRole("button", { name: "Continue with the Default" }),
     );
     await waitFor(() => expect(screen.getByText("git is offline")).toBeInTheDocument());
+  });
+
+  it("keeps a fixture setup failure visible during visual acceptance", async () => {
+    vi.useFakeTimers();
+    try {
+      renderGate({ onboarding: { mode: "open", setupError: "Could not set up the catalog." } });
+      expect(screen.getByText("Could not set up the catalog.")).toBeInTheDocument();
+      await act(() => vi.advanceTimersByTimeAsync(5_000));
+      expect(screen.getByText("Could not set up the catalog.")).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

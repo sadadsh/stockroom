@@ -1,13 +1,12 @@
-"""The source host's window chrome: two tabs, page controls, and no escape to another browser.
+"""The source host's provider controller and in-window navigation safeguards.
 
-These cover the host the owner actually launches (``python -m stockroom.host.run``, a
-pywebview/WinForms window), not the frozen release's WPF host. The WPF strip had passing tests
-while the person saw no strip at all, because those tests construct the strip directly and this
-window never had one.
+These cover ``python -m stockroom.host.run``. The source host retains task-bound provider state
+and in-window navigation safety but mounts no global tabs or page controls.
 """
 
 from __future__ import annotations
 
+import inspect
 from types import SimpleNamespace
 
 import pytest
@@ -24,7 +23,6 @@ from stockroom.host.window import (
 from stockroom.host.window_chrome import (
     MAXIMUM_TAB_LENGTH,
     PROVIDER_TAB_FALLBACK,
-    STRIP_HEIGHT,
     ProviderChromeState,
     WindowChrome,
     new_window_url_allowed,
@@ -176,9 +174,15 @@ def test_the_tab_name_stays_short_enough_to_leave_room_for_the_address():
     assert resolved.endswith("…")
 
 
-def test_the_strip_is_as_tall_as_the_native_host_strip():
-    # WindowTabStrip.StripHeight. Two hosts, one answer about how much is chrome.
-    assert STRIP_HEIGHT == 44
+def test_mount_keeps_the_provider_controller_without_global_window_controls():
+    chrome = WindowChrome()
+    form = object()
+
+    assert chrome.mount(form) is True
+    assert chrome.mounted is True
+    source = inspect.getsource(WindowChrome.mount)
+    assert "WinForms" not in source
+    assert "Controls.Add" not in source
 
 
 # --- nothing reaches the operating system's browser -----------------------------------------

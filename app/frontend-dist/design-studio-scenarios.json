@@ -707,33 +707,36 @@
       ]
     },
     {
-      "id": "components.complete-part-ready",
-      "title": "Complete Part Ready",
+      "id": "components.manage-models-ready",
+      "title": "Manage Models Ready",
       "area": "components",
       "group": "Components",
       "route": "components",
       "expectedTargets": [
-        "component-browser.complete-component"
+        "component-browser.manage-models",
+        "component-browser.provider-viewport"
       ]
     },
     {
-      "id": "components.complete-part-partial",
-      "title": "Complete Part Partial",
+      "id": "components.manage-models-partial",
+      "title": "Manage Models Partial",
       "area": "components",
       "group": "Components",
       "route": "components",
       "expectedTargets": [
-        "component-browser.complete-component"
+        "component-browser.manage-models",
+        "component-browser.provider-list"
       ]
     },
     {
-      "id": "components.complete-part-blocked",
-      "title": "Complete Part Blocked",
+      "id": "components.manage-models-blocked",
+      "title": "Manage Models Blocked",
       "area": "components",
       "group": "Components",
       "route": "components",
       "expectedTargets": [
-        "component-browser.complete-component"
+        "component-browser.manage-models",
+        "component-browser.provider-status"
       ]
     },
     {
@@ -757,23 +760,25 @@
       ]
     },
     {
-      "id": "components.variant-alternatives",
-      "title": "Variant Alternatives",
+      "id": "components.manage-models-attached",
+      "title": "Manage Models Attached",
       "area": "components",
       "group": "Components",
       "route": "components",
       "expectedTargets": [
-        "component-browser.complete-component"
+        "component-browser.manage-models",
+        "component-browser.provider-status"
       ]
     },
     {
-      "id": "components.variant-pending",
-      "title": "Variant Pending",
+      "id": "components.manage-models-invalid",
+      "title": "Manage Models Invalid Files",
       "area": "components",
       "group": "Components",
       "route": "components",
       "expectedTargets": [
-        "component-browser.complete-component"
+        "component-browser.manage-models",
+        "component-browser.provider-import"
       ]
     },
     {
@@ -813,8 +818,8 @@
       "group": "Provider Download",
       "route": "components",
       "expectedTargets": [
-        "component-browser.complete-component",
-        "component-browser.provider-browser"
+        "component-browser.manage-models",
+        "component-browser.provider-viewport"
       ]
     },
     {
@@ -824,8 +829,8 @@
       "group": "Provider Download",
       "route": "components",
       "expectedTargets": [
-        "component-browser.complete-component",
-        "component-browser.provider-browser"
+        "component-browser.manage-models",
+        "component-browser.provider-viewport"
       ]
     },
     {
@@ -835,8 +840,8 @@
       "group": "Provider Download",
       "route": "components",
       "expectedTargets": [
-        "component-browser.complete-component",
-        "component-browser.provider-browser"
+        "component-browser.manage-models",
+        "component-browser.provider-viewport"
       ]
     },
     {
@@ -846,8 +851,8 @@
       "group": "Provider Download",
       "route": "components",
       "expectedTargets": [
-        "component-browser.complete-component",
-        "component-browser.provider-browser"
+        "component-browser.manage-models",
+        "component-browser.provider-viewport"
       ]
     },
     {
@@ -857,8 +862,8 @@
       "group": "Provider Download",
       "route": "components",
       "expectedTargets": [
-        "component-browser.complete-component",
-        "component-browser.provider-browser"
+        "component-browser.manage-models",
+        "component-browser.provider-viewport"
       ]
     },
     {
@@ -868,8 +873,8 @@
       "group": "Provider Download",
       "route": "components",
       "expectedTargets": [
-        "component-browser.complete-component",
-        "component-browser.provider-browser"
+        "component-browser.manage-models",
+        "component-browser.provider-viewport"
       ]
     },
     {
@@ -879,8 +884,8 @@
       "group": "Provider Download",
       "route": "components",
       "expectedTargets": [
-        "component-browser.complete-component",
-        "component-browser.provider-browser"
+        "component-browser.manage-models",
+        "component-browser.provider-viewport"
       ]
     },
     {
@@ -890,8 +895,8 @@
       "group": "Provider Download",
       "route": "components",
       "expectedTargets": [
-        "component-browser.complete-component",
-        "component-browser.provider-browser"
+        "component-browser.manage-models",
+        "component-browser.provider-viewport"
       ]
     },
     {
@@ -901,8 +906,8 @@
       "group": "Provider Download",
       "route": "components",
       "expectedTargets": [
-        "component-browser.complete-component",
-        "component-browser.provider-browser"
+        "component-browser.manage-models",
+        "component-browser.provider-viewport"
       ]
     },
     {
@@ -912,8 +917,8 @@
       "group": "Provider Download",
       "route": "components",
       "expectedTargets": [
-        "component-browser.complete-component",
-        "component-browser.provider-browser"
+        "component-browser.manage-models",
+        "component-browser.provider-viewport"
       ]
     },
     {
@@ -923,8 +928,8 @@
       "group": "Provider Download",
       "route": "components",
       "expectedTargets": [
-        "component-browser.complete-component",
-        "component-browser.provider-browser"
+        "component-browser.manage-models",
+        "component-browser.provider-viewport"
       ]
     },
     {
@@ -934,8 +939,8 @@
       "group": "Provider Download",
       "route": "components",
       "expectedTargets": [
-        "component-browser.complete-component",
-        "component-browser.provider-browser"
+        "component-browser.manage-models",
+        "component-browser.provider-viewport"
       ]
     },
     {
@@ -945,8 +950,8 @@
       "group": "Provider Download",
       "route": "components",
       "expectedTargets": [
-        "component-browser.complete-component",
-        "component-browser.provider-browser"
+        "component-browser.manage-models",
+        "component-browser.provider-viewport"
       ]
     },
     {
@@ -956,8 +961,8 @@
       "group": "Provider Download",
       "route": "components",
       "expectedTargets": [
-        "component-browser.complete-component",
-        "component-browser.provider-browser"
+        "component-browser.manage-models",
+        "component-browser.provider-viewport"
       ]
     },
     {
@@ -967,8 +972,8 @@
       "group": "Provider Download",
       "route": "components",
       "expectedTargets": [
-        "component-browser.complete-component",
-        "component-browser.provider-browser"
+        "component-browser.manage-models",
+        "component-browser.provider-viewport"
       ]
     },
     {
@@ -978,8 +983,8 @@
       "group": "Provider Download",
       "route": "components",
       "expectedTargets": [
-        "component-browser.complete-component",
-        "component-browser.provider-browser"
+        "component-browser.manage-models",
+        "component-browser.provider-viewport"
       ]
     },
     {

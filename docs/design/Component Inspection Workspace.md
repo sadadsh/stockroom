@@ -165,7 +165,7 @@ The primary action is never a fixed button. Examples:
 
 - `Resolve 3 Issues`
 - `Review Replacement`
-- `Complete Component`
+- `Manage Models`
 - `Ready`
 
 Delete, raw-file operations, and administrative actions live in the overflow menu,

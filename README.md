@@ -1,11 +1,12 @@
 # Stockroom
 
-Stockroom is a Windows desktop app for managing a KiCad V10 component library and
-the PCB projects that use it. You drag in the vendor zips for a part (symbol,
-footprint, 3D model), paste the product link, and it converts, names, categorizes,
-fills the fields, stores the datasheet and purchase link, and registers everything
-with KiCad so the part is usable right away. It also audits an existing KiCad
-project: adding the parts it doesn't recognize, relinking the ones it does.
+Stockroom is a Windows desktop app for managing a shared KiCad V10 and Altium
+component library and the PCB projects that use it. Open a component and choose
+**CAD Models > Manage Models** to see every known provider, with complete Symbol +
+Footprint + 3D Model sets first. Stockroom opens the best complete source, captures
+and validates its download, and attaches the coherent set; **Choose Downloaded
+Files** is the manual recovery path. It also audits existing PCB projects, adding
+the parts it does not recognize and relinking the ones it does.
 
 The app is a Python backend (FastAPI) that serves a React single-page app inside a
 WebView2 window. The library itself is a git repository of one JSON file per part,
@@ -41,8 +42,8 @@ The backend is a stack, low level to high:
   project operations built on it.
 - `kicad/` reads and writes KiCad files: symbols, footprints, schematics, boards,
   the library tables, and the kicad-cli wrapper.
-- `ingest/` takes vendor zips apart: fingerprinting, staging, and converting to
-  KiCad.
+- `ingest/` takes provider downloads apart: fingerprinting, staging, and preparing
+  verified KiCad, Altium, and shared 3D assets.
 - `enrich/` and `scrape/` turn a manufacturer part number into specs, datasheets,
   and assets. `scrape/` is the portable headless-browser engine; `enrich/`
   orchestrates it.

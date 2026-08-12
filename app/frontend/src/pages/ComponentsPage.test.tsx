@@ -590,13 +590,14 @@ describe("opening a component", () => {
     await user.click(await screen.findByRole("button", { name: new RegExp(`MPN-${index}\\b`) }));
   }
 
-  it("renders no per-component tab strip: the picker row IS the way in", async () => {
+  it("renders only the CAD Models tabs inside the selected component", async () => {
     wrap(<ComponentsPage />);
     await screen.findByText("Description p0");
-    // The native window already carries one tab for Stockroom and one for a provider page. A
-    // second row of tabs inside the application competed with it for the same job.
-    expect(screen.queryAllByRole("tab")).toHaveLength(0);
-    expect(screen.queryAllByRole("tablist")).toHaveLength(0);
+    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual([
+      "Models",
+      "Manage Models",
+    ]);
+    expect(screen.getAllByRole("tablist")).toHaveLength(1);
     expect(document.querySelector('[data-dev-id="components.workspace-band"]')).toBeNull();
   });
 

@@ -202,7 +202,7 @@ export function ComponentWorkspace({
         onDelete: () => setConfirmDelete(true),
         shellItems,
       }),
-    [refresh, refreshing, shellItems],
+    [refresh, refreshing, setCadView, shellItems],
   );
 
   if (query.isLoading) {

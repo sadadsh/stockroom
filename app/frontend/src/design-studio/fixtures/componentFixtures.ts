@@ -96,6 +96,50 @@ function providerRow(): ProviderCoverageRow {
   };
 }
 
+function providerVariant(
+  base: ProviderCoverageRow,
+  options: {
+    id: string;
+    label: string;
+    order: number;
+    statuses: readonly [CoverageStatus, CoverageStatus, CoverageStatus];
+    reachable?: boolean;
+  },
+): ProviderCoverageRow {
+  const [symbolStatus, footprintStatus, modelStatus] = options.statuses;
+  const suppliedStatuses = new Set<CoverageStatus>(["available", "downloaded", "validated"]);
+  const suppliedCount = options.statuses.filter((status) => suppliedStatuses.has(status)).length;
+  const complete = suppliedCount === 3;
+  const statusCounts: Record<CoverageStatus, number> = {
+    unknown: options.statuses.filter((status) => status === "unknown").length,
+    available: options.statuses.filter((status) => status === "available").length,
+    not_available: options.statuses.filter((status) => status === "not_available").length,
+    downloaded: options.statuses.filter((status) => status === "downloaded").length,
+    validated: options.statuses.filter((status) => status === "validated").length,
+  };
+  const toolCoverage = {
+    count: suppliedCount,
+    total: 3,
+    summary: `${suppliedCount}/3`,
+    complete,
+    supported: suppliedCount > 0,
+  };
+  return {
+    ...base,
+    id: options.id,
+    label: options.label,
+    order: options.order,
+    url: options.reachable === false ? "" : `https://example.invalid/${options.id}/lm358dr`,
+    statusCounts,
+    complete,
+    symbol: coverage(symbolStatus),
+    footprint: coverage(footprintStatus),
+    model: coverage(modelStatus),
+    kicad: toolCoverage,
+    altium: toolCoverage,
+  };
+}
+
 function representation(
   kind: RepresentationKind,
   status: RepresentationStatus = "ready",
@@ -189,6 +233,34 @@ export function fullComponentDossier(): ComponentDossier {
     status: "stored" as const,
   };
   const row = providerRow();
+  const providerRows = [
+    row,
+    providerVariant(row, {
+      id: "snapmagic",
+      label: "SnapMagic",
+      order: 20,
+      statuses: ["available", "available", "available"],
+    }),
+    providerVariant(row, {
+      id: "samacsys",
+      label: "SamacSys",
+      order: 30,
+      statuses: ["available", "available", "not_available"],
+    }),
+    providerVariant(row, {
+      id: "traceparts",
+      label: "TraceParts",
+      order: 40,
+      statuses: ["unknown", "unknown", "available"],
+    }),
+    providerVariant(row, {
+      id: "cadenas",
+      label: "CADENAS",
+      order: 50,
+      statuses: ["unknown", "unknown", "unknown"],
+      reachable: false,
+    }),
+  ];
   return {
     schemaVersion: 2,
     identity: {
@@ -269,8 +341,8 @@ export function fullComponentDossier(): ComponentDossier {
       artifacts: ["symbol", "footprint", "model"],
       statuses: ["unknown", "available", "not_available", "downloaded", "validated"],
       tools: ["kicad", "altium"],
-      completeProviders: ["ultralibrarian"],
-      rows: [row],
+      completeProviders: providerRows.filter((provider) => provider.complete).map((provider) => provider.id),
+      rows: providerRows,
     },
     supplySummary: {
       offerCount: 2,

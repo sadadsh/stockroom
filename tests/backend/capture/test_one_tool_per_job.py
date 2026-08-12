@@ -208,6 +208,7 @@ _TOOLS = {
     ),
     "capturerec.py": "THE recorder: a human drives a vendor page, this writes down the workflow.",
     "deploy.py": "Deploy to the Windows install AND prove the code arrived.",
+    "design_parity.py": "Compare two frontend builds through the existing uishot screenshot owner.",
     "export_stm_target_definition.py": "Compile an STM target definition from explicit policy.",
     "gen_eda_registry_ts.py": "Generate the TS EDA registry from the Python one (single source).",
     "import_library.py": "Bulk-import parts into the library from a register/BOM.",

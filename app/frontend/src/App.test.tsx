@@ -129,9 +129,13 @@ describe("App shell", () => {
     expect((await screen.findAllByText("LM358")).length).toBeGreaterThan(0);
     // The opened component states what the part IS on its identity line.
     expect((await screen.findAllByText(/Dual Operational Amplifier/)).length).toBeGreaterThan(0);
-    // The default route renders the Components flagship, and it has NO tabs at all: the page-level
-    // strip went with the Doctor and BOM surfaces, and the opened component is three columns.
-    expect(screen.queryAllByRole("tab")).toHaveLength(0);
+    // The only in-product tabs belong to CAD Models. Provider navigation no longer creates a
+    // second, window-level tab system.
+    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual([
+      "Models",
+      "Manage Models",
+    ]);
+    expect(screen.getAllByRole("tablist")).toHaveLength(1);
   });
 
   it("reaches Add Parts as a full-screen wizard from the Parts toolbar", async () => {

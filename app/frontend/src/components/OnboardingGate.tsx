@@ -80,8 +80,9 @@ export function OnboardingGate({ status }: { status: OnboardingStatus }) {
   );
 
   useEffect(() => {
-    if (scenarioSetupError !== undefined) showSetupFailure(new ApiError(0, scenarioSetupError));
-  }, [scenarioSetupError, showSetupFailure]);
+    if (scenarioSetupError === undefined) return;
+    return toast(scenarioSetupError, "err", undefined, null);
+  }, [scenarioSetupError, toast]);
 
   // Each mode has its own required field: open needs a path, clone needs a URL; create
   // can fall back to the default location, so its path is optional.

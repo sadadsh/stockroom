@@ -130,6 +130,12 @@ The automated matrix is browser-rendered product proof, not native-host, provide
 credential, or signed-release proof. Those layers remain separately recorded whenever the real
 Windows owner state prevents an isolated current-source run.
 
+Component and provider cases use the production **CAD Models > Manage Models** workspace. They
+cover complete, partial, unavailable, active, validation, attached, invalid-file, and recovery
+states while keeping the provider document itself outside the editable target tree. The provider
+list, browser chrome, status, and recovery controls remain inspectable; fixture activation cannot
+open the native provider WebView or file picker.
+
 The Studio remembers the last scenario/case, viewport and custom width, data mode, zoom, grid,
 snap, and presentation preference in the existing machine-preferences record. Fixture restore is
 fail-closed and retries if persisted state is temporarily unavailable. The canvas offers a visible

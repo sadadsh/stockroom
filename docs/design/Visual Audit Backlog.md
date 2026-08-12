@@ -21,6 +21,25 @@ and `P2` meaningful fit, finish, or clarity debt.
 
 ## Acceptance Captures
 
+### 2026-08-12 — Manage Models Browser Workspace
+
+- Capture layer: current production frontend plus the real local Stockroom service through locked
+  Chromium and a task-owned configuration. The final all-scenario run passed 190 scenarios in dark
+  and light at 1,366 x 872, 1,600 x 1,000, and 1,920 x 1,200, including restart persistence and
+  zero fixture product effects. A focused follow-up retained the five-provider Manage Models frame
+  at `.work plans/sdd/2026-08-12-manage-models-focused/browser/`.
+- Intended claim: **CAD Models > Manage Models** stays inside the open component, shows all five
+  representative providers with complete sets first, leaves partial and unavailable rows honest,
+  and keeps one component-bound browser viewport without any global provider tab.
+- Visual result: dark `8d55030b3476` and light `1617ed1947ac` at 1,366 x 872 show two complete,
+  two partial, and one unavailable provider simultaneously. The provider list remains readable,
+  browser chrome stays inside the component, and identity/status survive the workspace change.
+  The sparse first capture exposed an underrepresentative one-provider fixture; the fixture was
+  expanded before these accepted frames.
+- Windows boundary: native host unit coverage passes, but this task's isolated Computer Use run was
+  interrupted before interaction. Exact current-source WebView2 overlay alignment, provider-account
+  gates, and live automatic/manual downloads remain native/provider acceptance, not browser proof.
+
 ### 2026-08-11 — Exhaustive Design Studio Browser Matrix
 
 - Capture layer: the production frontend and real local Stockroom service through locked Chromium,
