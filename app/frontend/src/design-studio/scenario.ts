@@ -1,5 +1,6 @@
 import type { ApiRequestDescriptor } from "./requestAdapter";
 import type { Route } from "../lib/router";
+import type { TargetDefinitionDTO } from "../api/types";
 
 /** The product surface a scenario belongs to. Route-specific areas grow with the product routes. */
 export type ScenarioArea = "global" | Route;
@@ -35,6 +36,16 @@ export interface ScenarioUiState {
   projects?: {
     selectedId?: string | null;
     activeTab?: "overview" | "bom" | "build" | "activity";
+  };
+  stm?: {
+    tab?: "explorer" | "compatibility";
+    activePart?: string | null;
+    selectedPosition?: string | null;
+    pinoutView?: "map" | "table";
+    benchScope?: { families: string[]; mcus?: string[] };
+    benchPackage?: string | null;
+    targetDefinition?: TargetDefinitionDTO;
+    showTargetPolicy?: boolean;
   };
   /** Native provider chrome is rendered by WindowHost, not duplicated in the React app tree. */
   provider?: {

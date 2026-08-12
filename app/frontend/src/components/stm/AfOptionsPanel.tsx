@@ -15,7 +15,7 @@ import { useMemo, useState } from "react";
 import { useStmPinAf, useStmSignalCandidates } from "../../api/stmQueries";
 import { ApiError } from "../../api/client";
 import { Eyebrow } from "../primitives";
-import { Text } from "../../lib/copy";
+import { Text, useText } from "../../lib/copy";
 import { withStableKeys } from "./listKeys";
 
 // The single numeric-aware collation (mirrors PinoutViewer.tsx): it orders "1","2","10" correctly
@@ -55,10 +55,11 @@ export function AfOptionsPanel({ part, position }: { part: string; position: str
   );
 
   const notBuilt = is409(pinAf.error) || is409(candidates.error);
+  const alternateFunctionsLabel = useText("stm.af.options.title", "Alternate Functions");
 
   return (
     <div className="flex flex-col gap-4" data-testid="af-options-panel">
-      <section>
+      <section role="region" aria-label={alternateFunctionsLabel}>
         <Eyebrow className="mb-1.5">
           <Text id="stm.af.options.title">Alternate Functions</Text>
         </Eyebrow>

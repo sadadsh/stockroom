@@ -191,7 +191,8 @@ import { DEV_IDS, DEV_ID_AREAS, DEV_ID_BY_ID } from "./devIds";
 // stable target contract as the rest of the production picker.
 // 495 with the Projects scenario states that distinguish loading, failures, native/runtime
 // blockers, repository collaboration, shared review, and build completion in the real workbenches.
-const EXPECTED_ENTRIES = 495;
+// 496 with the STM target-definition rules surface used by the real Bench scenario.
+const EXPECTED_ENTRIES = 496;
 
 describe("devIds catalogue", () => {
   // The count is asserted from a single constant so bumping it is one edit, and so the test NAME can

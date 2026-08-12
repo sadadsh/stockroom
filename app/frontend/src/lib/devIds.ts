@@ -413,6 +413,7 @@ export const DEV_IDS: DevIdEntry[] = [
   { id: "stm.package", label: "Every package choice", area: "stm" },
   { id: "stm.family", label: "Every family choice", area: "stm" },
   { id: "stm.target-definition", label: "Target definition workspace", area: "stm" },
+  { id: "stm.target-policy", label: "Target definition rules", area: "stm" },
   { id: "stm.socket-solution", label: "Socket solution workspace", area: "stm" },
   { id: "stm.target-map", label: "Physical package map", area: "stm" },
   { id: "stm.target-legend", label: "Interactive map legend", area: "stm" },

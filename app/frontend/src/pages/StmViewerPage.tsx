@@ -34,6 +34,7 @@ import {
   type TabItem,
 } from "../components/primitives";
 import { Text, useText } from "../lib/copy";
+import { useScenarioUiState } from "../design-studio/scenarioState";
 
 export interface StmScope extends StmMcusArgs {
   families: string[];
@@ -59,10 +60,11 @@ function scopeToArgs(scope: StmScope): StmMcusArgs {
 }
 
 export function StmViewerPage() {
-  const [tab, setTab] = useState<StmTab>("explorer");
+  const preview = useScenarioUiState().stm;
+  const [tab, setTab] = useState<StmTab>(preview?.tab ?? "explorer");
   const [scope, setScope] = useState<StmScope>(EMPTY_SCOPE);
-  const [activePart, setActivePart] = useState<string | null>(null);
-  const [selectedPosition, setSelectedPosition] = useState<string | null>(null);
+  const [activePart, setActivePart] = useState<string | null>(preview?.activePart ?? null);
+  const [selectedPosition, setSelectedPosition] = useState<string | null>(preview?.selectedPosition ?? null);
 
   const status = useStmStatus();
   const sectionsAria = useText("stm.viewer.sections-aria", "STM Viewer sections");
@@ -154,6 +156,7 @@ export function StmViewerPage() {
               onSelectPosition={setSelectedPosition}
               inspectedPin={inspectedPin}
               onRetry={() => pinout.refetch()}
+              initialView={preview?.pinoutView}
             />
           </aside>
         </TabPanel>
@@ -178,6 +181,7 @@ function PinoutRegion({
   onSelectPosition,
   inspectedPin,
   onRetry,
+  initialView,
 }: {
   activePart: string | null;
   pinout: import("../api/types").PinoutDTO | null;
@@ -187,8 +191,9 @@ function PinoutRegion({
   onSelectPosition: (position: string) => void;
   inspectedPin: import("../api/types").PinDTO | null;
   onRetry: () => void;
+  initialView?: "map" | "table";
 }) {
-  const [view, setView] = useState<"map" | "table">("map");
+  const [view, setView] = useState<"map" | "table">(initialView ?? "map");
   const viewAria = useText("stm.viewer.pinout-view-aria", "Pinout view");
   // The legend's category lens: highlighted buckets dim every other pad on the map. The lens
   // describes ONE part's pins, so it is stored WITH the part it was picked on and read back only

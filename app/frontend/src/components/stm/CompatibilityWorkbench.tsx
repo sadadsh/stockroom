@@ -47,6 +47,8 @@ import { benchSets, packagesForScope } from "./benchModel";
 import { Button, ErrorState } from "../primitives";
 import { Text, useCopyFormatter, useText } from "../../lib/copy";
 import { downloadTextFile } from "../../lib/stmTargetExport";
+import { useScenarioUiState } from "../../design-studio/scenarioState";
+import { TargetDefinitionPanel } from "./TargetDefinitionPanel";
 import {
   stmSocketExport,
   stmSocketExportFilename,
@@ -56,8 +58,12 @@ import {
 // ── the Bench ────────────────────────────────────────────────────────────────
 
 export function CompatibilityWorkbench() {
-  const [scope, setScope] = useState<StmScope>({ families: [], mcus: [] });
-  const [selectedPackage, setSelectedPackage] = useState<string | null>(null);
+  const preview = useScenarioUiState().stm;
+  const [scope, setScope] = useState<StmScope>(() => ({
+    families: preview?.benchScope?.families ?? [],
+    mcus: preview?.benchScope?.mcus ?? [],
+  }));
+  const [selectedPackage, setSelectedPackage] = useState<string | null>(preview?.benchPackage ?? null);
   const [activeSetId, setActiveSetId] = useState<string>("all");
   // A chip drop edits the active set into a custom one (auto-rebuilt, still explicit).
   const [customParts, setCustomParts] = useState<string[] | null>(null);
@@ -189,6 +195,26 @@ export function CompatibilityWorkbench() {
       selected.type,
     );
   };
+
+  if (preview?.targetDefinition) {
+    return <TargetDefinitionPanel definition={preview.targetDefinition} />;
+  }
+  if (preview?.showTargetPolicy) {
+    return (
+      <div data-dev-id="stm.bench" className="flex min-h-0 min-w-0 flex-1">
+        <BenchScopeRail
+          scope={scope}
+          onScopeChange={changeScope}
+          packageOptions={packageOptions}
+          selectedPackage={selectedPackage}
+          onSelectPackage={setSelectedPackage}
+        />
+        <div className="min-w-0 flex-1 border-l border-line p-4">
+          <TargetPolicyEditor policy={policy} onPolicyChange={setPolicy} />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div data-dev-id="stm.bench" className="flex min-h-0 min-w-0 flex-1">

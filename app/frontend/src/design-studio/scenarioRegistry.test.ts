@@ -6,6 +6,7 @@ import { bootstrapScenarioRegistry, globalScenarios } from "./scenarios";
 import { componentScenarioIds } from "./scenarios/components";
 import { projectScenarioIds } from "./scenarios/projects";
 import { providerScenarioIds } from "./scenarios/provider";
+import { stmScenarioIds } from "./scenarios/stm";
 import { bootstrapFixtureValidators } from "./scenarioFixtureValidation";
 
 function scenario(id: string): DesignScenario {
@@ -176,6 +177,7 @@ describe("registerScenarios", () => {
       ...componentScenarioIds,
       ...providerScenarioIds,
       ...projectScenarioIds,
+      ...stmScenarioIds,
     ]);
     expect(bootstrapScenarioRegistry.searchScenarios("update")).toEqual([
       expect.objectContaining({ id: "global.update.available", expectedTargets: ["rail.update"] }),

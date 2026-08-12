@@ -67,7 +67,7 @@ export function TargetPolicyEditor({
   };
 
   return (
-    <details className="rounded-card border border-line bg-surface">
+    <details data-dev-id="stm.target-policy" className="rounded-card border border-line bg-surface">
       <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3">
         <span>
           <Eyebrow>
