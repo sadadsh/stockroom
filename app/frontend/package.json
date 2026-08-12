@@ -6,7 +6,7 @@
   "description": "Stockroom SPA (KiCad V10 component library manager)",
   "scripts": {
     "dev": "vite",
-    "build": "node scripts/check-tokens.mjs && tsc -b && vite build",
+    "build": "node scripts/check-tokens.mjs && tsc -b && vite build && node scripts/emit-design-studio-scenarios.mjs",
     "preview": "vite preview",
     "typecheck": "tsc -b --noEmit",
     "test": "vitest",

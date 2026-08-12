@@ -71,3 +71,35 @@ Every registered `data-dev-id` can use the Box editor. A control needs the seman
 `AdaptiveChoice` primitive before the Behavior editor can safely change its presentation. This
 boundary is deliberate: Dev Mode can reshape the interface extensively, but it does not rewrite
 arbitrary JSX or silently change application meaning.
+
+## Acceptance And Preview Isolation
+
+`scripts/Verify-DesignStudio.ps1` is the deterministic Design Studio acceptance entry point. Its
+browser case list is generated from the production scenario registry during `npm run build` and
+written to `app/frontend-dist/design-studio-scenarios.json`; the browser harness does not maintain
+a second scenario list. The current projection contains 190 scenarios.
+
+The browser matrix opens every projected scenario in dark and light themes at 1,366 x 872,
+1,600 x 1,000, and 1,920 x 1,200. It verifies the registered visible targets, Browse/Inspect/Arrange
+click-through, editor-panel collapse and expansion, all inspector domains, and browser console
+health. It rejects external requests and every non-read product request while a fixture is active.
+The one exception is the local `/api/design-studio/personal` autosave: acceptance makes a real
+token edit, stops the service, restarts it with the same task-owned configuration, and requires the
+exact value to return.
+
+Run the complete entry point from the repository root:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\Verify-DesignStudio.ps1
+```
+
+`-BrowserOnly` runs the production projection and browser matrix; `-SkipBrowser` runs the full
+frontend, deterministic-build, and repository-gate portion. The wrapper writes only to its
+task-owned evidence and configuration directories. Fixture previews never call component,
+project, provider, credential, updater, EDA, filesystem, or source-promotion mutations. Real Data
+mode remains the only route to real product operations, and packaged builds must refuse source
+promotion when a writable managed source checkout is unavailable.
+
+The automated matrix is browser-rendered product proof, not native-host, provider-account, EDA,
+credential, or signed-release proof. Those layers remain separately recorded whenever the real
+Windows owner state prevents an isolated current-source run.

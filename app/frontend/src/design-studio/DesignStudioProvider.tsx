@@ -371,7 +371,10 @@ function DesignStudioBridge({
         setScenarioUiState(scenario.initialUi);
         setActiveScenario(scenario);
         mountScenarioRoute(scenario.route);
-        await refreshActiveProductQueries();
+        // A loading scenario deliberately owns queries whose fixture never settles. The scenario
+        // transition is complete once the adapter and UI state are installed; awaiting its query
+        // refresh would keep the catalog locked forever and make the next scenario unreachable.
+        void refreshActiveProductQueries();
       }),
     [beginTransition, clearInactiveProductQueries, queryClient, refreshActiveProductQueries],
   );

@@ -11,7 +11,7 @@
  * the family/line multi-select and every column facet filter client-side over the fetched rows,
  * decision 3); a matrix row click sets activePart, the seam the pinout map (04-03) consumes.
  */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useStmMcus, useStmStatus, useStmPinout } from "../api/stmQueries";
 import { ApiError } from "../api/client";
 import type { StmMcusArgs } from "../api/client";
@@ -62,6 +62,7 @@ function scopeToArgs(scope: StmScope): StmMcusArgs {
 export function StmViewerPage() {
   const preview = useScenarioUiState().stm;
   const [tab, setTab] = useState<StmTab>(preview?.tab ?? "explorer");
+  const priorScenarioTab = useRef<StmTab | null>(null);
   const [scope, setScope] = useState<StmScope>(EMPTY_SCOPE);
   const [activePart, setActivePart] = useState<string | null>(preview?.activePart ?? null);
   const [selectedPosition, setSelectedPosition] = useState<string | null>(preview?.selectedPosition ?? null);
@@ -71,6 +72,19 @@ export function StmViewerPage() {
   const args = useMemo(() => scopeToArgs(scope), [scope]);
   const mcus = useStmMcus(args);
   const pinout = useStmPinout(activePart);
+
+  useEffect(() => {
+    if (!preview) {
+      if (priorScenarioTab.current !== null) setTab(priorScenarioTab.current);
+      priorScenarioTab.current = null;
+      return;
+    }
+    if (priorScenarioTab.current === null) priorScenarioTab.current = tab;
+    setTab(preview.tab ?? "explorer");
+    // Each preview object is an explicit registry transition. `tab` is deliberately excluded so
+    // owner interaction inside a preview cannot replace the real-data tab restored on exit.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [preview]);
 
   // A new part clears any pin selection (the previous pin does not exist on the new package).
   useEffect(() => {

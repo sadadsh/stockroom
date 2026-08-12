@@ -174,6 +174,8 @@ export function DesignStudioShell({ children }: { children: ReactNode }) {
     <div
       className={studio.enabled ? "fixed inset-0 z-[190] flex flex-col overflow-hidden bg-canvas text-t1" : "contents"}
       data-studio-mode={studio.enabled ? mode : undefined}
+      data-scenario-id={studio.activeScenario?.id ?? "global.real-data"}
+      data-preview-live-product-requests={studio.activeScenario ? "0" : undefined}
     >
       {studio.enabled ? (
         <DesignStudioToolbar

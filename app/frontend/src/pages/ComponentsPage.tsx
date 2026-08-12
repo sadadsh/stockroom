@@ -59,6 +59,7 @@ interface ComponentFilters {
 }
 
 type FiltersAction =
+  | { type: "replaced"; value: ComponentFilters }
   | { type: "query"; value: string }
   | { type: "category"; value: string | null }
   | { type: "completeOnly"; value: boolean }
@@ -87,6 +88,8 @@ function initialFilters(): ComponentFilters {
 
 function filtersReducer(state: ComponentFilters, action: FiltersAction): ComponentFilters {
   switch (action.type) {
+    case "replaced":
+      return action.value;
     case "query":
       return { ...state, query: action.value };
     case "category":
@@ -126,11 +129,15 @@ export function ComponentsPage() {
       : persisted;
   });
   const { query: search, category, completeOnly, duplicatesOnly } = filters;
+  const priorScenarioFilters = useRef<ComponentFilters | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(
     () => scenarioUi.components?.selectedId === undefined
       ? readUiSession().selected_ids.component
       : scenarioUi.components.selectedId,
   );
+  const displayedSelectedId = scenarioUi.components?.selectedId === undefined
+    ? selectedId
+    : scenarioUi.components.selectedId;
   const [searchOpen, setSearchOpen] = useState(
     () => readUiSession().open_surface === "search",
   );
@@ -139,6 +146,30 @@ export function ComponentsPage() {
   const priorSearchOpen = useRef<boolean | null>(null);
   const [listScrollElement, setListScrollElement] =
     useState<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const preview = scenarioUi.components;
+    if (!preview) {
+      if (priorScenarioFilters.current) {
+        dispatchFilters({ type: "replaced", value: priorScenarioFilters.current });
+      }
+      priorScenarioFilters.current = null;
+      return;
+    }
+    if (priorScenarioFilters.current === null) priorScenarioFilters.current = filters;
+    dispatchFilters({
+      type: "replaced",
+      value: {
+        query: preview.filters?.query ?? "",
+        category: preview.filters?.category ?? null,
+        completeOnly: preview.filters?.completeOnly ?? false,
+        duplicatesOnly: preview.filters?.duplicatesOnly ?? false,
+      },
+    });
+    // A scenario object is the transition boundary. The prior filters are captured exactly once
+    // and restored on exit; including `filters` here would overwrite that saved real-data state.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scenarioUi.components]);
 
   const session = useUiSession();
   const partsQuery = usePartsQuery({ q: search, category, completeOnly });
@@ -197,7 +228,7 @@ export function ComponentsPage() {
   usePickerScrollAnchor(
     listScrollElement,
     !partsQuery.isLoading && !partsQuery.error,
-    selectedId,
+    displayedSelectedId,
   );
   useSearchHotkey(searchOpen, () => setSearchOpen(true));
 
@@ -293,7 +324,14 @@ export function ComponentsPage() {
   // list, so re-selecting parts[0] here would re-pick a just-deleted or
   // filtered-out part and fire a wasted, guaranteed-404 workspace request.
   const partsFetching = partsQuery.isFetching;
-  const activeComponent = session.active_component;
+  const activeComponent = scenarioUi.components?.selectedId === undefined
+    ? session.active_component
+    : scenarioUi.components.selectedId;
+  const scenarioWorkspaceKey = JSON.stringify({
+    surface: scenarioUi.components?.surface ?? null,
+    preview: scenarioUi.components?.preview ?? null,
+    confirmDelete: scenarioUi.components?.confirmDelete ?? false,
+  });
   useEffect(() => {
     if (partsFetching) return;
     if (scenarioUi.components?.autoSelect === false) return;
@@ -356,7 +394,7 @@ export function ComponentsPage() {
           isLoading={partsQuery.isLoading}
           error={scenarioServiceError ? new ApiError(0, scenarioServiceError) : partsQuery.error}
           parts={parts}
-          selectedId={selectedId}
+          selectedId={displayedSelectedId}
           onSelect={openComponent}
           scrollElement={listScrollElement}
           onScrollElement={setListScrollElement}
@@ -373,7 +411,7 @@ export function ComponentsPage() {
           <div className="min-h-0 min-w-0 flex-1 overflow-hidden">
             {activeComponent ? (
               <ComponentWorkspace
-                key={activeComponent}
+                key={`${activeComponent}:${scenarioWorkspaceKey}`}
                 componentId={activeComponent}
                 onDeleted={componentDeleted}
                 initialSurface={scenarioUi.components?.surface}

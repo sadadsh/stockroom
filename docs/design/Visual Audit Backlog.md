@@ -21,6 +21,31 @@ and `P2` meaningful fit, finish, or clarity debt.
 
 ## Acceptance Captures
 
+### 2026-08-11 — Exhaustive Design Studio Browser Matrix
+
+- Capture layer: the production frontend and real local Stockroom service through locked Chromium,
+  using a task-owned configuration. The production registry emitted 190 cases; each case was
+  captured in dark and light themes at 1,366 x 872, 1,600 x 1,000, and 1,920 x 1,200, for 1,140
+  scenario frames. Representative click-through and autosave-after-restart frames are retained
+  beside the matrix under
+  `.work plans/sdd/2026-08-11-in-app-design-studio/task-15-evidence/browser-source-final/browser/`.
+- Intended claim: every production scenario exposes its case identity and registered target;
+  preview fixtures produce no external request or product mutation; Browse, Inspect, Arrange,
+  inspector domains, collapsed rails, dark/light contrast, and restart persistence remain usable
+  throughout the supported desktop sizes.
+- Acceptance result: functional pass at the browser-rendered product layer. The audit applied the
+  existing Stockroom hierarchy and density contract while checking typography hierarchy, spacing
+  and alignment, control-state affordances, loading/empty/error states, contrast, and icon
+  consistency. Sequential scenario testing exposed and corrected stale capture, component-filter,
+  workspace-selection, and STM-tab state. Existing dense-settings and muted-helper-text findings
+  continue to own their established scopes; VA-052 records one new Studio-specific framing issue.
+- Windows boundary: a Computer Use inspection found one real Stockroom WebView2 window, but its
+  process belonged to the separate `Catalog Workspace Convergence` worktree and exposed no Design
+  Studio entry. The task did not close, modify, or relabel that owner-controlled instance. A package
+  build for this worktree refused safely because that instance owned coordinator authority, so
+  current-source packaged entry/exit, editor modes, persistence, refusal, and promotion states are
+  still required before calling the native layer accepted.
+
 ### 2026-08-03 — Source-Backed Dev Mode
 
 - Capture layer: Computer Use against the current source in the real Windows pywebview/WebView2
@@ -283,6 +308,7 @@ and `P2` meaningful fit, finish, or clarity debt.
 | VA-050 | P1 | Components, Complete Part | The visible 1,386 × 893 dark WebView2 Proof 7 frame exposed internal requirement keys verbatim in the lead state: `required projected references are absent: kicad_symbol, kicad_footprint, kicad_model, altium_symbol, altium_footprint`. This competes with the otherwise plain-language KiCad/Shared/Altium checklist and makes a normal missing-files state read like a backend exception. | The lead state says which user-facing files are needed without schema keys; exact requirement keys remain available only in diagnostics/evidence. |
 | VA-051 | P1 | Windows first launch | The browser-downloaded 0.6.0 EXE can remain completely invisible while it unpacks and starts the continuous runtime. A fresh-machine acquisition or runtime failure has no user-facing error, and duplicate launches are easy. | Show a branded window or splash within two seconds, report each bounded bootstrap phase, make one launch authoritative, and surface an actionable failure instead of remaining invisible. Verify from a browser-downloaded asset on a clean Windows machine. |
 | VA-051 | P1 | Components, Representations, CAD Variants | The real TPS62130RGTR source-host readback shows `33 Retained`, including 17 KiCad and 16 Altium Ultra Librarian variants, so repeated acquisition turns the primary inspection surface into a long wall of visually identical `Preferred` cards. The active all-five-role pair is correct, but history overwhelms comparison and makes a successful one-click workflow look unfinished. | Identical source-receipt evidence reuses one retained same-download pair regardless of nondeterministic generated timestamps. Existing duplicates are grouped or collapsed without deleting immutable originals; the active pair and genuinely different provider/geometry variants remain immediately comparable at 1,024 and 1,384 px widths. |
+| VA-052 | P2 | Design Studio preview canvas | At the 1,920 px preset and 100% zoom, the virtual product viewport is wider than the remaining canvas after the scenario rail and inspector. The retained light Settings frame starts partway through headings and labels, so a static capture cannot distinguish intentional pan position from clipping, and no persistent framing cue is visible. | The Studio initially fits the complete selected viewport or visibly identifies the pan position and offers a one-action Fit control. Automated acceptance proves pan/fit with keyboard and pointer input at 1,366, 1,600, and 1,920 px, and retained frames show both edges without hiding the editor rails. |
 
 ## Resolved Findings
 

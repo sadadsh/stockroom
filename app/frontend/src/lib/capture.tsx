@@ -32,6 +32,7 @@ import type {
   WorkflowEvent,
 } from "../api/types";
 import { readUiSession, updateUiSession } from "./uiSession";
+import { useScenarioUiState } from "../design-studio/scenarioState";
 import {
   CaptureBusyError,
   captureInFlight,
@@ -351,6 +352,9 @@ export function CaptureProvider({
   /** A deterministic restored host handoff used by real-app Design Studio previews. */
   initialCapture?: { state: CaptureState; batchId: string; itemId: string };
 }) {
+  const scenarioUi = useScenarioUiState();
+  const scenarioCapture = scenarioUi.capture;
+  const scenarioProvider = scenarioUi.provider;
   const [state, setState] = useState<CaptureState>(() => initialCapture?.state ?? IDLE);
   const stateRef = useRef(state);
   // Synced in a layout effect, not during render: render can be replayed or thrown away, and the
@@ -889,9 +893,36 @@ export function CaptureProvider({
   // `useCapture` consumer in the application, including surfaces with nothing to redraw. Named
   // `captureApi`, not `api`: this component reads the API CLIENT as `api`, and shadowing it here
   // silently routes every request into this object.
+  const previewState = useMemo<CaptureState | null>(
+    () => scenarioCapture || scenarioProvider?.state === "download-armed"
+      ? {
+          ...IDLE,
+          partId: "component-ti-lm358dr",
+          workflowItemId: "item-design-studio-preview",
+          partName: "LM358",
+          status: scenarioCapture?.status ?? (
+            scenarioProvider?.state === "complete" ? "done"
+              : scenarioProvider?.state === "timeout" ? "timed-out"
+                : scenarioProvider?.state === "unavailable" ? "unavailable"
+                  : scenarioProvider?.state === "error" || scenarioProvider?.state === "canceled" ? "error"
+                    : scenarioProvider?.state === "loading" ? "resolving"
+                      : scenarioProvider?.state === "one-file" || scenarioProvider?.state === "multiple-files" || scenarioProvider?.state === "partial-retained" || scenarioProvider?.state === "returned-to-stockroom" ? "receiving"
+                        : "window-open"
+          ),
+          message: "Deterministic Design Studio capture preview.",
+          url: "https://example.invalid/ultralibrarian/lm358dr",
+          routeToken: "route-design-studio-preview",
+          vendor: "ultralibrarian",
+          needs: ["kicad_symbol", "kicad_footprint", "kicad_model", "altium_symbol", "altium_footprint"],
+          backgrounded: scenarioCapture?.backgrounded ?? scenarioProvider?.state === "returned-to-stockroom",
+        }
+      : null,
+    [scenarioCapture, scenarioProvider],
+  );
+  const activeState = previewState ?? state;
   const captureApi = useMemo<CaptureApi>(
     () => ({
-      active: state,
+      active: activeState,
       start,
       reset,
       keepWorking,
@@ -900,7 +931,7 @@ export function CaptureProvider({
       requestReopen,
       requestOpenFor,
     }),
-    [state, start, reset, keepWorking, showProvider, onReopen, requestReopen, requestOpenFor],
+    [activeState, start, reset, keepWorking, showProvider, onReopen, requestReopen, requestOpenFor],
   );
 
   return <CaptureContext.Provider value={captureApi}>{children}</CaptureContext.Provider>;

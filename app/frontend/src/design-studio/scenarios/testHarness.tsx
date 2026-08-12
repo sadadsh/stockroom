@@ -5,11 +5,11 @@ import { useEffect, type ReactNode } from "react";
 import App from "../../App";
 import { AddPartProvider } from "../../lib/addPart";
 import { CaptureProvider } from "../../lib/capture";
-import type { CaptureState } from "../../lib/captureRequirements";
 import { RouterProvider } from "../../lib/router";
 import { ThemeProvider } from "../../lib/theme";
 import { ToastProvider } from "../../lib/toast";
 import { DesignStudioProvider, useDesignStudio } from "../DesignStudioProvider";
+import { DesignStudioShell } from "../../components/design-mode/DesignStudioShell";
 import { bootstrapScenarioRegistry } from ".";
 
 function scenarioTarget(target: string): Element | null {
@@ -46,29 +46,6 @@ export async function mountScenario(id: string) {
   const user = userEvent.setup();
   const scenario = bootstrapScenarioRegistry.scenarioById(id);
   if (!scenario) throw new Error(`Unknown Design Studio scenario '${id}'.`);
-  const capturePreview = scenario.initialUi.capture;
-  const initialCapture = capturePreview || scenario.initialUi.provider?.state === "download-armed"
-    ? {
-        batchId: "batch-provider-fixture",
-        itemId: "item-provider-fixture",
-        state: {
-          partId: "component-ti-lm358dr",
-          workflowItemId: "item-provider-fixture",
-          partName: "LM358",
-          status: capturePreview?.status ?? "window-open",
-          message: "The provider page is ready for the person to continue.",
-          url: "https://example.invalid/ultralibrarian/lm358dr",
-          routeToken: "route-provider-fixture",
-          vendor: "ultralibrarian",
-          needs: ["kicad_symbol", "kicad_footprint", "kicad_model", "altium_symbol", "altium_footprint"],
-          received: {},
-          backgrounded: capturePreview?.backgrounded ?? false,
-          providerOutcomes: [],
-          completionEvidence: null,
-          completionEvidenceReported: false,
-        } satisfies CaptureState,
-      }
-    : undefined;
   let activateScenario: ((scenarioId: string) => Promise<void>) | undefined;
   const expose = (activate: (scenarioId: string) => Promise<void>) => {
     activateScenario = activate;
@@ -79,7 +56,7 @@ export async function mountScenario(id: string) {
         <DesignStudioProvider>
           <ToastProvider>
             <RouterProvider initial="components">
-              <CaptureProvider initialCapture={initialCapture}>
+              <CaptureProvider>
                 <AddPartProvider>
                   <ScenarioProbe expose={expose} />
                   {children}
@@ -94,7 +71,7 @@ export async function mountScenario(id: string) {
   const view = render(tree(null));
   await waitFor(() => expect(activateScenario).toBeDefined());
   await act(async () => activateScenario?.(id));
-  view.rerender(tree(<App />));
+  view.rerender(tree(<DesignStudioShell><App /></DesignStudioShell>));
   await waitFor(() => expect(scenarioTarget("shell.root")).toBeInTheDocument());
   for (const target of scenario?.expectedTargets ?? []) {
     await waitFor(() => expect(scenarioTarget(target)).toBeInTheDocument());

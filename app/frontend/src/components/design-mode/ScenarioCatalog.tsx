@@ -47,6 +47,7 @@ export function ScenarioCatalog() {
               <button
                 key={scenario.id}
                 type="button"
+                data-scenario-catalog-id={scenario.id}
                 aria-pressed={active}
                 disabled={activating !== ""}
                 onClick={() => void activate(scenario.id)}

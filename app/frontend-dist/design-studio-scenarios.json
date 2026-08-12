@@ -1,0 +1,2702 @@
+{
+  "schemaVersion": 1,
+  "scenarios": [
+    {
+      "id": "global.real-data",
+      "title": "Real Data",
+      "area": "global",
+      "group": "Global",
+      "route": "components",
+      "expectedTargets": [
+        "shell.root"
+      ],
+      "coverage": [
+        "route:components",
+        "state:real-data"
+      ]
+    },
+    {
+      "id": "global.onboarding.open",
+      "title": "Onboarding Open",
+      "area": "global",
+      "group": "Global",
+      "route": "components",
+      "expectedTargets": [
+        "onboarding.gate"
+      ],
+      "coverage": [
+        "route:components",
+        "state:onboarding-open"
+      ]
+    },
+    {
+      "id": "global.onboarding.create",
+      "title": "Onboarding Create",
+      "area": "global",
+      "group": "Global",
+      "route": "components",
+      "expectedTargets": [
+        "onboarding.gate"
+      ],
+      "coverage": [
+        "route:components",
+        "state:onboarding-create"
+      ]
+    },
+    {
+      "id": "global.onboarding.clone",
+      "title": "Onboarding Clone",
+      "area": "global",
+      "group": "Global",
+      "route": "components",
+      "expectedTargets": [
+        "onboarding.gate"
+      ],
+      "coverage": [
+        "route:components",
+        "state:onboarding-clone"
+      ]
+    },
+    {
+      "id": "global.onboarding.error",
+      "title": "Onboarding Error",
+      "area": "global",
+      "group": "Global",
+      "route": "components",
+      "expectedTargets": [
+        "toast.status"
+      ],
+      "coverage": [
+        "route:components",
+        "state:onboarding-error"
+      ]
+    },
+    {
+      "id": "global.onboarding.create-error",
+      "title": "Onboarding Create-Error",
+      "area": "global",
+      "group": "Global",
+      "route": "components",
+      "expectedTargets": [
+        "toast.status"
+      ],
+      "coverage": [
+        "route:components",
+        "state:onboarding-create-error"
+      ]
+    },
+    {
+      "id": "global.onboarding.clone-error",
+      "title": "Onboarding Clone-Error",
+      "area": "global",
+      "group": "Global",
+      "route": "components",
+      "expectedTargets": [
+        "toast.status"
+      ],
+      "coverage": [
+        "route:components",
+        "state:onboarding-clone-error"
+      ]
+    },
+    {
+      "id": "global.about.open",
+      "title": "About Open",
+      "area": "global",
+      "group": "Global",
+      "route": "components",
+      "expectedTargets": [
+        "about.root"
+      ],
+      "coverage": [
+        "route:components",
+        "state:about-open"
+      ]
+    },
+    {
+      "id": "global.about.current",
+      "title": "About Current",
+      "area": "global",
+      "group": "Global",
+      "route": "components",
+      "expectedTargets": [
+        "about.root"
+      ],
+      "coverage": [
+        "route:components",
+        "state:about-current"
+      ]
+    },
+    {
+      "id": "global.about.update-available",
+      "title": "About Update-Available",
+      "area": "global",
+      "group": "Global",
+      "route": "components",
+      "expectedTargets": [
+        "about.root"
+      ],
+      "coverage": [
+        "route:components",
+        "state:about-update-available"
+      ]
+    },
+    {
+      "id": "global.about.stale",
+      "title": "About Stale",
+      "area": "global",
+      "group": "Global",
+      "route": "components",
+      "expectedTargets": [
+        "about.root"
+      ],
+      "coverage": [
+        "route:components",
+        "state:about-stale"
+      ]
+    },
+    {
+      "id": "global.rail.expanded",
+      "title": "Rail Expanded",
+      "area": "global",
+      "group": "Global",
+      "route": "components",
+      "expectedTargets": [
+        "shell.root"
+      ],
+      "coverage": [
+        "route:components",
+        "state:rail-expanded"
+      ]
+    },
+    {
+      "id": "global.rail.collapsed",
+      "title": "Rail Collapsed",
+      "area": "global",
+      "group": "Global",
+      "route": "components",
+      "expectedTargets": [
+        "shell.root"
+      ],
+      "coverage": [
+        "route:components",
+        "state:rail-collapsed"
+      ]
+    },
+    {
+      "id": "global.theme.dark",
+      "title": "Theme Dark",
+      "area": "global",
+      "group": "Global",
+      "route": "components",
+      "expectedTargets": [
+        "shell.root"
+      ],
+      "coverage": [
+        "route:components",
+        "state:theme-dark"
+      ]
+    },
+    {
+      "id": "global.theme.light",
+      "title": "Theme Light",
+      "area": "global",
+      "group": "Global",
+      "route": "components",
+      "expectedTargets": [
+        "shell.root"
+      ],
+      "coverage": [
+        "route:components",
+        "state:theme-light"
+      ]
+    },
+    {
+      "id": "global.update.current",
+      "title": "Update Current",
+      "area": "global",
+      "group": "Global",
+      "route": "components",
+      "expectedTargets": [
+        "shell.root"
+      ],
+      "coverage": [
+        "route:components",
+        "state:update-current"
+      ]
+    },
+    {
+      "id": "global.update.available",
+      "title": "Update Available",
+      "area": "global",
+      "group": "Global",
+      "route": "components",
+      "expectedTargets": [
+        "rail.update"
+      ],
+      "coverage": [
+        "route:components",
+        "state:update-available"
+      ]
+    },
+    {
+      "id": "global.update.updating",
+      "title": "Update Updating",
+      "area": "global",
+      "group": "Global",
+      "route": "components",
+      "expectedTargets": [
+        "rail.update"
+      ],
+      "coverage": [
+        "route:components",
+        "state:update-updating"
+      ]
+    },
+    {
+      "id": "global.update.error",
+      "title": "Update Error",
+      "area": "global",
+      "group": "Global",
+      "route": "components",
+      "expectedTargets": [
+        "shell.root"
+      ],
+      "coverage": [
+        "route:components",
+        "state:update-error"
+      ]
+    },
+    {
+      "id": "global.add-parts.empty",
+      "title": "Add-Parts Empty",
+      "area": "global",
+      "group": "Global",
+      "route": "components",
+      "expectedTargets": [
+        "addpart.root"
+      ],
+      "coverage": [
+        "route:components",
+        "state:add-parts-empty"
+      ]
+    },
+    {
+      "id": "global.add-parts.validating",
+      "title": "Add-Parts Validating",
+      "area": "global",
+      "group": "Global",
+      "route": "components",
+      "expectedTargets": [
+        "addpart.root"
+      ],
+      "coverage": [
+        "route:components",
+        "state:add-parts-validating"
+      ]
+    },
+    {
+      "id": "global.add-parts.exact",
+      "title": "Add-Parts Exact",
+      "area": "global",
+      "group": "Global",
+      "route": "components",
+      "expectedTargets": [
+        "addpart.root"
+      ],
+      "coverage": [
+        "route:components",
+        "state:add-parts-exact"
+      ]
+    },
+    {
+      "id": "global.add-parts.mismatch",
+      "title": "Add-Parts Mismatch",
+      "area": "global",
+      "group": "Global",
+      "route": "components",
+      "expectedTargets": [
+        "addpart.root"
+      ],
+      "coverage": [
+        "route:components",
+        "state:add-parts-mismatch"
+      ]
+    },
+    {
+      "id": "global.add-parts.duplicate",
+      "title": "Add-Parts Duplicate",
+      "area": "global",
+      "group": "Global",
+      "route": "components",
+      "expectedTargets": [
+        "addpart.root"
+      ],
+      "coverage": [
+        "route:components",
+        "state:add-parts-duplicate"
+      ]
+    },
+    {
+      "id": "global.add-parts.failure",
+      "title": "Add-Parts Failure",
+      "area": "global",
+      "group": "Global",
+      "route": "components",
+      "expectedTargets": [
+        "addpart.root"
+      ],
+      "coverage": [
+        "route:components",
+        "state:add-parts-failure"
+      ]
+    },
+    {
+      "id": "global.search.initial",
+      "title": "Search Initial",
+      "area": "global",
+      "group": "Global",
+      "route": "components",
+      "expectedTargets": [
+        "search.root"
+      ],
+      "coverage": [
+        "route:components",
+        "state:search-initial"
+      ]
+    },
+    {
+      "id": "global.search.filtered",
+      "title": "Search Filtered",
+      "area": "global",
+      "group": "Global",
+      "route": "components",
+      "expectedTargets": [
+        "search.root"
+      ],
+      "coverage": [
+        "route:components",
+        "state:search-filtered"
+      ]
+    },
+    {
+      "id": "global.search.empty",
+      "title": "Search Empty",
+      "area": "global",
+      "group": "Global",
+      "route": "components",
+      "expectedTargets": [
+        "search.root"
+      ],
+      "coverage": [
+        "route:components",
+        "state:search-empty"
+      ]
+    },
+    {
+      "id": "global.search.error",
+      "title": "Search Error",
+      "area": "global",
+      "group": "Global",
+      "route": "components",
+      "expectedTargets": [
+        "search.root"
+      ],
+      "coverage": [
+        "route:components",
+        "state:search-error"
+      ]
+    },
+    {
+      "id": "global.confirmation.neutral",
+      "title": "Confirmation Neutral",
+      "area": "global",
+      "group": "Global",
+      "route": "components",
+      "expectedTargets": [
+        "confirm.root"
+      ],
+      "coverage": [
+        "route:components",
+        "state:confirmation-neutral"
+      ]
+    },
+    {
+      "id": "global.confirmation.destructive",
+      "title": "Confirmation Destructive",
+      "area": "global",
+      "group": "Global",
+      "route": "components",
+      "expectedTargets": [
+        "confirm.root"
+      ],
+      "coverage": [
+        "route:components",
+        "state:confirmation-destructive"
+      ]
+    },
+    {
+      "id": "global.toast.neutral",
+      "title": "Toast Neutral",
+      "area": "global",
+      "group": "Global",
+      "route": "components",
+      "expectedTargets": [
+        "toast.status"
+      ],
+      "coverage": [
+        "route:components",
+        "state:toast-neutral"
+      ]
+    },
+    {
+      "id": "global.toast.success",
+      "title": "Toast Success",
+      "area": "global",
+      "group": "Global",
+      "route": "components",
+      "expectedTargets": [
+        "toast.status"
+      ],
+      "coverage": [
+        "route:components",
+        "state:toast-success"
+      ]
+    },
+    {
+      "id": "global.toast.error",
+      "title": "Toast Error",
+      "area": "global",
+      "group": "Global",
+      "route": "components",
+      "expectedTargets": [
+        "toast.status"
+      ],
+      "coverage": [
+        "route:components",
+        "state:toast-error"
+      ]
+    },
+    {
+      "id": "global.capture.active",
+      "title": "Capture Active",
+      "area": "global",
+      "group": "Global",
+      "route": "components",
+      "expectedTargets": [
+        "shell.root"
+      ],
+      "coverage": [
+        "route:components",
+        "state:capture-active"
+      ]
+    },
+    {
+      "id": "global.capture.backgrounded",
+      "title": "Capture Backgrounded",
+      "area": "global",
+      "group": "Global",
+      "route": "components",
+      "expectedTargets": [
+        "capture.status"
+      ],
+      "coverage": [
+        "route:components",
+        "state:capture-backgrounded"
+      ]
+    },
+    {
+      "id": "global.capture.complete",
+      "title": "Capture Complete",
+      "area": "global",
+      "group": "Global",
+      "route": "components",
+      "expectedTargets": [
+        "capture.status"
+      ],
+      "coverage": [
+        "route:components",
+        "state:capture-complete"
+      ]
+    },
+    {
+      "id": "global.capture.error",
+      "title": "Capture Error",
+      "area": "global",
+      "group": "Global",
+      "route": "components",
+      "expectedTargets": [
+        "capture.status"
+      ],
+      "coverage": [
+        "route:components",
+        "state:capture-error"
+      ]
+    },
+    {
+      "id": "global.offline",
+      "title": "Offline",
+      "area": "global",
+      "group": "Global",
+      "route": "components",
+      "expectedTargets": [
+        "shell.root"
+      ],
+      "coverage": [
+        "route:components",
+        "state:offline"
+      ]
+    },
+    {
+      "id": "global.service-error",
+      "title": "Service-Error",
+      "area": "global",
+      "group": "Global",
+      "route": "components",
+      "expectedTargets": [
+        "components.list-unreachable"
+      ],
+      "coverage": [
+        "route:components",
+        "state:service-error"
+      ]
+    },
+    {
+      "id": "global.stale",
+      "title": "Stale",
+      "area": "global",
+      "group": "Global",
+      "route": "components",
+      "expectedTargets": [
+        "shell.root"
+      ],
+      "coverage": [
+        "route:components",
+        "state:stale"
+      ]
+    },
+    {
+      "id": "global.source-promotion.unavailable",
+      "title": "Source-Promotion Unavailable",
+      "area": "global",
+      "group": "Global",
+      "route": "components",
+      "expectedTargets": [
+        "shell.root"
+      ],
+      "coverage": [
+        "route:components",
+        "state:source-promotion-unavailable"
+      ]
+    },
+    {
+      "id": "global.source-promotion.ready",
+      "title": "Source-Promotion Ready",
+      "area": "global",
+      "group": "Global",
+      "route": "components",
+      "expectedTargets": [
+        "shell.root"
+      ],
+      "coverage": [
+        "route:components",
+        "state:source-promotion-ready"
+      ]
+    },
+    {
+      "id": "global.source-promotion.blocked",
+      "title": "Source-Promotion Blocked",
+      "area": "global",
+      "group": "Global",
+      "route": "components",
+      "expectedTargets": [
+        "shell.root"
+      ],
+      "coverage": [
+        "route:components",
+        "state:source-promotion-blocked"
+      ]
+    },
+    {
+      "id": "global.source-promotion.success",
+      "title": "Source-Promotion Success",
+      "area": "global",
+      "group": "Global",
+      "route": "components",
+      "expectedTargets": [
+        "shell.root"
+      ],
+      "coverage": [
+        "route:components",
+        "state:source-promotion-success"
+      ]
+    },
+    {
+      "id": "global.source-promotion.failure",
+      "title": "Source-Promotion Failure",
+      "area": "global",
+      "group": "Global",
+      "route": "components",
+      "expectedTargets": [
+        "shell.root"
+      ],
+      "coverage": [
+        "route:components",
+        "state:source-promotion-failure"
+      ]
+    },
+    {
+      "id": "components.full-data",
+      "title": "Full Data",
+      "area": "components",
+      "group": "Components",
+      "route": "components",
+      "expectedTargets": [
+        "components.root",
+        "component-browser.cad-asset",
+        "component-browser.offers-table",
+        "component-browser.documents",
+        "component-browser.related",
+        "component-browser.provenance"
+      ],
+      "coverage": [
+        "route:components",
+        "state:full-data"
+      ]
+    },
+    {
+      "id": "components.empty",
+      "title": "Empty Library",
+      "area": "components",
+      "group": "Components",
+      "route": "components",
+      "expectedTargets": [
+        "components.empty"
+      ],
+      "coverage": [
+        "route:components",
+        "state:empty"
+      ]
+    },
+    {
+      "id": "components.loading",
+      "title": "Loading",
+      "area": "components",
+      "group": "Components",
+      "route": "components",
+      "expectedTargets": [
+        "components.list-loading"
+      ],
+      "coverage": [
+        "route:components",
+        "state:loading"
+      ]
+    },
+    {
+      "id": "components.server-error",
+      "title": "Server Error",
+      "area": "components",
+      "group": "Components",
+      "route": "components",
+      "expectedTargets": [
+        "components.list-failed"
+      ],
+      "coverage": [
+        "route:components",
+        "state:server-error"
+      ]
+    },
+    {
+      "id": "components.no-selection",
+      "title": "No Selection",
+      "area": "components",
+      "group": "Components",
+      "route": "components",
+      "expectedTargets": [
+        "component-browser.empty"
+      ],
+      "coverage": [
+        "route:components",
+        "state:no-selection"
+      ]
+    },
+    {
+      "id": "components.no-matches",
+      "title": "No Matches",
+      "area": "components",
+      "group": "Components",
+      "route": "components",
+      "expectedTargets": [
+        "components.list-no-match"
+      ],
+      "coverage": [
+        "route:components",
+        "state:no-matches"
+      ]
+    },
+    {
+      "id": "components.complete-only",
+      "title": "Complete Only",
+      "area": "components",
+      "group": "Components",
+      "route": "components",
+      "expectedTargets": [
+        "components.root"
+      ],
+      "coverage": [
+        "route:components",
+        "state:complete-only"
+      ]
+    },
+    {
+      "id": "components.duplicates-only",
+      "title": "Duplicates Only",
+      "area": "components",
+      "group": "Components",
+      "route": "components",
+      "expectedTargets": [
+        "components.root"
+      ],
+      "coverage": [
+        "route:components",
+        "state:duplicates-only"
+      ]
+    },
+    {
+      "id": "components.category-filter",
+      "title": "Category Filter",
+      "area": "components",
+      "group": "Components",
+      "route": "components",
+      "expectedTargets": [
+        "components.root"
+      ],
+      "coverage": [
+        "route:components",
+        "state:category-filter"
+      ]
+    },
+    {
+      "id": "components.incomplete",
+      "title": "Incomplete",
+      "area": "components",
+      "group": "Components",
+      "route": "components",
+      "expectedTargets": [
+        "components.root"
+      ],
+      "coverage": [
+        "route:components",
+        "state:incomplete"
+      ]
+    },
+    {
+      "id": "components.missing-model",
+      "title": "Missing Model",
+      "area": "components",
+      "group": "Components",
+      "route": "components",
+      "expectedTargets": [
+        "components.root"
+      ],
+      "coverage": [
+        "route:components",
+        "state:missing-model"
+      ]
+    },
+    {
+      "id": "components.missing-symbol",
+      "title": "Missing Symbol",
+      "area": "components",
+      "group": "Components",
+      "route": "components",
+      "expectedTargets": [
+        "components.root"
+      ],
+      "coverage": [
+        "route:components",
+        "state:missing-symbol"
+      ]
+    },
+    {
+      "id": "components.missing-footprint",
+      "title": "Missing Footprint",
+      "area": "components",
+      "group": "Components",
+      "route": "components",
+      "expectedTargets": [
+        "components.root"
+      ],
+      "coverage": [
+        "route:components",
+        "state:missing-footprint"
+      ]
+    },
+    {
+      "id": "components.cad-source-conflict",
+      "title": "CAD Source Conflict",
+      "area": "components",
+      "group": "Components",
+      "route": "components",
+      "expectedTargets": [
+        "components.root"
+      ],
+      "coverage": [
+        "route:components",
+        "state:cad-source-conflict"
+      ]
+    },
+    {
+      "id": "components.spec-conflict",
+      "title": "Specification Conflict",
+      "area": "components",
+      "group": "Components",
+      "route": "components",
+      "expectedTargets": [
+        "components.root"
+      ],
+      "coverage": [
+        "route:components",
+        "state:spec-conflict"
+      ]
+    },
+    {
+      "id": "components.pinout-absent",
+      "title": "Pinout Absent",
+      "area": "components",
+      "group": "Components",
+      "route": "components",
+      "expectedTargets": [
+        "components.root"
+      ],
+      "coverage": [
+        "route:components",
+        "state:pinout-absent"
+      ]
+    },
+    {
+      "id": "components.sourcing-sparse",
+      "title": "Sparse Sourcing",
+      "area": "components",
+      "group": "Components",
+      "route": "components",
+      "expectedTargets": [
+        "components.root"
+      ],
+      "coverage": [
+        "route:components",
+        "state:sourcing-sparse"
+      ]
+    },
+    {
+      "id": "components.offer-failure",
+      "title": "Offer Failure",
+      "area": "components",
+      "group": "Components",
+      "route": "components",
+      "expectedTargets": [
+        "components.root"
+      ],
+      "coverage": [
+        "route:components",
+        "state:offer-failure"
+      ]
+    },
+    {
+      "id": "components.documents-empty",
+      "title": "Documents Empty",
+      "area": "components",
+      "group": "Components",
+      "route": "components",
+      "expectedTargets": [
+        "components.root"
+      ],
+      "coverage": [
+        "route:components",
+        "state:documents-empty"
+      ]
+    },
+    {
+      "id": "components.related-empty",
+      "title": "Related Empty",
+      "area": "components",
+      "group": "Components",
+      "route": "components",
+      "expectedTargets": [
+        "components.root"
+      ],
+      "coverage": [
+        "route:components",
+        "state:related-empty"
+      ]
+    },
+    {
+      "id": "components.provenance-conflict",
+      "title": "Provenance Conflict",
+      "area": "components",
+      "group": "Components",
+      "route": "components",
+      "expectedTargets": [
+        "components.root"
+      ],
+      "coverage": [
+        "route:components",
+        "state:provenance-conflict"
+      ]
+    },
+    {
+      "id": "components.preview-3d",
+      "title": "3D Preview",
+      "area": "components",
+      "group": "Components",
+      "route": "components",
+      "expectedTargets": [
+        "components.root"
+      ],
+      "coverage": [
+        "route:components",
+        "state:preview-3d"
+      ]
+    },
+    {
+      "id": "components.preview-symbol",
+      "title": "Symbol Preview",
+      "area": "components",
+      "group": "Components",
+      "route": "components",
+      "expectedTargets": [
+        "components.root"
+      ],
+      "coverage": [
+        "route:components",
+        "state:preview-symbol"
+      ]
+    },
+    {
+      "id": "components.preview-footprint",
+      "title": "Footprint Preview",
+      "area": "components",
+      "group": "Components",
+      "route": "components",
+      "expectedTargets": [
+        "components.root"
+      ],
+      "coverage": [
+        "route:components",
+        "state:preview-footprint"
+      ]
+    },
+    {
+      "id": "components.complete-part-ready",
+      "title": "Complete Part Ready",
+      "area": "components",
+      "group": "Components",
+      "route": "components",
+      "expectedTargets": [
+        "component-browser.complete-component"
+      ],
+      "coverage": [
+        "route:components",
+        "state:complete-part-ready"
+      ]
+    },
+    {
+      "id": "components.complete-part-partial",
+      "title": "Complete Part Partial",
+      "area": "components",
+      "group": "Components",
+      "route": "components",
+      "expectedTargets": [
+        "component-browser.complete-component"
+      ],
+      "coverage": [
+        "route:components",
+        "state:complete-part-partial"
+      ]
+    },
+    {
+      "id": "components.complete-part-blocked",
+      "title": "Complete Part Blocked",
+      "area": "components",
+      "group": "Components",
+      "route": "components",
+      "expectedTargets": [
+        "component-browser.complete-component"
+      ],
+      "coverage": [
+        "route:components",
+        "state:complete-part-blocked"
+      ]
+    },
+    {
+      "id": "components.bulk-import",
+      "title": "Bulk Import",
+      "area": "components",
+      "group": "Components",
+      "route": "components",
+      "expectedTargets": [
+        "components.root"
+      ],
+      "coverage": [
+        "route:components",
+        "state:bulk-import"
+      ]
+    },
+    {
+      "id": "components.passive-intake",
+      "title": "Passive Intake",
+      "area": "components",
+      "group": "Components",
+      "route": "components",
+      "expectedTargets": [
+        "components.root"
+      ],
+      "coverage": [
+        "route:components",
+        "state:passive-intake"
+      ]
+    },
+    {
+      "id": "components.variant-alternatives",
+      "title": "Variant Alternatives",
+      "area": "components",
+      "group": "Components",
+      "route": "components",
+      "expectedTargets": [
+        "component-browser.complete-component"
+      ],
+      "coverage": [
+        "route:components",
+        "state:variant-alternatives"
+      ]
+    },
+    {
+      "id": "components.variant-pending",
+      "title": "Variant Pending",
+      "area": "components",
+      "group": "Components",
+      "route": "components",
+      "expectedTargets": [
+        "component-browser.complete-component"
+      ],
+      "coverage": [
+        "route:components",
+        "state:variant-pending"
+      ]
+    },
+    {
+      "id": "components.diff-open",
+      "title": "Diff Open",
+      "area": "components",
+      "group": "Components",
+      "route": "components",
+      "expectedTargets": [
+        "component-browser.sources-sheet"
+      ],
+      "coverage": [
+        "route:components",
+        "state:diff-open"
+      ]
+    },
+    {
+      "id": "components.clear-cad",
+      "title": "Clear CAD",
+      "area": "components",
+      "group": "Components",
+      "route": "components",
+      "expectedTargets": [
+        "components.root"
+      ],
+      "coverage": [
+        "route:components",
+        "state:clear-cad"
+      ]
+    },
+    {
+      "id": "components.delete-confirm",
+      "title": "Delete Confirmation",
+      "area": "components",
+      "group": "Components",
+      "route": "components",
+      "expectedTargets": [
+        "components.root"
+      ],
+      "coverage": [
+        "route:components",
+        "state:delete-confirm"
+      ]
+    },
+    {
+      "id": "provider.loading",
+      "title": "Loading",
+      "area": "components",
+      "group": "Provider Download",
+      "route": "components",
+      "expectedTargets": [
+        "component-browser.complete-component",
+        "component-browser.provider-browser"
+      ],
+      "coverage": [
+        "route:components",
+        "state:provider-loading"
+      ]
+    },
+    {
+      "id": "provider.ready",
+      "title": "Ready",
+      "area": "components",
+      "group": "Provider Download",
+      "route": "components",
+      "expectedTargets": [
+        "component-browser.complete-component",
+        "component-browser.provider-browser"
+      ],
+      "coverage": [
+        "route:components",
+        "state:provider-ready"
+      ]
+    },
+    {
+      "id": "provider.sign-in",
+      "title": "Sign In",
+      "area": "components",
+      "group": "Provider Download",
+      "route": "components",
+      "expectedTargets": [
+        "component-browser.complete-component",
+        "component-browser.provider-browser"
+      ],
+      "coverage": [
+        "route:components",
+        "state:provider-sign-in"
+      ]
+    },
+    {
+      "id": "provider.waiting-for-person",
+      "title": "Waiting For Person",
+      "area": "components",
+      "group": "Provider Download",
+      "route": "components",
+      "expectedTargets": [
+        "component-browser.complete-component",
+        "component-browser.provider-browser"
+      ],
+      "coverage": [
+        "route:components",
+        "state:provider-waiting-for-person"
+      ]
+    },
+    {
+      "id": "provider.format-selection",
+      "title": "Format Selection",
+      "area": "components",
+      "group": "Provider Download",
+      "route": "components",
+      "expectedTargets": [
+        "component-browser.complete-component",
+        "component-browser.provider-browser"
+      ],
+      "coverage": [
+        "route:components",
+        "state:provider-format-selection"
+      ]
+    },
+    {
+      "id": "provider.download-armed",
+      "title": "Download Armed",
+      "area": "components",
+      "group": "Provider Download",
+      "route": "components",
+      "expectedTargets": [
+        "component-browser.complete-component",
+        "component-browser.provider-browser"
+      ],
+      "coverage": [
+        "route:components",
+        "state:provider-download-armed"
+      ]
+    },
+    {
+      "id": "provider.one-file",
+      "title": "One File",
+      "area": "components",
+      "group": "Provider Download",
+      "route": "components",
+      "expectedTargets": [
+        "component-browser.complete-component",
+        "component-browser.provider-browser"
+      ],
+      "coverage": [
+        "route:components",
+        "state:provider-one-file"
+      ]
+    },
+    {
+      "id": "provider.multiple-files",
+      "title": "Multiple Files",
+      "area": "components",
+      "group": "Provider Download",
+      "route": "components",
+      "expectedTargets": [
+        "component-browser.complete-component",
+        "component-browser.provider-browser"
+      ],
+      "coverage": [
+        "route:components",
+        "state:provider-multiple-files"
+      ]
+    },
+    {
+      "id": "provider.partial-retained",
+      "title": "Partial Retained",
+      "area": "components",
+      "group": "Provider Download",
+      "route": "components",
+      "expectedTargets": [
+        "component-browser.complete-component",
+        "component-browser.provider-browser"
+      ],
+      "coverage": [
+        "route:components",
+        "state:provider-partial-retained"
+      ]
+    },
+    {
+      "id": "provider.unavailable",
+      "title": "Unavailable",
+      "area": "components",
+      "group": "Provider Download",
+      "route": "components",
+      "expectedTargets": [
+        "component-browser.complete-component",
+        "component-browser.provider-browser"
+      ],
+      "coverage": [
+        "route:components",
+        "state:provider-unavailable"
+      ]
+    },
+    {
+      "id": "provider.timeout",
+      "title": "Timeout",
+      "area": "components",
+      "group": "Provider Download",
+      "route": "components",
+      "expectedTargets": [
+        "component-browser.complete-component",
+        "component-browser.provider-browser"
+      ],
+      "coverage": [
+        "route:components",
+        "state:provider-timeout"
+      ]
+    },
+    {
+      "id": "provider.canceled",
+      "title": "Canceled",
+      "area": "components",
+      "group": "Provider Download",
+      "route": "components",
+      "expectedTargets": [
+        "component-browser.complete-component",
+        "component-browser.provider-browser"
+      ],
+      "coverage": [
+        "route:components",
+        "state:provider-canceled"
+      ]
+    },
+    {
+      "id": "provider.error",
+      "title": "Error",
+      "area": "components",
+      "group": "Provider Download",
+      "route": "components",
+      "expectedTargets": [
+        "component-browser.complete-component",
+        "component-browser.provider-browser"
+      ],
+      "coverage": [
+        "route:components",
+        "state:provider-error"
+      ]
+    },
+    {
+      "id": "provider.selected-file-recovery",
+      "title": "Selected File Recovery",
+      "area": "components",
+      "group": "Provider Download",
+      "route": "components",
+      "expectedTargets": [
+        "component-browser.complete-component",
+        "component-browser.provider-browser"
+      ],
+      "coverage": [
+        "route:components",
+        "state:provider-selected-file-recovery"
+      ]
+    },
+    {
+      "id": "provider.returned-to-stockroom",
+      "title": "Returned To Stockroom",
+      "area": "components",
+      "group": "Provider Download",
+      "route": "components",
+      "expectedTargets": [
+        "component-browser.complete-component",
+        "component-browser.provider-browser"
+      ],
+      "coverage": [
+        "route:components",
+        "state:provider-returned-to-stockroom"
+      ]
+    },
+    {
+      "id": "provider.complete",
+      "title": "Complete",
+      "area": "components",
+      "group": "Provider Download",
+      "route": "components",
+      "expectedTargets": [
+        "component-browser.complete-component",
+        "component-browser.provider-browser"
+      ],
+      "coverage": [
+        "route:components",
+        "state:provider-complete"
+      ]
+    },
+    {
+      "id": "projects.loading",
+      "title": "Loading Projects",
+      "area": "projects",
+      "group": "Projects",
+      "route": "projects",
+      "expectedTargets": [
+        "projects.picker.loading",
+        "projects.loading"
+      ],
+      "coverage": [
+        "route:projects",
+        "state:loading"
+      ]
+    },
+    {
+      "id": "projects.empty",
+      "title": "No Linked Projects",
+      "area": "projects",
+      "group": "Projects",
+      "route": "projects",
+      "expectedTargets": [
+        "projects.empty"
+      ],
+      "coverage": [
+        "route:projects",
+        "state:empty"
+      ]
+    },
+    {
+      "id": "projects.list-error",
+      "title": "Project List Error",
+      "area": "projects",
+      "group": "Projects",
+      "route": "projects",
+      "expectedTargets": [
+        "projects.picker.failed"
+      ],
+      "coverage": [
+        "route:projects",
+        "state:list-error"
+      ]
+    },
+    {
+      "id": "projects.workspace-error",
+      "title": "Project Workspace Error",
+      "area": "projects",
+      "group": "Projects",
+      "route": "projects",
+      "expectedTargets": [
+        "projects.workspace.error"
+      ],
+      "coverage": [
+        "route:projects",
+        "state:workspace-error"
+      ]
+    },
+    {
+      "id": "projects.kicad.overview",
+      "title": "KiCad Overview",
+      "area": "projects",
+      "group": "Projects",
+      "route": "projects",
+      "expectedTargets": [
+        "projects.overview"
+      ],
+      "coverage": [
+        "route:projects",
+        "state:kicad.overview"
+      ]
+    },
+    {
+      "id": "projects.kicad.bom",
+      "title": "KiCad Bom",
+      "area": "projects",
+      "group": "Projects",
+      "route": "projects",
+      "expectedTargets": [
+        "projects.bom"
+      ],
+      "coverage": [
+        "route:projects",
+        "state:kicad.bom"
+      ]
+    },
+    {
+      "id": "projects.kicad.build",
+      "title": "KiCad Build",
+      "area": "projects",
+      "group": "Projects",
+      "route": "projects",
+      "expectedTargets": [
+        "projects.build"
+      ],
+      "coverage": [
+        "route:projects",
+        "state:kicad.build"
+      ]
+    },
+    {
+      "id": "projects.kicad.activity",
+      "title": "KiCad Recent Work",
+      "area": "projects",
+      "group": "Projects",
+      "route": "projects",
+      "expectedTargets": [
+        "projects.activity"
+      ],
+      "coverage": [
+        "route:projects",
+        "state:kicad.activity"
+      ]
+    },
+    {
+      "id": "projects.altium.overview",
+      "title": "Altium Overview",
+      "area": "projects",
+      "group": "Projects",
+      "route": "projects",
+      "expectedTargets": [
+        "projects.overview"
+      ],
+      "coverage": [
+        "route:projects",
+        "state:altium.overview"
+      ]
+    },
+    {
+      "id": "projects.altium.bom",
+      "title": "Altium Bom",
+      "area": "projects",
+      "group": "Projects",
+      "route": "projects",
+      "expectedTargets": [
+        "projects.bom"
+      ],
+      "coverage": [
+        "route:projects",
+        "state:altium.bom"
+      ]
+    },
+    {
+      "id": "projects.altium.build",
+      "title": "Altium Build",
+      "area": "projects",
+      "group": "Projects",
+      "route": "projects",
+      "expectedTargets": [
+        "projects.build"
+      ],
+      "coverage": [
+        "route:projects",
+        "state:altium.build"
+      ]
+    },
+    {
+      "id": "projects.altium.activity",
+      "title": "Altium Recent Work",
+      "area": "projects",
+      "group": "Projects",
+      "route": "projects",
+      "expectedTargets": [
+        "projects.activity"
+      ],
+      "coverage": [
+        "route:projects",
+        "state:altium.activity"
+      ]
+    },
+    {
+      "id": "projects.render-blocked",
+      "title": "Native Render Blocked",
+      "area": "projects",
+      "group": "Projects",
+      "route": "projects",
+      "expectedTargets": [
+        "projects.overview",
+        "projects.native-action-blocked"
+      ],
+      "coverage": [
+        "route:projects",
+        "state:render-blocked"
+      ]
+    },
+    {
+      "id": "projects.native-render-ready",
+      "title": "Native Render Ready",
+      "area": "projects",
+      "group": "Projects",
+      "route": "projects",
+      "expectedTargets": [
+        "projects.overview",
+        "projects.native-board-render"
+      ],
+      "coverage": [
+        "route:projects",
+        "state:native-render-ready"
+      ]
+    },
+    {
+      "id": "projects.missing-kicad",
+      "title": "KiCad Missing",
+      "area": "projects",
+      "group": "Projects",
+      "route": "projects",
+      "expectedTargets": [
+        "projects.overview",
+        "projects.runtime-missing"
+      ],
+      "coverage": [
+        "route:projects",
+        "state:missing-kicad"
+      ]
+    },
+    {
+      "id": "projects.missing-altium",
+      "title": "Altium Missing",
+      "area": "projects",
+      "group": "Projects",
+      "route": "projects",
+      "expectedTargets": [
+        "projects.overview",
+        "projects.runtime-missing"
+      ],
+      "coverage": [
+        "route:projects",
+        "state:missing-altium"
+      ]
+    },
+    {
+      "id": "projects.overlay-blocked",
+      "title": "Editor Overlay Blocked",
+      "area": "projects",
+      "group": "Projects",
+      "route": "projects",
+      "expectedTargets": [
+        "projects.overview",
+        "projects.placement-blocked"
+      ],
+      "coverage": [
+        "route:projects",
+        "state:overlay-blocked"
+      ]
+    },
+    {
+      "id": "projects.no-repository",
+      "title": "No Repository",
+      "area": "projects",
+      "group": "Projects",
+      "route": "projects",
+      "expectedTargets": [
+        "projects.activity",
+        "projects.no-repository"
+      ],
+      "coverage": [
+        "route:projects",
+        "state:no-repository"
+      ]
+    },
+    {
+      "id": "projects.diverged",
+      "title": "Repository Diverged",
+      "area": "projects",
+      "group": "Projects",
+      "route": "projects",
+      "expectedTargets": [
+        "projects.activity",
+        "projects.repository-diverged"
+      ],
+      "coverage": [
+        "route:projects",
+        "state:diverged"
+      ]
+    },
+    {
+      "id": "projects.shared-review",
+      "title": "Shared Review",
+      "area": "projects",
+      "group": "Projects",
+      "route": "projects",
+      "expectedTargets": [
+        "projects.activity",
+        "projects.shared-review"
+      ],
+      "coverage": [
+        "route:projects",
+        "state:shared-review"
+      ]
+    },
+    {
+      "id": "projects.build-complete",
+      "title": "Build Complete",
+      "area": "projects",
+      "group": "Projects",
+      "route": "projects",
+      "expectedTargets": [
+        "projects.build",
+        "projects.build-complete"
+      ],
+      "coverage": [
+        "route:projects",
+        "state:build-complete"
+      ]
+    },
+    {
+      "id": "stm.index-missing",
+      "title": "Index Missing",
+      "area": "stm",
+      "group": "STM Viewer",
+      "route": "stm",
+      "expectedTargets": [
+        "stm.root"
+      ],
+      "coverage": [
+        "route:stm",
+        "state:index-missing"
+      ]
+    },
+    {
+      "id": "stm.index-building",
+      "title": "Index Building",
+      "area": "stm",
+      "group": "STM Viewer",
+      "route": "stm",
+      "expectedTargets": [
+        "stm.root"
+      ],
+      "coverage": [
+        "route:stm",
+        "state:index-building"
+      ]
+    },
+    {
+      "id": "stm.index-error",
+      "title": "Index Error",
+      "area": "stm",
+      "group": "STM Viewer",
+      "route": "stm",
+      "expectedTargets": [
+        "stm.root"
+      ],
+      "coverage": [
+        "route:stm",
+        "state:index-error"
+      ]
+    },
+    {
+      "id": "stm.explorer-loading",
+      "title": "Explorer Loading",
+      "area": "stm",
+      "group": "STM Viewer",
+      "route": "stm",
+      "expectedTargets": [
+        "stm.root"
+      ],
+      "coverage": [
+        "route:stm",
+        "state:explorer-loading"
+      ]
+    },
+    {
+      "id": "stm.explorer-error",
+      "title": "Explorer Error",
+      "area": "stm",
+      "group": "STM Viewer",
+      "route": "stm",
+      "expectedTargets": [
+        "stm.root"
+      ],
+      "coverage": [
+        "route:stm",
+        "state:explorer-error"
+      ]
+    },
+    {
+      "id": "stm.explorer-empty",
+      "title": "Explorer Empty",
+      "area": "stm",
+      "group": "STM Viewer",
+      "route": "stm",
+      "expectedTargets": [
+        "stm.root"
+      ],
+      "coverage": [
+        "route:stm",
+        "state:explorer-empty"
+      ]
+    },
+    {
+      "id": "stm.explorer-matrix",
+      "title": "Explorer Matrix",
+      "area": "stm",
+      "group": "STM Viewer",
+      "route": "stm",
+      "expectedTargets": [
+        "stm.root"
+      ],
+      "coverage": [
+        "route:stm",
+        "state:explorer-matrix"
+      ]
+    },
+    {
+      "id": "stm.explorer-selected-mcu",
+      "title": "Selected MCU",
+      "area": "stm",
+      "group": "STM Viewer",
+      "route": "stm",
+      "expectedTargets": [
+        "stm.root"
+      ],
+      "coverage": [
+        "route:stm",
+        "state:explorer-selected-mcu"
+      ]
+    },
+    {
+      "id": "stm.explorer-selected-package",
+      "title": "Selected Package",
+      "area": "stm",
+      "group": "STM Viewer",
+      "route": "stm",
+      "expectedTargets": [
+        "stm.root"
+      ],
+      "coverage": [
+        "route:stm",
+        "state:explorer-selected-package"
+      ]
+    },
+    {
+      "id": "stm.explorer-selected-pin",
+      "title": "Selected Pin",
+      "area": "stm",
+      "group": "STM Viewer",
+      "route": "stm",
+      "expectedTargets": [
+        "stm.root"
+      ],
+      "coverage": [
+        "route:stm",
+        "state:explorer-selected-pin"
+      ]
+    },
+    {
+      "id": "stm.explorer-pinout",
+      "title": "Pinout",
+      "area": "stm",
+      "group": "STM Viewer",
+      "route": "stm",
+      "expectedTargets": [
+        "stm.root"
+      ],
+      "coverage": [
+        "route:stm",
+        "state:explorer-pinout"
+      ]
+    },
+    {
+      "id": "stm.explorer-af-options",
+      "title": "Alternate Functions",
+      "area": "stm",
+      "group": "STM Viewer",
+      "route": "stm",
+      "expectedTargets": [
+        "stm.root"
+      ],
+      "coverage": [
+        "route:stm",
+        "state:explorer-af-options"
+      ]
+    },
+    {
+      "id": "stm.target-definition",
+      "title": "Target Definition",
+      "area": "stm",
+      "group": "STM Viewer",
+      "route": "stm",
+      "expectedTargets": [
+        "stm.root",
+        "stm.target-definition"
+      ],
+      "coverage": [
+        "route:stm",
+        "state:target-definition"
+      ]
+    },
+    {
+      "id": "stm.target-evidence",
+      "title": "Target Evidence",
+      "area": "stm",
+      "group": "STM Viewer",
+      "route": "stm",
+      "expectedTargets": [
+        "stm.root",
+        "stm.target-definition"
+      ],
+      "coverage": [
+        "route:stm",
+        "state:target-evidence"
+      ]
+    },
+    {
+      "id": "stm.target-policy",
+      "title": "Target Policy",
+      "area": "stm",
+      "group": "STM Viewer",
+      "route": "stm",
+      "expectedTargets": [
+        "stm.root",
+        "stm.bench",
+        "stm.target-policy"
+      ],
+      "coverage": [
+        "route:stm",
+        "state:target-policy"
+      ]
+    },
+    {
+      "id": "stm.target-package-map",
+      "title": "Target Package Map",
+      "area": "stm",
+      "group": "STM Viewer",
+      "route": "stm",
+      "expectedTargets": [
+        "stm.root",
+        "stm.target-definition",
+        "stm.target-map"
+      ],
+      "coverage": [
+        "route:stm",
+        "state:target-package-map"
+      ]
+    },
+    {
+      "id": "stm.compatibility-ready",
+      "title": "Compatibility Ready",
+      "area": "stm",
+      "group": "STM Viewer",
+      "route": "stm",
+      "expectedTargets": [
+        "stm.root"
+      ],
+      "coverage": [
+        "route:stm",
+        "state:compatibility-ready"
+      ]
+    },
+    {
+      "id": "stm.compatibility-conflict",
+      "title": "Compatibility Conflict",
+      "area": "stm",
+      "group": "STM Viewer",
+      "route": "stm",
+      "expectedTargets": [
+        "stm.root"
+      ],
+      "coverage": [
+        "route:stm",
+        "state:compatibility-conflict"
+      ]
+    },
+    {
+      "id": "stm.bench-part-selection",
+      "title": "Bench Part Selection",
+      "area": "stm",
+      "group": "STM Viewer",
+      "route": "stm",
+      "expectedTargets": [
+        "stm.root"
+      ],
+      "coverage": [
+        "route:stm",
+        "state:bench-part-selection"
+      ]
+    },
+    {
+      "id": "stm.bench-socket-solution",
+      "title": "Bench Socket Solution",
+      "area": "stm",
+      "group": "STM Viewer",
+      "route": "stm",
+      "expectedTargets": [
+        "stm.root"
+      ],
+      "coverage": [
+        "route:stm",
+        "state:bench-socket-solution"
+      ]
+    },
+    {
+      "id": "stm.bench-blocked",
+      "title": "Bench Blocked",
+      "area": "stm",
+      "group": "STM Viewer",
+      "route": "stm",
+      "expectedTargets": [
+        "stm.root"
+      ],
+      "coverage": [
+        "route:stm",
+        "state:bench-blocked"
+      ]
+    },
+    {
+      "id": "settings.appearance.ready",
+      "title": "appearance ready",
+      "area": "settings",
+      "group": "Settings",
+      "route": "settings",
+      "expectedTargets": [
+        "settings.appearance"
+      ],
+      "coverage": [
+        "route:settings",
+        "state:ready"
+      ]
+    },
+    {
+      "id": "settings.libraries.ready",
+      "title": "libraries ready",
+      "area": "settings",
+      "group": "Settings",
+      "route": "settings",
+      "expectedTargets": [
+        "settings.profiles"
+      ],
+      "coverage": [
+        "route:settings",
+        "state:ready"
+      ]
+    },
+    {
+      "id": "settings.libraries.attention",
+      "title": "libraries attention",
+      "area": "settings",
+      "group": "Settings",
+      "route": "settings",
+      "expectedTargets": [
+        "settings.profiles"
+      ],
+      "coverage": [
+        "route:settings",
+        "state:attention"
+      ]
+    },
+    {
+      "id": "settings.libraries.error",
+      "title": "libraries error",
+      "area": "settings",
+      "group": "Settings",
+      "route": "settings",
+      "expectedTargets": [
+        "settings.profiles"
+      ],
+      "coverage": [
+        "route:settings",
+        "state:error"
+      ]
+    },
+    {
+      "id": "settings.libraries.create",
+      "title": "libraries create",
+      "area": "settings",
+      "group": "Settings",
+      "route": "settings",
+      "expectedTargets": [
+        "settings.profiles"
+      ],
+      "coverage": [
+        "route:settings",
+        "state:create"
+      ]
+    },
+    {
+      "id": "settings.libraries.clone",
+      "title": "libraries clone",
+      "area": "settings",
+      "group": "Settings",
+      "route": "settings",
+      "expectedTargets": [
+        "settings.profiles"
+      ],
+      "coverage": [
+        "route:settings",
+        "state:clone"
+      ]
+    },
+    {
+      "id": "settings.libraries.current",
+      "title": "libraries current",
+      "area": "settings",
+      "group": "Settings",
+      "route": "settings",
+      "expectedTargets": [
+        "settings.profiles"
+      ],
+      "coverage": [
+        "route:settings",
+        "state:current"
+      ]
+    },
+    {
+      "id": "settings.sync.ready",
+      "title": "sync ready",
+      "area": "settings",
+      "group": "Settings",
+      "route": "settings",
+      "expectedTargets": [
+        "settings.sync"
+      ],
+      "coverage": [
+        "route:settings",
+        "state:ready"
+      ]
+    },
+    {
+      "id": "settings.sync.attention",
+      "title": "sync attention",
+      "area": "settings",
+      "group": "Settings",
+      "route": "settings",
+      "expectedTargets": [
+        "settings.sync"
+      ],
+      "coverage": [
+        "route:settings",
+        "state:attention"
+      ]
+    },
+    {
+      "id": "settings.sync.error",
+      "title": "sync error",
+      "area": "settings",
+      "group": "Settings",
+      "route": "settings",
+      "expectedTargets": [
+        "settings.sync"
+      ],
+      "coverage": [
+        "route:settings",
+        "state:error"
+      ]
+    },
+    {
+      "id": "settings.sync.syncing",
+      "title": "sync syncing",
+      "area": "settings",
+      "group": "Settings",
+      "route": "settings",
+      "expectedTargets": [
+        "settings.sync"
+      ],
+      "coverage": [
+        "route:settings",
+        "state:syncing"
+      ]
+    },
+    {
+      "id": "settings.sync.diverged",
+      "title": "sync diverged",
+      "area": "settings",
+      "group": "Settings",
+      "route": "settings",
+      "expectedTargets": [
+        "settings.sync"
+      ],
+      "coverage": [
+        "route:settings",
+        "state:diverged"
+      ]
+    },
+    {
+      "id": "settings.kicad.ready",
+      "title": "kicad ready",
+      "area": "settings",
+      "group": "Settings",
+      "route": "settings",
+      "expectedTargets": [
+        "settings.kicad"
+      ],
+      "coverage": [
+        "route:settings",
+        "state:ready"
+      ]
+    },
+    {
+      "id": "settings.kicad.attention",
+      "title": "kicad attention",
+      "area": "settings",
+      "group": "Settings",
+      "route": "settings",
+      "expectedTargets": [
+        "settings.kicad"
+      ],
+      "coverage": [
+        "route:settings",
+        "state:attention"
+      ]
+    },
+    {
+      "id": "settings.kicad.error",
+      "title": "kicad error",
+      "area": "settings",
+      "group": "Settings",
+      "route": "settings",
+      "expectedTargets": [
+        "settings.kicad"
+      ],
+      "coverage": [
+        "route:settings",
+        "state:error"
+      ]
+    },
+    {
+      "id": "settings.kicad.picker",
+      "title": "kicad picker",
+      "area": "settings",
+      "group": "Settings",
+      "route": "settings",
+      "expectedTargets": [
+        "settings.kicad"
+      ],
+      "coverage": [
+        "route:settings",
+        "state:picker"
+      ]
+    },
+    {
+      "id": "settings.altium.ready",
+      "title": "altium ready",
+      "area": "settings",
+      "group": "Settings",
+      "route": "settings",
+      "expectedTargets": [
+        "settings.altium"
+      ],
+      "coverage": [
+        "route:settings",
+        "state:ready"
+      ]
+    },
+    {
+      "id": "settings.altium.attention",
+      "title": "altium attention",
+      "area": "settings",
+      "group": "Settings",
+      "route": "settings",
+      "expectedTargets": [
+        "settings.altium"
+      ],
+      "coverage": [
+        "route:settings",
+        "state:attention"
+      ]
+    },
+    {
+      "id": "settings.altium.error",
+      "title": "altium error",
+      "area": "settings",
+      "group": "Settings",
+      "route": "settings",
+      "expectedTargets": [
+        "settings.altium"
+      ],
+      "coverage": [
+        "route:settings",
+        "state:error"
+      ]
+    },
+    {
+      "id": "settings.altium.setup-dialog",
+      "title": "altium setup-dialog",
+      "area": "settings",
+      "group": "Settings",
+      "route": "settings",
+      "expectedTargets": [
+        "altiumdb.setup-modal"
+      ],
+      "coverage": [
+        "route:settings",
+        "state:setup-dialog"
+      ]
+    },
+    {
+      "id": "settings.altium.dblib-dialog",
+      "title": "altium dblib-dialog",
+      "area": "settings",
+      "group": "Settings",
+      "route": "settings",
+      "expectedTargets": [
+        "altiumdb.modal"
+      ],
+      "coverage": [
+        "route:settings",
+        "state:dblib-dialog"
+      ]
+    },
+    {
+      "id": "settings.cubemx.ready",
+      "title": "cubemx ready",
+      "area": "settings",
+      "group": "Settings",
+      "route": "settings",
+      "expectedTargets": [
+        "settings.cubemx"
+      ],
+      "coverage": [
+        "route:settings",
+        "state:ready"
+      ]
+    },
+    {
+      "id": "settings.cubemx.attention",
+      "title": "cubemx attention",
+      "area": "settings",
+      "group": "Settings",
+      "route": "settings",
+      "expectedTargets": [
+        "settings.cubemx"
+      ],
+      "coverage": [
+        "route:settings",
+        "state:attention"
+      ]
+    },
+    {
+      "id": "settings.cubemx.error",
+      "title": "cubemx error",
+      "area": "settings",
+      "group": "Settings",
+      "route": "settings",
+      "expectedTargets": [
+        "settings.cubemx"
+      ],
+      "coverage": [
+        "route:settings",
+        "state:error"
+      ]
+    },
+    {
+      "id": "settings.cubemx.picker",
+      "title": "cubemx picker",
+      "area": "settings",
+      "group": "Settings",
+      "route": "settings",
+      "expectedTargets": [
+        "settings.cubemx"
+      ],
+      "coverage": [
+        "route:settings",
+        "state:picker"
+      ]
+    },
+    {
+      "id": "settings.distributors.ready",
+      "title": "distributors ready",
+      "area": "settings",
+      "group": "Settings",
+      "route": "settings",
+      "expectedTargets": [
+        "settings.distributor"
+      ],
+      "coverage": [
+        "route:settings",
+        "state:ready"
+      ]
+    },
+    {
+      "id": "settings.distributors.attention",
+      "title": "distributors attention",
+      "area": "settings",
+      "group": "Settings",
+      "route": "settings",
+      "expectedTargets": [
+        "settings.distributor"
+      ],
+      "coverage": [
+        "route:settings",
+        "state:attention"
+      ]
+    },
+    {
+      "id": "settings.distributors.error",
+      "title": "distributors error",
+      "area": "settings",
+      "group": "Settings",
+      "route": "settings",
+      "expectedTargets": [
+        "settings.distributor"
+      ],
+      "coverage": [
+        "route:settings",
+        "state:error"
+      ]
+    },
+    {
+      "id": "settings.distributors.credentials-partial",
+      "title": "distributors credentials-partial",
+      "area": "settings",
+      "group": "Settings",
+      "route": "settings",
+      "expectedTargets": [
+        "settings.distributor"
+      ],
+      "coverage": [
+        "route:settings",
+        "state:credentials-partial"
+      ]
+    },
+    {
+      "id": "settings.distributors.credentials-refresh",
+      "title": "distributors credentials-refresh",
+      "area": "settings",
+      "group": "Settings",
+      "route": "settings",
+      "expectedTargets": [
+        "settings.distributor"
+      ],
+      "coverage": [
+        "route:settings",
+        "state:credentials-refresh"
+      ]
+    },
+    {
+      "id": "settings.vendor-logins.ready",
+      "title": "vendor-logins ready",
+      "area": "settings",
+      "group": "Settings",
+      "route": "settings",
+      "expectedTargets": [
+        "settings.vendor-login-row"
+      ],
+      "coverage": [
+        "route:settings",
+        "state:ready"
+      ]
+    },
+    {
+      "id": "settings.vendor-logins.attention",
+      "title": "vendor-logins attention",
+      "area": "settings",
+      "group": "Settings",
+      "route": "settings",
+      "expectedTargets": [
+        "settings.vendor-login-row"
+      ],
+      "coverage": [
+        "route:settings",
+        "state:attention"
+      ]
+    },
+    {
+      "id": "settings.vendor-logins.error",
+      "title": "vendor-logins error",
+      "area": "settings",
+      "group": "Settings",
+      "route": "settings",
+      "expectedTargets": [
+        "settings.vendor-login-row"
+      ],
+      "coverage": [
+        "route:settings",
+        "state:error"
+      ]
+    },
+    {
+      "id": "settings.github.ready",
+      "title": "github ready",
+      "area": "settings",
+      "group": "Settings",
+      "route": "settings",
+      "expectedTargets": [
+        "settings.github"
+      ],
+      "coverage": [
+        "route:settings",
+        "state:ready"
+      ]
+    },
+    {
+      "id": "settings.github.attention",
+      "title": "github attention",
+      "area": "settings",
+      "group": "Settings",
+      "route": "settings",
+      "expectedTargets": [
+        "settings.github"
+      ],
+      "coverage": [
+        "route:settings",
+        "state:attention"
+      ]
+    },
+    {
+      "id": "settings.github.error",
+      "title": "github error",
+      "area": "settings",
+      "group": "Settings",
+      "route": "settings",
+      "expectedTargets": [
+        "settings.github"
+      ],
+      "coverage": [
+        "route:settings",
+        "state:error"
+      ]
+    },
+    {
+      "id": "settings.updates.ready",
+      "title": "updates ready",
+      "area": "settings",
+      "group": "Settings",
+      "route": "settings",
+      "expectedTargets": [
+        "settings.update"
+      ],
+      "coverage": [
+        "route:settings",
+        "state:ready"
+      ]
+    },
+    {
+      "id": "settings.updates.attention",
+      "title": "updates attention",
+      "area": "settings",
+      "group": "Settings",
+      "route": "settings",
+      "expectedTargets": [
+        "settings.update"
+      ],
+      "coverage": [
+        "route:settings",
+        "state:attention"
+      ]
+    },
+    {
+      "id": "settings.updates.error",
+      "title": "updates error",
+      "area": "settings",
+      "group": "Settings",
+      "route": "settings",
+      "expectedTargets": [
+        "settings.update"
+      ],
+      "coverage": [
+        "route:settings",
+        "state:error"
+      ]
+    },
+    {
+      "id": "settings.maintenance.ready",
+      "title": "maintenance ready",
+      "area": "settings",
+      "group": "Settings",
+      "route": "settings",
+      "expectedTargets": [
+        "settings.completion"
+      ],
+      "coverage": [
+        "route:settings",
+        "state:ready"
+      ]
+    },
+    {
+      "id": "settings.maintenance.attention",
+      "title": "maintenance attention",
+      "area": "settings",
+      "group": "Settings",
+      "route": "settings",
+      "expectedTargets": [
+        "settings.completion"
+      ],
+      "coverage": [
+        "route:settings",
+        "state:attention"
+      ]
+    },
+    {
+      "id": "settings.maintenance.error",
+      "title": "maintenance error",
+      "area": "settings",
+      "group": "Settings",
+      "route": "settings",
+      "expectedTargets": [
+        "settings.completion"
+      ],
+      "coverage": [
+        "route:settings",
+        "state:error"
+      ]
+    },
+    {
+      "id": "settings.completion.ready",
+      "title": "completion ready",
+      "area": "settings",
+      "group": "Settings",
+      "route": "settings",
+      "expectedTargets": [
+        "settings.completion"
+      ],
+      "coverage": [
+        "route:settings",
+        "state:ready"
+      ]
+    },
+    {
+      "id": "settings.completion.attention",
+      "title": "completion attention",
+      "area": "settings",
+      "group": "Settings",
+      "route": "settings",
+      "expectedTargets": [
+        "settings.completion"
+      ],
+      "coverage": [
+        "route:settings",
+        "state:attention"
+      ]
+    },
+    {
+      "id": "settings.completion.error",
+      "title": "completion error",
+      "area": "settings",
+      "group": "Settings",
+      "route": "settings",
+      "expectedTargets": [
+        "settings.completion"
+      ],
+      "coverage": [
+        "route:settings",
+        "state:error"
+      ]
+    },
+    {
+      "id": "settings.health.ready",
+      "title": "health ready",
+      "area": "settings",
+      "group": "Settings",
+      "route": "settings",
+      "expectedTargets": [
+        "settings.health"
+      ],
+      "coverage": [
+        "route:settings",
+        "state:ready"
+      ]
+    },
+    {
+      "id": "settings.health.attention",
+      "title": "health attention",
+      "area": "settings",
+      "group": "Settings",
+      "route": "settings",
+      "expectedTargets": [
+        "settings.health"
+      ],
+      "coverage": [
+        "route:settings",
+        "state:attention"
+      ]
+    },
+    {
+      "id": "settings.health.error",
+      "title": "health error",
+      "area": "settings",
+      "group": "Settings",
+      "route": "settings",
+      "expectedTargets": [
+        "settings.health"
+      ],
+      "coverage": [
+        "route:settings",
+        "state:error"
+      ]
+    },
+    {
+      "id": "settings.rescan.ready",
+      "title": "rescan ready",
+      "area": "settings",
+      "group": "Settings",
+      "route": "settings",
+      "expectedTargets": [
+        "settings.rescan"
+      ],
+      "coverage": [
+        "route:settings",
+        "state:ready"
+      ]
+    },
+    {
+      "id": "settings.rescan.attention",
+      "title": "rescan attention",
+      "area": "settings",
+      "group": "Settings",
+      "route": "settings",
+      "expectedTargets": [
+        "settings.rescan"
+      ],
+      "coverage": [
+        "route:settings",
+        "state:attention"
+      ]
+    },
+    {
+      "id": "settings.rescan.error",
+      "title": "rescan error",
+      "area": "settings",
+      "group": "Settings",
+      "route": "settings",
+      "expectedTargets": [
+        "settings.rescan"
+      ],
+      "coverage": [
+        "route:settings",
+        "state:error"
+      ]
+    },
+    {
+      "id": "settings.reset-cad.confirmation",
+      "title": "reset-cad confirmation",
+      "area": "settings",
+      "group": "Settings",
+      "route": "settings",
+      "expectedTargets": [
+        "confirm.root"
+      ],
+      "coverage": [
+        "route:settings",
+        "state:confirmation"
+      ]
+    }
+  ]
+}
