@@ -30,7 +30,12 @@ interface ToastItem {
 }
 
 interface ToastApi {
-  toast: (message: string, tone?: ToastTone, action?: ToastAction) => void;
+  toast: (
+    message: string,
+    tone?: ToastTone,
+    action?: ToastAction,
+    lifetimeMs?: number | null,
+  ) => () => void;
 }
 
 const ToastContext = createContext<ToastApi | null>(null);
@@ -50,10 +55,12 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const toast = useCallback(
-    (message: string, tone: ToastTone = "neutral", action?: ToastAction) => {
+    (message: string, tone: ToastTone = "neutral", action?: ToastAction, lifetimeMs?: number | null) => {
       const id = (seq += 1);
       setItems((current) => [...current, { id, message, tone, action }]);
-      setTimeout(() => dismiss(id), action ? ACTION_DISMISS_MS : DISMISS_MS);
+      const timeoutMs = lifetimeMs === undefined ? (action ? ACTION_DISMISS_MS : DISMISS_MS) : lifetimeMs;
+      if (timeoutMs !== null) setTimeout(() => dismiss(id), timeoutMs);
+      return () => dismiss(id);
     },
     [dismiss],
   );

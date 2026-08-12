@@ -22,6 +22,11 @@ function ActionTrigger({ action }: { action: () => void }) {
   );
 }
 
+function PersistentTrigger() {
+  const { toast } = useToast();
+  return <button type="button" onClick={() => toast("Fixture state", "ok", undefined, null)}>persist</button>;
+}
+
 describe("toasts", () => {
   beforeEach(() => vi.useFakeTimers());
   afterEach(() => vi.useRealTimers());
@@ -48,6 +53,19 @@ describe("toasts", () => {
     fireEvent.click(screen.getByText("fire"));
     fireEvent.click(screen.getByRole("button", { name: "Dismiss Saved" }));
     expect(screen.queryByText("Saved")).not.toBeInTheDocument();
+  });
+
+  it("keeps an explicitly persistent preview toast visible until dismissed", () => {
+    render(
+      <ToastProvider>
+        <PersistentTrigger />
+      </ToastProvider>,
+    );
+    fireEvent.click(screen.getByText("persist"));
+    act(() => vi.advanceTimersByTime(60_000));
+    expect(screen.getByText("Fixture state")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Dismiss Fixture state" }));
+    expect(screen.queryByText("Fixture state")).not.toBeInTheDocument();
   });
 
   it("runs an explicit recovery action once and dismisses the toast", () => {

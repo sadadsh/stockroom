@@ -31,14 +31,22 @@ function globalFixtures(id: GlobalScenarioId): ScenarioFixture[] {
   const updateState = id.endsWith("update.available") || id.endsWith("about.update-available") ? "update_available"
     : id.endsWith("update.updating") ? "updating" : id === "global.offline" ? "offline"
       : id === "global.stale" || id.endsWith("about.stale") ? "restart_required" : "up_to_date";
-  const reads = settingsReadFixtures({ updateState }).filter((item) => !(isOnboarding && item.path === "/api/onboarding"));
+  const reads: ScenarioFixture[] = [];
+  for (const item of settingsReadFixtures({ updateState })) {
+    if (isOnboarding && item.path === "/api/onboarding") continue;
+    reads.push(id === "global.update.error" && item.path === "/api/update/check"
+      ? { ...item, behavior: { state: "error" as const, status: 503, message: "Update check unavailable." } }
+      : item);
+  }
   if (isOnboarding) reads.unshift(fixture("GET", "/api/onboarding", firstRun));
   if (id.startsWith("global.search.")) {
+    const query = id.endsWith(".initial") ? "" : id.endsWith(".filtered") ? "LM358" : id.endsWith(".empty") ? "missing-part" : "LM358";
     const error = id.endsWith(".error") ? { state: "error" as const, status: 503, message: "Search unavailable." } : undefined;
     const rows = id.endsWith(".empty") ? [] : searchRows;
+    const params = query ? { q: query, ...(id.endsWith(".filtered") ? { category: "Integrated Circuits" } : {}) } : {};
     reads.push(
-      fixture("GET", "/api/library/search", { parts: rows, count: rows.length }, error),
-      fixture("GET", "/api/library/facets/parametric", { category: null, facets: [], total: rows.length }),
+      { ...fixture("GET", "/api/library/search", { parts: rows, count: rows.length }, error), params },
+      { ...fixture("GET", "/api/library/facets/parametric", { category: id.endsWith(".filtered") ? "Integrated Circuits" : null, facets: [], total: rows.length }), params },
     );
   }
   return reads;
@@ -49,14 +57,14 @@ function uiFor(id: GlobalScenarioId): Readonly<ScenarioUiState> {
     const mode = id.includes("clone") ? "clone" : id.includes("create") ? "create" : "open";
     return { onboarding: { mode, setupError: id.includes("error") ? "Could not set up the catalog." : undefined } };
   }
-  if (id.startsWith("global.about.")) return { rail: { aboutOpen: true } };
+  if (id.startsWith("global.about.")) return { rail: { aboutOpen: true, aboutNote: id.endsWith(".current") ? "Stockroom is current." : undefined } };
   if (id === "global.rail.collapsed" || id === "global.rail.expanded") return { railState: id.endsWith("collapsed") ? "collapsed" : "expanded" };
   if (id === "global.theme.dark" || id === "global.theme.light") return { theme: id.endsWith("light") ? "light" : "dark" };
   if (id.startsWith("global.add-parts.")) return { addParts: { state: id.split(".").slice(-1)[0] as NonNullable<ScenarioUiState["addParts"]>["state"] } };
-  if (id.startsWith("global.search.")) return { search: { open: true } };
+  if (id.startsWith("global.search.")) return { search: { open: true, query: id.endsWith(".initial") ? "" : id.endsWith(".filtered") ? "LM358" : id.endsWith(".empty") ? "missing-part" : "LM358", category: id.endsWith(".filtered") ? "Integrated Circuits" : undefined } };
   if (id === "global.confirmation.neutral" || id === "global.confirmation.destructive") return { confirmation: { danger: id.endsWith("destructive") } };
   if (id.startsWith("global.toast.")) return { toast: { message: `Fixture ${id.split(".").slice(-1)[0]} notification.`, tone: id.endsWith("success") ? "ok" : id.endsWith("error") ? "err" : "neutral" } };
-  if (id.startsWith("global.capture.")) return { capture: { status: id.endsWith("complete") ? "done" : id.endsWith("error") ? "error" : id.endsWith("active") ? "receiving" : "resolving", backgrounded: !id.endsWith("active") } };
+  if (id.startsWith("global.capture.")) return { capture: { status: id.endsWith("complete") ? "done" : id.endsWith("error") ? "error" : id.endsWith("active") ? "receiving" : "resolving", backgrounded: true } };
   if (id === "global.service-error") return { service: { error: "Service unavailable" } };
   if (id.startsWith("global.source-promotion.")) return { sourcePromotion: { state: id.split(".").slice(-1)[0] as NonNullable<ScenarioUiState["sourcePromotion"]>["state"] } };
   return {};
@@ -71,6 +79,8 @@ function targetFor(id: GlobalScenarioId): string {
   if (id.startsWith("global.toast.")) return "toast.status";
   if (id.startsWith("global.capture.") && !id.endsWith("active")) return "capture.status";
   if (id === "global.service-error") return "components.list-unreachable";
+  if (id.startsWith("global.theme.")) return "rail.theme-toggle";
+  if (id === "global.update.current" || id === "global.update.error") return "shell.statusbar";
   if (id.includes("update.available") || id.includes("update.updating")) return "rail.update";
   return "shell.root";
 }

@@ -9,8 +9,7 @@
       "route": "components",
       "expectedTargets": [
         "shell.root"
-      ],
-      "stateSignature": "real-data"
+      ]
     },
     {
       "id": "global.onboarding.open",
@@ -20,8 +19,7 @@
       "route": "components",
       "expectedTargets": [
         "onboarding.gate"
-      ],
-      "stateSignature": "state-c5a5ae06"
+      ]
     },
     {
       "id": "global.onboarding.create",
@@ -31,8 +29,7 @@
       "route": "components",
       "expectedTargets": [
         "onboarding.gate"
-      ],
-      "stateSignature": "state-6d98d022"
+      ]
     },
     {
       "id": "global.onboarding.clone",
@@ -42,8 +39,7 @@
       "route": "components",
       "expectedTargets": [
         "onboarding.gate"
-      ],
-      "stateSignature": "state-bf5b77c9"
+      ]
     },
     {
       "id": "global.onboarding.error",
@@ -53,8 +49,7 @@
       "route": "components",
       "expectedTargets": [
         "toast.status"
-      ],
-      "stateSignature": "state-27639c28"
+      ]
     },
     {
       "id": "global.onboarding.create-error",
@@ -64,8 +59,7 @@
       "route": "components",
       "expectedTargets": [
         "toast.status"
-      ],
-      "stateSignature": "state-99bb01c4"
+      ]
     },
     {
       "id": "global.onboarding.clone-error",
@@ -75,8 +69,7 @@
       "route": "components",
       "expectedTargets": [
         "toast.status"
-      ],
-      "stateSignature": "state-28874ab9"
+      ]
     },
     {
       "id": "global.about.open",
@@ -86,8 +79,7 @@
       "route": "components",
       "expectedTargets": [
         "about.root"
-      ],
-      "stateSignature": "state-67298e75"
+      ]
     },
     {
       "id": "global.about.current",
@@ -97,8 +89,7 @@
       "route": "components",
       "expectedTargets": [
         "about.root"
-      ],
-      "stateSignature": "state-67298e75"
+      ]
     },
     {
       "id": "global.about.update-available",
@@ -108,8 +99,7 @@
       "route": "components",
       "expectedTargets": [
         "about.root"
-      ],
-      "stateSignature": "state-baf28d3d"
+      ]
     },
     {
       "id": "global.about.stale",
@@ -119,8 +109,7 @@
       "route": "components",
       "expectedTargets": [
         "about.root"
-      ],
-      "stateSignature": "state-65f11ae2"
+      ]
     },
     {
       "id": "global.rail.expanded",
@@ -130,8 +119,7 @@
       "route": "components",
       "expectedTargets": [
         "shell.root"
-      ],
-      "stateSignature": "state-d074f74b"
+      ]
     },
     {
       "id": "global.rail.collapsed",
@@ -141,8 +129,7 @@
       "route": "components",
       "expectedTargets": [
         "shell.root"
-      ],
-      "stateSignature": "state-cb569591"
+      ]
     },
     {
       "id": "global.theme.dark",
@@ -151,9 +138,8 @@
       "group": "Global",
       "route": "components",
       "expectedTargets": [
-        "shell.root"
-      ],
-      "stateSignature": "state-8b2c4192"
+        "rail.theme-toggle"
+      ]
     },
     {
       "id": "global.theme.light",
@@ -162,9 +148,8 @@
       "group": "Global",
       "route": "components",
       "expectedTargets": [
-        "shell.root"
-      ],
-      "stateSignature": "state-409a6834"
+        "rail.theme-toggle"
+      ]
     },
     {
       "id": "global.update.current",
@@ -173,9 +158,8 @@
       "group": "Global",
       "route": "components",
       "expectedTargets": [
-        "shell.root"
-      ],
-      "stateSignature": "state-5eb0779f"
+        "shell.statusbar"
+      ]
     },
     {
       "id": "global.update.available",
@@ -185,8 +169,7 @@
       "route": "components",
       "expectedTargets": [
         "rail.update"
-      ],
-      "stateSignature": "state-ba12d962"
+      ]
     },
     {
       "id": "global.update.updating",
@@ -196,8 +179,7 @@
       "route": "components",
       "expectedTargets": [
         "rail.update"
-      ],
-      "stateSignature": "state-be7a8e0c"
+      ]
     },
     {
       "id": "global.update.error",
@@ -206,9 +188,8 @@
       "group": "Global",
       "route": "components",
       "expectedTargets": [
-        "shell.root"
-      ],
-      "stateSignature": "state-5eb0779f"
+        "shell.statusbar"
+      ]
     },
     {
       "id": "global.add-parts.empty",
@@ -218,8 +199,7 @@
       "route": "components",
       "expectedTargets": [
         "addpart.root"
-      ],
-      "stateSignature": "state-de427e2a"
+      ]
     },
     {
       "id": "global.add-parts.validating",
@@ -229,8 +209,7 @@
       "route": "components",
       "expectedTargets": [
         "addpart.root"
-      ],
-      "stateSignature": "state-597f5454"
+      ]
     },
     {
       "id": "global.add-parts.exact",
@@ -240,8 +219,7 @@
       "route": "components",
       "expectedTargets": [
         "addpart.root"
-      ],
-      "stateSignature": "state-4206e4d8"
+      ]
     },
     {
       "id": "global.add-parts.mismatch",
@@ -251,8 +229,7 @@
       "route": "components",
       "expectedTargets": [
         "addpart.root"
-      ],
-      "stateSignature": "state-5ec3a29f"
+      ]
     },
     {
       "id": "global.add-parts.duplicate",
@@ -262,8 +239,7 @@
       "route": "components",
       "expectedTargets": [
         "addpart.root"
-      ],
-      "stateSignature": "state-90284b8e"
+      ]
     },
     {
       "id": "global.add-parts.failure",
@@ -273,8 +249,7 @@
       "route": "components",
       "expectedTargets": [
         "addpart.root"
-      ],
-      "stateSignature": "state-f84964cb"
+      ]
     },
     {
       "id": "global.search.initial",
@@ -284,8 +259,7 @@
       "route": "components",
       "expectedTargets": [
         "search.root"
-      ],
-      "stateSignature": "state-e43534e6"
+      ]
     },
     {
       "id": "global.search.filtered",
@@ -295,8 +269,7 @@
       "route": "components",
       "expectedTargets": [
         "search.root"
-      ],
-      "stateSignature": "state-e43534e6"
+      ]
     },
     {
       "id": "global.search.empty",
@@ -306,8 +279,7 @@
       "route": "components",
       "expectedTargets": [
         "search.root"
-      ],
-      "stateSignature": "state-b0fc9e16"
+      ]
     },
     {
       "id": "global.search.error",
@@ -317,8 +289,7 @@
       "route": "components",
       "expectedTargets": [
         "search.root"
-      ],
-      "stateSignature": "state-0a3b8f38"
+      ]
     },
     {
       "id": "global.confirmation.neutral",
@@ -328,8 +299,7 @@
       "route": "components",
       "expectedTargets": [
         "confirm.root"
-      ],
-      "stateSignature": "state-2cf2a1b0"
+      ]
     },
     {
       "id": "global.confirmation.destructive",
@@ -339,8 +309,7 @@
       "route": "components",
       "expectedTargets": [
         "confirm.root"
-      ],
-      "stateSignature": "state-dba18269"
+      ]
     },
     {
       "id": "global.toast.neutral",
@@ -350,8 +319,7 @@
       "route": "components",
       "expectedTargets": [
         "toast.status"
-      ],
-      "stateSignature": "state-e12d288e"
+      ]
     },
     {
       "id": "global.toast.success",
@@ -361,8 +329,7 @@
       "route": "components",
       "expectedTargets": [
         "toast.status"
-      ],
-      "stateSignature": "state-ddf13823"
+      ]
     },
     {
       "id": "global.toast.error",
@@ -372,8 +339,7 @@
       "route": "components",
       "expectedTargets": [
         "toast.status"
-      ],
-      "stateSignature": "state-0f96682f"
+      ]
     },
     {
       "id": "global.capture.active",
@@ -383,8 +349,7 @@
       "route": "components",
       "expectedTargets": [
         "shell.root"
-      ],
-      "stateSignature": "state-a668b7c5"
+      ]
     },
     {
       "id": "global.capture.backgrounded",
@@ -394,8 +359,7 @@
       "route": "components",
       "expectedTargets": [
         "capture.status"
-      ],
-      "stateSignature": "state-d7baba0d"
+      ]
     },
     {
       "id": "global.capture.complete",
@@ -405,8 +369,7 @@
       "route": "components",
       "expectedTargets": [
         "capture.status"
-      ],
-      "stateSignature": "state-c23ae76c"
+      ]
     },
     {
       "id": "global.capture.error",
@@ -416,8 +379,7 @@
       "route": "components",
       "expectedTargets": [
         "capture.status"
-      ],
-      "stateSignature": "state-7316edea"
+      ]
     },
     {
       "id": "global.offline",
@@ -427,8 +389,7 @@
       "route": "components",
       "expectedTargets": [
         "shell.root"
-      ],
-      "stateSignature": "state-cfee88bc"
+      ]
     },
     {
       "id": "global.service-error",
@@ -438,8 +399,7 @@
       "route": "components",
       "expectedTargets": [
         "components.list-unreachable"
-      ],
-      "stateSignature": "state-a79184a6"
+      ]
     },
     {
       "id": "global.stale",
@@ -449,8 +409,7 @@
       "route": "components",
       "expectedTargets": [
         "shell.root"
-      ],
-      "stateSignature": "state-ce104fea"
+      ]
     },
     {
       "id": "global.source-promotion.unavailable",
@@ -460,8 +419,7 @@
       "route": "components",
       "expectedTargets": [
         "shell.root"
-      ],
-      "stateSignature": "state-66f78032"
+      ]
     },
     {
       "id": "global.source-promotion.ready",
@@ -471,8 +429,7 @@
       "route": "components",
       "expectedTargets": [
         "shell.root"
-      ],
-      "stateSignature": "state-f015aca1"
+      ]
     },
     {
       "id": "global.source-promotion.blocked",
@@ -482,8 +439,7 @@
       "route": "components",
       "expectedTargets": [
         "shell.root"
-      ],
-      "stateSignature": "state-e7a72340"
+      ]
     },
     {
       "id": "global.source-promotion.success",
@@ -493,8 +449,7 @@
       "route": "components",
       "expectedTargets": [
         "shell.root"
-      ],
-      "stateSignature": "state-09092b5d"
+      ]
     },
     {
       "id": "global.source-promotion.failure",
@@ -504,8 +459,7 @@
       "route": "components",
       "expectedTargets": [
         "shell.root"
-      ],
-      "stateSignature": "state-74564f16"
+      ]
     },
     {
       "id": "components.full-data",
@@ -520,8 +474,7 @@
         "component-browser.documents",
         "component-browser.related",
         "component-browser.provenance"
-      ],
-      "stateSignature": "state-127bee0c"
+      ]
     },
     {
       "id": "components.empty",
@@ -531,8 +484,7 @@
       "route": "components",
       "expectedTargets": [
         "components.empty"
-      ],
-      "stateSignature": "state-717cff79"
+      ]
     },
     {
       "id": "components.loading",
@@ -542,8 +494,7 @@
       "route": "components",
       "expectedTargets": [
         "components.list-loading"
-      ],
-      "stateSignature": "state-e9f1c69a"
+      ]
     },
     {
       "id": "components.server-error",
@@ -553,8 +504,7 @@
       "route": "components",
       "expectedTargets": [
         "components.list-failed"
-      ],
-      "stateSignature": "state-fb30803d"
+      ]
     },
     {
       "id": "components.no-selection",
@@ -564,8 +514,7 @@
       "route": "components",
       "expectedTargets": [
         "component-browser.empty"
-      ],
-      "stateSignature": "state-300ee20b"
+      ]
     },
     {
       "id": "components.no-matches",
@@ -575,8 +524,7 @@
       "route": "components",
       "expectedTargets": [
         "components.list-no-match"
-      ],
-      "stateSignature": "state-ab508fdc"
+      ]
     },
     {
       "id": "components.complete-only",
@@ -586,8 +534,7 @@
       "route": "components",
       "expectedTargets": [
         "components.root"
-      ],
-      "stateSignature": "state-2ec286a7"
+      ]
     },
     {
       "id": "components.duplicates-only",
@@ -597,8 +544,7 @@
       "route": "components",
       "expectedTargets": [
         "components.root"
-      ],
-      "stateSignature": "state-d3cab630"
+      ]
     },
     {
       "id": "components.category-filter",
@@ -608,8 +554,7 @@
       "route": "components",
       "expectedTargets": [
         "components.root"
-      ],
-      "stateSignature": "state-b1b8f7e8"
+      ]
     },
     {
       "id": "components.incomplete",
@@ -619,8 +564,7 @@
       "route": "components",
       "expectedTargets": [
         "components.root"
-      ],
-      "stateSignature": "state-f321a699"
+      ]
     },
     {
       "id": "components.missing-model",
@@ -630,8 +574,7 @@
       "route": "components",
       "expectedTargets": [
         "components.root"
-      ],
-      "stateSignature": "state-bd202582"
+      ]
     },
     {
       "id": "components.missing-symbol",
@@ -641,8 +584,7 @@
       "route": "components",
       "expectedTargets": [
         "components.root"
-      ],
-      "stateSignature": "state-7f5add40"
+      ]
     },
     {
       "id": "components.missing-footprint",
@@ -652,8 +594,7 @@
       "route": "components",
       "expectedTargets": [
         "components.root"
-      ],
-      "stateSignature": "state-d9dd0848"
+      ]
     },
     {
       "id": "components.cad-source-conflict",
@@ -663,8 +604,7 @@
       "route": "components",
       "expectedTargets": [
         "components.root"
-      ],
-      "stateSignature": "state-8678982f"
+      ]
     },
     {
       "id": "components.spec-conflict",
@@ -674,8 +614,7 @@
       "route": "components",
       "expectedTargets": [
         "components.root"
-      ],
-      "stateSignature": "state-7043de2b"
+      ]
     },
     {
       "id": "components.pinout-absent",
@@ -685,8 +624,7 @@
       "route": "components",
       "expectedTargets": [
         "components.root"
-      ],
-      "stateSignature": "state-8a2dc4f7"
+      ]
     },
     {
       "id": "components.sourcing-sparse",
@@ -696,8 +634,7 @@
       "route": "components",
       "expectedTargets": [
         "components.root"
-      ],
-      "stateSignature": "state-49c56ae6"
+      ]
     },
     {
       "id": "components.offer-failure",
@@ -707,8 +644,7 @@
       "route": "components",
       "expectedTargets": [
         "components.root"
-      ],
-      "stateSignature": "state-13db627f"
+      ]
     },
     {
       "id": "components.documents-empty",
@@ -718,8 +654,7 @@
       "route": "components",
       "expectedTargets": [
         "components.root"
-      ],
-      "stateSignature": "state-76b11712"
+      ]
     },
     {
       "id": "components.related-empty",
@@ -729,8 +664,7 @@
       "route": "components",
       "expectedTargets": [
         "components.root"
-      ],
-      "stateSignature": "state-5460465d"
+      ]
     },
     {
       "id": "components.provenance-conflict",
@@ -740,8 +674,7 @@
       "route": "components",
       "expectedTargets": [
         "component-browser.sources-sheet"
-      ],
-      "stateSignature": "state-bb0db593"
+      ]
     },
     {
       "id": "components.preview-3d",
@@ -751,8 +684,7 @@
       "route": "components",
       "expectedTargets": [
         "components.root"
-      ],
-      "stateSignature": "state-db4c418e"
+      ]
     },
     {
       "id": "components.preview-symbol",
@@ -762,8 +694,7 @@
       "route": "components",
       "expectedTargets": [
         "components.root"
-      ],
-      "stateSignature": "state-b3086807"
+      ]
     },
     {
       "id": "components.preview-footprint",
@@ -773,8 +704,7 @@
       "route": "components",
       "expectedTargets": [
         "components.root"
-      ],
-      "stateSignature": "state-c2693af4"
+      ]
     },
     {
       "id": "components.complete-part-ready",
@@ -784,8 +714,7 @@
       "route": "components",
       "expectedTargets": [
         "component-browser.complete-component"
-      ],
-      "stateSignature": "state-5ddb8f74"
+      ]
     },
     {
       "id": "components.complete-part-partial",
@@ -795,8 +724,7 @@
       "route": "components",
       "expectedTargets": [
         "component-browser.complete-component"
-      ],
-      "stateSignature": "state-4ebbf7f4"
+      ]
     },
     {
       "id": "components.complete-part-blocked",
@@ -806,8 +734,7 @@
       "route": "components",
       "expectedTargets": [
         "component-browser.complete-component"
-      ],
-      "stateSignature": "state-db46d591"
+      ]
     },
     {
       "id": "components.bulk-import",
@@ -817,8 +744,7 @@
       "route": "components",
       "expectedTargets": [
         "ingest.bulk"
-      ],
-      "stateSignature": "state-86d989ee"
+      ]
     },
     {
       "id": "components.offers-open",
@@ -828,8 +754,7 @@
       "route": "components",
       "expectedTargets": [
         "component-browser.sourcing-sheet"
-      ],
-      "stateSignature": "state-948886f1"
+      ]
     },
     {
       "id": "components.variant-alternatives",
@@ -839,8 +764,7 @@
       "route": "components",
       "expectedTargets": [
         "component-browser.complete-component"
-      ],
-      "stateSignature": "state-5ddb8f74"
+      ]
     },
     {
       "id": "components.variant-pending",
@@ -850,8 +774,7 @@
       "route": "components",
       "expectedTargets": [
         "component-browser.complete-component"
-      ],
-      "stateSignature": "state-5ddb8f74"
+      ]
     },
     {
       "id": "components.diff-open",
@@ -861,8 +784,7 @@
       "route": "components",
       "expectedTargets": [
         "component-browser.sources-sheet"
-      ],
-      "stateSignature": "state-bb0db593"
+      ]
     },
     {
       "id": "components.pinout-open",
@@ -872,8 +794,7 @@
       "route": "components",
       "expectedTargets": [
         "component-browser.pinout-table"
-      ],
-      "stateSignature": "state-4b96b2bf"
+      ]
     },
     {
       "id": "components.delete-confirm",
@@ -883,8 +804,7 @@
       "route": "components",
       "expectedTargets": [
         "components.root"
-      ],
-      "stateSignature": "state-c9f8f8e8"
+      ]
     },
     {
       "id": "provider.loading",
@@ -895,8 +815,7 @@
       "expectedTargets": [
         "component-browser.complete-component",
         "component-browser.provider-browser"
-      ],
-      "stateSignature": "state-eef681ba"
+      ]
     },
     {
       "id": "provider.ready",
@@ -907,8 +826,7 @@
       "expectedTargets": [
         "component-browser.complete-component",
         "component-browser.provider-browser"
-      ],
-      "stateSignature": "state-486e1baf"
+      ]
     },
     {
       "id": "provider.sign-in",
@@ -919,8 +837,7 @@
       "expectedTargets": [
         "component-browser.complete-component",
         "component-browser.provider-browser"
-      ],
-      "stateSignature": "state-20ddfdbf"
+      ]
     },
     {
       "id": "provider.waiting-for-person",
@@ -931,8 +848,7 @@
       "expectedTargets": [
         "component-browser.complete-component",
         "component-browser.provider-browser"
-      ],
-      "stateSignature": "state-08642f31"
+      ]
     },
     {
       "id": "provider.format-selection",
@@ -943,8 +859,7 @@
       "expectedTargets": [
         "component-browser.complete-component",
         "component-browser.provider-browser"
-      ],
-      "stateSignature": "state-e3d4e711"
+      ]
     },
     {
       "id": "provider.download-armed",
@@ -955,8 +870,7 @@
       "expectedTargets": [
         "component-browser.complete-component",
         "component-browser.provider-browser"
-      ],
-      "stateSignature": "state-d6ee3d8b"
+      ]
     },
     {
       "id": "provider.one-file",
@@ -967,8 +881,7 @@
       "expectedTargets": [
         "component-browser.complete-component",
         "component-browser.provider-browser"
-      ],
-      "stateSignature": "state-6fbd9584"
+      ]
     },
     {
       "id": "provider.multiple-files",
@@ -979,8 +892,7 @@
       "expectedTargets": [
         "component-browser.complete-component",
         "component-browser.provider-browser"
-      ],
-      "stateSignature": "state-87475e21"
+      ]
     },
     {
       "id": "provider.partial-retained",
@@ -991,8 +903,7 @@
       "expectedTargets": [
         "component-browser.complete-component",
         "component-browser.provider-browser"
-      ],
-      "stateSignature": "state-e0c13f2b"
+      ]
     },
     {
       "id": "provider.unavailable",
@@ -1003,8 +914,7 @@
       "expectedTargets": [
         "component-browser.complete-component",
         "component-browser.provider-browser"
-      ],
-      "stateSignature": "state-fbcefd87"
+      ]
     },
     {
       "id": "provider.timeout",
@@ -1015,8 +925,7 @@
       "expectedTargets": [
         "component-browser.complete-component",
         "component-browser.provider-browser"
-      ],
-      "stateSignature": "state-4c42c2b1"
+      ]
     },
     {
       "id": "provider.canceled",
@@ -1027,8 +936,7 @@
       "expectedTargets": [
         "component-browser.complete-component",
         "component-browser.provider-browser"
-      ],
-      "stateSignature": "state-dfc90bb3"
+      ]
     },
     {
       "id": "provider.error",
@@ -1039,8 +947,7 @@
       "expectedTargets": [
         "component-browser.complete-component",
         "component-browser.provider-browser"
-      ],
-      "stateSignature": "state-b7078c7b"
+      ]
     },
     {
       "id": "provider.selected-file-recovery",
@@ -1051,8 +958,7 @@
       "expectedTargets": [
         "component-browser.complete-component",
         "component-browser.provider-browser"
-      ],
-      "stateSignature": "state-0694f42f"
+      ]
     },
     {
       "id": "provider.returned-to-stockroom",
@@ -1063,8 +969,7 @@
       "expectedTargets": [
         "component-browser.complete-component",
         "component-browser.provider-browser"
-      ],
-      "stateSignature": "state-2c1200cf"
+      ]
     },
     {
       "id": "provider.complete",
@@ -1075,8 +980,7 @@
       "expectedTargets": [
         "component-browser.complete-component",
         "component-browser.provider-browser"
-      ],
-      "stateSignature": "state-87a78207"
+      ]
     },
     {
       "id": "projects.loading",
@@ -1087,8 +991,7 @@
       "expectedTargets": [
         "projects.picker.loading",
         "projects.loading"
-      ],
-      "stateSignature": "state-26e7359a"
+      ]
     },
     {
       "id": "projects.empty",
@@ -1098,8 +1001,7 @@
       "route": "projects",
       "expectedTargets": [
         "projects.empty"
-      ],
-      "stateSignature": "state-c9ef5baf"
+      ]
     },
     {
       "id": "projects.list-error",
@@ -1109,8 +1011,7 @@
       "route": "projects",
       "expectedTargets": [
         "projects.picker.failed"
-      ],
-      "stateSignature": "state-bb6292e1"
+      ]
     },
     {
       "id": "projects.workspace-error",
@@ -1120,8 +1021,7 @@
       "route": "projects",
       "expectedTargets": [
         "projects.workspace.error"
-      ],
-      "stateSignature": "state-70b8f966"
+      ]
     },
     {
       "id": "projects.kicad.overview",
@@ -1131,8 +1031,7 @@
       "route": "projects",
       "expectedTargets": [
         "projects.overview"
-      ],
-      "stateSignature": "state-6c8e3a53"
+      ]
     },
     {
       "id": "projects.kicad.bom",
@@ -1142,8 +1041,7 @@
       "route": "projects",
       "expectedTargets": [
         "projects.bom"
-      ],
-      "stateSignature": "state-01cddf99"
+      ]
     },
     {
       "id": "projects.kicad.build",
@@ -1153,8 +1051,7 @@
       "route": "projects",
       "expectedTargets": [
         "projects.build"
-      ],
-      "stateSignature": "state-b83de3e5"
+      ]
     },
     {
       "id": "projects.kicad.activity",
@@ -1164,8 +1061,7 @@
       "route": "projects",
       "expectedTargets": [
         "projects.activity"
-      ],
-      "stateSignature": "state-da9160e7"
+      ]
     },
     {
       "id": "projects.altium.overview",
@@ -1175,8 +1071,7 @@
       "route": "projects",
       "expectedTargets": [
         "projects.overview"
-      ],
-      "stateSignature": "state-d84b99b5"
+      ]
     },
     {
       "id": "projects.altium.bom",
@@ -1186,8 +1081,7 @@
       "route": "projects",
       "expectedTargets": [
         "projects.bom"
-      ],
-      "stateSignature": "state-23d5b1e7"
+      ]
     },
     {
       "id": "projects.altium.build",
@@ -1197,8 +1091,7 @@
       "route": "projects",
       "expectedTargets": [
         "projects.build"
-      ],
-      "stateSignature": "state-9a0978e3"
+      ]
     },
     {
       "id": "projects.altium.activity",
@@ -1208,8 +1101,7 @@
       "route": "projects",
       "expectedTargets": [
         "projects.activity"
-      ],
-      "stateSignature": "state-25147cc9"
+      ]
     },
     {
       "id": "projects.render-blocked",
@@ -1220,8 +1112,7 @@
       "expectedTargets": [
         "projects.overview",
         "projects.native-action-blocked"
-      ],
-      "stateSignature": "state-2701b15e"
+      ]
     },
     {
       "id": "projects.native-render-ready",
@@ -1232,8 +1123,7 @@
       "expectedTargets": [
         "projects.overview",
         "projects.native-board-render"
-      ],
-      "stateSignature": "state-d2f1715a"
+      ]
     },
     {
       "id": "projects.missing-kicad",
@@ -1244,8 +1134,7 @@
       "expectedTargets": [
         "projects.overview",
         "projects.runtime-missing"
-      ],
-      "stateSignature": "state-1f4cdb6b"
+      ]
     },
     {
       "id": "projects.missing-altium",
@@ -1256,8 +1145,7 @@
       "expectedTargets": [
         "projects.overview",
         "projects.runtime-missing"
-      ],
-      "stateSignature": "state-5b6cf382"
+      ]
     },
     {
       "id": "projects.overlay-blocked",
@@ -1268,8 +1156,7 @@
       "expectedTargets": [
         "projects.overview",
         "projects.placement-blocked"
-      ],
-      "stateSignature": "state-012193e4"
+      ]
     },
     {
       "id": "projects.no-repository",
@@ -1280,8 +1167,7 @@
       "expectedTargets": [
         "projects.activity",
         "projects.no-repository"
-      ],
-      "stateSignature": "state-ac604398"
+      ]
     },
     {
       "id": "projects.diverged",
@@ -1292,8 +1178,7 @@
       "expectedTargets": [
         "projects.activity",
         "projects.repository-diverged"
-      ],
-      "stateSignature": "state-b8218d44"
+      ]
     },
     {
       "id": "projects.shared-review",
@@ -1304,8 +1189,7 @@
       "expectedTargets": [
         "projects.activity",
         "projects.shared-review"
-      ],
-      "stateSignature": "state-86fa4044"
+      ]
     },
     {
       "id": "projects.build-complete",
@@ -1316,8 +1200,7 @@
       "expectedTargets": [
         "projects.build",
         "projects.build-complete"
-      ],
-      "stateSignature": "state-7e2d72ab"
+      ]
     },
     {
       "id": "stm.index-missing",
@@ -1327,8 +1210,7 @@
       "route": "stm",
       "expectedTargets": [
         "stm.root"
-      ],
-      "stateSignature": "state-e0357a0f"
+      ]
     },
     {
       "id": "stm.index-building",
@@ -1338,8 +1220,7 @@
       "route": "stm",
       "expectedTargets": [
         "stm.root"
-      ],
-      "stateSignature": "state-bf473230"
+      ]
     },
     {
       "id": "stm.index-error",
@@ -1349,8 +1230,7 @@
       "route": "stm",
       "expectedTargets": [
         "stm.root"
-      ],
-      "stateSignature": "state-ff439dd7"
+      ]
     },
     {
       "id": "stm.explorer-loading",
@@ -1360,8 +1240,7 @@
       "route": "stm",
       "expectedTargets": [
         "stm.root"
-      ],
-      "stateSignature": "state-4ea2f08d"
+      ]
     },
     {
       "id": "stm.explorer-error",
@@ -1371,8 +1250,7 @@
       "route": "stm",
       "expectedTargets": [
         "stm.root"
-      ],
-      "stateSignature": "state-624d9e97"
+      ]
     },
     {
       "id": "stm.explorer-empty",
@@ -1382,8 +1260,7 @@
       "route": "stm",
       "expectedTargets": [
         "stm.root"
-      ],
-      "stateSignature": "state-131d2599"
+      ]
     },
     {
       "id": "stm.explorer-matrix",
@@ -1393,8 +1270,7 @@
       "route": "stm",
       "expectedTargets": [
         "stm.root"
-      ],
-      "stateSignature": "state-95523469"
+      ]
     },
     {
       "id": "stm.explorer-selected-mcu",
@@ -1404,8 +1280,7 @@
       "route": "stm",
       "expectedTargets": [
         "stm.root"
-      ],
-      "stateSignature": "state-32131ca4"
+      ]
     },
     {
       "id": "stm.explorer-selected-package",
@@ -1415,8 +1290,7 @@
       "route": "stm",
       "expectedTargets": [
         "stm.root"
-      ],
-      "stateSignature": "state-c8034838"
+      ]
     },
     {
       "id": "stm.explorer-selected-pin",
@@ -1426,8 +1300,7 @@
       "route": "stm",
       "expectedTargets": [
         "stm.root"
-      ],
-      "stateSignature": "state-91756073"
+      ]
     },
     {
       "id": "stm.explorer-pinout",
@@ -1437,8 +1310,7 @@
       "route": "stm",
       "expectedTargets": [
         "stm.root"
-      ],
-      "stateSignature": "state-2cd01f3a"
+      ]
     },
     {
       "id": "stm.explorer-af-options",
@@ -1448,8 +1320,7 @@
       "route": "stm",
       "expectedTargets": [
         "stm.root"
-      ],
-      "stateSignature": "state-91756073"
+      ]
     },
     {
       "id": "stm.target-definition",
@@ -1460,8 +1331,7 @@
       "expectedTargets": [
         "stm.root",
         "stm.target-definition"
-      ],
-      "stateSignature": "state-2a2b062e"
+      ]
     },
     {
       "id": "stm.target-evidence",
@@ -1472,8 +1342,7 @@
       "expectedTargets": [
         "stm.root",
         "stm.target-definition"
-      ],
-      "stateSignature": "state-2a2b062e"
+      ]
     },
     {
       "id": "stm.target-policy",
@@ -1485,8 +1354,7 @@
         "stm.root",
         "stm.bench",
         "stm.target-policy"
-      ],
-      "stateSignature": "state-347fb4ca"
+      ]
     },
     {
       "id": "stm.target-package-map",
@@ -1498,8 +1366,7 @@
         "stm.root",
         "stm.target-definition",
         "stm.target-map"
-      ],
-      "stateSignature": "state-77b5671c"
+      ]
     },
     {
       "id": "stm.compatibility-ready",
@@ -1509,8 +1376,7 @@
       "route": "stm",
       "expectedTargets": [
         "stm.root"
-      ],
-      "stateSignature": "state-4723687a"
+      ]
     },
     {
       "id": "stm.compatibility-conflict",
@@ -1519,9 +1385,9 @@
       "group": "STM Viewer",
       "route": "stm",
       "expectedTargets": [
-        "stm.root"
-      ],
-      "stateSignature": "state-4723687a"
+        "stm.root",
+        "stm.target-definition"
+      ]
     },
     {
       "id": "stm.bench-part-selection",
@@ -1531,8 +1397,7 @@
       "route": "stm",
       "expectedTargets": [
         "stm.root"
-      ],
-      "stateSignature": "state-4723687a"
+      ]
     },
     {
       "id": "stm.bench-socket-solution",
@@ -1542,8 +1407,7 @@
       "route": "stm",
       "expectedTargets": [
         "stm.root"
-      ],
-      "stateSignature": "state-4723687a"
+      ]
     },
     {
       "id": "stm.bench-blocked",
@@ -1553,8 +1417,7 @@
       "route": "stm",
       "expectedTargets": [
         "stm.root"
-      ],
-      "stateSignature": "state-fadd032a"
+      ]
     },
     {
       "id": "settings.appearance.ready",
@@ -1564,8 +1427,7 @@
       "route": "settings",
       "expectedTargets": [
         "settings.appearance"
-      ],
-      "stateSignature": "state-fafb74d3"
+      ]
     },
     {
       "id": "settings.libraries.ready",
@@ -1575,8 +1437,7 @@
       "route": "settings",
       "expectedTargets": [
         "settings.profiles"
-      ],
-      "stateSignature": "state-6e22a804"
+      ]
     },
     {
       "id": "settings.libraries.attention",
@@ -1586,8 +1447,7 @@
       "route": "settings",
       "expectedTargets": [
         "settings.profiles"
-      ],
-      "stateSignature": "state-c215243e"
+      ]
     },
     {
       "id": "settings.libraries.error",
@@ -1597,8 +1457,7 @@
       "route": "settings",
       "expectedTargets": [
         "settings.profiles"
-      ],
-      "stateSignature": "state-31dd8f6a"
+      ]
     },
     {
       "id": "settings.libraries.create",
@@ -1608,8 +1467,7 @@
       "route": "settings",
       "expectedTargets": [
         "settings.profiles"
-      ],
-      "stateSignature": "state-6e22a804"
+      ]
     },
     {
       "id": "settings.libraries.clone",
@@ -1619,8 +1477,7 @@
       "route": "settings",
       "expectedTargets": [
         "settings.profiles"
-      ],
-      "stateSignature": "state-6e22a804"
+      ]
     },
     {
       "id": "settings.libraries.current",
@@ -1630,8 +1487,7 @@
       "route": "settings",
       "expectedTargets": [
         "settings.profiles"
-      ],
-      "stateSignature": "state-6e22a804"
+      ]
     },
     {
       "id": "settings.sync.ready",
@@ -1641,8 +1497,7 @@
       "route": "settings",
       "expectedTargets": [
         "settings.sync"
-      ],
-      "stateSignature": "state-64aa1639"
+      ]
     },
     {
       "id": "settings.sync.attention",
@@ -1652,8 +1507,7 @@
       "route": "settings",
       "expectedTargets": [
         "settings.sync"
-      ],
-      "stateSignature": "state-d3b3663d"
+      ]
     },
     {
       "id": "settings.sync.error",
@@ -1663,8 +1517,7 @@
       "route": "settings",
       "expectedTargets": [
         "settings.sync"
-      ],
-      "stateSignature": "state-a3fed00b"
+      ]
     },
     {
       "id": "settings.sync.syncing",
@@ -1674,8 +1527,7 @@
       "route": "settings",
       "expectedTargets": [
         "settings.sync"
-      ],
-      "stateSignature": "state-c910db89"
+      ]
     },
     {
       "id": "settings.sync.diverged",
@@ -1685,8 +1537,7 @@
       "route": "settings",
       "expectedTargets": [
         "settings.sync"
-      ],
-      "stateSignature": "state-58f51d89"
+      ]
     },
     {
       "id": "settings.kicad.ready",
@@ -1696,8 +1547,7 @@
       "route": "settings",
       "expectedTargets": [
         "settings.kicad"
-      ],
-      "stateSignature": "state-b50c9aed"
+      ]
     },
     {
       "id": "settings.kicad.attention",
@@ -1707,8 +1557,7 @@
       "route": "settings",
       "expectedTargets": [
         "settings.kicad"
-      ],
-      "stateSignature": "state-3f14e86f"
+      ]
     },
     {
       "id": "settings.kicad.error",
@@ -1718,8 +1567,7 @@
       "route": "settings",
       "expectedTargets": [
         "settings.kicad"
-      ],
-      "stateSignature": "state-75ff345f"
+      ]
     },
     {
       "id": "settings.kicad.picker",
@@ -1729,8 +1577,7 @@
       "route": "settings",
       "expectedTargets": [
         "settings.kicad"
-      ],
-      "stateSignature": "state-4602747b"
+      ]
     },
     {
       "id": "settings.altium.ready",
@@ -1740,8 +1587,7 @@
       "route": "settings",
       "expectedTargets": [
         "settings.altium"
-      ],
-      "stateSignature": "state-fdd6662d"
+      ]
     },
     {
       "id": "settings.altium.attention",
@@ -1751,8 +1597,7 @@
       "route": "settings",
       "expectedTargets": [
         "settings.altium"
-      ],
-      "stateSignature": "state-80a197af"
+      ]
     },
     {
       "id": "settings.altium.error",
@@ -1762,8 +1607,7 @@
       "route": "settings",
       "expectedTargets": [
         "settings.altium"
-      ],
-      "stateSignature": "state-3da83437"
+      ]
     },
     {
       "id": "settings.altium.setup-dialog",
@@ -1773,8 +1617,7 @@
       "route": "settings",
       "expectedTargets": [
         "altiumdb.setup-modal"
-      ],
-      "stateSignature": "state-7092f14c"
+      ]
     },
     {
       "id": "settings.altium.dblib-dialog",
@@ -1784,8 +1627,7 @@
       "route": "settings",
       "expectedTargets": [
         "altiumdb.modal"
-      ],
-      "stateSignature": "state-fa8eccf4"
+      ]
     },
     {
       "id": "settings.cubemx.ready",
@@ -1795,8 +1637,7 @@
       "route": "settings",
       "expectedTargets": [
         "settings.cubemx"
-      ],
-      "stateSignature": "state-3620ad81"
+      ]
     },
     {
       "id": "settings.cubemx.attention",
@@ -1806,8 +1647,7 @@
       "route": "settings",
       "expectedTargets": [
         "settings.cubemx"
-      ],
-      "stateSignature": "state-49f5a4cb"
+      ]
     },
     {
       "id": "settings.cubemx.error",
@@ -1817,8 +1657,7 @@
       "route": "settings",
       "expectedTargets": [
         "settings.cubemx"
-      ],
-      "stateSignature": "state-a3f6443f"
+      ]
     },
     {
       "id": "settings.cubemx.picker",
@@ -1828,8 +1667,7 @@
       "route": "settings",
       "expectedTargets": [
         "settings.cubemx"
-      ],
-      "stateSignature": "state-ecc4f173"
+      ]
     },
     {
       "id": "settings.distributors.ready",
@@ -1839,8 +1677,7 @@
       "route": "settings",
       "expectedTargets": [
         "settings.distributor"
-      ],
-      "stateSignature": "state-1b2e4496"
+      ]
     },
     {
       "id": "settings.distributors.attention",
@@ -1850,8 +1687,7 @@
       "route": "settings",
       "expectedTargets": [
         "settings.distributor"
-      ],
-      "stateSignature": "state-2c0d18be"
+      ]
     },
     {
       "id": "settings.distributors.error",
@@ -1861,8 +1697,7 @@
       "route": "settings",
       "expectedTargets": [
         "settings.distributor"
-      ],
-      "stateSignature": "state-5457dc20"
+      ]
     },
     {
       "id": "settings.distributors.credentials-partial",
@@ -1872,8 +1707,7 @@
       "route": "settings",
       "expectedTargets": [
         "settings.distributor"
-      ],
-      "stateSignature": "state-6921d2b5"
+      ]
     },
     {
       "id": "settings.distributors.credentials-refresh",
@@ -1883,8 +1717,7 @@
       "route": "settings",
       "expectedTargets": [
         "settings.distributor"
-      ],
-      "stateSignature": "state-1b2e4496"
+      ]
     },
     {
       "id": "settings.vendor-logins.ready",
@@ -1894,8 +1727,7 @@
       "route": "settings",
       "expectedTargets": [
         "settings.vendor-login-row"
-      ],
-      "stateSignature": "state-03c9154c"
+      ]
     },
     {
       "id": "settings.vendor-logins.attention",
@@ -1905,8 +1737,7 @@
       "route": "settings",
       "expectedTargets": [
         "settings.vendor-login-row"
-      ],
-      "stateSignature": "state-b9f89618"
+      ]
     },
     {
       "id": "settings.vendor-logins.error",
@@ -1916,8 +1747,7 @@
       "route": "settings",
       "expectedTargets": [
         "settings.vendor-login-row"
-      ],
-      "stateSignature": "state-d76c7f22"
+      ]
     },
     {
       "id": "settings.github.ready",
@@ -1927,8 +1757,7 @@
       "route": "settings",
       "expectedTargets": [
         "settings.github"
-      ],
-      "stateSignature": "state-078d2505"
+      ]
     },
     {
       "id": "settings.github.attention",
@@ -1938,8 +1767,7 @@
       "route": "settings",
       "expectedTargets": [
         "settings.github"
-      ],
-      "stateSignature": "state-c8938581"
+      ]
     },
     {
       "id": "settings.github.error",
@@ -1949,8 +1777,7 @@
       "route": "settings",
       "expectedTargets": [
         "settings.github"
-      ],
-      "stateSignature": "state-99123e07"
+      ]
     },
     {
       "id": "settings.updates.ready",
@@ -1960,8 +1787,7 @@
       "route": "settings",
       "expectedTargets": [
         "settings.update"
-      ],
-      "stateSignature": "state-e47f6078"
+      ]
     },
     {
       "id": "settings.updates.attention",
@@ -1971,8 +1797,7 @@
       "route": "settings",
       "expectedTargets": [
         "settings.update"
-      ],
-      "stateSignature": "state-d9e853e0"
+      ]
     },
     {
       "id": "settings.updates.error",
@@ -1982,8 +1807,7 @@
       "route": "settings",
       "expectedTargets": [
         "settings.update"
-      ],
-      "stateSignature": "state-df309a7a"
+      ]
     },
     {
       "id": "settings.maintenance.ready",
@@ -1992,9 +1816,8 @@
       "group": "Settings",
       "route": "settings",
       "expectedTargets": [
-        "settings.completion"
-      ],
-      "stateSignature": "state-0b8d7658"
+        "settings.derivation"
+      ]
     },
     {
       "id": "settings.maintenance.attention",
@@ -2003,9 +1826,8 @@
       "group": "Settings",
       "route": "settings",
       "expectedTargets": [
-        "settings.completion"
-      ],
-      "stateSignature": "state-38b52a1e"
+        "settings.derivation"
+      ]
     },
     {
       "id": "settings.maintenance.error",
@@ -2014,9 +1836,8 @@
       "group": "Settings",
       "route": "settings",
       "expectedTargets": [
-        "settings.completion"
-      ],
-      "stateSignature": "state-03015bce"
+        "settings.derivation"
+      ]
     },
     {
       "id": "settings.completion.ready",
@@ -2026,8 +1847,7 @@
       "route": "settings",
       "expectedTargets": [
         "settings.completion"
-      ],
-      "stateSignature": "state-0b8d7658"
+      ]
     },
     {
       "id": "settings.completion.attention",
@@ -2037,8 +1857,7 @@
       "route": "settings",
       "expectedTargets": [
         "settings.completion"
-      ],
-      "stateSignature": "state-38b52a1e"
+      ]
     },
     {
       "id": "settings.completion.error",
@@ -2048,8 +1867,7 @@
       "route": "settings",
       "expectedTargets": [
         "settings.completion"
-      ],
-      "stateSignature": "state-e8d4f9de"
+      ]
     },
     {
       "id": "settings.health.ready",
@@ -2059,8 +1877,7 @@
       "route": "settings",
       "expectedTargets": [
         "settings.health"
-      ],
-      "stateSignature": "state-01ef70f0"
+      ]
     },
     {
       "id": "settings.health.attention",
@@ -2070,8 +1887,7 @@
       "route": "settings",
       "expectedTargets": [
         "settings.health"
-      ],
-      "stateSignature": "state-c9f48726"
+      ]
     },
     {
       "id": "settings.health.error",
@@ -2081,8 +1897,7 @@
       "route": "settings",
       "expectedTargets": [
         "settings.health"
-      ],
-      "stateSignature": "state-ef540986"
+      ]
     },
     {
       "id": "settings.rescan.ready",
@@ -2092,8 +1907,7 @@
       "route": "settings",
       "expectedTargets": [
         "settings.rescan"
-      ],
-      "stateSignature": "state-5aa0837f"
+      ]
     },
     {
       "id": "settings.rescan.attention",
@@ -2103,8 +1917,7 @@
       "route": "settings",
       "expectedTargets": [
         "settings.rescan"
-      ],
-      "stateSignature": "state-7ee8a835"
+      ]
     },
     {
       "id": "settings.rescan.error",
@@ -2114,8 +1927,7 @@
       "route": "settings",
       "expectedTargets": [
         "settings.rescan"
-      ],
-      "stateSignature": "state-5ecee46d"
+      ]
     },
     {
       "id": "settings.reset-cad.confirmation",
@@ -2125,8 +1937,7 @@
       "route": "settings",
       "expectedTargets": [
         "confirm.root"
-      ],
-      "stateSignature": "state-a4113284"
+      ]
     }
   ]
 }

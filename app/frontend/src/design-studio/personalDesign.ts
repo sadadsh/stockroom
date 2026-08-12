@@ -26,10 +26,16 @@ export interface PersonalDesignController {
   hydrate: () => Promise<void>;
   replaceDocument: (document: unknown) => boolean;
   flush: () => Promise<void>;
+  flushForPageExit: () => void;
   dispose: () => void;
 }
 
 const AUTOSAVE_DELAY_MS = 400;
+const PAGE_EXIT_DOCUMENT_BUDGET_BYTES = 28 * 1024;
+
+function pageExitSafe(document: DesignDocument | null): boolean {
+  return document === null || new TextEncoder().encode(JSON.stringify(document)).byteLength <= PAGE_EXIT_DOCUMENT_BUDGET_BYTES;
+}
 
 function validDocument(value: unknown): DesignDocument | null {
   const parsed = parseDesignDocument(value);
@@ -58,6 +64,7 @@ export function createPersonalDesignController(
   let pendingDocument: DesignDocument | null = null;
   let pendingReady = false;
   let inFlight: Promise<void> | null = null;
+  let inFlightDocument: DesignDocument | null = null;
   let hydration: Promise<void> | null = null;
   let hydrationSettled = false;
   let flushRequested = false;
@@ -68,16 +75,17 @@ export function createPersonalDesignController(
     if (!disposed) listeners.forEach((listener) => listener());
   };
 
-  const savePending = (): Promise<void> => {
+  const savePending = (forPageExit = false): Promise<void> => {
     if (inFlight) return inFlight;
     if (!pendingDocument || blockedByConflict) return Promise.resolve();
 
     const savingDocument = pendingDocument;
+    inFlightDocument = savingDocument;
     pendingDocument = null;
     pendingReady = false;
     publish({ ...snapshot, personalState: "saving" });
 
-    const request = api.designStudioPut({
+    const request = (forPageExit ? api.designStudioPutForPageExit : api.designStudioPut)({
       document: savingDocument,
       expected_revision: snapshot.revision,
     });
@@ -107,6 +115,7 @@ export function createPersonalDesignController(
       })
       .finally(() => {
         inFlight = null;
+        inFlightDocument = null;
         if (pendingDocument && pendingReady && !blockedByConflict) void savePending();
       });
     return inFlight;
@@ -209,7 +218,13 @@ export function createPersonalDesignController(
               ? "saving"
               : "ready",
       });
-      if (hydrationSettled && !blockedByConflict) scheduleSave();
+      if (hydrationSettled && !blockedByConflict) {
+        if (pageExitSafe(document)) scheduleSave();
+        else {
+          pendingReady = true;
+          void savePending();
+        }
+      }
       return true;
     },
     flush: async () => {
@@ -220,6 +235,26 @@ export function createPersonalDesignController(
       pendingReady = true;
       await savePending();
       await waitForInFlight();
+    },
+    flushForPageExit: () => {
+      flushRequested = true;
+      if (!hydrationSettled) return;
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = null;
+      if (!pendingDocument) return;
+      if (!pageExitSafe(pendingDocument) || !pageExitSafe(inFlightDocument)) {
+        pendingReady = true;
+        void savePending();
+        return;
+      }
+      const closingDocument = pendingDocument;
+      pendingDocument = null;
+      pendingReady = false;
+      void api.designStudioPutForPageExit({
+        document: closingDocument,
+        expected_revision: snapshot.revision,
+        superseded_document: inFlightDocument,
+      }).catch(() => undefined);
     },
     dispose: () => {
       flushRequested = true;

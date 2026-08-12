@@ -18,6 +18,10 @@ from typing import BinaryIO
 from stockroom.store.machine_config import config_dir
 
 MAX_PERSONAL_DESIGN_BYTES = 2 * 1024 * 1024
+# Keepalive bodies share a browser-wide ~64 KiB quota. The page-exit handoff can carry two
+# documents, so only that endpoint uses the narrower bound. Ordinary storage keeps its established
+# 2 MiB contract and can load every already-valid personal design.
+MAX_PAGE_EXIT_DESIGN_BYTES = 28 * 1024
 PERSONAL_DESIGN_FILENAME = "design-studio.json"
 _LOCK_TIMEOUT_SECONDS = 5.0
 _LOCK_RETRY_SECONDS = 0.01
@@ -94,7 +98,7 @@ def _reject_json_constant(value: str) -> object:
     raise PersonalDesignValidationError(f"personal design contains invalid JSON constant {value}")
 
 
-def _validate_document(document: object) -> bytes:
+def _validate_document(document: object, max_bytes: int = MAX_PERSONAL_DESIGN_BYTES) -> bytes:
     if type(document) is not dict:
         raise PersonalDesignValidationError("personal design document must be a JSON object")
     schema_version = document.get("schemaVersion")
@@ -110,7 +114,7 @@ def _validate_document(document: object) -> bytes:
         ).encode("utf-8")
     except (TypeError, ValueError) as exc:
         raise PersonalDesignValidationError("personal design must be JSON serializable") from exc
-    if len(encoded) > MAX_PERSONAL_DESIGN_BYTES:
+    if len(encoded) > max_bytes:
         raise PersonalDesignValidationError("personal design is too large")
     return encoded
 
@@ -146,6 +150,26 @@ def _require_revision(current: PersonalDesignRecord | None, expected_revision: s
         raise PersonalDesignConflict("personal design revision is stale")
 
 
+def _replace_payload(path: Path, payload: bytes) -> None:
+    temporary: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            "wb",
+            dir=path.parent,
+            prefix=f".{path.name}.",
+            suffix=".tmp",
+            delete=False,
+        ) as stream:
+            temporary = Path(stream.name)
+            stream.write(payload)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, path)
+    finally:
+        if temporary is not None and temporary.exists():
+            temporary.unlink()
+
+
 def save_personal_design(
     document: dict[str, object],
     expected_revision: str | None,
@@ -156,23 +180,38 @@ def save_personal_design(
     with _exclusive_lock(path):
         current = load_personal_design(root)
         _require_revision(current, expected_revision)
-        temporary: Path | None = None
-        try:
-            with tempfile.NamedTemporaryFile(
-                "wb",
-                dir=path.parent,
-                prefix=f".{path.name}.",
-                suffix=".tmp",
-                delete=False,
-            ) as stream:
-                temporary = Path(stream.name)
-                stream.write(payload)
-                stream.flush()
-                os.fsync(stream.fileno())
-            os.replace(temporary, path)
-        finally:
-            if temporary is not None and temporary.exists():
-                temporary.unlink()
+        _replace_payload(path, payload)
+    return _record_from_bytes(payload)
+
+
+def save_personal_design_for_page_exit(
+    document: dict[str, object],
+    expected_revision: str | None,
+    superseded_document: dict[str, object] | None = None,
+    root: Path | None = None,
+) -> PersonalDesignRecord:
+    """Persist the newest closing-window draft after any older revisioned save.
+
+    Stockroom has one coordinator-owned application window. This explicit endpoint is the
+    unload handoff: whichever request reaches the lock first, a later ordinary save cannot
+    overwrite this document because its expected revision becomes stale.
+    """
+
+    payload = _validate_document(document, MAX_PAGE_EXIT_DESIGN_BYTES)
+    superseded_revision = (
+        _record_from_bytes(
+            _validate_document(superseded_document, MAX_PAGE_EXIT_DESIGN_BYTES)
+        ).revision
+        if superseded_document is not None
+        else None
+    )
+    path = _path(root)
+    with _exclusive_lock(path):
+        current = load_personal_design(root)
+        current_revision = current.revision if current is not None else None
+        if current_revision not in {expected_revision, superseded_revision}:
+            raise PersonalDesignConflict("personal design revision is stale")
+        _replace_payload(path, payload)
     return _record_from_bytes(payload)
 
 

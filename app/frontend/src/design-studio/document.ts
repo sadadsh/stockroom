@@ -99,11 +99,9 @@ export function builtInVariationDocument(): Record<string, DesignVariation> {
     {
       id,
       title,
-      extends: id === "full-data"
-        ? undefined
-        : id === "minimal"
-          ? "compact"
-          : "full-data",
+      ...(id === "full-data"
+        ? {}
+        : { extends: id === "minimal" ? "compact" : "full-data" }),
       patch: {},
     },
   ]));
@@ -150,10 +148,27 @@ function copyStringMap(value: unknown, nullable: boolean): Record<string, string
 
 function copyIcon(value: unknown): IconOverride | null {
   if (!isRecord(value)) return null;
-  const { body, swapToId } = value;
+  const { body, swapToId, strokeWidth, treatment, a11yLabel, alignment } = value;
   if (body !== undefined && typeof body !== "string") return null;
   if (swapToId !== undefined && typeof swapToId !== "string") return null;
-  return { ...(body === undefined ? {} : { body }), ...(swapToId === undefined ? {} : { swapToId }) };
+  if (strokeWidth !== undefined && (typeof strokeWidth !== "number" || !Number.isFinite(strokeWidth))) return null;
+  if (treatment !== undefined && treatment !== "line" && treatment !== "solid" && treatment !== "muted") return null;
+  if (a11yLabel !== undefined && typeof a11yLabel !== "string") return null;
+  if (
+    alignment !== undefined &&
+    alignment !== "baseline" &&
+    alignment !== "middle" &&
+    alignment !== "text-top" &&
+    alignment !== "text-bottom"
+  ) return null;
+  return {
+    ...(body === undefined ? {} : { body }),
+    ...(swapToId === undefined ? {} : { swapToId }),
+    ...(strokeWidth === undefined ? {} : { strokeWidth }),
+    ...(treatment === undefined ? {} : { treatment }),
+    ...(a11yLabel === undefined ? {} : { a11yLabel }),
+    ...(alignment === undefined ? {} : { alignment }),
+  };
 }
 
 function copyIcons(value: unknown, nullable: boolean): Record<string, IconOverride | null> | null {
@@ -595,6 +610,7 @@ export function parseDesignDocument(value: unknown): DesignDocumentParseResult {
   if (!base) return error("invalid-base", "Design document base must contain only valid override slices.");
 
   const variations = dictionary<DesignVariation>();
+  Object.assign(variations, builtInVariationDocument());
   if (value.variations !== undefined) {
     if (!isRecord(value.variations)) return error("invalid-variation", "Design document variations must be an object.");
     for (const [key, rawVariation] of Object.entries(value.variations)) {

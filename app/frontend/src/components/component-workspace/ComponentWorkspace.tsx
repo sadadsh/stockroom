@@ -67,6 +67,7 @@ export function ComponentWorkspace({
   initialSurface,
   initialPreview,
   initialConfirmDelete = false,
+  initialSourcesTab,
 }: {
   componentId: string;
   /** The component was removed. The page owns what happens to the selection afterwards. */
@@ -74,6 +75,7 @@ export function ComponentWorkspace({
   initialSurface?: WorkspaceSurface;
   initialPreview?: PreviewKind;
   initialConfirmDelete?: boolean;
+  initialSourcesTab?: import("./SourcesSheet").SourcesSheetTab;
 }) {
   const session = useUiSession();
   const view = componentView(session, componentId);
@@ -313,6 +315,7 @@ export function ComponentWorkspace({
               />
             }
             confirmDelete={confirmDelete}
+            initialSourcesTab={initialSourcesTab}
             deleting={deletePart.isPending}
             onCancelDelete={() => setConfirmDelete(false)}
             onConfirmDelete={() => {

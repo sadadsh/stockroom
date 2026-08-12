@@ -24,7 +24,6 @@ const scenarios = registryModule.bootstrapScenarioRegistry.scenarios.map((scenar
   group: scenario.group,
   route: scenario.route,
   expectedTargets: [...scenario.expectedTargets],
-  stateSignature: scenarioModule.scenarioStateSignature(scenario),
 }));
 
 await mkdir(path.dirname(output), { recursive: true });

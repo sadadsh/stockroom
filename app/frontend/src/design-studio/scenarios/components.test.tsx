@@ -1,6 +1,6 @@
 import { screen, within } from "@testing-library/react";
 import { bootstrapScenarioRegistry } from ".";
-import { componentScenarioIds } from "./components";
+import { componentScenarios } from "./components";
 import { mountScenario } from "./testHarness";
 
 const EXPECTED_COMPONENT_CASES = [
@@ -42,7 +42,7 @@ const EXPECTED_COMPONENT_CASES = [
 
 describe("Components Design Studio scenarios", () => {
   it("registers the exact Components case inventory with valid endpoint fixtures", () => {
-    expect(componentScenarioIds).toEqual(EXPECTED_COMPONENT_CASES);
+    expect(componentScenarios.map((scenario) => scenario.id)).toEqual(EXPECTED_COMPONENT_CASES);
     expect(
       bootstrapScenarioRegistry.issues.filter((issue) =>
         issue.scenarioId?.startsWith("components."),

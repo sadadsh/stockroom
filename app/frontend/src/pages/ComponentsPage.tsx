@@ -331,6 +331,7 @@ export function ComponentsPage() {
     surface: scenarioUi.components?.surface ?? null,
     preview: scenarioUi.components?.preview ?? null,
     confirmDelete: scenarioUi.components?.confirmDelete ?? false,
+    sourcesTab: scenarioUi.components?.sourcesTab ?? null,
   });
   useEffect(() => {
     if (partsFetching) return;
@@ -417,6 +418,7 @@ export function ComponentsPage() {
                 initialSurface={scenarioUi.components?.surface}
                 initialPreview={scenarioUi.components?.preview}
                 initialConfirmDelete={scenarioUi.components?.confirmDelete}
+                initialSourcesTab={scenarioUi.components?.sourcesTab}
               />
             ) : partsQuery.isLoading ? (
               <div
@@ -434,7 +436,11 @@ export function ComponentsPage() {
         </div>
 
         {searchOpen ? (
-          <SearchOverlay onClose={() => setSearchOpen(false)} onOpenPart={openFromSearch} />
+          <SearchOverlay
+            key={JSON.stringify(scenarioUi.search ?? {})}
+            onClose={() => setSearchOpen(false)}
+            onOpenPart={openFromSearch}
+          />
         ) : null}
 
     </div>

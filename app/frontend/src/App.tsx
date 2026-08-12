@@ -41,7 +41,7 @@ function ScenarioGlobalEffects() {
   const neutralTitle = useText("scenario.confirm.neutral", "Confirm Change");
   const destructiveTitle = useText("scenario.confirm.destructive", "Delete Component");
   useEffect(() => {
-    if (scenario.toast) toast(scenario.toast.message, scenario.toast.tone);
+    if (scenario.toast) return toast(scenario.toast.message, scenario.toast.tone, undefined, null);
   }, [scenario.toast, toast]);
   return (
     <ConfirmDialog

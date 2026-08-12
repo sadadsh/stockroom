@@ -12,9 +12,37 @@ function fixture(markup: string): HTMLElement {
 describe("target coverage", () => {
   it("fails when a meaningful interactive or visual boundary has no stable target", () => {
     const root = fixture("<section><button>Save</button></section>");
+    expect(coverageIssuesFor(root, DEV_IDS)).toEqual(
+      expect.arrayContaining([expect.objectContaining({ code: "missing-target" })]),
+    );
+    expect(coverageIssuesFor(root, DEV_IDS).some((issue) => issue.element.tagName === "BUTTON")).toBe(true);
+  });
+
+  it("lets one stable component target own its internal text and icon domains", () => {
+    const root = fixture(`
+      <button data-dev-id="rail.about"><span>About</span><svg viewBox="0 0 24 24"></svg></button>
+    `);
+    expect(coverageIssuesFor(root, DEV_IDS)).toEqual([]);
+  });
+
+  it("does not let a shell root hide an unaddressed nested control", () => {
+    const root = fixture('<main data-dev-id="shell.root"><button>Save</button></main>');
     expect(coverageIssuesFor(root, DEV_IDS)).toEqual([
-      expect.objectContaining({ code: "missing-target" }),
+      expect.objectContaining({ code: "missing-target", element: root.querySelector("button") }),
     ]);
+  });
+
+  it("does not let any broad page identity hide an unaddressed nested control", () => {
+    const root = fixture('<main data-dev-id="components.root"><div><button>Save</button></div></main>');
+    expect(coverageIssuesFor(root, DEV_IDS)).toEqual([
+      expect.objectContaining({ code: "missing-target", element: root.querySelector("button") }),
+    ]);
+  });
+
+  it("does not let a broad page identity absorb nested text or icon boundaries", () => {
+    const root = fixture('<main data-dev-id="components.root"><h2>Summary</h2><svg viewBox="0 0 24 24"></svg></main>');
+    const missing = coverageIssuesFor(root, DEV_IDS).filter((issue) => issue.code === "missing-target");
+    expect(missing.map((issue) => issue.element.tagName)).toEqual(expect.arrayContaining(["H2", "svg"]));
   });
 
   it("derives text, icon, layout, and interactive boundaries without opt-in markers", () => {
@@ -27,6 +55,22 @@ describe("target coverage", () => {
 
     expect(coverageIssuesFor(root, DEV_IDS)).toEqual([]);
     expect(root.querySelector("[data-design-meaningful]")).toBeNull();
+  });
+
+  it("reports unaddressed text, icon, and semantic layout boundaries without annotations", () => {
+    const root = fixture(`
+      <main>
+        <section aria-label="Summary">
+          <h2>Component Summary</h2>
+          <svg viewBox="0 0 24 24"></svg>
+        </section>
+      </main>
+    `);
+
+    const missingTags = coverageIssuesFor(root, DEV_IDS)
+      .filter((issue) => issue.code === "missing-target")
+      .map((issue) => issue.element.tagName.toLowerCase());
+    expect(missingTags).toEqual(expect.arrayContaining(["main", "section", "h2", "svg"]));
   });
 
   it("accepts registered dev, copy, icon, layout-piece, and approved dynamic identities", () => {

@@ -112,8 +112,18 @@ export function collectDesignIssues(
   }
   issues.push(...targetIssues(document, theme));
   if (targetRoot) {
-    for (const issue of coverageIssuesFor(targetRoot, DEV_IDS)) {
-      issues.push({ code: issue.code, source: "target", targetId: issue.targetId });
+    const productRoots = targetRoot instanceof Element && targetRoot.matches("[data-design-product-root]")
+      ? [targetRoot]
+      : Array.from(targetRoot.querySelectorAll("[data-design-product-root]"));
+    const coverageRoots: ParentNode[] = productRoots.length > 0
+      ? productRoots
+      : targetRoot instanceof Element
+        ? [targetRoot]
+        : [];
+    for (const coverageRoot of coverageRoots) {
+      for (const issue of coverageIssuesFor(coverageRoot, DEV_IDS)) {
+        issues.push({ code: issue.code, source: "target", targetId: issue.targetId });
+      }
     }
   }
   const resolved = resolveDesign(document, document.activeVariationId, theme);

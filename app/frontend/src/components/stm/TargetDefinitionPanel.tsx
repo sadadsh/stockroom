@@ -37,18 +37,22 @@ function selectedDefault(definition: TargetDefinitionDTO): string | null {
 // selection (and that had to read the whole `definition` while watching only its digest).
 export function TargetDefinitionPanel({
   definition,
+  evidenceOpen = false,
 }: {
   definition: TargetDefinitionDTO;
+  evidenceOpen?: boolean;
 }) {
   return (
-    <TargetDefinitionBody key={definition.artifact_digest} definition={definition} />
+    <TargetDefinitionBody key={`${definition.artifact_digest}:${evidenceOpen}`} definition={definition} evidenceOpen={evidenceOpen} />
   );
 }
 
 function TargetDefinitionBody({
   definition,
+  evidenceOpen,
 }: {
   definition: TargetDefinitionDTO;
+  evidenceOpen: boolean;
 }) {
   const [lens, setLens] = useState<TargetMapLens>("compatibility");
   const [activeLegendKey, setActiveLegendKey] = useState<string | null>(null);
@@ -221,7 +225,7 @@ function TargetDefinitionBody({
         </aside>
       </div>
 
-      <details className="flex-none border-t border-line bg-surface">
+      <details open={evidenceOpen} className="flex-none border-t border-line bg-surface">
         <summary className="cursor-pointer px-4 py-2 text-xs text-t2">
           <Text id="stm.target.definition-evidence">Definition Evidence</Text>
           <span className="ml-2 font-mono text-2xs text-t3">

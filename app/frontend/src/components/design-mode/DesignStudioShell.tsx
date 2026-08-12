@@ -15,7 +15,6 @@ import { ArrangePreferencesProvider } from "./ArrangeSurface";
 import { ScenarioCatalog } from "./ScenarioCatalog";
 import { PREVIEW_EFFECT_BLOCKED_EVENT, type PreviewEffectError } from "../../design-studio/previewEffects";
 import { useToast } from "../../lib/toast";
-import { scenarioStateSignature } from "../../design-studio/scenario";
 
 const LEFT_COLLAPSED_KEY = "stockroom.design-studio.left-collapsed";
 const RIGHT_COLLAPSED_KEY = "stockroom.design-studio.right-collapsed";
@@ -121,6 +120,7 @@ export function DesignStudioShell({ children }: { children: ReactNode }) {
   const [lastScenario] = useState(() => readPref("design_studio_last_scenario", LAST_SCENARIO_KEY, parseString, "global.real-data"));
   const [preferredMode] = useState(() => readPref("design_studio_mode", MODE_KEY, parseMode, "browse"));
   const previewRegionRef = useRef<HTMLDivElement | null>(null);
+  const [previewRegionWidth, setPreviewRegionWidth] = useState(0);
   const closingRef = useRef(false);
   const restoredOpenRef = useRef(false);
   const panStart = useRef<{ x: number; y: number; left: number; top: number } | null>(null);
@@ -215,6 +215,21 @@ export function DesignStudioShell({ children }: { children: ReactNode }) {
     if (studio.activeScenario === null) void flushPendingUiPrefs();
   }, [studio.activeScenario]);
 
+  useEffect(() => {
+    if (!studio.enabled) return;
+    const region = previewRegionRef.current;
+    if (!region) return;
+    const measure = () => setPreviewRegionWidth(region.clientWidth);
+    measure();
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure);
+    observer?.observe(region);
+    window.addEventListener("resize", measure);
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener("resize", measure);
+    };
+  }, [studio.enabled]);
+
   const setLeftPanelCollapsed = (collapsed: boolean) => {
     setLeftCollapsed(collapsed);
     writePref("design_studio_left_collapsed", collapsed, LEFT_COLLAPSED_KEY);
@@ -234,7 +249,7 @@ export function DesignStudioShell({ children }: { children: ReactNode }) {
   const presetWidth = RESPONSIVE_VIEWPORT_PRESETS.find((preset) => preset.id === viewport)?.width;
   const viewportWidth = presetWidth ?? Math.min(3840, Math.max(320, customViewportWidth || 320));
   const fitScale = zoom === 0
-    ? Math.min(1, Math.max(0.1, ((previewRegionRef.current?.clientWidth ?? viewportWidth) - 24) / viewportWidth))
+    ? Math.min(1, Math.max(0.1, ((previewRegionWidth || viewportWidth) - 24) / viewportWidth))
     : zoom / 100;
   const previewStyle: CSSProperties = {
     width: `${viewportWidth}px`,
@@ -263,6 +278,7 @@ export function DesignStudioShell({ children }: { children: ReactNode }) {
     writePref("design_studio_snap", next, SNAP_KEY);
   };
   const panByKey = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (event.target !== event.currentTarget) return;
     const delta = 80;
     if (event.key === "ArrowLeft") previewRegionRef.current!.scrollLeft -= delta;
     else if (event.key === "ArrowRight") previewRegionRef.current!.scrollLeft += delta;
@@ -273,7 +289,13 @@ export function DesignStudioShell({ children }: { children: ReactNode }) {
   };
   const beginPan = (event: ReactPointerEvent<HTMLDivElement>) => {
     const region = previewRegionRef.current;
-    if (!region) return;
+    const target = event.target;
+    if (
+      !region ||
+      event.button !== 0 ||
+      !(target instanceof Element) ||
+      target.closest("button, a, input, select, textarea, [contenteditable='true'], [role='button'], [role='slider'], [role='separator'], [data-design-control]")
+    ) return;
     panStart.current = { x: event.clientX, y: event.clientY, left: region.scrollLeft, top: region.scrollTop };
     region.setPointerCapture?.(event.pointerId);
   };
@@ -290,7 +312,6 @@ export function DesignStudioShell({ children }: { children: ReactNode }) {
       className={studio.enabled ? "fixed inset-0 z-[190] flex flex-col overflow-hidden bg-canvas text-t1" : "contents"}
       data-studio-mode={studio.enabled ? mode : undefined}
       data-scenario-id={studio.activeScenario?.id ?? "global.real-data"}
-      data-scenario-state={studio.activeScenario ? scenarioStateSignature(studio.activeScenario) : "real-data"}
       data-preview-live-product-requests={studio.activeScenario ? "0" : undefined}
     >
       {studio.enabled ? (
@@ -369,6 +390,7 @@ export function DesignStudioShell({ children }: { children: ReactNode }) {
           }
         >
           <div
+            data-design-product-root="true"
             className={studio.enabled ? "mx-auto min-h-full overflow-hidden border border-line bg-surface shadow-pop" : "contents"}
             style={studio.enabled ? previewStyle : undefined}
           >

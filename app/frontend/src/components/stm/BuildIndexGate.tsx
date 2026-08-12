@@ -16,8 +16,10 @@ import { useSettings, useUpdateSettings } from "../../api/queries";
 import { pickHostFolder } from "../../lib/hostFolderPicker";
 import { Button, Card, Eyebrow } from "../primitives";
 import { Text, useText } from "../../lib/copy";
+import { useScenarioUiState } from "../../design-studio/scenarioState";
 
 export function BuildIndexGate() {
+  const previewState = useScenarioUiState().stm?.indexState;
   const build = useBuildStmIndex();
   const status = useStmStatus();
   const qc = useQueryClient();
@@ -45,7 +47,7 @@ export function BuildIndexGate() {
     }
   }, [build.status, qc]);
 
-  const running = build.status === "running";
+  const running = build.status === "running" || previewState === "building";
   const checkingSource = status.isLoading && !status.data;
   const needsSource =
     status.data?.source_present === false ||
@@ -71,8 +73,8 @@ export function BuildIndexGate() {
         <Eyebrow className="mb-2">
           <Text id="stm.index.eyebrow">STM Index</Text>
         </Eyebrow>
-        <h2 className="mb-1.5 text-lg font-semibold text-t1">
-          <Text id="stm.index.title">Build the Index</Text>
+        <h2 className="mb-1.5 text-lg font-semibold text-t1" data-stm-index-state={previewState ?? "missing"}>
+          {previewState === "building" ? <Text id="stm.index.building-title">Building the Index</Text> : previewState === "error" ? <Text id="stm.index.error-title">Index Build Failed</Text> : previewState === "blocked" ? <Text id="stm.index.blocked-title">Compatibility Is Blocked</Text> : <Text id="stm.index.title">Build the Index</Text>}
         </h2>
         <p className="mb-4 text-sm text-t2">
           <Text id="stm.index.body">The STM32 spec matrix and pinout maps are served from a derived index built from the CubeMX source. It has not been built on this machine. Building runs once and takes a moment.</Text>
@@ -90,9 +92,9 @@ export function BuildIndexGate() {
           </div>
         ) : null}
 
-        {build.status === "error" ? (
+        {build.status === "error" || previewState === "error" ? (
           <p className="mb-4 text-sm text-err-text" data-testid="stm-build-error">
-            {needsSource ? needsSourceLabel : build.error}
+            {previewState === "error" ? <Text id="stm.index.preview-error">The last index build failed. Rerun after checking the CubeMX source.</Text> : needsSource ? needsSourceLabel : build.error}
           </p>
         ) : null}
 

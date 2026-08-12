@@ -1633,6 +1633,7 @@ def _promote(request: Request, body: object) -> dict:
     paths = [repo.root / rel for rel in _DEV_SOURCE_PATHS]
     paths.append(repo.root / "app" / "frontend-dist")
     revision: str | None = None
+    starting_revision = repo.head()
     with tempfile.TemporaryDirectory(prefix="stockroom-design-promotion-") as raw_snapshot:
         snapshot = Path(raw_snapshot)
         existing = _snapshot_promotion_paths(repo, snapshot, paths)
@@ -1653,20 +1654,20 @@ def _promote(request: Request, body: object) -> dict:
                     pass
             _restore_promotion_paths(repo, snapshot, paths, existing)
             raise
-
-    pushed = repo.push()
-    if not pushed.ok:
-        try:
-            recovery = repo.revert(revision)
-        except Exception as recovery_error:
+        pushed = repo.push()
+        if not pushed.ok:
+            try:
+                repo.rollback_commit(revision, starting_revision)
+                _restore_promotion_paths(repo, snapshot, paths, existing)
+            except Exception as recovery_error:
+                raise ApiError(
+                    503,
+                    f"Promotion commit {revision} could not be pushed ({pushed.reason}); automatic recovery failed: {recovery_error}",
+                ) from recovery_error
             raise ApiError(
                 503,
-                f"Promotion commit {revision} could not be pushed ({pushed.reason}); automatic recovery failed: {recovery_error}",
-            ) from recovery_error
-        raise ApiError(
-            503,
-            f"Promotion push failed ({pushed.reason}); source was recovered by {recovery} and the personal design was retained.",
-        )
+                f"Promotion push failed ({pushed.reason}); exact source and dist snapshot was restored and the personal design was retained.",
+            )
     return {
         "ok": True,
         "commit": revision,

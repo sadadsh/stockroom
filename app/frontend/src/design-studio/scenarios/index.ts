@@ -14,7 +14,6 @@ export { projectScenarios } from "./projects";
 export { providerScenarios } from "./provider";
 export { stmScenarios } from "./stm";
 export { settingsScenarios } from "./settings";
-export { scenarioStateSignature } from "../scenario";
 
 /** The shipped scenario set. Domain-specific scenarios are added by their owning feature. */
 export const bootstrapScenarioRegistry = registerScenarios(

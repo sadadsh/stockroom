@@ -659,10 +659,11 @@ function AppearanceSection() {
 }
 
 function LibraryRepositoriesSection() {
+  const scenarioMode = useScenarioUiState().settings?.libraryMode;
   const libraries = useOnboarding();
   const setLibrary = useSetLibrary();
   const { toast } = useToast();
-  const [mode, setMode] = useState<SetLibraryBody["mode"]>("create");
+  const [mode, setMode] = useState<SetLibraryBody["mode"] | "current">(scenarioMode ?? "create");
   const [path, setPath] = useState("");
   const [url, setUrl] = useState("");
   const cloneUrlLabel = useText("settings.library.clone-url", "Git Remote URL");
@@ -672,6 +673,9 @@ function LibraryRepositoriesSection() {
     "settings.library.toast-ready",
     "Catalog prepared at {root}.",
   );
+  useEffect(() => {
+    if (scenarioMode) setMode(scenarioMode);
+  }, [scenarioMode]);
 
   function apply(body: SetLibraryBody) {
     if (setLibrary.isPending) return;
@@ -736,7 +740,11 @@ function LibraryRepositoriesSection() {
         </div>
       )}
 
-      <div
+      {mode === "current" ? (
+        <p className="mt-3.5 text-xs text-t2">
+          <Text id="settings.library.current-note">The active catalog above receives component changes.</Text>
+        </p>
+      ) : <div
         className="mt-3.5 space-y-2.5"
         data-dev-id="settings.profiles-create"
       >
@@ -789,7 +797,7 @@ function LibraryRepositoriesSection() {
         <p className="text-xs text-t3">
           <Text id="settings.library.create-note">Creating a catalog initializes its own Git checkout. Stockroom source and other catalogs are never added to it.</Text>
         </p>
-      </div>
+      </div>}
     </>
   );
 }
@@ -1364,6 +1372,7 @@ function CubeMxSection() {
 }
 
 function DistributorSection() {
+  const credentialsRefresh = useScenarioUiState().settings?.credentialsRefresh === true;
   const settings = useSettings();
   const save = useUpdateSettings();
   const { toast } = useToast();
@@ -1434,6 +1443,11 @@ function DistributorSection() {
         className="mt-3.5 flex flex-wrap items-center gap-2.5"
         data-dev-id="settings.distributor-key"
       >
+        {credentialsRefresh ? (
+          <p className="w-full text-xs text-warn">
+            <Text id="settings.distributor.refresh-note">Replace the saved credentials, then validate source access.</Text>
+          </p>
+        ) : null}
         <label htmlFor="mouser-key" className="sr-only">
           <Text id="settings.distributor.key-field-label">Mouser API Credential</Text>
         </label>

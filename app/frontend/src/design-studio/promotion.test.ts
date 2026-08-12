@@ -102,6 +102,18 @@ describe("personal design source promotion", () => {
     expect(() => promotionPlan(document, "dark", null)).toThrow(PromotionValidationError);
   });
 
+  it("validates only the rendered product root, never Design Studio controls", () => {
+    const shell = document.createElement("div");
+    shell.innerHTML = `
+      <button>Make App Default</button>
+      <div data-design-product-root>
+        <button data-dev-id="rail.about">About</button>
+      </div>
+    `;
+
+    expect(collectDesignIssues(fixtureDocument(), "dark", shell)).toEqual([]);
+  });
+
   it("never invokes source APIs while a fixture scenario is active", async () => {
     const client = {
       devStatus: vi.fn(),

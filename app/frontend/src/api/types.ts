@@ -3044,6 +3044,10 @@ export interface PersonalDesignSaveBody {
   expected_revision: string | null;
 }
 
+export interface PersonalDesignPageExitBody extends PersonalDesignSaveBody {
+  superseded_document?: DesignDocument | null;
+}
+
 export interface PersonalDesignDeleteBody {
   expected_revision: string | null;
 }

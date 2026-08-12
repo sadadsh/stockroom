@@ -653,6 +653,45 @@ def test_design_promotion_restores_pre_source_and_dist_snapshot_when_build_fails
     assert repo.committed == []
 
 
+def test_design_promotion_restores_exact_bytes_and_head_when_push_fails(tmp_path, monkeypatch):
+    root = tmp_path / "repo"
+    src = root / "app" / "frontend" / "src"
+    lib = src / "lib"
+    dist = root / "app" / "frontend-dist"
+    lib.mkdir(parents=True)
+    dist.mkdir(parents=True)
+    monkeypatch.setattr(dev_mod, "_FRONTEND_SRC", src)
+    for rel in dev_mod._DEV_SOURCE_PATHS:
+        target = root / rel
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(f"owner-dirty-before:{rel}", encoding="utf-8")
+    (dist / "asset.js").write_text("owner-dist-before", encoding="utf-8")
+    before = {rel: (root / rel).read_bytes() for rel in dev_mod._DEV_SOURCE_PATHS}
+
+    class PushFailureRepo(_PublishRepo):
+        def __init__(self):
+            super().__init__(root, list(dev_mod._DEV_SOURCE_PATHS))
+            self.rolled_back = []
+
+        def push(self):
+            return SimpleNamespace(ok=False, reason="offline")
+
+        def rollback_commit(self, revision, previous):
+            self.rolled_back.append((revision, previous))
+
+    monkeypatch.setattr(dev_mod, "_run_frontend", lambda repo, command: None)
+    repo = PushFailureRepo()
+
+    with pytest.raises(dev_mod.ApiError) as caught:
+        dev_mod._promote(_publish_request(repo), _promotion_body())
+
+    assert caught.value.status == 503
+    assert "exact source and dist snapshot was restored" in caught.value.detail
+    assert repo.rolled_back == [("b" * 40, "a" * 40)]
+    assert {rel: (root / rel).read_bytes() for rel in dev_mod._DEV_SOURCE_PATHS} == before
+    assert (dist / "asset.js").read_text(encoding="utf-8") == "owner-dist-before"
+
+
 def test_dev_save_accepts_approved_dynamic_element_ids(client, tmp_path, monkeypatch):
     # An element that exists once per open component / staged candidate has no catalogue row, so its
     # id carries a bracketed instance value. Those ids must be writable - editing exactly one

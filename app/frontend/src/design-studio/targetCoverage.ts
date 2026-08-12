@@ -25,7 +25,7 @@ export interface TargetLayer {
 }
 
 const STABLE_COPY_ID = /^[A-Za-z][A-Za-z0-9]*(?:[.-][A-Za-z0-9]+)*$/;
-const MEANINGFUL_BOUNDARY_SELECTOR = [
+const INTERACTIVE_BOUNDARY_SELECTOR = [
   "button",
   "a[href]",
   "input:not([type='hidden'])",
@@ -38,24 +38,57 @@ const MEANINGFUL_BOUNDARY_SELECTOR = [
   "[role='option']",
   "[role='slider']",
   "[role='separator'][tabindex]",
-  "[data-copy-id]",
-  "[data-icon-id]",
-  "[data-layout-piece]",
   "[data-design-meaningful]",
 ].join(", ");
+const SEMANTIC_LAYOUT_TAGS = new Set(["ARTICLE", "ASIDE", "FOOTER", "HEADER", "MAIN", "NAV", "SECTION"]);
 
 const TARGET_IDENTITY_SELECTOR = "[data-dev-id], [data-copy-id], [data-icon-id], [data-layout-piece]";
-
 function identityOwner(element: Element): Element | null {
   if (element.matches(TARGET_IDENTITY_SELECTOR)) return element;
-  return element.closest(TARGET_IDENTITY_SELECTOR);
+  const owner = element.closest(TARGET_IDENTITY_SELECTOR);
+  if (!owner) return null;
+  const ownerHasDomainIdentity = owner.hasAttribute("data-copy-id") || owner.hasAttribute("data-icon-id") || owner.hasAttribute("data-layout-piece");
+  const ownerIsControl = owner.matches(INTERACTIVE_BOUNDARY_SELECTOR);
+  // A broad page/section identity cannot make a nested control addressable. Interactive and
+  // semantic layout boundaries need their own identity; text/icons may inherit only through a
+  // non-interactive wrapper that belongs to the same visual control.
+  if (element.matches(INTERACTIVE_BOUNDARY_SELECTOR) || SEMANTIC_LAYOUT_TAGS.has(element.tagName)) {
+    return null;
+  }
+  if (!ownerHasDomainIdentity && !ownerIsControl && (element.localName === "svg" || element.localName === "img" || hasDirectVisibleText(element))) {
+    return null;
+  }
+  let ancestor = element.parentElement;
+  while (ancestor && ancestor !== owner) {
+    if (ancestor.matches(INTERACTIVE_BOUNDARY_SELECTOR) || SEMANTIC_LAYOUT_TAGS.has(ancestor.tagName)) {
+      return null;
+    }
+    ancestor = ancestor.parentElement;
+  }
+  return owner;
+}
+
+function hasDirectVisibleText(element: Element): boolean {
+  return Array.from(element.childNodes).some(
+    (node) => node.nodeType === Node.TEXT_NODE && Boolean(node.textContent?.trim()),
+  );
+}
+
+function isMeaningfulBoundary(element: Element): boolean {
+  return (
+    element.matches(INTERACTIVE_BOUNDARY_SELECTOR) ||
+    element.localName === "svg" ||
+    element.localName === "img" ||
+    SEMANTIC_LAYOUT_TAGS.has(element.tagName) ||
+    hasDirectVisibleText(element)
+  );
 }
 
 /** Report explicitly meaningful boundaries that cannot be addressed by a production registry. */
 export function coverageIssuesFor(root: ParentNode, registry: DevIdEntry[]): TargetCoverageIssue[] {
   const registeredDevIds = new Set(registry.map((entry) => entry.id));
   const issues: TargetCoverageIssue[] = [];
-  for (const element of root.querySelectorAll(MEANINGFUL_BOUNDARY_SELECTOR)) {
+  for (const element of Array.from(root.querySelectorAll("*")).filter(isMeaningfulBoundary)) {
     if (element.closest('[data-design-technical-content="true"]')) continue;
     const owner = identityOwner(element);
     if (!owner) {

@@ -27,7 +27,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     // the window never grows a body scrollbar that shifts the rail between pages.
     // A column: the rail + page row on top, a full-width Altium status bar pinned
     // across the very bottom (under everything, the way a docked app reads).
-    <div data-dev-id="shell.root" data-source-promotion-state={scenario.sourcePromotion?.state} className="flex h-screen w-full flex-col overflow-hidden bg-surface text-t1">
+    <div data-dev-id="shell.root" data-source-promotion-state={scenario.sourcePromotion?.state} className="relative flex h-screen w-full flex-col overflow-hidden bg-surface text-t1">
       <div className="flex min-h-0 flex-1">
         <Rail />
         <div data-dev-id="shell.content" className="flex min-w-0 flex-1 flex-col">{children}</div>

@@ -1,4 +1,5 @@
 import hashlib
+import json
 import threading
 from pathlib import Path
 
@@ -6,11 +7,13 @@ import pytest
 
 from stockroom.design_studio.personal import (
     MAX_PERSONAL_DESIGN_BYTES,
+    MAX_PAGE_EXIT_DESIGN_BYTES,
     PERSONAL_DESIGN_FILENAME,
     PersonalDesignConflict,
     PersonalDesignValidationError,
     load_personal_design,
     save_personal_design,
+    save_personal_design_for_page_exit,
 )
 
 
@@ -33,6 +36,39 @@ def test_personal_design_rejects_stale_revision_without_changing_saved_document(
         save_personal_design({"schemaVersion": 1, "base": {}}, "stale", tmp_path)
 
     assert load_personal_design(tmp_path) == saved
+
+
+def test_page_exit_save_replaces_an_older_in_flight_revision_result(tmp_path):
+    first = save_personal_design({"schemaVersion": 1, "base": {"copy": {}}}, None, tmp_path)
+    older = save_personal_design(
+        {"schemaVersion": 1, "base": {"copy": {"status": "older"}}},
+        first.revision,
+        tmp_path,
+    )
+    latest = save_personal_design_for_page_exit(
+        {"schemaVersion": 1, "base": {"copy": {"status": "latest"}}},
+        first.revision,
+        older.document,
+        tmp_path,
+    )
+
+    assert latest.revision != older.revision
+    assert load_personal_design(tmp_path) == latest
+
+
+def test_page_exit_save_rejects_a_delayed_stale_window(tmp_path):
+    first = save_personal_design({"schemaVersion": 1}, None, tmp_path)
+    current = save_personal_design({"schemaVersion": 1, "base": {}}, first.revision, tmp_path)
+
+    with pytest.raises(PersonalDesignConflict):
+        save_personal_design_for_page_exit(
+            {"schemaVersion": 1, "base": {"copy": {"status": "stale"}}},
+            "older-window",
+            None,
+            tmp_path,
+        )
+
+    assert load_personal_design(tmp_path) == current
 
 
 @pytest.mark.parametrize(
@@ -63,6 +99,31 @@ def test_personal_design_rejects_oversize_document_without_creating_a_file(tmp_p
         save_personal_design(document, None, tmp_path)
 
     assert load_personal_design(tmp_path) is None
+
+
+def test_two_valid_page_exit_documents_fit_the_browser_keepalive_budget():
+    document = {
+        "schemaVersion": 1,
+        "base": {"copy": {"large": "x" * (MAX_PAGE_EXIT_DESIGN_BYTES - 1024)}},
+    }
+    body = {
+        "document": document,
+        "expected_revision": "a" * 64,
+        "superseded_document": document,
+    }
+
+    assert len(json.dumps(body, separators=(",", ":")).encode("utf-8")) < 64 * 1024
+
+
+def test_existing_large_personal_design_still_round_trips_outside_page_exit(tmp_path):
+    document = {
+        "schemaVersion": 1,
+        "base": {"copy": {"large": "x" * (MAX_PAGE_EXIT_DESIGN_BYTES + 4096)}},
+    }
+
+    saved = save_personal_design(document, None, tmp_path)
+
+    assert load_personal_design(tmp_path) == saved
 
 
 def test_personal_design_load_rejects_malformed_json(tmp_path):

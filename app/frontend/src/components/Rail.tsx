@@ -143,7 +143,8 @@ export function Rail() {
 
   const { query: update, view: updateView } = useUpdateStanding();
   const [aboutOpen, setAboutOpen] = useState(false);
-  const scenarioAboutOpen = useScenarioUiState().rail?.aboutOpen;
+  const scenarioRail = useScenarioUiState().rail;
+  const scenarioAboutOpen = scenarioRail?.aboutOpen;
   const scenarioRailState = useScenarioUiState().railState;
   const priorAboutOpen = useRef<boolean | null>(null);
   useEffect(() => {
@@ -399,7 +400,7 @@ export function Rail() {
           // About states the backend's authoritative release as THE version. That is the same
           // confident claim the pill used to make, so when the running bundle disagrees with the
           // backend, the window that names the version also names the disagreement.
-          note={updateView.standing === "restart_required" ? updateView.detail : ""}
+          note={scenarioRail?.aboutNote ?? (updateView.standing === "restart_required" ? updateView.detail : "")}
         />
       ) : null}
     </nav>

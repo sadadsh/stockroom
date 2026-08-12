@@ -7,6 +7,7 @@ import {
   fullComponentDossier,
 } from "../fixtures/componentFixtures";
 import type { DesignScenario, ScenarioUiState } from "../scenario";
+import type { CadVariantDocument, CadVariant } from "../../api/cadVariantClient";
 
 export const componentScenarioIds = [
   "components.full-data",
@@ -62,6 +63,8 @@ function scenario(
     listParams?: Readonly<Record<string, string | readonly string[]>>;
     listBehavior?: ReturnType<typeof componentReadFixtures>[number]["behavior"];
     dossierBehavior?: ReturnType<typeof componentReadFixtures>[number]["behavior"];
+    cadVariants?: CadVariantDocument;
+    cadVariantsBehavior?: ReturnType<typeof componentReadFixtures>[number]["behavior"];
   },
 ): DesignScenario {
   return {
@@ -149,6 +152,42 @@ partialProvider.cadSourceCoverage.rows[0] = {
 const blockedProvider = cloneDossier();
 blockedProvider.identity.manufacturer = "";
 
+function retainedVariant(id: string, provider: string, format: string): CadVariant {
+  return {
+    id,
+    provider,
+    format,
+    artifacts: [
+      { kind: "symbol", fileName: `${id}.sym` },
+      { kind: "footprint", fileName: `${id}.footprint` },
+      { kind: "model", fileName: `${id}.step` },
+    ],
+    evidenceDigest: `sha256:${id}`,
+    verificationState: "reverified",
+    trustRank: provider === "Ultra Librarian" ? 1 : 2,
+    trustLabel: provider === "Ultra Librarian" ? "Preferred Source" : "Alternative Source",
+  };
+}
+
+function cadVariants(alternatives = false): CadVariantDocument {
+  const kicad = retainedVariant("ul-kicad", "Ultra Librarian", "KiCad");
+  const altium = retainedVariant("ul-altium", "Ultra Librarian", "Altium");
+  const snapKicad = retainedVariant("snap-kicad", "SnapMagic", "KiCad");
+  const snapAltium = retainedVariant("snap-altium", "SnapMagic", "Altium");
+  return {
+    partId: COMPONENT_ID,
+    inventories: [
+      { tool: "kicad", activeVariantId: kicad.id, variants: alternatives ? [kicad, snapKicad] : [kicad] },
+      { tool: "altium", activeVariantId: altium.id, variants: alternatives ? [altium, snapAltium] : [altium] },
+    ],
+    pairs: [
+      { kicadVariantId: kicad.id, altiumVariantId: altium.id, provider: "Ultra Librarian", trustRank: 1, verificationState: "reverified", trustLabel: "Preferred Source" },
+      ...(alternatives ? [{ kicadVariantId: snapKicad.id, altiumVariantId: snapAltium.id, provider: "SnapMagic", trustRank: 2, verificationState: "reverified" as const, trustLabel: "Alternative Source" }] : []),
+    ],
+    supplementary: [],
+  };
+}
+
 export const componentScenarios: readonly DesignScenario[] = [
   scenario("components.full-data", {
     title: "Full Data",
@@ -184,14 +223,14 @@ export const componentScenarios: readonly DesignScenario[] = [
   scenario("components.preview-3d", { title: "3D Preview", initialUi: { components: { preview: "model" } } }),
   scenario("components.preview-symbol", { title: "Symbol Preview", initialUi: { components: { preview: "symbol" } } }),
   scenario("components.preview-footprint", { title: "Footprint Preview", initialUi: { components: { preview: "footprint" } } }),
-  scenario("components.complete-part-ready", { title: "Complete Part Ready", initialUi: { components: { surface: "cad-sources" } }, expectedTargets: ["component-browser.complete-component"] }),
+  scenario("components.complete-part-ready", { title: "Complete Part Ready", cadVariants: cadVariants(), initialUi: { components: { surface: "cad-sources" } }, expectedTargets: ["component-browser.complete-component"] }),
   scenario("components.complete-part-partial", { title: "Complete Part Partial", dossier: partialProvider, initialUi: { components: { surface: "cad-sources" } }, expectedTargets: ["component-browser.complete-component"] }),
   scenario("components.complete-part-blocked", { title: "Complete Part Blocked", dossier: blockedProvider, initialUi: { components: { surface: "cad-sources" } }, expectedTargets: ["component-browser.complete-component"] }),
   scenario("components.bulk-import", { title: "Bulk Import", initialUi: { addParts: { state: "empty" } }, expectedTargets: ["ingest.bulk"] }),
   scenario("components.offers-open", { title: "Price Breaks Open", initialUi: { components: { surface: "offers" } }, expectedTargets: ["component-browser.sourcing-sheet"] }),
-  scenario("components.variant-alternatives", { title: "Variant Alternatives", initialUi: { components: { surface: "cad-sources" } }, expectedTargets: ["component-browser.complete-component"] }),
-  scenario("components.variant-pending", { title: "Variant Pending", initialUi: { components: { surface: "cad-sources" } }, expectedTargets: ["component-browser.complete-component"] }),
-  scenario("components.diff-open", { title: "Diff Open", initialUi: { components: { surface: "provenance" } }, expectedTargets: ["component-browser.sources-sheet"] }),
+  scenario("components.variant-alternatives", { title: "Variant Alternatives", cadVariants: cadVariants(true), initialUi: { components: { surface: "cad-sources" } }, expectedTargets: ["component-browser.complete-component"] }),
+  scenario("components.variant-pending", { title: "Variant Pending", cadVariants: cadVariants(), cadVariantsBehavior: { state: "pending" }, initialUi: { components: { surface: "cad-sources" } }, expectedTargets: ["component-browser.complete-component"] }),
+  scenario("components.diff-open", { title: "Diff Open", initialUi: { components: { surface: "provenance", sourcesTab: "changes" } }, expectedTargets: ["component-browser.sources-sheet"] }),
   scenario("components.pinout-open", { title: "Pinout Open", initialUi: { components: { surface: "pinout" } }, expectedTargets: ["component-browser.pinout-table"] }),
   scenario("components.delete-confirm", { title: "Delete Confirmation", initialUi: { components: { confirmDelete: true } } }),
 ];

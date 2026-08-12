@@ -32,6 +32,7 @@ function stateFor(id: SettingsScenarioId): { group: NonNullable<ScenarioUiState[
   if (id.includes("rescan")) return { group: "sources", target: "settings.rescan", errorPath: id.endsWith(".error") ? "/api/library/rescan/state" : undefined };
   if (id.includes("health")) return { group: "maintenance", target: "settings.health", errorPath: id.endsWith(".error") ? "/api/doctor/scan" : undefined };
   if (id.includes("completion")) return { group: "maintenance", target: "settings.completion", errorPath: id.endsWith(".error") ? "/api/library/completion" : undefined };
+  if (id.includes("maintenance")) return { group: "maintenance", target: "settings.derivation", errorPath: id.endsWith(".error") ? "/api/library/derivation" : undefined };
   if (id.includes("reset-cad")) return { group: "maintenance", target: "confirm.root" };
   return { group: "maintenance", target: "settings.completion", errorPath: id.endsWith(".error") ? "/api/doctor/scan" : undefined };
 }
@@ -44,6 +45,8 @@ function scenario(id: SettingsScenarioId): DesignScenario {
     altiumDialog: id.endsWith("setup-dialog") ? "setup" : id.endsWith("dblib-dialog") ? "dblib" : undefined,
     confirmResetCad: id.endsWith("reset-cad.confirmation"),
     picker: id.endsWith("kicad.picker") ? "kicad" : id.endsWith("cubemx.picker") ? "cubemx" : undefined,
+    libraryMode: id === "settings.libraries.ready" ? "open" : id === "settings.libraries.create" ? "create" : id === "settings.libraries.clone" ? "clone" : id === "settings.libraries.current" ? "current" : undefined,
+    credentialsRefresh: id === "settings.distributors.credentials-refresh",
   };
   return {
     id, title: id.split(".").slice(1).join(" "), area: "settings", group: "Settings", route: "settings",
@@ -51,7 +54,7 @@ function scenario(id: SettingsScenarioId): DesignScenario {
       attention, errorPath: state.errorPath,
       updateState: id.includes("updates.attention") ? "update_available" : undefined,
       syncState: id.endsWith(".syncing") ? "syncing" : id.endsWith(".diverged") ? "diverged" : undefined,
-      credentialsPartial: id.endsWith("credentials-partial"),
+      credentialsPartial: id.endsWith("credentials-partial") || id.endsWith("credentials-refresh"),
     }),
     initialUi: { settings: initialSettings }, expectedTargets: [state.target],
   };

@@ -29,6 +29,7 @@ vi.mock("../api/client", async (importActual) => {
       ...actual.api,
       designStudioGet: vi.fn(),
       designStudioPut: vi.fn(),
+      designStudioPutForPageExit: vi.fn(),
       designStudioDelete: vi.fn(),
       devStatus: vi.fn(),
       devPromote: vi.fn(),
@@ -256,6 +257,7 @@ describe("DesignStudioProvider", () => {
   beforeEach(() => {
     mockApi.designStudioGet.mockReset();
     mockApi.designStudioPut.mockReset();
+    mockApi.designStudioPutForPageExit.mockReset();
     mockApi.designStudioDelete.mockReset();
     mockApi.devStatus.mockReset();
     mockApi.devPromote.mockReset();
@@ -379,6 +381,32 @@ describe("DesignStudioProvider", () => {
     });
     expect(screen.getByTestId("studio-document")).toHaveTextContent("Restart Safe");
     second.unmount();
+  });
+
+  it("starts a keepalive save when pagehide fires inside the debounce window", async () => {
+    vi.useFakeTimers();
+    mockApi.designStudioGet.mockResolvedValue({ revision: "r1", document: fixtureDocument() });
+    const pageExitDocument = fixtureDocument();
+    pageExitDocument.base.copy["rail.about"] = "Page Exit Safe";
+    mockApi.designStudioPutForPageExit.mockResolvedValue({
+      revision: "r2",
+      document: pageExitDocument,
+    });
+    const studio = renderStudio();
+    await act(async () => Promise.resolve());
+
+    studio.setCopy("rail.about", "Page Exit Safe");
+    window.dispatchEvent(new PageTransitionEvent("pagehide"));
+
+    expect(mockApi.designStudioPut).not.toHaveBeenCalled();
+    expect(mockApi.designStudioPutForPageExit).toHaveBeenCalledWith({
+      document: expect.objectContaining({
+        base: expect.objectContaining({ copy: { "rail.about": "Page Exit Safe" } }),
+      }),
+      expected_revision: "r1",
+      superseded_document: null,
+    });
+    studio.unmount();
   });
 
   it("keeps a pre-hydration edit instead of applying a late server draft over it", async () => {

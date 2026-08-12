@@ -200,7 +200,7 @@ function DesignStudioBridge({
 
   useEffect(() => {
     const flushForPageExit = () => {
-      void controller.flush();
+      controller.flushForPageExit();
     };
     window.addEventListener("pagehide", flushForPageExit);
     return () => window.removeEventListener("pagehide", flushForPageExit);

@@ -12,6 +12,7 @@ from stockroom.design_studio.personal import (
     delete_personal_design,
     load_personal_design,
     save_personal_design,
+    save_personal_design_for_page_exit,
 )
 
 
@@ -22,6 +23,12 @@ class PersonalDesignSaveBody(BaseModel):
 
     document: dict[str, object]
     expected_revision: str | None
+
+
+class PersonalDesignPageExitBody(PersonalDesignSaveBody):
+    """Newest closing draft plus the one ordinary save it may supersede."""
+
+    superseded_document: dict[str, object] | None = None
 
 
 class PersonalDesignDeleteBody(BaseModel):
@@ -72,6 +79,23 @@ def design_studio_router(require_token) -> APIRouter:
         del request
         try:
             record = save_personal_design(body.document, body.expected_revision)
+        except PersonalDesignConflict as exc:
+            raise ApiError(409, str(exc)) from exc
+        except PersonalDesignValidationError as exc:
+            raise ApiError(422, str(exc)) from exc
+        return PersonalDesignResponse(revision=record.revision, document=record.document)
+
+    @router.put("/personal/page-exit", response_model=PersonalDesignResponse)
+    def put_personal_design_for_page_exit(
+        request: Request, body: PersonalDesignPageExitBody
+    ) -> PersonalDesignResponse:
+        del request
+        try:
+            record = save_personal_design_for_page_exit(
+                body.document,
+                body.expected_revision,
+                body.superseded_document,
+            )
         except PersonalDesignConflict as exc:
             raise ApiError(409, str(exc)) from exc
         except PersonalDesignValidationError as exc:

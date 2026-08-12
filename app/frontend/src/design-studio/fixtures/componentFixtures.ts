@@ -17,6 +17,7 @@ import type {
   PartsResponse,
 } from "../../api/types";
 import type { ScenarioFixture } from "../scenario";
+import type { CadVariantDocument } from "../../api/cadVariantClient";
 import {
   bootstrapFixtureValidators,
   createScenarioFixtureValidatorRegistry,
@@ -459,6 +460,8 @@ export type ComponentFixtureOptions = {
   listParams?: Readonly<Record<string, string | readonly string[]>>;
   listBehavior?: ScenarioFixture<PartsResponse, undefined>["behavior"];
   dossierBehavior?: ScenarioFixture<ComponentDossier, undefined>["behavior"];
+  cadVariants?: CadVariantDocument;
+  cadVariantsBehavior?: ScenarioFixture<CadVariantDocument, undefined>["behavior"];
 };
 
 export function componentReadFixtures(options: ComponentFixtureOptions = {}): ScenarioFixture[] {
@@ -478,6 +481,7 @@ export function componentReadFixtures(options: ComponentFixtureOptions = {}): Sc
     { method: "GET", path: "/api/duplicates", params: {}, body: undefined, response: COMPONENT_DUPLICATES },
     { method: "GET", path: `/api/library/parts/${COMPONENT_ID}/dossier`, params: {}, body: undefined, response: dossier, behavior: options.dossierBehavior },
     { method: "GET", path: `/api/library/parts/${COMPONENT_ID}/shell`, params: {}, body: undefined, response: COMPONENT_SHELL },
+    ...(options.cadVariants ? [{ method: "GET", path: `/api/library/parts/${COMPONENT_ID}/cad-variants`, params: {}, body: undefined, response: options.cadVariants, behavior: options.cadVariantsBehavior } satisfies ScenarioFixture<CadVariantDocument, undefined>] : []),
     { method: "GET", path: `/api/previews/symbol/${COMPONENT_ID}.json`, params: {}, body: undefined, response: COMPONENT_SYMBOL_GEOMETRY },
     { method: "GET", path: `/api/previews/land/${COMPONENT_ID}.json`, params: {}, body: undefined, response: COMPONENT_LAND_PATTERN },
     { method: "GET", path: `/api/previews/model/${COMPONENT_ID}.glb`, params: {}, body: undefined, response: new Blob([new Uint8Array([0x67, 0x6c, 0x54, 0x46])], { type: "model/gltf-binary" }), behavior: { state: "pending" } },
@@ -502,6 +506,7 @@ export const componentFixtureValidators = createScenarioFixtureValidatorRegistry
   "GET /api/duplicates": (fixture) => fixture.body === undefined && isRecord(fixture.response) && Array.isArray(fixture.response.by_mpn) && Array.isArray(fixture.response.by_footprint),
   [`GET /api/library/parts/${COMPONENT_ID}/dossier`]: (fixture) => fixture.body === undefined && isDossier(fixture.response),
   [`GET /api/library/parts/${COMPONENT_ID}/shell`]: (fixture) => fixture.body === undefined && isRecord(fixture.response) && typeof fixture.response.supported === "boolean" && Array.isArray(fixture.response.export_formats) && Array.isArray(fixture.response.eda_applications),
+  [`GET /api/library/parts/${COMPONENT_ID}/cad-variants`]: (fixture) => fixture.body === undefined && isRecord(fixture.response) && fixture.response.partId === COMPONENT_ID && Array.isArray(fixture.response.inventories) && Array.isArray(fixture.response.pairs),
   [`GET /api/previews/symbol/${COMPONENT_ID}.json`]: (fixture) => fixture.body === undefined && isRecord(fixture.response) && Array.isArray(fixture.response.pins) && Array.isArray(fixture.response.graphics),
   [`GET /api/previews/land/${COMPONENT_ID}.json`]: (fixture) => fixture.body === undefined && isRecord(fixture.response) && Array.isArray(fixture.response.pads) && Array.isArray(fixture.response.graphics),
   [`GET /api/previews/model/${COMPONENT_ID}.glb`]: (fixture) => fixture.body === undefined && fixture.response instanceof Blob,

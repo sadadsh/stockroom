@@ -59,6 +59,7 @@ import {
   type SearchSortState,
 } from "../lib/uiSession";
 import { SEARCH_FACET_RAIL_WIDTH } from "../lib/libraryLayout";
+import { useScenarioUiState } from "../design-studio/scenarioState";
 import {
   LIFECYCLE_KEYS,
   PACKAGE_KEYS,
@@ -91,10 +92,12 @@ type SortKey = { kind: "name" } | { kind: "stock" } | { kind: "unit" } | { kind:
 const SEARCH_QUERY_DEBOUNCE_MS = 120;
 
 export function SearchOverlay({ onClose, onOpenPart }: Props) {
-  const [q, setQ] = useState(() => readUiSession().search_filters.query);
-  const [filters, setFilters] = useState<SearchFilters>(() =>
-    filtersFromSession(),
-  );
+  const preview = useScenarioUiState().search;
+  const [q, setQ] = useState(() => preview?.query ?? readUiSession().search_filters.query);
+  const [filters, setFilters] = useState<SearchFilters>(() => ({
+    ...filtersFromSession(),
+    category: preview?.category === undefined ? filtersFromSession().category : preview.category,
+  }));
   const [sort, setSort] = useState<{ key: SortKey; dir: "asc" | "desc" }>(() =>
     sortFromSession(readUiSession().search_sort),
   );

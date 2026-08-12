@@ -67,7 +67,7 @@ export function CompatibilityWorkbench() {
   const [activeSetId, setActiveSetId] = useState<string>("all");
   // A chip drop edits the active set into a custom one (auto-rebuilt, still explicit).
   const [customParts, setCustomParts] = useState<string[] | null>(null);
-  const [openPart, setOpenPart] = useState<string | null>(null);
+  const [openPart, setOpenPart] = useState<string | null>(preview?.openBenchPart ?? null);
   const [policy, setPolicy] = useState<TargetDefinitionPolicy>(() =>
     cloneCoreBringUpPolicy(),
   );
@@ -81,6 +81,15 @@ export function CompatibilityWorkbench() {
   const socketSolution = useStmSocketSolution();
 
   const unreachableLabel = useText("stm.compat.unreachable", "Cannot reach the Stockroom server.");
+
+  useEffect(() => {
+    setScope({
+      families: preview?.benchScope?.families ?? [],
+      mcus: preview?.benchScope?.mcus ?? [],
+    });
+    setSelectedPackage(preview?.benchPackage ?? null);
+    setOpenPart(preview?.openBenchPart ?? null);
+  }, [preview]);
 
   const selectedFamilies = scope.families;
   const familiesKey = selectedFamilies.join(",");
@@ -196,8 +205,9 @@ export function CompatibilityWorkbench() {
     );
   };
 
+  if (preview?.indexState === "blocked") return <BuildIndexGate />;
   if (preview?.targetDefinition) {
-    return <TargetDefinitionPanel definition={preview.targetDefinition} />;
+    return <TargetDefinitionPanel definition={preview.targetDefinition} evidenceOpen={preview.targetEvidenceOpen} />;
   }
   if (preview?.showTargetPolicy) {
     return (

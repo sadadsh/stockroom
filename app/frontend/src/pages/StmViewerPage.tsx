@@ -41,8 +41,6 @@ export interface StmScope extends StmMcusArgs {
   mcus: string[];
 }
 
-const EMPTY_SCOPE: StmScope = { families: [], mcus: [] };
-
 // The STM Viewer's two co-equal sections (CONTEXT decision 10 - a tab of this page, never a new
 // nav route): the Phase-4 explorer and the Bench (the socket-union workbench, named for the
 // retired Hardware app's Bench tab this workstream rebuilds - owner rename 2026-07-23).
@@ -63,9 +61,13 @@ export function StmViewerPage() {
   const preview = useScenarioUiState().stm;
   const [tab, setTab] = useState<StmTab>(preview?.tab ?? "explorer");
   const priorScenarioTab = useRef<StmTab | null>(null);
-  const [scope, setScope] = useState<StmScope>(EMPTY_SCOPE);
+  const [scope, setScope] = useState<StmScope>(() => ({
+    families: preview?.explorerScope?.families ?? [],
+    mcus: preview?.explorerScope?.mcus ?? [],
+  }));
   const [activePart, setActivePart] = useState<string | null>(preview?.activePart ?? null);
   const [selectedPosition, setSelectedPosition] = useState<string | null>(preview?.selectedPosition ?? null);
+  const priorActivePart = useRef(activePart);
 
   const status = useStmStatus();
   const sectionsAria = useText("stm.viewer.sections-aria", "STM Viewer sections");
@@ -81,6 +83,14 @@ export function StmViewerPage() {
     }
     if (priorScenarioTab.current === null) priorScenarioTab.current = tab;
     setTab(preview.tab ?? "explorer");
+    const nextActivePart = preview.activePart ?? null;
+    priorActivePart.current = nextActivePart;
+    setActivePart(nextActivePart);
+    setSelectedPosition(preview.selectedPosition ?? null);
+    setScope({
+      families: preview.explorerScope?.families ?? [],
+      mcus: preview.explorerScope?.mcus ?? [],
+    });
     // Each preview object is an explicit registry transition. `tab` is deliberately excluded so
     // owner interaction inside a preview cannot replace the real-data tab restored on exit.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -88,7 +98,8 @@ export function StmViewerPage() {
 
   // A new part clears any pin selection (the previous pin does not exist on the new package).
   useEffect(() => {
-    setSelectedPosition(null);
+    if (priorActivePart.current !== activePart) setSelectedPosition(null);
+    priorActivePart.current = activePart;
   }, [activePart]);
 
   // The inspected pin, looked up from the ALREADY-fetched pinout (decision 4): no per-pin fetch.

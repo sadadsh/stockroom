@@ -22,7 +22,10 @@ export function classifyPreviewRequest(
   descriptor: ApiRequestDescriptor,
 ): PreviewRequestClassification {
   const method = descriptor.method.toUpperCase();
-  if (descriptor.path === "/api/design-studio/personal") return "studio-live";
+  if (
+    ((descriptor.path === "/api/design-studio/personal" && (method === "GET" || method === "PUT")) ||
+      (descriptor.path === "/api/design-studio/personal/page-exit" && method === "PUT"))
+  ) return "studio-live";
   return READ_METHODS.has(method) ? "fixture-only" : "block";
 }
 

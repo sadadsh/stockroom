@@ -110,7 +110,71 @@ describe("Design Studio document", () => {
     expect(result.ok && result.document.base.layout).toBeNull();
     expect(result.ok && result.document.base.copy["rail.about"]).toBe("Info");
     expect(result.ok && result.document.base.tokens).toEqual({ root: {}, light: {} });
-    expect(result.ok && result.document.variations).toEqual({});
+    expect(result.ok && Object.keys(result.document.variations)).toEqual(
+      BUILT_IN_VARIATIONS.map(({ id }) => id),
+    );
+  });
+
+  it("preserves every approved icon presentation field through parsing", () => {
+    const result = parseDesignDocument({
+      schemaVersion: 1,
+      base: {
+        ...emptyDraft(),
+        icons: {
+          "action.add": {
+            body: "<path d=\"M1 1h2\" />",
+            swapToId: "action.edit",
+            strokeWidth: 2.5,
+            treatment: "muted",
+            a11yLabel: "Add component",
+            alignment: "text-top",
+          },
+        },
+      },
+    });
+
+    expect(result.ok && result.document.base.icons["action.add"]).toEqual({
+      body: "<path d=\"M1 1h2\" />",
+      swapToId: "action.edit",
+      strokeWidth: 2.5,
+      treatment: "muted",
+      a11yLabel: "Add component",
+      alignment: "text-top",
+    });
+  });
+
+  it("migrates missing built-ins into an existing personal document without replacing edits", () => {
+    const result = parseDesignDocument({
+      schemaVersion: 1,
+      base: emptyDraft(),
+      variations: {
+        compact: {
+          id: "compact",
+          title: "My Compact",
+          patch: { copy: { "rail.about": "Short" } },
+        },
+        review: {
+          id: "review",
+          title: "Review",
+          extends: "full-data",
+          patch: {},
+        },
+      },
+      activeVariationId: "review",
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(Object.keys(result.document.variations)).toEqual([
+      ...BUILT_IN_VARIATIONS.map(({ id }) => id),
+      "review",
+    ]);
+    expect(result.document.variations.compact).toEqual({
+      id: "compact",
+      title: "My Compact",
+      patch: { copy: { "rail.about": "Short" } },
+    });
+    expect(result.document.activeVariationId).toBe("review");
   });
 
   it("treats prototype-named variation ids as absent unless they are own entries", () => {

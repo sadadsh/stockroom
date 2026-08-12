@@ -226,13 +226,65 @@ describe("DesignStudioShell", () => {
     const pointer = (type: string, clientX: number) => {
       const event = new Event(type, { bubbles: true });
       Object.defineProperties(event, {
-        clientX: { value: clientX }, clientY: { value: 20 }, pointerId: { value: 1 },
+        button: { value: 0 }, clientX: { value: clientX }, clientY: { value: 20 }, pointerId: { value: 1 },
       });
       fireEvent(preview, event);
     };
     pointer("pointerdown", 100);
     pointer("pointermove", 20);
     expect(preview.scrollLeft).toBe(160);
+
+    const frameDown = new Event("pointerdown", { bubbles: true });
+    Object.defineProperties(frameDown, {
+      button: { value: 0 }, clientX: { value: 100 }, clientY: { value: 20 }, pointerId: { value: 3 },
+    });
+    fireEvent(frame, frameDown);
+    const frameMove = new Event("pointermove", { bubbles: true });
+    Object.defineProperties(frameMove, {
+      clientX: { value: 20 }, clientY: { value: 20 }, pointerId: { value: 3 },
+    });
+    fireEvent(preview, frameMove);
+    expect(preview.scrollLeft).toBe(240);
+  });
+
+  it("recomputes Fit when the preview region changes size", async () => {
+    let notifyResize: () => void = () => undefined;
+    class ResizeObserverStub {
+      constructor(callback: ResizeObserverCallback) {
+        notifyResize = () => callback([], this as unknown as ResizeObserver);
+      }
+      observe() {}
+      disconnect() {}
+      unobserve() {}
+    }
+    vi.stubGlobal("ResizeObserver", ResizeObserverStub);
+    await renderStudio();
+    await userEvent.setup().selectOptions(screen.getByLabelText("Viewport"), "desktop-1920");
+    await userEvent.setup().selectOptions(screen.getByLabelText("Zoom"), "0");
+    const preview = screen.getByRole("region", { name: "Stockroom Preview" });
+    const frame = preview.firstElementChild as HTMLElement;
+    Object.defineProperty(preview, "clientWidth", { configurable: true, value: 1000 });
+
+    fireEvent(window, new Event("resize"));
+    notifyResize();
+
+    await waitFor(() => expect(frame.style.transform).toBe("scale(0.5083333333333333)"));
+  });
+
+  it("never steals arrow or pointer input from controls inside the preview", async () => {
+    await renderStudio();
+    const preview = screen.getByRole("region", { name: "Stockroom Preview" });
+    const frame = preview.firstElementChild as HTMLElement;
+    const slider = document.createElement("input");
+    slider.type = "range";
+    frame.append(slider);
+    preview.scrollLeft = 0;
+
+    fireEvent.keyDown(slider, { key: "ArrowRight" });
+    fireEvent.pointerDown(slider, { button: 0, pointerId: 2, clientX: 100, clientY: 20 });
+    fireEvent.pointerMove(preview, { pointerId: 2, clientX: 20, clientY: 20 });
+
+    expect(preview.scrollLeft).toBe(0);
   });
 
   it("lists only rendered stable targets and exposes their hierarchy without index keys", async () => {

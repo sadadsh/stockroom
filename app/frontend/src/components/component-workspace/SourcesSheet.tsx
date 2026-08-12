@@ -71,6 +71,7 @@ export function SourcesSheet({
   applying,
   refresh,
   enrich,
+  initialTab = "fields",
 }: {
   componentId: string;
   /** The display name the nested visual diff titles itself with. */
@@ -83,8 +84,9 @@ export function SourcesSheet({
   refresh: { run: () => void; running: boolean };
   /** The enrichment surface, passed in so this sheet never re-implements enrichment. */
   enrich: ReactNode;
+  initialTab?: SourcesSheetTab;
 }) {
-  const [tab, setTab] = useState<SourcesSheetTab>("fields");
+  const [tab, setTab] = useState<SourcesSheetTab>(initialTab);
   const tabsLabel = useText("component-browser.sources-tabs", "Sources and timeline");
 
   return (

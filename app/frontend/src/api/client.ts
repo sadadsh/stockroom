@@ -106,6 +106,7 @@ import type {
   AfCheckResponse,
   PersonalDesignResponse,
   PersonalDesignSaveBody,
+  PersonalDesignPageExitBody,
   PersonalDesignDeleteBody,
   PersonalDesignDeleteResponse,
 } from "./types";
@@ -128,6 +129,7 @@ interface RequestOptions {
   // which the parametric spec filter needs.
   params?: Record<string, string | string[]>;
   body?: unknown;
+  keepalive?: boolean;
 }
 
 function responseErrorMessage(body: unknown, fallback: string): string {
@@ -163,7 +165,7 @@ async function request<T>(
     params: opts.params ?? {},
     body: opts.body,
   };
-  return dispatchApiRequest(descriptor, () => liveJsonRequest<T>(descriptor));
+  return dispatchApiRequest(descriptor, () => liveJsonRequest<T>(descriptor, opts.keepalive));
 }
 
 function requestUrl(path: string, params: ApiRequestParams): URL {
@@ -180,12 +182,12 @@ function requestUrl(path: string, params: ApiRequestParams): URL {
   return url;
 }
 
-async function liveJsonRequest<T>(descriptor: ApiRequestDescriptor): Promise<T> {
+async function liveJsonRequest<T>(descriptor: ApiRequestDescriptor, keepalive = false): Promise<T> {
   const url = requestUrl(descriptor.path, descriptor.params);
   const token = apiToken();
   const headers: Record<string, string> = { Accept: "application/json" };
   if (token) headers.Authorization = `Bearer ${token}`;
-  const init: RequestInit = { method: descriptor.method, headers };
+  const init: RequestInit = { method: descriptor.method, headers, keepalive };
   if (descriptor.body !== undefined) {
     headers["Content-Type"] = "application/json";
     init.body = JSON.stringify(descriptor.body);
@@ -426,6 +428,13 @@ export const api = {
 
   designStudioPut(body: PersonalDesignSaveBody): Promise<PersonalDesignResponse> {
     return request<PersonalDesignResponse>("PUT", "/api/design-studio/personal", { body });
+  },
+
+  designStudioPutForPageExit(body: PersonalDesignPageExitBody): Promise<PersonalDesignResponse> {
+    return request<PersonalDesignResponse>("PUT", "/api/design-studio/personal/page-exit", {
+      body,
+      keepalive: true,
+    });
   },
 
   designStudioDelete(body: PersonalDesignDeleteBody): Promise<PersonalDesignDeleteResponse> {

@@ -120,6 +120,25 @@ def test_personal_design_api_rejects_stale_revisions_without_replacing_document(
     assert client.get("/api/design-studio/personal").json() == saved
 
 
+def test_page_exit_endpoint_keeps_the_newest_closing_draft(client, personal_config):
+    saved = client.put(
+        "/api/design-studio/personal",
+        json={"document": {"schemaVersion": 1}, "expected_revision": None},
+    ).json()
+    closing = client.put(
+        "/api/design-studio/personal/page-exit",
+        json={
+            "document": {"schemaVersion": 1, "base": {"copy": {"status": "latest"}}},
+            "expected_revision": saved["revision"],
+            "superseded_document": None,
+        },
+    )
+
+    assert closing.status_code == 200
+    assert closing.json()["document"]["base"]["copy"]["status"] == "latest"
+    assert client.get("/api/design-studio/personal").json() == closing.json()
+
+
 @pytest.mark.parametrize(
     "body",
     [

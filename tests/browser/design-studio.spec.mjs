@@ -81,6 +81,17 @@ run_windowed(ctx=context, open_window=open_window)
 
 async function stopStockroom(host) {
   if (host.child.exitCode !== null) return;
+  if (process.platform === "win32") {
+    await new Promise((resolve) => {
+      const killer = spawn("taskkill", ["/PID", String(host.child.pid), "/T", "/F"], {
+        stdio: "ignore",
+        windowsHide: true,
+      });
+      killer.once("exit", resolve);
+      killer.once("error", resolve);
+    });
+    return;
+  }
   await new Promise((resolve) => {
     const timeout = setTimeout(resolve, 5_000);
     host.child.once("exit", () => {
@@ -141,12 +152,22 @@ function createStudio(page, baseUrl) {
 async function assertVisibleTargets(page, scenario) {
   const root = page.locator(`[data-scenario-id="${scenario.id}"]`);
   await root.waitFor({ state: "attached" });
-  assert.equal(await root.getAttribute("data-scenario-state"), scenario.stateSignature,
-    `${scenario.id} did not render its exact distinguishing state`);
   for (const target of scenario.expectedTargets) {
     const locator = page.locator(`[data-dev-id="${target}"], [data-dev-role="${target}"]`).first();
     await locator.waitFor({ state: "visible", timeout: 15_000 });
   }
+  let previous = "";
+  for (let attempt = 0; attempt < 30; attempt += 1) {
+    const product = page.locator("[data-design-product-root]");
+    const targetMarkup = await Promise.all(scenario.expectedTargets.map(async (target) =>
+      page.locator(`[data-dev-id="${target}"], [data-dev-role="${target}"]`).first().evaluate((element) => element.outerHTML),
+    ));
+    const current = [`theme:${await page.locator("html").getAttribute("data-theme") ?? ""}`, await product.innerHTML(), ...targetMarkup].join("\n").replace(/\s+/g, " ").trim();
+    if (current === previous) return current;
+    previous = current;
+    await page.waitForTimeout(100);
+  }
+  return previous;
 }
 
 async function representativeClickThrough(page, studio) {
@@ -201,15 +222,17 @@ try {
     throw new Error(`Stockroom browser boot did not expose Design Studio:\n${JSON.stringify(diagnostic, null, 2)}`, { cause: error });
   }
   const studio = createStudio(page, baseUrl);
+  const renderedStates = new Map();
 
   const scenarios = scenarioLimit > 0 ? registry.scenarios.slice(0, scenarioLimit) : registry.scenarios;
   for (const scenario of scenarios) {
     await studio.open(scenario.id);
+    renderedStates.set(scenario.id, await assertVisibleTargets(page, scenario));
     for (const viewport of matrix) {
       await studio.setViewport(viewport);
       for (const theme of themes) {
         await studio.setTheme(theme);
-        await assertVisibleTargets(page, scenario);
+        const renderedState = await assertVisibleTargets(page, scenario);
         if (scenario.id !== "global.real-data") {
           assert.deepEqual(studio.liveProductRequests(), [], `${scenario.id} produced a live product effect`);
         }
@@ -223,6 +246,13 @@ try {
     }
     process.stdout.write(`PASS ${scenario.id}\n`);
   }
+
+  const stateOwners = new Map();
+  for (const [id, state] of renderedStates) {
+    stateOwners.set(state, [...(stateOwners.get(state) ?? []), id]);
+  }
+  const duplicateStates = Array.from(stateOwners.values()).filter((ids) => ids.length > 1);
+  assert.deepEqual(duplicateStates, [], "Every shipped case must render distinct product DOM.");
 
   await representativeClickThrough(page, studio);
   assert.deepEqual(consoleErrors, [], `Browser console errors:\n${consoleErrors.join("\n")}`);

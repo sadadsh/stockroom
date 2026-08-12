@@ -14,14 +14,16 @@ export interface ScenarioLocalOutcome {
 
 export interface ScenarioUiState {
   onboarding?: { mode?: "open" | "create" | "clone"; setupError?: string };
-  rail?: { aboutOpen?: boolean };
-  search?: { open?: boolean };
+  rail?: { aboutOpen?: boolean; aboutNote?: string };
+  search?: { open?: boolean; query?: string; category?: string | null };
   service?: { error?: string };
   settings?: {
     group?: "general" | "library" | "eda" | "sources" | "maintenance";
     altiumDialog?: "setup" | "dblib";
     confirmResetCad?: boolean;
     picker?: "kicad" | "cubemx";
+    libraryMode?: "create" | "open" | "clone" | "current";
+    credentialsRefresh?: boolean;
   };
   addParts?: { state: "empty" | "validating" | "exact" | "mismatch" | "duplicate" | "failure" };
   toast?: { message: string; tone: "neutral" | "ok" | "err" };
@@ -40,6 +42,7 @@ export interface ScenarioUiState {
     selectedId?: string | null;
     autoSelect?: boolean;
     surface?: "identity" | "classification" | "cad-sources" | "provenance" | "offers" | "pinout";
+    sourcesTab?: "fields" | "records" | "changes" | "diagnostics";
     preview?: "symbol" | "footprint" | "model";
     confirmDelete?: boolean;
   };
@@ -52,10 +55,14 @@ export interface ScenarioUiState {
     activePart?: string | null;
     selectedPosition?: string | null;
     pinoutView?: "map" | "table";
+    explorerScope?: { families: string[]; mcus?: string[] };
     benchScope?: { families: string[]; mcus?: string[] };
     benchPackage?: string | null;
     targetDefinition?: TargetDefinitionDTO;
+    targetEvidenceOpen?: boolean;
     showTargetPolicy?: boolean;
+    openBenchPart?: string;
+    indexState?: "missing" | "building" | "error" | "blocked";
   };
   /** Native provider chrome is rendered by WindowHost, not duplicated in the React app tree. */
   provider?: {
@@ -86,33 +93,4 @@ export interface DesignScenario {
   fixtures: readonly ScenarioFixture[];
   initialUi: Readonly<ScenarioUiState>;
   expectedTargets: readonly string[];
-}
-
-function canonicalScenarioValue(value: unknown): string {
-  if (value === undefined) return '"<undefined>"';
-  if (value === null || typeof value !== "object") return JSON.stringify(value);
-  if (Array.isArray(value)) return `[${value.map(canonicalScenarioValue).join(",")}]`;
-  return `{${Object.entries(value as Record<string, unknown>)
-    .sort(([left], [right]) => left.localeCompare(right))
-    .map(([key, item]) => `${JSON.stringify(key)}:${canonicalScenarioValue(item)}`)
-    .join(",")}}`;
-}
-
-/** Exact non-title state fingerprint shared by production DOM, jsdom, and the browser projection. */
-export function scenarioStateSignature(scenario: DesignScenario): string {
-  if (scenario.id === "global.real-data") return "real-data";
-  const material = canonicalScenarioValue({
-    route: scenario.route,
-    initialUi: scenario.initialUi,
-    expectedTargets: scenario.expectedTargets,
-    fixtures: scenario.fixtures.map(({ method, path, params, body, behavior, response, localOutcome }) => ({
-      method: method.toUpperCase(), path, params, body, behavior, response, localOutcome,
-    })),
-  });
-  let hash = 0x811c9dc5;
-  for (let index = 0; index < material.length; index += 1) {
-    hash ^= material.charCodeAt(index);
-    hash = Math.imul(hash, 0x01000193);
-  }
-  return `state-${(hash >>> 0).toString(16).padStart(8, "0")}`;
 }

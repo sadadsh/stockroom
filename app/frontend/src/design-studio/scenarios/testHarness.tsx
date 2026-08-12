@@ -76,5 +76,9 @@ export async function mountScenario(id: string) {
   for (const target of scenario?.expectedTargets ?? []) {
     await waitFor(() => expect(scenarioTarget(target)).toBeInTheDocument());
   }
+  if (!scenario.fixtures.some((fixture) => fixture.behavior?.state === "pending")) {
+    await waitFor(() => expect(queryClient.isFetching()).toBe(0));
+  }
+  await act(async () => Promise.resolve());
   return { user, liveRequest, queryClient };
 }

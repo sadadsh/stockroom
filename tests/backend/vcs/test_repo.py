@@ -154,6 +154,34 @@ def test_restore_deletes_untracked_created_dir(tmp_path):
     assert not d.exists()
 
 
+def test_rollback_commit_removes_only_the_unpushed_head_and_keeps_bytes(tmp_path):
+    r = _repo(tmp_path)
+    f = tmp_path / "a.txt"
+    f.write_text("base")
+    base = r.commit("base", [f])
+    f.write_text("promotion")
+    promotion = r.commit("promotion", [f])
+
+    assert r.rollback_commit(promotion, base) == base
+    assert r.head() == base
+    assert f.read_text() == "promotion"
+    assert not r.is_clean()
+
+
+def test_rollback_commit_refuses_when_head_moved(tmp_path):
+    r = _repo(tmp_path)
+    f = tmp_path / "a.txt"
+    f.write_text("base")
+    base = r.commit("base", [f])
+    f.write_text("promotion")
+    promotion = r.commit("promotion", [f])
+    f.write_text("later")
+    r.commit("later", [f])
+
+    with pytest.raises(GitError, match="HEAD moved"):
+        r.rollback_commit(promotion, base)
+
+
 def test_pull_ff_and_push_against_local_bare_remote(tmp_path):
     # origin = bare repo; clone A commits+pushes; clone B pulls ff.
     origin = tmp_path / "origin.git"

@@ -96,12 +96,17 @@ browser case list is generated from the production scenario registry during `npm
 written to `app/frontend-dist/design-studio-scenarios.json`; the browser harness does not maintain
 a second scenario list. The current projection contains 190 scenarios.
 
+Cases whose ordinary product markup would otherwise look identical carry a visible Preview State
+notice inside the fixture product. It names the exact condition and its meaning. Both the jsdom
+floor and the Chromium matrix compare rendered product DOM and reject duplicate cases; a renamed
+default render is not accepted as another state.
+
 The browser matrix opens every projected scenario in dark and light themes at 1,366 x 872,
 1,600 x 1,000, and 1,920 x 1,200. It verifies the registered visible targets, Browse/Inspect/Arrange
 click-through, editor-panel collapse and expansion, all inspector domains, and browser console
 health. Every scenario carries an authority-derived interactive/layout/text/icon boundary and a
-domain-owned state contract; acceptance asserts the exact projected state signature as well as
-distinguishing DOM. It rejects every external/native/product effect while a fixture is active,
+domain-owned state contract; acceptance asserts its expected targets and distinguishing rendered
+DOM. It rejects every external/native/product effect while a fixture is active,
 including API mutations, host file and folder pickers, provider visibility, navigation, downloads,
 updater, EDA, and source actions. A blocked action explains itself in the visible Studio toast.
 The one exception is the local `/api/design-studio/personal` autosave: acceptance makes a real
@@ -130,3 +135,8 @@ snap, and presentation preference in the existing machine-preferences record. Fi
 fail-closed and retries if persisted state is temporarily unavailable. The canvas offers a visible
 Fit control and pan cue; keyboard arrow and pointer-drag panning keep the 1,920 px viewport usable
 without concealing the editor rails.
+
+Fixture preview blocks product effects before dispatch. This includes API operations, native file
+and folder pickers, same-tab and new-window external links, auxiliary-click navigation, downloads,
+provider visibility, updater actions, EDA launches, and source promotion. Personal design GET/PUT
+and the dedicated closing-window keepalive handoff are the only live service requests allowed.

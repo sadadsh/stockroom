@@ -1,6 +1,6 @@
 import { cleanup } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import { globalScenarioIds } from "./global";
+import { globalScenarios } from "./global";
 import { mountScenario } from "./testHarness";
 
 const GLOBAL_SCENARIO_INVENTORY = [
@@ -56,7 +56,7 @@ afterEach(cleanup);
 
 describe("global Design Studio scenarios", () => {
   it("registers the complete literal global and modal inventory", () => {
-    expect(globalScenarioIds).toEqual(GLOBAL_SCENARIO_INVENTORY);
+    expect(globalScenarios.map((scenario) => scenario.id)).toEqual(GLOBAL_SCENARIO_INVENTORY);
   });
 
   it.each(GLOBAL_SCENARIO_INVENTORY.filter((id) => id !== "global.real-data"))(

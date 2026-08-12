@@ -1,7 +1,7 @@
 import { act } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError, api } from "../api/client";
-import type { DesignDocument } from "./document";
+import { builtInVariationDocument, type DesignDocument } from "./document";
 import { createPersonalDesignController } from "./personalDesign";
 
 vi.mock("../api/client", async (importActual) => {
@@ -12,6 +12,7 @@ vi.mock("../api/client", async (importActual) => {
       ...actual.api,
       designStudioGet: vi.fn(),
       designStudioPut: vi.fn(),
+      designStudioPutForPageExit: vi.fn(),
       designStudioDelete: vi.fn(),
     },
   };
@@ -30,7 +31,7 @@ function fixtureDocument(copy: Record<string, string> = {}): DesignDocument {
       behaviors: {},
       layout: null,
     },
-    variations: {},
+    variations: builtInVariationDocument(),
     activeVariationId: "",
     targetScopes: {},
   };
@@ -58,6 +59,7 @@ describe("personal design persistence", () => {
     vi.useFakeTimers();
     mockApi.designStudioGet.mockReset();
     mockApi.designStudioPut.mockReset();
+    mockApi.designStudioPutForPageExit.mockReset();
     mockApi.designStudioDelete.mockReset();
   });
 
@@ -337,5 +339,46 @@ describe("personal design persistence", () => {
       document: edited,
       expected_revision: "r1",
     });
+  });
+
+  it("hands the newest edit to the page-exit endpoint while an older save is in flight", async () => {
+    const initial = fixtureDocument();
+    const firstEdit = fixtureDocument({ "rail.about": "First" });
+    const closingEdit = fixtureDocument({ "rail.about": "Newest" });
+    const firstSave = deferred<{ revision: string; document: DesignDocument }>();
+    mockApi.designStudioGet.mockResolvedValue({ revision: "r1", document: initial });
+    mockApi.designStudioPut.mockReturnValue(firstSave.promise);
+    mockApi.designStudioPutForPageExit.mockResolvedValue({ revision: "r3", document: closingEdit });
+    const controller = createPersonalDesignController(initial);
+    await controller.hydrate();
+
+    controller.replaceDocument(firstEdit);
+    await vi.advanceTimersByTimeAsync(400);
+    controller.replaceDocument(closingEdit);
+    controller.flushForPageExit();
+
+    expect(mockApi.designStudioPutForPageExit).toHaveBeenCalledWith({
+      document: closingEdit,
+      expected_revision: "r1",
+      superseded_document: firstEdit,
+    });
+    firstSave.resolve({ revision: "r2", document: firstEdit });
+  });
+
+  it("starts ordinary autosave immediately when a document is too large for keepalive", async () => {
+    const initial = fixtureDocument();
+    const large = fixtureDocument({ large: "x".repeat(32 * 1024) });
+    mockApi.designStudioGet.mockResolvedValue({ revision: "r1", document: initial });
+    mockApi.designStudioPut.mockResolvedValue({ revision: "r2", document: large });
+    const controller = createPersonalDesignController(initial);
+    await controller.hydrate();
+
+    controller.replaceDocument(large);
+
+    expect(mockApi.designStudioPut).toHaveBeenCalledWith({
+      document: large,
+      expected_revision: "r1",
+    });
+    expect(mockApi.designStudioPutForPageExit).not.toHaveBeenCalled();
   });
 });

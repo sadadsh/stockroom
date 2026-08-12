@@ -3,11 +3,11 @@ import type { OnboardingStatus } from "../api/types";
 import type { DesignScenario, ScenarioFixture } from "./scenario";
 import { registerScenarios } from "./scenarioRegistry";
 import { bootstrapScenarioRegistry, globalScenarios } from "./scenarios";
-import { componentScenarioIds } from "./scenarios/components";
-import { projectScenarioIds } from "./scenarios/projects";
-import { providerScenarioIds } from "./scenarios/provider";
-import { stmScenarioIds } from "./scenarios/stm";
-import { settingsScenarioIds } from "./scenarios/settings";
+import { componentScenarios } from "./scenarios/components";
+import { projectScenarios } from "./scenarios/projects";
+import { providerScenarios } from "./scenarios/provider";
+import { stmScenarios } from "./scenarios/stm";
+import { settingsScenarios } from "./scenarios/settings";
 import { settingsFixtureValidators } from "./fixtures/settingsFixtures";
 import { defineScenarioStateContracts } from "./scenarioStateContracts";
 
@@ -185,11 +185,11 @@ describe("registerScenarios", () => {
     expect(bootstrapScenarioRegistry.issues).toEqual([]);
     expect(bootstrapScenarioRegistry.scenarios.map((item) => item.id)).toEqual([
       ...globalScenarios.map((scenario) => scenario.id),
-      ...componentScenarioIds,
-      ...providerScenarioIds,
-      ...projectScenarioIds,
-      ...stmScenarioIds,
-      ...settingsScenarioIds,
+      ...componentScenarios.map((scenario) => scenario.id),
+      ...providerScenarios.map((scenario) => scenario.id),
+      ...projectScenarios.map((scenario) => scenario.id),
+      ...stmScenarios.map((scenario) => scenario.id),
+      ...settingsScenarios.map((scenario) => scenario.id),
     ]);
     expect(bootstrapScenarioRegistry.searchScenarios("update")).toContainEqual(
       expect.objectContaining({ id: "global.update.available", expectedTargets: ["rail.update"] }),

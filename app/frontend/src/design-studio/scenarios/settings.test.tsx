@@ -1,6 +1,6 @@
 import { cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import { settingsScenarioIds } from "./settings";
+import { settingsScenarios } from "./settings";
 import { mountScenario } from "./testHarness";
 
 const SETTINGS_SCENARIO_INVENTORY = [
@@ -69,14 +69,13 @@ const READY_CASES = [
   ["vendor-logins", "settings.vendor-login-row"],
   ["github", "settings.github"],
   ["updates", "settings.update"],
-  ["maintenance", "settings.completion"],
 ] as const;
 
 afterEach(cleanup);
 
 describe("Settings Design Studio scenarios", () => {
   it("registers the complete literal Settings inventory", () => {
-    expect(settingsScenarioIds).toEqual(SETTINGS_SCENARIO_INVENTORY);
+    expect(settingsScenarios.map((scenario) => scenario.id)).toEqual(SETTINGS_SCENARIO_INVENTORY);
   });
 
   it.each(SETTINGS_SCENARIO_INVENTORY)("mounts the real Settings surface for %s", async (id) => {

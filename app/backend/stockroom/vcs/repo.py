@@ -511,6 +511,21 @@ class GitRepo:
             raise GitError(f"git revert {sha} failed: {(proc.stderr or proc.stdout).strip()}")
         return self.head()
 
+    @_serialized
+    def rollback_commit(self, revision: str, previous: str) -> str:
+        """Remove one unpushed transaction commit while preserving its working-tree bytes.
+
+        Callers must restore their scoped byte snapshot immediately afterward. Refusing when HEAD
+        moved prevents this recovery path from rewriting unrelated later work.
+        """
+        current = self.head()
+        if current != revision:
+            raise GitError(
+                f"cannot roll back {revision}: repository HEAD moved to {current}"
+            )
+        self._run("reset", "--mixed", previous)
+        return self.head()
+
     def add_remote(self, name: str, url: str) -> None:
         self._run("remote", "add", name, url)
 

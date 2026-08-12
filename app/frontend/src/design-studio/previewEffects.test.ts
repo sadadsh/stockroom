@@ -71,6 +71,60 @@ describe("fixture preview effects", () => {
     expect(click).not.toHaveBeenCalled();
   });
 
+  it("captures ordinary external and download anchors before their handlers run", () => {
+    const restore = installPreviewEffectGuard("components.full-data");
+    const invoked = vi.fn();
+    const blocked: Error[] = [];
+    const recordBlocked = (event: Event) => {
+      blocked.push((event as CustomEvent<Error>).detail);
+    };
+    window.addEventListener("stockroom:preview-effect-blocked", recordBlocked);
+
+    try {
+      for (const anchor of [
+        Object.assign(document.createElement("a"), {
+          href: "https://example.test/part",
+          target: "_blank",
+        }),
+        Object.assign(document.createElement("a"), {
+          href: "blob:https://stockroom.test/export",
+          download: "bom.csv",
+        }),
+        Object.assign(document.createElement("a"), {
+          href: "https://example.test/same-tab",
+        }),
+      ]) {
+        anchor.addEventListener("click", invoked);
+        document.body.append(anchor);
+        const click = new MouseEvent("click", { bubbles: true, cancelable: true });
+        anchor.dispatchEvent(click);
+        expect(click.defaultPrevented).toBe(true);
+        anchor.remove();
+      }
+      const middleLink = Object.assign(document.createElement("a"), {
+        href: "https://example.test/middle",
+      });
+      middleLink.addEventListener("auxclick", invoked);
+      document.body.append(middleLink);
+      const auxclick = new MouseEvent("auxclick", { bubbles: true, cancelable: true, button: 1 });
+      middleLink.dispatchEvent(auxclick);
+      expect(auxclick.defaultPrevented).toBe(true);
+      middleLink.remove();
+    } finally {
+      window.removeEventListener("stockroom:preview-effect-blocked", recordBlocked);
+      restore();
+    }
+
+    expect(invoked).not.toHaveBeenCalled();
+    expect(blocked).toHaveLength(4);
+    expect(blocked.map((error) => error.message)).toEqual([
+      expect.stringContaining("opening an external page"),
+      expect.stringContaining("downloading bom.csv"),
+      expect.stringContaining("opening an external page"),
+      expect.stringContaining("opening an external page"),
+    ]);
+  });
+
   it("blocks provider, updater, EDA, and source API effects before fetch", async () => {
     const fetch = vi.fn();
     vi.stubGlobal("fetch", fetch);
@@ -109,10 +163,43 @@ describe("fixture preview effects", () => {
         document: { schemaVersion: 1 } as never,
         expected_revision: "r1",
       });
+      await api.designStudioPutForPageExit({
+        document: { schemaVersion: 1 } as never,
+        expected_revision: "r2",
+      });
     } finally {
       restore();
     }
 
-    expect(fetch).toHaveBeenCalledOnce();
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(fetch).toHaveBeenLastCalledWith(
+      expect.any(String),
+      expect.objectContaining({ method: "PUT", keepalive: true }),
+    );
+  });
+
+  it("blocks personal-design deletion while allowing hydration and autosave", async () => {
+    const fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ revision: "r2", document: null }),
+    });
+    vi.stubGlobal("fetch", fetch);
+    const restore = installPreviewEffectGuard("components.full-data");
+
+    try {
+      await api.designStudioGet();
+      await api.designStudioPut({
+        document: { schemaVersion: 1 } as never,
+        expected_revision: "r1",
+      });
+      await expect(api.designStudioDelete({ expected_revision: "r2" })).rejects.toBeInstanceOf(
+        PreviewEffectError,
+      );
+    } finally {
+      restore();
+    }
+
+    expect(fetch).toHaveBeenCalledTimes(2);
   });
 });

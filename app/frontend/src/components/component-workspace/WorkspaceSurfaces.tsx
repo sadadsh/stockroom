@@ -24,6 +24,7 @@ import { IdentitySheet } from "./IdentitySheet";
 import { PinoutApply } from "./PinoutApply";
 import { PinoutTable } from "./PinoutTable";
 import { SourcesSheet } from "./SourcesSheet";
+import type { SourcesSheetTab } from "./SourcesSheet";
 import { SourcingSheet } from "./SourcingSheet";
 import { WorkspaceModal } from "./WorkspaceModal";
 import type { DatasheetTarget } from "./datasheetWorkflow";
@@ -64,6 +65,7 @@ export interface WorkspaceSurfacesProps {
   /** The enrichment surface, passed in so the provenance sheet never re-implements it. */
   enrich: ReactNode;
   confirmDelete: boolean;
+  initialSourcesTab?: SourcesSheetTab;
   deleting: boolean;
   onCancelDelete: () => void;
   onConfirmDelete: () => void;
@@ -88,6 +90,7 @@ export function WorkspaceSurfaces({
   onPinoutFailed,
   enrich,
   confirmDelete,
+  initialSourcesTab,
   deleting,
   onCancelDelete,
   onConfirmDelete,
@@ -204,6 +207,7 @@ export function WorkspaceSurfaces({
             onApplyAlternate={onEditField}
             refresh={refresh}
             enrich={enrich}
+            initialTab={initialSourcesTab}
           />
         ) : null}
       </WorkspaceModal>
