@@ -114,6 +114,11 @@ const KNOWN_DERIVED: readonly string[] = [
 // (2) Passed as a plain string prop and rendered by a child as data-dev-id={devId}. The
 // id string is present in source (verified below), just not on a data-dev-id attribute.
 const KNOWN_PROP_PASSED: readonly string[] = [
+  // ComponentsPage passes state-specific ids through productState's shared `devId` prop. The
+  // loading, failed, and filtered-empty frames are separate states of the real picker body.
+  "components.list-loading",
+  "components.list-failed",
+  "components.list-no-match",
   // ProductPhoto.tsx CarouselArrow: the pager buttons take devId as a prop. Spelled out in full
   // at the call site, never built as `preview.photo-${side}` - an interpolated id is invisible to
   // this gate and to grep.

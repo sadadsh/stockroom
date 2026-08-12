@@ -155,9 +155,13 @@ function isParametricFacets(value: unknown): value is ParametricFacets {
 
 export function createScenarioFixtureValidatorRegistry(
   validators: Readonly<Record<string, ScenarioFixtureValidator>>,
+  fallback?: ScenarioFixtureValidatorRegistry,
 ): ScenarioFixtureValidatorRegistry {
   return {
-    validate: (fixture) => validators[`${fixture.method.toUpperCase()} ${fixture.path}`]?.(fixture) === true,
+    validate: (fixture) => {
+      const validator = validators[`${fixture.method.toUpperCase()} ${fixture.path}`];
+      return validator ? validator(fixture) : fallback?.validate(fixture) === true;
+    },
   };
 }
 

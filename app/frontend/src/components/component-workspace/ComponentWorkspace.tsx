@@ -64,10 +64,16 @@ import type { SpecFilter } from "./specificationRows";
 export function ComponentWorkspace({
   componentId,
   onDeleted,
+  initialSurface,
+  initialPreview,
+  initialConfirmDelete = false,
 }: {
   componentId: string;
   /** The component was removed. The page owns what happens to the selection afterwards. */
   onDeleted?: (id: string) => void;
+  initialSurface?: WorkspaceSurface;
+  initialPreview?: PreviewKind;
+  initialConfirmDelete?: boolean;
 }) {
   const session = useUiSession();
   const view = componentView(session, componentId);
@@ -82,11 +88,11 @@ export function ComponentWorkspace({
   const shell = usePartShellQuery(componentId);
   const revealFiles = useRevealPartFiles();
   const { toast } = useToast();
-  const [preview, setPreview] = useState<PreviewKind | null>(null);
-  const [surface, setSurface] = useState<WorkspaceSurface | null>(null);
+  const [preview, setPreview] = useState<PreviewKind | null>(initialPreview ?? null);
+  const [surface, setSurface] = useState<WorkspaceSurface | null>(initialSurface ?? null);
   const [datasheet, setDatasheet] = useState<DatasheetTarget | null>(null);
   const [specFilter, setSpecFilter] = useState<SpecFilter>("all");
-  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(initialConfirmDelete);
   const [shellDialog, setShellDialog] = useState<ShellDialog>(null);
   const specScrollRef = useRef<HTMLDivElement | null>(null);
   const sourcingScrollRef = useRef<HTMLDivElement | null>(null);

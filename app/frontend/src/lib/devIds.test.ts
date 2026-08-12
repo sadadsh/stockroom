@@ -187,7 +187,9 @@ import { DEV_IDS, DEV_ID_AREAS, DEV_ID_BY_ID } from "./devIds";
 // editor (plan 1.5). The WIDE style scope earns no row: editing a role everywhere it appears is the
 // Tokens rows and the Box tab, which stay outside the id system with the panel's other chrome.
 // 474 with the onboarding and toast targets used by Design Studio's real-component scenarios.
-const EXPECTED_ENTRIES = 479;
+// 482 with the Components list's loading, failed, and filtered-empty states exposed to the same
+// stable target contract as the rest of the production picker.
+const EXPECTED_ENTRIES = 482;
 
 describe("devIds catalogue", () => {
   // The count is asserted from a single constant so bumping it is one edit, and so the test NAME can

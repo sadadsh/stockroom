@@ -19,6 +19,24 @@ export interface ScenarioUiState {
   rail?: { aboutOpen?: boolean };
   search?: { open?: boolean };
   service?: { error?: string };
+  components?: {
+    filters?: {
+      query?: string;
+      category?: string | null;
+      completeOnly?: boolean;
+      duplicatesOnly?: boolean;
+    };
+    selectedId?: string | null;
+    autoSelect?: boolean;
+    surface?: "identity" | "classification" | "cad-sources" | "provenance" | "offers" | "pinout";
+    preview?: "symbol" | "footprint" | "model";
+    confirmDelete?: boolean;
+  };
+  /** Native provider chrome is rendered by WindowHost, not duplicated in the React app tree. */
+  provider?: {
+    state: string;
+    nativeHostTargets?: readonly ("provider-back" | "provider-forward" | "stockroom-tab" | "provider-tab")[];
+  };
 }
 
 /** One typed API response used while a scenario preview is active. */
@@ -26,6 +44,10 @@ export interface ScenarioFixture<TResponse = unknown, TBody = unknown>
   extends ApiRequestDescriptor {
   body: TBody;
   response: TResponse;
+  /** Deterministic transport state while preserving a schema-valid typed response fixture. */
+  behavior?:
+    | { state: "pending" }
+    | { state: "error"; status: number; message: string };
   localOutcome?: ScenarioLocalOutcome;
 }
 

@@ -31,6 +31,16 @@ export class MissingScenarioFixtureError extends Error {
   }
 }
 
+export class ScenarioFixtureError extends Error {
+  readonly status: number;
+
+  constructor(status: number, message: string) {
+    super(message);
+    this.name = "ScenarioFixtureError";
+    this.status = status;
+  }
+}
+
 function sameValue(left: unknown, right: unknown): boolean {
   if (Object.is(left, right)) return true;
   if (Array.isArray(left) || Array.isArray(right)) {
@@ -72,6 +82,10 @@ export function previewAdapter(scenario: DesignScenario): ApiRequestAdapter {
   return {
     async handle<T>(descriptor: ApiRequestDescriptor, live: () => Promise<T>): Promise<T> {
       const fixture = scenario.fixtures.find((candidate) => sameRequest(candidate, descriptor));
+      if (fixture?.behavior?.state === "pending") return new Promise<T>(() => {});
+      if (fixture?.behavior?.state === "error") {
+        throw new ScenarioFixtureError(fixture.behavior.status, fixture.behavior.message);
+      }
       if (fixture) return fixture.response as T;
 
       const classification = guardPreviewRequest(descriptor);

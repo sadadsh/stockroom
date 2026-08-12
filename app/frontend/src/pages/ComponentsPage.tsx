@@ -112,16 +112,30 @@ export function ComponentsPage() {
   // The four narrowings are ONE thing: they are persisted as one component_filters document,
   // cleared as a group, and rewritten as a group when the search overlay scopes the picker to a
   // category. So they move as one transition rather than four setter calls that have to agree.
-  const [filters, dispatchFilters] = useReducer(filtersReducer, undefined, initialFilters);
+  const scenarioUi = useScenarioUiState();
+  const [filters, dispatchFilters] = useReducer(filtersReducer, undefined, () => {
+    const persisted = initialFilters();
+    const preview = scenarioUi.components?.filters;
+    return preview
+      ? {
+          query: preview.query ?? persisted.query,
+          category: preview.category === undefined ? persisted.category : preview.category,
+          completeOnly: preview.completeOnly ?? persisted.completeOnly,
+          duplicatesOnly: preview.duplicatesOnly ?? persisted.duplicatesOnly,
+        }
+      : persisted;
+  });
   const { query: search, category, completeOnly, duplicatesOnly } = filters;
   const [selectedId, setSelectedId] = useState<string | null>(
-    () => readUiSession().selected_ids.component,
+    () => scenarioUi.components?.selectedId === undefined
+      ? readUiSession().selected_ids.component
+      : scenarioUi.components.selectedId,
   );
   const [searchOpen, setSearchOpen] = useState(
     () => readUiSession().open_surface === "search",
   );
-  const scenarioSearchOpen = useScenarioUiState().search?.open;
-  const scenarioServiceError = useScenarioUiState().service?.error;
+  const scenarioSearchOpen = scenarioUi.search?.open;
+  const scenarioServiceError = scenarioUi.service?.error;
   const priorSearchOpen = useRef<boolean | null>(null);
   const [listScrollElement, setListScrollElement] =
     useState<HTMLDivElement | null>(null);
@@ -198,9 +212,10 @@ export function ComponentsPage() {
     [duplicatesQuery.data],
   );
   const allParts = partsQuery.data?.parts ?? [];
-  const parts = duplicatesOnly
-    ? allParts.filter((p) => duplicateIds.has(p.id))
-    : allParts;
+  const parts = useMemo(
+    () => duplicatesOnly ? allParts.filter((part) => duplicateIds.has(part.id)) : allParts,
+    [allParts, duplicateIds, duplicatesOnly],
+  );
 
   // Move the selection and checkpoint it in the same act. Both belong to the selection: keeping
   // the checkpoint in a separate effect meant every selection cost an extra render pass.
@@ -281,6 +296,7 @@ export function ComponentsPage() {
   const activeComponent = session.active_component;
   useEffect(() => {
     if (partsFetching) return;
+    if (scenarioUi.components?.autoSelect === false) return;
     if (parts.length === 0) {
       if (selectedId !== null) selectComponent(null);
       return;
@@ -293,7 +309,7 @@ export function ComponentsPage() {
       openComponent(selectedId);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [parts, selectedId, partsFetching, activeComponent]);
+  }, [parts, selectedId, partsFetching, activeComponent, scenarioUi.components?.autoSelect]);
 
   // A tab whose component left the library cannot render, so it goes. Only ever evaluated against
   // an UNFILTERED settled list: a search narrows what is listed without deleting anything, and
@@ -360,6 +376,9 @@ export function ComponentsPage() {
                 key={activeComponent}
                 componentId={activeComponent}
                 onDeleted={componentDeleted}
+                initialSurface={scenarioUi.components?.surface}
+                initialPreview={scenarioUi.components?.preview}
+                initialConfirmDelete={scenarioUi.components?.confirmDelete}
               />
             ) : partsQuery.isLoading ? (
               <div
@@ -458,7 +477,7 @@ function PickerBody({
   // `error.message` - a raw transport exception - straight in front of the person.
   if (isLoading) {
     return (
-      <LoadingState className="mt-2" id="components.list-loading">
+      <LoadingState className="mt-2" id="components.list-loading" devId="components.list-loading">
         Loading this catalog's components...
       </LoadingState>
     );
@@ -476,7 +495,7 @@ function PickerBody({
             This machine is not signed in to the catalog.
           </ErrorState>
         ) : (
-          <ErrorState id="components.list-failed" onRetry={onRetry}>
+          <ErrorState id="components.list-failed" devId="components.list-failed" onRetry={onRetry}>
             This catalog's components could not be listed.
           </ErrorState>
         )}
@@ -489,7 +508,7 @@ function PickerBody({
     if (hasSearchOrFilter) {
       return (
         <div className="mt-2 flex flex-col items-start gap-2">
-          <EmptyState id="components.list-no-match">
+          <EmptyState id="components.list-no-match" devId="components.list-no-match">
             No component matches the current search or filter.
           </EmptyState>
           <Button small onClick={onClearFilters}>

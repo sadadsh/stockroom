@@ -343,8 +343,15 @@ function completionEvidenceMessage(evidence: CompletionEvidence | null): string 
   return reason || "The CAD package was reverified against an immutable manifest.";
 }
 
-export function CaptureProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<CaptureState>(IDLE);
+export function CaptureProvider({
+  children,
+  initialCapture,
+}: {
+  children: ReactNode;
+  /** A deterministic restored host handoff used by real-app Design Studio previews. */
+  initialCapture?: { state: CaptureState; batchId: string; itemId: string };
+}) {
+  const [state, setState] = useState<CaptureState>(() => initialCapture?.state ?? IDLE);
   const stateRef = useRef(state);
   // Synced in a layout effect, not during render: render can be replayed or thrown away, and the
   // busy-slot guard in `start` must never reject against a capture state that no commit ever
@@ -358,10 +365,10 @@ export function CaptureProvider({ children }: { children: ReactNode }) {
   const reopenHandlersRef = useRef(new Set<(partId: string) => void>());
   const pendingReopenRef = useRef<string | null>(null);
   const queryClient = useQueryClient();
-  const partIdRef = useRef<string | null>(null);
-  const needsRef = useRef<Requirement[]>([]);
-  const batchIdRef = useRef<string | null>(null);
-  const itemIdRef = useRef<string | null>(null);
+  const partIdRef = useRef<string | null>(initialCapture?.state.partId ?? null);
+  const needsRef = useRef<Requirement[]>(initialCapture?.state.needs ?? []);
+  const batchIdRef = useRef<string | null>(initialCapture?.batchId ?? null);
+  const itemIdRef = useRef<string | null>(initialCapture?.itemId ?? null);
   const followGenerationRef = useRef(0);
   const pendingStartRef = useRef<{
     commandKey: string;

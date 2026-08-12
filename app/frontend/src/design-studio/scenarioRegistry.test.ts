@@ -3,6 +3,8 @@ import type { OnboardingStatus } from "../api/types";
 import type { DesignScenario, ScenarioFixture } from "./scenario";
 import { registerScenarios } from "./scenarioRegistry";
 import { bootstrapScenarioRegistry, globalScenarios } from "./scenarios";
+import { componentScenarioIds } from "./scenarios/components";
+import { providerScenarioIds } from "./scenarios/provider";
 import { bootstrapFixtureValidators } from "./scenarioFixtureValidation";
 
 function scenario(id: string): DesignScenario {
@@ -166,18 +168,12 @@ describe("registerScenarios", () => {
     ).toBe(true);
   });
 
-  it("registers the global bootstrap scenarios with stable targets and typed fixtures", () => {
+  it("registers the shipped bootstrap scenarios with stable targets and typed fixtures", () => {
     expect(bootstrapScenarioRegistry.issues).toEqual([]);
     expect(bootstrapScenarioRegistry.scenarios.map((item) => item.id)).toEqual([
-      "global.real-data",
-      "global.onboarding.open",
-      "global.onboarding.create",
-      "global.onboarding.clone",
-      "global.onboarding.error",
-      "global.about.open",
-      "global.update.available",
-      "global.search.open",
-      "global.service-error",
+      ...globalScenarios.map((scenario) => scenario.id),
+      ...componentScenarioIds,
+      ...providerScenarioIds,
     ]);
     expect(bootstrapScenarioRegistry.searchScenarios("update")).toEqual([
       expect.objectContaining({ id: "global.update.available", expectedTargets: ["rail.update"] }),

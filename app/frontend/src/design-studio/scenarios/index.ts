@@ -1,10 +1,18 @@
 import { registerScenarios } from "../scenarioRegistry";
+import { providerFixtureValidators } from "../fixtures/providerFixtures";
+import { componentScenarios } from "./components";
 import { globalScenarios } from "./global";
+import { providerScenarios } from "./provider";
 
 export { globalScenarios } from "./global";
+export { componentScenarios } from "./components";
+export { providerScenarios } from "./provider";
 
 /** The shipped scenario set. Domain-specific scenarios are added by their owning feature. */
-export const bootstrapScenarioRegistry = registerScenarios(globalScenarios);
+export const bootstrapScenarioRegistry = registerScenarios(
+  [...globalScenarios, ...componentScenarios, ...providerScenarios],
+  providerFixtureValidators,
+);
 
 export function scenarioById(id: string) {
   return bootstrapScenarioRegistry.scenarioById(id);
