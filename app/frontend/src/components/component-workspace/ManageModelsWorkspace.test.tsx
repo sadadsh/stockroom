@@ -84,4 +84,25 @@ describe("ManageModelsWorkspace", () => {
     expect(lastProvider).toHaveAttribute("aria-checked", "true");
     expect(providers[0]).toHaveTextContent("Missing 3D Model");
   });
+
+  it("uses one file chooser as recovery and reports what attached", async () => {
+    const user = userEvent.setup();
+    const dossier = makeDossier();
+    dossier.cadSourceCoverage.rows = [providerRow("partial", false)];
+    const onAttached = vi.fn();
+
+    render(
+      <ManageModelsWorkspace
+        componentId="part-1"
+        dossier={dossier}
+        onView={vi.fn()}
+        onRecoverFiles={vi.fn().mockResolvedValue({ selected: 1, accepted: 3 })}
+        onAttached={onAttached}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Choose Downloaded Files" }));
+    expect(await screen.findByRole("status")).toHaveTextContent("3 CAD roles attached");
+    expect(onAttached).toHaveBeenCalledTimes(1);
+  });
 });

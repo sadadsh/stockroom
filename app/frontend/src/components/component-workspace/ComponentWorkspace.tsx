@@ -276,6 +276,7 @@ export function ComponentWorkspace({
             componentId={componentId}
             dossier={dossier}
             onView={(cadView) => patchView({ cad_view: cadView })}
+            onAttached={() => void query.refetch()}
           />
         ) : undefined
       }

@@ -10,10 +10,12 @@ const ARTIFACT_LABELS = {
 export function ProviderList({
   providers,
   selectedId,
+  disabled = false,
   onSelect,
 }: {
   providers: readonly ManageModelsProvider[];
   selectedId: string | null;
+  disabled?: boolean;
   onSelect: (providerId: string) => void;
 }) {
   return (
@@ -39,6 +41,7 @@ export function ProviderList({
             type="button"
             role="radio"
             aria-checked={provider.row.id === selectedId}
+            disabled={disabled}
             className={
               "w-full rounded-control border px-2.5 py-2 text-left " +
               (provider.row.id === selectedId

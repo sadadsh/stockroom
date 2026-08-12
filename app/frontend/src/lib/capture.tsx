@@ -942,3 +942,7 @@ export function useCapture(): CaptureApi {
   if (!context) throw new Error("useCapture must be used within a CaptureProvider");
   return context;
 }
+
+export function useOptionalCapture(): CaptureApi | null {
+  return useContext(CaptureContext);
+}
