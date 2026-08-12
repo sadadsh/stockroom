@@ -1,176 +1,86 @@
-import type {
-  OnboardingStatus,
-  ParametricFacets,
-  SearchResponse,
-  SetLibraryBody,
-  UpdateCheck,
-} from "../../api/types";
-import type { DesignScenario, ScenarioFixture } from "../scenario";
+import type { DesignScenario, ScenarioFixture, ScenarioUiState } from "../scenario";
+import { settingsReadFixtures, SETTINGS_ONBOARDING } from "../fixtures/settingsFixtures";
 
-const ONBOARDING_READY: OnboardingStatus = {
-  onboarded: true,
-  first_run: false,
-  libraries_root: "C:\\Stockroom",
-  profiles: [],
-  under_git: true,
-  default_dir: "C:\\Stockroom\\Components",
-  libraries: [
-    {
-      name: "Components",
-      path: "C:\\Stockroom\\Components",
-      active: true,
-      available: true,
-      under_git: true,
-    },
-  ],
-};
+export const globalScenarioIds = [
+  "global.real-data", "global.onboarding.open", "global.onboarding.create", "global.onboarding.clone",
+  "global.onboarding.error", "global.onboarding.create-error", "global.onboarding.clone-error",
+  "global.about.open", "global.about.current", "global.about.update-available", "global.about.stale",
+  "global.rail.expanded", "global.rail.collapsed", "global.theme.dark", "global.theme.light",
+  "global.update.current", "global.update.available", "global.update.updating", "global.update.error",
+  "global.add-parts.empty", "global.add-parts.validating", "global.add-parts.exact", "global.add-parts.mismatch", "global.add-parts.duplicate", "global.add-parts.failure",
+  "global.search.initial", "global.search.filtered", "global.search.empty", "global.search.error",
+  "global.confirmation.neutral", "global.confirmation.destructive",
+  "global.toast.neutral", "global.toast.success", "global.toast.error",
+  "global.capture.active", "global.capture.backgrounded", "global.capture.complete", "global.capture.error",
+  "global.offline", "global.service-error", "global.stale",
+  "global.source-promotion.unavailable", "global.source-promotion.ready", "global.source-promotion.blocked", "global.source-promotion.success", "global.source-promotion.failure",
+] as const;
 
-const ONBOARDING_FIRST_RUN: OnboardingStatus = {
-  ...ONBOARDING_READY,
-  onboarded: false,
-  first_run: true,
-  libraries: [],
-};
+type GlobalScenarioId = typeof globalScenarioIds[number];
 
-const UPDATE_AVAILABLE: UpdateCheck = {
-  update_available: true,
-  state: "available",
-  behind: 1,
-  current_revision: "preview-current",
-  target_revision: "preview-next",
-  detail: "An update is available.",
-};
+const firstRun = { ...SETTINGS_ONBOARDING, onboarded: false, first_run: true, libraries: [], profiles: [] };
+const searchRows = [{ id: "fixture-part", display_name: "LM358", category: "Integrated Circuits", mpn: "LM358DR", manufacturer: "Texas Instruments", is_complete: true, missing: [], specs: { channels: 2 }, stock: 1200, unit_price: 0.42, currency: "USD" }];
 
-const EMPTY_SEARCH: SearchResponse = { parts: [], count: 0 };
-const EMPTY_PARAMETRIC_FACETS: ParametricFacets = { category: null, facets: [], total: 0 };
-
-function onboardingFixture(
-  response: OnboardingStatus,
-): ScenarioFixture<OnboardingStatus, undefined> {
-  return { method: "GET", path: "/api/onboarding", params: {}, body: undefined, response };
+function fixture(method: string, path: string, response: unknown, behavior?: ScenarioFixture["behavior"]): ScenarioFixture {
+  return { method, path, params: {}, body: undefined, response, behavior };
 }
 
-function coverage(state: string): readonly [`route:components`, `state:${string}`] {
-  return ["route:components", `state:${state}`];
+function globalFixtures(id: GlobalScenarioId): ScenarioFixture[] {
+  if (id === "global.real-data") return [];
+  const isOnboarding = id.startsWith("global.onboarding.");
+  const updateState = id.endsWith("update.available") || id.endsWith("about.update-available") ? "update_available"
+    : id.endsWith("update.updating") ? "updating" : id === "global.offline" ? "offline"
+      : id === "global.stale" || id.endsWith("about.stale") ? "restart_required" : "up_to_date";
+  const reads = settingsReadFixtures({ updateState }).filter((item) => !(isOnboarding && item.path === "/api/onboarding"));
+  if (isOnboarding) reads.unshift(fixture("GET", "/api/onboarding", firstRun));
+  if (id.startsWith("global.search.")) {
+    const error = id.endsWith(".error") ? { state: "error" as const, status: 503, message: "Search unavailable." } : undefined;
+    const rows = id.endsWith(".empty") ? [] : searchRows;
+    reads.push(
+      fixture("GET", "/api/library/search", { parts: rows, count: rows.length }, error),
+      fixture("GET", "/api/library/facets/parametric", { category: null, facets: [], total: rows.length }),
+    );
+  }
+  return reads;
 }
 
-const common = {
-  area: "global" as const,
-  group: "Global",
-  route: "components" as const,
-};
+function uiFor(id: GlobalScenarioId): Readonly<ScenarioUiState> {
+  if (id.startsWith("global.onboarding.")) {
+    const mode = id.includes("clone") ? "clone" : id.includes("create") ? "create" : "open";
+    return { onboarding: { mode, setupError: id.includes("error") ? "Could not set up the catalog." : undefined } };
+  }
+  if (id.startsWith("global.about.")) return { rail: { aboutOpen: true } };
+  if (id === "global.rail.collapsed" || id === "global.rail.expanded") return { railState: id.endsWith("collapsed") ? "collapsed" : "expanded" };
+  if (id === "global.theme.dark" || id === "global.theme.light") return { theme: id.endsWith("light") ? "light" : "dark" };
+  if (id.startsWith("global.add-parts.")) return { addParts: { state: id.split(".").slice(-1)[0] as NonNullable<ScenarioUiState["addParts"]>["state"] } };
+  if (id.startsWith("global.search.")) return { search: { open: true } };
+  if (id === "global.confirmation.neutral" || id === "global.confirmation.destructive") return { confirmation: { danger: id.endsWith("destructive") } };
+  if (id.startsWith("global.toast.")) return { toast: { message: `Fixture ${id.split(".").slice(-1)[0]} notification.`, tone: id.endsWith("success") ? "ok" : id.endsWith("error") ? "err" : "neutral" } };
+  if (id.startsWith("global.capture.")) return { capture: { status: id.endsWith("complete") ? "done" : id.endsWith("error") ? "error" : id.endsWith("active") ? "receiving" : "resolving", backgrounded: !id.endsWith("active") } };
+  if (id === "global.service-error") return { service: { error: "Service unavailable" } };
+  if (id.startsWith("global.source-promotion.")) return { sourcePromotion: { state: id.split(".").slice(-1)[0] as NonNullable<ScenarioUiState["sourcePromotion"]>["state"] } };
+  return {};
+}
 
-/** Global preview cases that exercise existing production chrome without a parallel UI. */
-export const globalScenarios: readonly DesignScenario[] = [
-  {
-    ...common,
-    id: "global.real-data",
-    title: "Real Data",
-    fixtures: [],
-    initialUi: {},
-    expectedTargets: ["shell.root"],
-    coverage: coverage("real-data"),
-  },
-  {
-    ...common,
-    id: "global.onboarding.open",
-    title: "Onboarding Open",
-    fixtures: [onboardingFixture(ONBOARDING_FIRST_RUN)],
-    initialUi: { onboarding: { mode: "open" } },
-    expectedTargets: ["onboarding.gate"],
-    coverage: coverage("onboarding-open"),
-  },
-  {
-    ...common,
-    id: "global.onboarding.create",
-    title: "Onboarding Create",
-    fixtures: [
-      onboardingFixture(ONBOARDING_FIRST_RUN),
-      {
-        method: "POST",
-        path: "/api/onboarding/library",
-        params: {},
-        body: { mode: "create" } satisfies SetLibraryBody,
-        response: ONBOARDING_READY,
-        localOutcome: { state: "succeeded", target: "onboarding.gate" },
-      } satisfies ScenarioFixture<OnboardingStatus, SetLibraryBody>,
-    ],
-    initialUi: { onboarding: { mode: "create" } },
-    expectedTargets: ["onboarding.gate"],
-    coverage: coverage("onboarding-create"),
-  },
-  {
-    ...common,
-    id: "global.onboarding.clone",
-    title: "Onboarding Clone",
-    fixtures: [
-      onboardingFixture(ONBOARDING_FIRST_RUN),
-      {
-        method: "POST",
-        path: "/api/onboarding/library",
-        params: {},
-        body: { mode: "clone", url: "https://example.test/components.git" } satisfies SetLibraryBody,
-        response: ONBOARDING_READY,
-        localOutcome: { state: "succeeded", target: "onboarding.gate" },
-      } satisfies ScenarioFixture<OnboardingStatus, SetLibraryBody>,
-    ],
-    initialUi: { onboarding: { mode: "clone" } },
-    expectedTargets: ["onboarding.gate"],
-    coverage: coverage("onboarding-clone"),
-  },
-  {
-    ...common,
-    id: "global.onboarding.error",
-    title: "Onboarding Error",
-    fixtures: [onboardingFixture(ONBOARDING_FIRST_RUN)],
-    initialUi: { onboarding: { mode: "open", setupError: "Could not set up the components" } },
-    expectedTargets: ["toast.status"],
-    coverage: coverage("onboarding-error"),
-  },
-  {
-    ...common,
-    id: "global.about.open",
-    title: "About Open",
-    fixtures: [
-      onboardingFixture(ONBOARDING_READY),
-      { method: "GET", path: "/api/update/check", params: {}, body: undefined, response: UPDATE_AVAILABLE } satisfies ScenarioFixture<UpdateCheck, undefined>,
-    ],
-    initialUi: { rail: { aboutOpen: true } },
-    expectedTargets: ["about.root"],
-    coverage: coverage("about-open"),
-  },
-  {
-    ...common,
-    id: "global.update.available",
-    title: "Update Available",
-    fixtures: [
-      onboardingFixture(ONBOARDING_READY),
-      { method: "GET", path: "/api/update/check", params: {}, body: undefined, response: UPDATE_AVAILABLE } satisfies ScenarioFixture<UpdateCheck, undefined>,
-    ],
-    initialUi: {},
-    expectedTargets: ["rail.update"],
-    coverage: coverage("update-available"),
-  },
-  {
-    ...common,
-    id: "global.search.open",
-    title: "Search Open",
-    fixtures: [
-      onboardingFixture(ONBOARDING_READY),
-      { method: "GET", path: "/api/library/search", params: {}, body: undefined, response: EMPTY_SEARCH } satisfies ScenarioFixture<SearchResponse, undefined>,
-      { method: "GET", path: "/api/library/facets/parametric", params: {}, body: undefined, response: EMPTY_PARAMETRIC_FACETS } satisfies ScenarioFixture<ParametricFacets, undefined>,
-    ],
-    initialUi: { search: { open: true } },
-    expectedTargets: ["search.query"],
-    coverage: coverage("search-open"),
-  },
-  {
-    ...common,
-    id: "global.service-error",
-    title: "Service Error",
-    fixtures: [onboardingFixture(ONBOARDING_READY)],
-    initialUi: { service: { error: "Service unavailable" } },
-    expectedTargets: ["components.list-unreachable"],
-    coverage: coverage("service-error"),
-  },
-];
+function targetFor(id: GlobalScenarioId): string {
+  if (id.startsWith("global.onboarding.")) return id.includes("error") ? "toast.status" : "onboarding.gate";
+  if (id.startsWith("global.about.")) return "about.root";
+  if (id.startsWith("global.add-parts.")) return "addpart.root";
+  if (id.startsWith("global.search.")) return "search.root";
+  if (id.startsWith("global.confirmation.")) return "confirm.root";
+  if (id.startsWith("global.toast.")) return "toast.status";
+  if (id.startsWith("global.capture.") && !id.endsWith("active")) return "capture.status";
+  if (id === "global.service-error") return "components.list-unreachable";
+  if (id.includes("update.available") || id.includes("update.updating")) return "rail.update";
+  return "shell.root";
+}
+
+function scenario(id: GlobalScenarioId): DesignScenario {
+  return {
+    id, title: id === "global.real-data" ? "Real Data" : id.split(".").slice(1).join(" ").replace(/(^|[ -])\w/g, (letter) => letter.toUpperCase()), area: "global", group: "Global", route: "components",
+    fixtures: globalFixtures(id), initialUi: uiFor(id), expectedTargets: [targetFor(id)],
+    coverage: ["route:components", `state:${id.split(".").slice(1).join("-")}`],
+  };
+}
+
+export const globalScenarios: readonly DesignScenario[] = globalScenarioIds.map(scenario);

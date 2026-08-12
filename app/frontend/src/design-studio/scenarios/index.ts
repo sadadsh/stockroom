@@ -1,21 +1,23 @@
 import { registerScenarios } from "../scenarioRegistry";
-import { stmFixtureValidators } from "../fixtures/stmFixtures";
+import { settingsFixtureValidators } from "../fixtures/settingsFixtures";
 import { componentScenarios } from "./components";
 import { globalScenarios } from "./global";
 import { projectScenarios } from "./projects";
 import { providerScenarios } from "./provider";
 import { stmScenarios } from "./stm";
+import { settingsScenarios } from "./settings";
 
 export { globalScenarios } from "./global";
 export { componentScenarios } from "./components";
 export { projectScenarios } from "./projects";
 export { providerScenarios } from "./provider";
 export { stmScenarios } from "./stm";
+export { settingsScenarios } from "./settings";
 
 /** The shipped scenario set. Domain-specific scenarios are added by their owning feature. */
 export const bootstrapScenarioRegistry = registerScenarios(
-  [...globalScenarios, ...componentScenarios, ...providerScenarios, ...projectScenarios, ...stmScenarios],
-  stmFixtureValidators,
+  [...globalScenarios, ...componentScenarios, ...providerScenarios, ...projectScenarios, ...stmScenarios, ...settingsScenarios],
+  settingsFixtureValidators,
 );
 
 export function scenarioById(id: string) {

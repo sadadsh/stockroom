@@ -144,6 +144,7 @@ export function Rail() {
   const { query: update, view: updateView } = useUpdateStanding();
   const [aboutOpen, setAboutOpen] = useState(false);
   const scenarioAboutOpen = useScenarioUiState().rail?.aboutOpen;
+  const scenarioRailState = useScenarioUiState().railState;
   const priorAboutOpen = useRef<boolean | null>(null);
   useEffect(() => {
     if (scenarioAboutOpen === undefined) {
@@ -154,6 +155,9 @@ export function Rail() {
     if (priorAboutOpen.current === null) priorAboutOpen.current = aboutOpen;
     setAboutOpen(scenarioAboutOpen);
   }, [scenarioAboutOpen]);
+  useEffect(() => {
+    if (scenarioRailState) setCollapsed(scenarioRailState === "collapsed");
+  }, [scenarioRailState]);
 
   return (
     // COLLAPSED, the outer shell holds a fixed 52px of layout. Pinned open, the content reflows

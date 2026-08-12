@@ -20,6 +20,19 @@ export interface ScenarioUiState {
   rail?: { aboutOpen?: boolean };
   search?: { open?: boolean };
   service?: { error?: string };
+  settings?: {
+    group?: "general" | "library" | "eda" | "sources" | "maintenance";
+    altiumDialog?: "setup" | "dblib";
+    confirmResetCad?: boolean;
+    picker?: "kicad" | "cubemx";
+  };
+  addParts?: { state: "empty" | "validating" | "exact" | "mismatch" | "duplicate" | "failure" };
+  toast?: { message: string; tone: "neutral" | "ok" | "err" };
+  confirmation?: { danger?: boolean };
+  capture?: { status: "resolving" | "receiving" | "done" | "error"; backgrounded: boolean };
+  theme?: "dark" | "light";
+  railState?: "expanded" | "collapsed";
+  sourcePromotion?: { state: "unavailable" | "ready" | "blocked" | "success" | "failure" };
   components?: {
     filters?: {
       query?: string;

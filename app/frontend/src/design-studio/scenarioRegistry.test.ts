@@ -7,7 +7,8 @@ import { componentScenarioIds } from "./scenarios/components";
 import { projectScenarioIds } from "./scenarios/projects";
 import { providerScenarioIds } from "./scenarios/provider";
 import { stmScenarioIds } from "./scenarios/stm";
-import { bootstrapFixtureValidators } from "./scenarioFixtureValidation";
+import { settingsScenarioIds } from "./scenarios/settings";
+import { settingsFixtureValidators } from "./fixtures/settingsFixtures";
 
 function scenario(id: string): DesignScenario {
   return {
@@ -165,7 +166,7 @@ describe("registerScenarios", () => {
   it("accepts the shipped typed fixtures through their endpoint-owned validators", () => {
     expect(
       globalScenarios.flatMap((scenario) => scenario.fixtures).every((fixture) =>
-        bootstrapFixtureValidators.validate(fixture),
+        settingsFixtureValidators.validate(fixture),
       ),
     ).toBe(true);
   });
@@ -178,9 +179,10 @@ describe("registerScenarios", () => {
       ...providerScenarioIds,
       ...projectScenarioIds,
       ...stmScenarioIds,
+      ...settingsScenarioIds,
     ]);
-    expect(bootstrapScenarioRegistry.searchScenarios("update")).toEqual([
+    expect(bootstrapScenarioRegistry.searchScenarios("update")).toContainEqual(
       expect.objectContaining({ id: "global.update.available", expectedTargets: ["rail.update"] }),
-    ]);
+    );
   });
 });

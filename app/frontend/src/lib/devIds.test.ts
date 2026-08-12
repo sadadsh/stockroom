@@ -192,7 +192,8 @@ import { DEV_IDS, DEV_ID_AREAS, DEV_ID_BY_ID } from "./devIds";
 // 495 with the Projects scenario states that distinguish loading, failures, native/runtime
 // blockers, repository collaboration, shared review, and build completion in the real workbenches.
 // 496 with the STM target-definition rules surface used by the real Bench scenario.
-const EXPECTED_ENTRIES = 496;
+// 497 with the background guided-capture status exposed to global scenario coverage.
+const EXPECTED_ENTRIES = 497;
 
 describe("devIds catalogue", () => {
   // The count is asserted from a single constant so bumping it is one edit, and so the test NAME can
@@ -219,12 +220,13 @@ describe("devIds catalogue", () => {
     expect(seen.size).toBe(EXPECTED_ENTRIES);
   });
 
-  it("enumerates the 20 areas in first-appearance order, and every entry is a member", () => {
+  it("enumerates the 21 areas in first-appearance order, and every entry is a member", () => {
     expect(DEV_ID_AREAS).toEqual([
       "rail",
       "about",
       "onboarding",
       "toast",
+      "capture",
       "components",
       "projects",
       "component-browser",
@@ -244,7 +246,7 @@ describe("devIds catalogue", () => {
       // first-appearance order rather than a taxonomy.
       "design",
     ]);
-    expect(DEV_ID_AREAS).toHaveLength(20);
+    expect(DEV_ID_AREAS).toHaveLength(21);
 
     // Every catalogued area is declared in DEV_ID_AREAS...
     const declared = new Set(DEV_ID_AREAS);

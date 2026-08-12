@@ -7,6 +7,11 @@ import { StmViewerPage } from "./pages/StmViewerPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { useOnboarding } from "./api/queries";
 import { useRouter, type Route } from "./lib/router";
+import { useEffect } from "react";
+import { useScenarioUiState } from "./design-studio/scenarioState";
+import { useToast } from "./lib/toast";
+import { ConfirmDialog } from "./components/ConfirmDialog";
+import { useText } from "./lib/copy";
 
 // The shell hosts whichever page the active route names. Routes light up as their
 // pages ship (see lib/nav.ts + the M6 plan); only reachable routes get a case.
@@ -25,7 +30,29 @@ export default function App() {
       <AppShell>{renderRoute(route)}</AppShell>
       {/* The guided capture keeps running when the modal is closed; the pill is its handle. */}
       <CaptureStatusPill />
+      <ScenarioGlobalEffects />
     </>
+  );
+}
+
+function ScenarioGlobalEffects() {
+  const scenario = useScenarioUiState();
+  const { toast } = useToast();
+  const neutralTitle = useText("scenario.confirm.neutral", "Confirm Change");
+  const destructiveTitle = useText("scenario.confirm.destructive", "Delete Component");
+  useEffect(() => {
+    if (scenario.toast) toast(scenario.toast.message, scenario.toast.tone);
+  }, [scenario.toast, toast]);
+  return (
+    <ConfirmDialog
+      open={scenario.confirmation !== undefined}
+      title={scenario.confirmation?.danger ? destructiveTitle : neutralTitle}
+      body="Review this fixture-backed operation before continuing."
+      confirmLabel="Confirm"
+      danger={scenario.confirmation?.danger}
+      onConfirm={() => {}}
+      onCancel={() => {}}
+    />
   );
 }
 

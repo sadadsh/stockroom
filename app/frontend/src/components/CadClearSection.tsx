@@ -32,8 +32,10 @@ import { useToast } from "../lib/toast";
 import { Text, useCopyFormatter, useText } from "../lib/copy";
 import { Badge, Button } from "./primitives";
 import { ConfirmDialog } from "./ConfirmDialog";
+import { useScenarioUiState } from "../design-studio/scenarioState";
 
 export function CadClearSection() {
+  const scenarioConfirming = useScenarioUiState().settings?.confirmResetCad === true;
   const inventory = useCadInventory();
   const job = useJob<CadInventory>();
   const { toast } = useToast();
@@ -240,7 +242,7 @@ export function CadClearSection() {
       ) : null}
 
       <ConfirmDialog
-        open={confirming}
+        open={confirming || scenarioConfirming}
         danger
         title={confirmTitle}
         confirmLabel="Remove Them"

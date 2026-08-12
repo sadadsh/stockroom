@@ -298,7 +298,7 @@ describe("App shell", () => {
     expect(screen.getByLabelText("Git URL")).toBeInTheDocument();
 
     await activate("global.onboarding.error");
-    expect(await screen.findByRole("status")).toHaveTextContent("Could not set up the components");
+    expect(await screen.findByRole("status")).toHaveTextContent("Could not set up the catalog");
     expect(document.querySelector('[data-dev-id="toast.status"]')).toBeInTheDocument();
 
     await activate("global.about.open");
@@ -309,7 +309,7 @@ describe("App shell", () => {
     expect((await screen.findAllByText("Update Available")).length).toBeGreaterThan(0);
     expect(document.querySelector('[data-dev-id="rail.update"]')).toBeInTheDocument();
 
-    await activate("global.search.open");
+    await activate("global.search.initial");
     expect(await screen.findByLabelText("Search components")).toBeInTheDocument();
     expect(document.querySelector('[data-dev-id="search.query"]')).toBeInTheDocument();
 

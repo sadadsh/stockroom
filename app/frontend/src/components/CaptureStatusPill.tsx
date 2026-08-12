@@ -61,6 +61,7 @@ export function CaptureStatusPill() {
           transition={{ duration: 0.22, ease: "easeOut" }}
         >
           <button
+            data-dev-role="capture.status"
             type="button"
             onClick={reopen}
             aria-label={reopenName({ part: a.partName ?? thisPart })}

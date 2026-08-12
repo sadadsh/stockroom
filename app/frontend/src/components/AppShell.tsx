@@ -12,14 +12,22 @@ import { useFacetsQuery, useOnboarding } from "../api/queries";
 import { useUpdateStanding } from "../lib/useUpdateStanding";
 import { useDevMode } from "../lib/devMode";
 import { RunningVersionIndicator } from "./RunningVersionIndicator";
+import { useScenarioUiState } from "../design-studio/scenarioState";
+import { useEffect } from "react";
+import { useTheme } from "../lib/theme";
 
 export function AppShell({ children }: { children: ReactNode }) {
+  const scenario = useScenarioUiState();
+  const { setTheme } = useTheme();
+  useEffect(() => {
+    if (scenario.theme) setTheme(scenario.theme);
+  }, [scenario.theme, setTheme]);
   return (
     // h-screen (not min-h-screen) so a tall page scrolls INSIDE its own pane and
     // the window never grows a body scrollbar that shifts the rail between pages.
     // A column: the rail + page row on top, a full-width Altium status bar pinned
     // across the very bottom (under everything, the way a docked app reads).
-    <div data-dev-id="shell.root" className="flex h-screen w-full flex-col overflow-hidden bg-surface text-t1">
+    <div data-dev-id="shell.root" data-source-promotion-state={scenario.sourcePromotion?.state} className="flex h-screen w-full flex-col overflow-hidden bg-surface text-t1">
       <div className="flex min-h-0 flex-1">
         <Rail />
         <div data-dev-id="shell.content" className="flex min-w-0 flex-1 flex-col">{children}</div>

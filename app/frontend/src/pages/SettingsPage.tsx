@@ -59,6 +59,7 @@ import {
 } from "../lib/updateStanding";
 import { useUpdateStanding } from "../lib/useUpdateStanding";
 import { pickHostFolder } from "../lib/hostFolderPicker";
+import { useScenarioUiState } from "../design-studio/scenarioState";
 
 function cx(...parts: Array<string | false | null | undefined>): string {
   return parts.filter(Boolean).join(" ");
@@ -147,6 +148,7 @@ interface SetupStep {
 }
 
 export function SettingsPage() {
+  const scenarioSettings = useScenarioUiState().settings;
   // The page-level reads that feed the Machine Setup band and the nav dots. Every one is a cached
   // query a section also uses, so this adds no extra request load. Each group panel below resolves
   // the rest of what it needs from the same cached keys.
@@ -174,6 +176,10 @@ export function SettingsPage() {
   useEffect(() => {
     if (settingsContentRef.current) settingsContentRef.current.scrollTop = 0;
   }, [group]);
+
+  useEffect(() => {
+    if (scenarioSettings?.group) setGroup(scenarioSettings.group);
+  }, [scenarioSettings?.group]);
 
   // Hidden dev combo (Ctrl+Alt+K): load API keys / logins from the per-machine
   // dev-creds.json so live validation is not blocked on retyping them. It lives at

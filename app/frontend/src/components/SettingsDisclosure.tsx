@@ -35,6 +35,7 @@ export function SettingsDisclosure({
 }) {
   return (
     <section
+      aria-labelledby={devId ? `${devId}.title` : undefined}
       className={cx(
         "flex min-w-0 flex-col overflow-hidden rounded-card border border-line bg-raise",
         className,
@@ -46,7 +47,7 @@ export function SettingsDisclosure({
         className="flex min-h-[54px] items-start gap-3 border-b border-line bg-band px-3.5 py-3"
       >
         <div className="min-w-0 flex-1">
-          <h2 className="text-sm font-semibold text-t1">
+          <h2 id={devId ? `${devId}.title` : undefined} className="text-sm font-semibold text-t1">
             {titleId ? <Text id={titleId}>{title}</Text> : title}
           </h2>
           {hint ? (

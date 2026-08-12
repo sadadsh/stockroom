@@ -46,7 +46,8 @@ export async function mountScenario(id: string) {
   const user = userEvent.setup();
   const scenario = bootstrapScenarioRegistry.scenarioById(id);
   if (!scenario) throw new Error(`Unknown Design Studio scenario '${id}'.`);
-  const initialCapture = scenario.initialUi.provider?.state === "download-armed"
+  const capturePreview = scenario.initialUi.capture;
+  const initialCapture = capturePreview || scenario.initialUi.provider?.state === "download-armed"
     ? {
         batchId: "batch-provider-fixture",
         itemId: "item-provider-fixture",
@@ -54,14 +55,14 @@ export async function mountScenario(id: string) {
           partId: "component-ti-lm358dr",
           workflowItemId: "item-provider-fixture",
           partName: "LM358",
-          status: "window-open",
+          status: capturePreview?.status ?? "window-open",
           message: "The provider page is ready for the person to continue.",
           url: "https://example.invalid/ultralibrarian/lm358dr",
           routeToken: "route-provider-fixture",
           vendor: "ultralibrarian",
           needs: ["kicad_symbol", "kicad_footprint", "kicad_model", "altium_symbol", "altium_footprint"],
           received: {},
-          backgrounded: false,
+          backgrounded: capturePreview?.backgrounded ?? false,
           providerOutcomes: [],
           completionEvidence: null,
           completionEvidenceReported: false,

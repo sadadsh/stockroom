@@ -11,9 +11,12 @@ import { useAddPart } from "../lib/addPart";
 import { IngestPage } from "../pages/IngestPage";
 import { Text, useText } from "../lib/copy";
 import { Icon } from "./Icon";
+import { useScenarioUiState } from "../design-studio/scenarioState";
 
 export function AddPartModal() {
   const { isOpen, close } = useAddPart();
+  const scenarioState = useScenarioUiState().addParts?.state;
+  const effectiveOpen = isOpen || scenarioState !== undefined;
   // Copy layer: the dialog and Close accessible names live in attributes, so they resolve through
   // useText; the visible title is a <Text> below. Resolved unconditionally (before the early return)
   // to keep hook order stable.
@@ -23,7 +26,7 @@ export function AddPartModal() {
   const restoreRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
-    if (!isOpen) return;
+    if (!effectiveOpen) return;
     restoreRef.current =
       document.activeElement instanceof HTMLElement ? document.activeElement : null;
     function onKey(e: KeyboardEvent) {
@@ -39,9 +42,9 @@ export function AddPartModal() {
       window.clearTimeout(focusTimer);
       restoreRef.current?.focus();
     };
-  }, [isOpen, close]);
+  }, [effectiveOpen, close]);
 
-  if (!isOpen) return null;
+  if (!effectiveOpen) return null;
 
   return (
     <div
@@ -59,6 +62,7 @@ export function AddPartModal() {
         role="dialog"
         aria-modal="true"
         aria-label={dialogLabel}
+        data-scenario-state={scenarioState}
         onClick={(e) => e.stopPropagation()}
       >
         {/* the same header idiom as the Complete Part window (its sibling): a titled band

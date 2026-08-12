@@ -24,8 +24,10 @@ import { AltiumSetupModal } from "./AltiumSetupModal";
 import { Button, Dot } from "./primitives";
 import { RefreshIcon, LibraryIcon, DownloadIcon, ExternalIcon, DuplicateIcon } from "./icons";
 import { Icon } from "./Icon";
+import { useScenarioUiState } from "../design-studio/scenarioState";
 
 export function AltiumDbLibSection() {
+  const scenarioDialog = useScenarioUiState().settings?.altiumDialog;
   const status = useAltiumStatus();
   const regenerate = useAltiumRegenerate();
   const setup = useAltiumSetup();
@@ -215,8 +217,8 @@ export function AltiumDbLibSection() {
         </Button>
       </div>
 
-      <AltiumDbLibModal open={open} onClose={() => setOpen(false)} />
-      <AltiumSetupModal open={setupOpen} onClose={() => setSetupOpen(false)} />
+      <AltiumDbLibModal open={open || scenarioDialog === "dblib"} onClose={() => setOpen(false)} />
+      <AltiumSetupModal open={setupOpen || scenarioDialog === "setup"} onClose={() => setSetupOpen(false)} />
     </>
   );
 }
