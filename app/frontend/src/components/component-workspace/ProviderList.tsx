@@ -7,6 +7,14 @@ const ARTIFACT_LABELS = {
   model: "3D Model",
 } as const;
 
+function artifactSummary(provider: ManageModelsProvider): string {
+  return (Object.keys(ARTIFACT_LABELS) as Array<keyof typeof ARTIFACT_LABELS>)
+    .map((artifact) =>
+      `${ARTIFACT_LABELS[artifact]} ${provider.supplied.includes(artifact) ? "✓" : "—"}`,
+    )
+    .join(" · ");
+}
+
 export function ProviderList({
   providers,
   selectedId,
@@ -19,7 +27,10 @@ export function ProviderList({
   onSelect: (providerId: string) => void;
 }) {
   return (
-    <aside className="flex min-h-0 w-[280px] flex-none flex-col border-r border-line bg-band">
+    <aside
+      data-dev-id="component-browser.provider-list"
+      className="flex min-h-0 w-[280px] flex-none flex-col border-r border-line bg-band"
+    >
       <div className="border-b border-line px-3 py-2">
         <div className="ui-section-title">
           <Text id="component-browser.manage-models-providers">Providers</Text>
@@ -40,8 +51,9 @@ export function ProviderList({
             key={provider.row.id}
             type="button"
             role="radio"
+            data-dev-role="component-browser.provider-row"
             aria-checked={provider.row.id === selectedId}
-            disabled={disabled}
+            disabled={disabled || !provider.reachable}
             className={
               "w-full rounded-control border px-2.5 py-2 text-left " +
               (provider.row.id === selectedId
@@ -59,10 +71,13 @@ export function ProviderList({
               ) : null}
             </span>
             <span className="mt-1 block text-xs text-t3">
-              {provider.complete ? (
-                <Text id="component-browser.manage-models-all-three">All three models</Text>
+              {!provider.reachable ? (
+                <Text id="component-browser.manage-models-unavailable">Unavailable</Text>
+              ) : provider.complete ? (
+                artifactSummary(provider)
               ) : (
                 <>
+                  {artifactSummary(provider)} ·{" "}
                   <Text id="component-browser.manage-models-missing">Missing</Text>{" "}
                   {provider.missing.map((artifact) => ARTIFACT_LABELS[artifact]).join(", ")}
                 </>

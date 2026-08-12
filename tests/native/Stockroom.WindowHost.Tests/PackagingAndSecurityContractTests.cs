@@ -113,7 +113,7 @@ public sealed class PackagingAndSecurityContractTests
             allSource.Replace("\r\n", "\n", StringComparison.Ordinal),
             StringComparison.Ordinal);
         Assert.Equal(
-            2,
+            4,
             allSource.Split(
                 "webview.postMessage({",
                 StringSplitOptions.None).Length - 1);
@@ -136,6 +136,14 @@ public sealed class PackagingAndSecurityContractTests
             StringComparison.Ordinal);
         Assert.Contains(
             "stockroom.host.file-result",
+            allSource,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "stockroom.host.provider-viewport",
+            allSource,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "stockroom.host.provider-command",
             allSource,
             StringComparison.Ordinal);
         Assert.Contains(

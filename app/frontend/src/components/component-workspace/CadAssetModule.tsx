@@ -663,7 +663,7 @@ function AssetControls({
  * nobody asked for above the specifications a person opened the component to read. Clicking a module
  * header focuses it (and `Show All Three` comes back), and the focused module states its evidence.
  * The data is not gone from anywhere: it is measured from the drawing on demand, the recorded checks
- * are in `Compare Sources` and the evidence surface, and a genuine FAULT is stated in every state by
+ * are in Manage Models and the evidence surface, and a genuine FAULT is stated in every state by
  * `AssetIssue` above plus the header's own status word.
  *
  * Built from the drawing and from the recorded checks, never from a claim. An asset nobody has

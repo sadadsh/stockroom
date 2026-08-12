@@ -146,12 +146,7 @@ export function CadColumnChrome({ children }: RegionChromeProps) {
 }
 
 /**
- * `CAD Assets  [Compare Sources]  2/3` - the column's one action, on the title line.
- *
- * It used to sit on a toolbar row of its own ABOVE the preferred source, so a ~300px column spent
- * two full rows on chrome before the first drawing: measured, the two rows plus six rows of layer
- * pills came to 14 bordered controls over the symbol. On the title line it costs no vertical space
- * at all.
+ * `CAD Assets  [Models] [Manage Models]  2/3` - one direct route for viewing and acquisition.
  */
 export function CadTitleStripPart() {
   const workspace = useWorkspaceRender();
@@ -166,15 +161,6 @@ export function CadTitleStripPart() {
         </span>
       }
       meta={`${state.attached}/${REPRESENTATION_KINDS.length}`}
-      action={
-        <Button
-          small
-          data-dev-id="component-browser.compare-sources"
-          onClick={workspace.cad.onCompareSources}
-        >
-          <Text id="component-browser.compare-sources">Compare Sources</Text>
-        </Button>
-      }
     />
   );
 }

@@ -126,7 +126,7 @@ describe("where the shell actions sit in the Manage menu", () => {
       "Edit Class and Classification...",
       "Review Missing Specifications...",
       "Refresh Component Data",
-      "Review CAD Sources...",
+      "Manage Models",
       "View Data Provenance...",
       "Export Component...",
       "Open In...",

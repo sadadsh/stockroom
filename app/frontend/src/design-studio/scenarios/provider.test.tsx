@@ -41,23 +41,15 @@ describe("provider-download Design Studio scenarios", () => {
     expect(liveRequest).not.toHaveBeenCalled();
   });
 
-  it("clicks through the real Complete Component provider trip without live product I/O", async () => {
+  it("clicks through the real Manage Models browser without live product I/O", async () => {
     const { user, liveRequest } = await mountScenario("provider.download-armed");
-    await user.click(await screen.findByRole("button", { name: "Manage" }));
-    await user.click(screen.getByRole("menuitem", { name: "Review CAD Sources..." }));
-
-    const dialog = await screen.findByRole("dialog", { name: "Review CAD Sources" });
-    expect(within(dialog).getByText("The Provider Trip")).toBeVisible();
-    expect(document.querySelector('[data-dev-id="component-browser.complete-component"]')).toBeVisible();
-    expect(document.querySelector('[data-dev-id="component-browser.provider-browser"]')).toBeVisible();
-    const showProvider = within(dialog).getByRole("button", { name: "Show Provider Page" });
-    const returnToStockroom = within(dialog).getByRole("button", { name: "Return To Stockroom" });
-    expect(showProvider).toBeEnabled();
-    expect(returnToStockroom).toBeEnabled();
-    expect(within(dialog).getByRole("button", { name: "Import Downloaded Files" })).toBeEnabled();
-    await user.click(showProvider);
-    await user.click(returnToStockroom);
-    expect(screen.queryByRole("dialog", { name: "Review CAD Sources" })).not.toBeInTheDocument();
+    const workspace = await screen.findByTestId("manage-models-workspace");
+    expect(within(workspace).getByRole("status")).toHaveTextContent("Download capture ready");
+    expect(within(workspace).getByRole("button", { name: "Back" })).toBeEnabled();
+    expect(within(workspace).getByRole("button", { name: "Forward" })).toBeEnabled();
+    expect(within(workspace).getByRole("button", { name: "Reload" })).toBeEnabled();
+    expect(within(workspace).getByRole("button", { name: "Choose Downloaded Files" })).toBeEnabled();
+    await user.click(within(workspace).getByRole("button", { name: "Reload" }));
     expect(document.querySelector('[data-dev-id="shell.root"]')).toBeInTheDocument();
     expect(liveRequest).not.toHaveBeenCalled();
   });
@@ -70,8 +62,8 @@ describe("provider-download Design Studio scenarios", () => {
     host.__STOCKROOM_HOST__ = { pickFiles };
     try {
       const { user, liveRequest } = await mountScenario("provider.selected-file-recovery");
-      const dialog = await screen.findByRole("dialog", { name: "Review CAD Sources" });
-      await user.click(within(dialog).getByRole("button", { name: "Import Downloaded Files" }));
+      const workspace = await screen.findByTestId("manage-models-workspace");
+      await user.click(within(workspace).getByRole("button", { name: "Choose Downloaded Files" }));
       expect(pickFiles).not.toHaveBeenCalled();
       await waitFor(() => expect(document.querySelector('[data-dev-id="toast.status"]')).toHaveTextContent(
         /Fixture preview blocked choosing CAD recovery files/i,

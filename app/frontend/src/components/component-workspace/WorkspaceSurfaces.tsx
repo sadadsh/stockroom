@@ -15,10 +15,8 @@
 import type { ReactNode } from "react";
 import type { ComponentDossier } from "../../api/dossierTypes";
 import { useCopyFormatter, useText } from "../../lib/copy";
-import { CadVariantSection } from "../CadVariantSection";
 import { ConfirmDialog } from "../ConfirmDialog";
 import { PreviewModal, type PreviewKind } from "../PreviewModal";
-import { CompleteComponentSheet } from "./CompleteComponentSheet";
 import { DatasheetViewer } from "./DatasheetViewer";
 import { IdentitySheet } from "./IdentitySheet";
 import { PinoutApply } from "./PinoutApply";
@@ -33,7 +31,6 @@ import type { DatasheetTarget } from "./datasheetWorkflow";
 export type WorkspaceSurface =
   | "identity"
   | "classification"
-  | "cad-sources"
   | "provenance"
   | "offers"
   | "pinout";
@@ -100,7 +97,6 @@ export function WorkspaceSurfaces({
     "component-browser.classification-modal",
     "Edit Class and Classification",
   );
-  const cadSourcesTitle = useText("component-browser.cad-sources-modal", "Review CAD Sources");
   const provenanceTitle = useText("component-browser.provenance-modal", "Data Provenance");
   const offersTitle = useText("component-browser.offers-modal", "Price Breaks");
   const pinoutTitle = useText("component-browser.pinout-modal", "Pinout");
@@ -130,25 +126,6 @@ export function WorkspaceSurfaces({
         target={datasheet}
         onClose={onCloseDatasheet}
       />
-
-      <WorkspaceModal
-        open={surface === "cad-sources"}
-        title={cadSourcesTitle}
-        onClose={onCloseSurface}
-      >
-        {surface === "cad-sources" ? (
-          <div className="flex flex-col gap-3">
-            <CompleteComponentSheet
-              componentId={componentId}
-              identity={dossier.identity}
-              providers={dossier.cadSourceCoverage}
-              preference={dossier.cadAssets.preference}
-              onClose={onCloseSurface}
-            />
-            <CadVariantSection partId={componentId} enabled />
-          </div>
-        ) : null}
-      </WorkspaceModal>
 
       <WorkspaceModal
         open={surface === "identity" || surface === "classification"}

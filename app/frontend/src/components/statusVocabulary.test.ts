@@ -14,7 +14,7 @@
  * `Validated`, `Downloaded`, `Available` and `Unknown` were once listed here as a sixth through
  * ninth word. They are real words on the opened component and they belong to OTHER closed sets with
  * other subjects: `CadAssetStatus` (asserted below) says what a CAD asset is, and `CoverageStatus`
- * in `ProviderCoverageMatrix.tsx` says what a provider has. Neither is a `WorkspaceStatus`, so
+ * in the Manage Models provider list says what a provider has. Neither is a `WorkspaceStatus`, so
  * nothing could produce those four as one, and `statusTone` had four entries no caller could reach.
  * The two assertions that now close this set are what keep such a word from being re-added: one
  * reads the union out of the module and holds it to the list spelled below, and the other holds

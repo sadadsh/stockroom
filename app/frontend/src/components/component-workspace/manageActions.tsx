@@ -66,9 +66,9 @@ export function manageMenuItems(actions: {
       run: actions.onRefresh,
     },
     {
-      id: "review-cad-sources",
+      id: "manage-models",
       copyId: "component-browser.manage-review-cad",
-      label: "Review CAD Sources...",
+      label: "Manage Models",
       run: actions.onReviewCadSources,
     },
     {

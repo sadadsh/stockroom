@@ -12,6 +12,7 @@ const ARTIFACTS: ReadonlyArray<CoverageArtifact> = ["symbol", "footprint", "mode
 export interface ManageModelsProvider {
   row: ProviderCoverageRow;
   complete: boolean;
+  reachable: boolean;
   supplied: CoverageArtifact[];
   missing: CoverageArtifact[];
 }
@@ -23,6 +24,7 @@ function describeProvider(row: ProviderCoverageRow): ManageModelsProvider {
   return {
     row,
     complete: row.complete && missing.length === 0,
+    reachable: row.url.trim().length > 0,
     supplied,
     missing,
   };
@@ -41,5 +43,5 @@ export function orderedManageModelsProviders(
 export function bestCompleteProvider(
   providers: readonly ManageModelsProvider[],
 ): ManageModelsProvider | null {
-  return providers.find((provider) => provider.complete) ?? null;
+  return providers.find((provider) => provider.complete && provider.reachable) ?? null;
 }

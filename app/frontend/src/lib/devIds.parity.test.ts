@@ -204,14 +204,6 @@ const KNOWN_PROP_PASSED: readonly string[] = [
   // full at each call site for the same reason as the regions above.
   "component-browser.pinout-table",
   "component-browser.offer-ladder",
-  // component-workspace/CompleteComponentSheet.tsx: the four bands of the provider trip share one
-  // band shell, so each band's id arrives as a `devId` string prop. Spelled out in full at each
-  // call site, never interpolated. The Providers band deliberately passes NONE: its addressable
-  // element is the matrix inside it, which emits `component-browser.provider-matrix` itself.
-  "component-browser.provider-browser",
-  "component-browser.provider-progress",
-  "component-browser.provider-report",
-  "component-browser.provider-sets",
   // components/modalParts.tsx ModalShell: the scrim, the 38px header and the close control are ONE
   // frame now, so each window names its own parts through `devId` / `headerDevId` / `closeDevId`
   // string props. Spelled out in full at each call site. Four windows had hand-written the same

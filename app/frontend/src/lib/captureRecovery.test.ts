@@ -31,7 +31,7 @@ describe("capture file recovery", () => {
       add,
     });
 
-    expect(result).toEqual({ selected: 2, accepted: 2 });
+    expect(result).toEqual({ selected: 2, accepted: 2, outcome: "queued" });
     expect(attach).toHaveBeenCalledWith({
       partId: "part-1",
       workflowItemId: "item-1",
@@ -51,7 +51,7 @@ describe("capture file recovery", () => {
       add,
     });
 
-    expect(result).toEqual({ selected: 1, accepted: 3 });
+    expect(result).toEqual({ selected: 1, accepted: 3, outcome: "attached" });
     expect(add).toHaveBeenCalledWith({ partId: "part-1", paths: ["complete.zip"] });
   });
 });

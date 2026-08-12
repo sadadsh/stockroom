@@ -11,6 +11,7 @@ interface RecoveryDependencies {
 export interface CaptureRecoveryResult {
   selected: number;
   accepted: number;
+  outcome: "canceled" | "queued" | "attached";
 }
 
 const DEFAULT_DEPENDENCIES: RecoveryDependencies = {
@@ -25,7 +26,7 @@ export async function recoverCaptureFiles(
   dependencies: RecoveryDependencies = DEFAULT_DEPENDENCIES,
 ): Promise<CaptureRecoveryResult> {
   const paths = await dependencies.pick("cad-recovery");
-  if (paths.length === 0) return { selected: 0, accepted: 0 };
+  if (paths.length === 0) return { selected: 0, accepted: 0, outcome: "canceled" };
 
   if (
     active.partId === componentId &&
@@ -42,9 +43,9 @@ export async function recoverCaptureFiles(
       detailUrl: active.url,
       routeToken: active.routeToken,
     });
-    return { selected: paths.length, accepted: result.queued_files };
+    return { selected: paths.length, accepted: result.queued_files, outcome: "queued" };
   }
 
   const result = await dependencies.add({ partId: componentId, paths });
-  return { selected: paths.length, accepted: result.attached.length };
+  return { selected: paths.length, accepted: result.attached.length, outcome: "attached" };
 }

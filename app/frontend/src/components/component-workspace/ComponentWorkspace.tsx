@@ -25,7 +25,7 @@
  * and empty states stay here too: they REPLACE the workspace rather than sitting in it, so they are
  * not placements and the document does not model them.
  */
-import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   useDeletePart,
   useEditField,
@@ -69,6 +69,7 @@ export function ComponentWorkspace({
   initialPreview,
   initialConfirmDelete = false,
   initialSourcesTab,
+  initialCadView,
 }: {
   componentId: string;
   /** The component was removed. The page owns what happens to the selection afterwards. */
@@ -77,9 +78,13 @@ export function ComponentWorkspace({
   initialPreview?: PreviewKind;
   initialConfirmDelete?: boolean;
   initialSourcesTab?: import("./SourcesSheet").SourcesSheetTab;
+  initialCadView?: import("../../lib/uiSession").CadWorkspaceView;
 }) {
   const session = useUiSession();
   const view = componentView(session, componentId);
+  const [previewCadView, setPreviewCadView] = useState(initialCadView);
+  useEffect(() => setPreviewCadView(initialCadView), [initialCadView]);
+  const activeCadView = previewCadView ?? view.cad_view;
   const query = usePartDossierQuery(componentId);
   const facets = useFacetsQuery();
   const editField = useEditField();
@@ -121,6 +126,13 @@ export function ComponentWorkspace({
       updateUiSession((snapshot) => setComponentViewInSession(snapshot, componentId, patch));
     },
     [componentId],
+  );
+  const setCadView = useCallback(
+    (cadView: import("../../lib/uiSession").CadWorkspaceView) => {
+      if (initialCadView) setPreviewCadView(cadView);
+      else patchView({ cad_view: cadView });
+    },
+    [initialCadView, patchView],
   );
 
   const failure = useCallback(
@@ -185,7 +197,7 @@ export function ComponentWorkspace({
         },
         onRefresh: () => refresh.run(),
         refreshing,
-        onReviewCadSources: () => setSurface("cad-sources"),
+        onReviewCadSources: () => setCadView("manage-models"),
         onViewProvenance: () => setSurface("provenance"),
         onDelete: () => setConfirmDelete(true),
         shellItems,
@@ -231,11 +243,10 @@ export function ComponentWorkspace({
       onFindDatasheet: () => setSurface("provenance"),
     },
     cad: {
-      view: view.cad_view,
-      onView: (cadView) => patchView({ cad_view: cadView }),
+      view: activeCadView,
+      onView: setCadView,
       layout: view.representation_layout,
       onLayout: (layout: RepresentationLayout) => patchView({ representation_layout: layout }),
-      onCompareSources: () => setSurface("cad-sources"),
       onOpenFullPreview: (kind) => setPreview(previewKindFor(kind)),
       assetRefs,
     },
@@ -271,11 +282,11 @@ export function ComponentWorkspace({
     <WorkspaceDocumentView
       context={context}
       bodyOverride={
-        view.cad_view === "manage-models" ? (
+        activeCadView === "manage-models" ? (
           <ManageModelsWorkspace
             componentId={componentId}
             dossier={dossier}
-            onView={(cadView) => patchView({ cad_view: cadView })}
+            onView={setCadView}
             onAttached={() => void query.refetch()}
           />
         ) : undefined

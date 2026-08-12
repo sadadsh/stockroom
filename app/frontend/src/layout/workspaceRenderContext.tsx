@@ -38,7 +38,6 @@ export interface WorkspaceCadSlice {
   /** `all` expands the three; a kind expands that one and compacts the other two. */
   layout: RepresentationLayout;
   onLayout: (layout: RepresentationLayout) => void;
-  onCompareSources: () => void;
   onOpenFullPreview: (kind: RepresentationKind) => void;
   /** Where each module's element is kept, so the quality summary can scroll one into view. */
   assetRefs: MutableRefObject<Partial<Record<RepresentationKind, HTMLElement | null>>>;

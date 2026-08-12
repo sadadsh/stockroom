@@ -49,12 +49,9 @@ export const providerScenarios: readonly DesignScenario[] = providerScenarioIds.
     route: "components",
     fixtures: providerReadFixtures(state),
     initialUi: {
-      components: { surface: "cad-sources" },
-      provider: {
-        state,
-        nativeHostTargets: ["provider-back", "provider-forward", "stockroom-tab", "provider-tab"],
-      },
+      components: { cadView: "manage-models" },
+      provider: { state },
     },
-    expectedTargets: ["component-browser.complete-component", "component-browser.provider-browser"],
+    expectedTargets: ["component-browser.manage-models", "component-browser.provider-viewport"],
   } satisfies DesignScenario;
 });

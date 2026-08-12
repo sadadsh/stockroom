@@ -145,7 +145,7 @@ public sealed class ProviderWindowChromeTests
     }
 
     [Fact]
-    public void TheStripIsMountedForTheLifeOfTheWindowAndNotGatedOnALease()
+    public void TheLegacyStripControllerIsMountedButItsWindowChromeIsCollapsed()
     {
         var source = HostSource();
         var constructorStart = source.IndexOf(
@@ -157,19 +157,17 @@ public sealed class ProviderWindowChromeTests
             StringComparison.Ordinal);
         var constructor = source[constructorStart..constructorEnd];
 
-        // The strip is created and added to the window's own row before any lease exists, so the
-        // Stockroom tab is on screen from the first frame.
+        // The controller remains mounted for rolling host compatibility, while the visible
+        // controls have moved into the component-scoped Manage Models workspace.
         Assert.Contains("_tabStrip = new WindowTabStrip();", constructor, StringComparison.Ordinal);
         Assert.Contains(
             "_root.Children.Add(_tabStrip.Root);",
             constructor,
             StringComparison.Ordinal);
         Assert.Contains("Grid.SetRow(_tabStrip.Root, 0);", constructor, StringComparison.Ordinal);
-        // Nothing hides or collapses the strip itself anywhere in the host: only the provider TAB
-        // comes and goes.
-        Assert.DoesNotContain(
-            "_tabStrip.Root.Visibility",
-            source,
+        Assert.Contains(
+            "_tabStrip.Root.Visibility = Visibility.Collapsed;",
+            constructor,
             StringComparison.Ordinal);
     }
 

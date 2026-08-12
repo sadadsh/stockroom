@@ -96,7 +96,7 @@ describe("ManageModelsWorkspace", () => {
         componentId="part-1"
         dossier={dossier}
         onView={vi.fn()}
-        onRecoverFiles={vi.fn().mockResolvedValue({ selected: 1, accepted: 3 })}
+        onRecoverFiles={vi.fn().mockResolvedValue({ selected: 1, accepted: 3, outcome: "attached" })}
         onAttached={onAttached}
       />,
     );

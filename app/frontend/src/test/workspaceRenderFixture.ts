@@ -51,7 +51,6 @@ export function workspaceRenderFixture(
       onView: noop,
       layout: over.layout ?? "all",
       onLayout: noop,
-      onCompareSources: noop,
       onOpenFullPreview: noop,
       assetRefs: { current: {} } as MutableRefObject<
         Partial<Record<RepresentationKind, HTMLElement | null>>

@@ -63,7 +63,6 @@ export function SpecificationsColumn({
         onView: noop,
         layout: "all",
         onLayout: noop,
-        onCompareSources: noop,
         onOpenFullPreview: noop,
         assetRefs: NO_ASSET_REFS,
       },

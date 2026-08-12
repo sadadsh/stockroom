@@ -24,8 +24,8 @@ const componentContractIds = [
   "components.missing-footprint", "components.cad-source-conflict", "components.spec-conflict", "components.pinout-absent",
   "components.sourcing-sparse", "components.offer-failure", "components.documents-empty", "components.related-empty",
   "components.provenance-conflict", "components.preview-3d", "components.preview-symbol", "components.preview-footprint",
-  "components.complete-part-ready", "components.complete-part-partial", "components.complete-part-blocked",
-  "components.bulk-import", "components.offers-open", "components.variant-alternatives", "components.variant-pending",
+  "components.manage-models-ready", "components.manage-models-partial", "components.manage-models-blocked",
+  "components.bulk-import", "components.offers-open", "components.manage-models-attached", "components.manage-models-invalid",
   "components.diff-open", "components.pinout-open", "components.delete-confirm",
 ] as const;
 

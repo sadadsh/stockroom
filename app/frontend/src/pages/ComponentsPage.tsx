@@ -419,6 +419,7 @@ export function ComponentsPage() {
                 initialPreview={scenarioUi.components?.preview}
                 initialConfirmDelete={scenarioUi.components?.confirmDelete}
                 initialSourcesTab={scenarioUi.components?.sourcesTab}
+                initialCadView={scenarioUi.components?.cadView}
               />
             ) : partsQuery.isLoading ? (
               <div

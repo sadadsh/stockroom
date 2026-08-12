@@ -24,9 +24,8 @@ import type { PreviewKind } from "../PreviewModal";
  * The backend's `ASSET_KINDS` is deliberately NOT reordered to match. That tuple is a storage and
  * domain ordering - it decides the key order of persisted part JSON and the sequence of the
  * library-wide readiness lists - so reordering it would rewrite files and move text on surfaces
- * nobody asked about. The payload states the SET; this states the reading order, and every consumer
- * that renders the three in sequence goes through here (see `ProviderCoverageMatrix`, which sorts the
- * payload's artifact list by this array rather than trusting its order).
+ * nobody asked about. The payload states the SET; this states the reading order, and every CAD
+ * presentation that renders the three in sequence goes through here.
  */
 export const REPRESENTATION_KINDS: readonly RepresentationKind[] = [
   "model",

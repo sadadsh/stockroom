@@ -52,4 +52,17 @@ describe("Manage Models provider policy", () => {
     expect(providers[0]?.missing).toEqual(["model"]);
     expect(providers[0]?.complete).toBe(false);
   });
+
+  it("never auto-opens a complete provider without a reachable route", () => {
+    const unavailable = row("unavailable", true, 1);
+    unavailable.url = "";
+    const providers = orderedManageModelsProviders({
+      artifacts: ["symbol", "footprint", "model"], statuses: [], tools: [], completeProviders: [],
+      rows: [unavailable],
+    });
+
+    expect(providers[0]?.complete).toBe(true);
+    expect(providers[0]?.reachable).toBe(false);
+    expect(bestCompleteProvider(providers)).toBeNull();
+  });
 });

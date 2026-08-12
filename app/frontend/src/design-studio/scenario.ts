@@ -41,7 +41,8 @@ export interface ScenarioUiState {
     };
     selectedId?: string | null;
     autoSelect?: boolean;
-    surface?: "identity" | "classification" | "cad-sources" | "provenance" | "offers" | "pinout";
+    surface?: "identity" | "classification" | "provenance" | "offers" | "pinout";
+    cadView?: "models" | "manage-models";
     sourcesTab?: "fields" | "records" | "changes" | "diagnostics";
     preview?: "symbol" | "footprint" | "model";
     confirmDelete?: boolean;
@@ -64,10 +65,8 @@ export interface ScenarioUiState {
     openBenchPart?: string;
     indexState?: "missing" | "building" | "error" | "blocked";
   };
-  /** Native provider chrome is rendered by WindowHost, not duplicated in the React app tree. */
   provider?: {
     state: string;
-    nativeHostTargets?: readonly ("provider-back" | "provider-forward" | "stockroom-tab" | "provider-tab")[];
   };
 }
 

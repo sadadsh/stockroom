@@ -4,6 +4,7 @@ export type PreviewEffectKind =
   | "api"
   | "host-folder-picker"
   | "host-file-picker"
+  | "provider-viewport"
   | "external-navigation"
   | "download";
 

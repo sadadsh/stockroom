@@ -10,8 +10,8 @@
  * that this was the ONE vocabulary the whole opened component speaks. It never was. Those four are
  * spoken on that screen, but by two other closed sets with two other subjects and two other tone
  * functions: a CAD asset's own state is `CadAssetStatus` below, toned by `cadStatusTone`, and a
- * provider's coverage of one artifact is `CoverageStatus` from the dossier, labelled and toned
- * inside `ProviderCoverageMatrix.tsx`. Naming their words here as well gave this type members no
+ * provider's coverage of one artifact is `CoverageStatus` from the dossier, labelled in the
+ * Manage Models provider list. Naming their words here as well gave this type members no
  * value of it could ever hold, and gave `statusTone` entries no caller could ever reach. A word
  * that only a vocabulary list can produce is not a vocabulary - it is a list.
  */

@@ -184,8 +184,8 @@ export function providerReadFixtures(state: ProviderFixtureState): ScenarioFixtu
       },
       localOutcome: {
         state: "succeeded",
-        target: "provider-tab",
-        detail: "Brought the in-memory provider host target forward.",
+        target: "component-browser.provider-viewport",
+        detail: "Brought the in-memory provider viewport forward.",
       },
     } satisfies ScenarioFixture<{
       workflow_batch_id: string;

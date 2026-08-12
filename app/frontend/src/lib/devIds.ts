@@ -143,7 +143,6 @@ export const DEV_IDS: DevIdEntry[] = [
   { id: "component-browser.asset-header", label: "CAD asset expand control", area: "component-browser" },
   { id: "component-browser.asset-preview", label: "CAD asset preview stage", area: "component-browser" },
   { id: "component-browser.asset-evidence", label: "CAD asset evidence line", area: "component-browser" },
-  { id: "component-browser.compare-sources", label: "Compare Sources action", area: "component-browser" },
   { id: "component-browser.preferred-source", label: "Preferred CAD source", area: "component-browser" },
   { id: "component-browser.asset-issue", label: "CAD asset issue line", area: "component-browser" },
   { id: "component-browser.asset-maximize", label: "Open the full CAD preview", area: "component-browser" },
@@ -298,26 +297,22 @@ export const DEV_IDS: DevIdEntry[] = [
   { id: "component-browser.change-diff", label: "Open the visual diff for one commit", area: "component-browser" },
   { id: "component-browser.diagnostics-toggle", label: "Show or hide diagnostics", area: "component-browser" },
   { id: "component-browser.diagnostics-raw", label: "Show or hide the canonical record", area: "component-browser" },
-  // Complete Component: the whole provider trip for one component, inside the one workspace modal.
-  // Which provider can supply the whole set, how to reach it, what has landed, and which retained
-  // set is in force. Per-provider ROWS are dynamic and deliberately have no rows here.
-  { id: "component-browser.complete-component", label: "Complete Component sheet", area: "component-browser" },
-  { id: "component-browser.provider-matrix", label: "Provider coverage matrix", area: "component-browser" },
+  // Manage Models: one component-scoped provider list, embedded browser, and status strip.
+  { id: "component-browser.manage-models", label: "Manage Models workspace", area: "component-browser" },
+  { id: "component-browser.cad-tab-models", label: "Models tab", area: "component-browser" },
+  { id: "component-browser.cad-tab-manage-models", label: "Manage Models tab", area: "component-browser" },
+  { id: "component-browser.provider-list", label: "CAD provider list", area: "component-browser" },
   // The SHARED role every provider row declares (`data-dev-role`). Each row also carries its own
   // per-provider instance id, so one row can be tuned without touching the others; this row is what
   // an edit meant for ALL of them is keyed on.
   { id: "component-browser.provider-row", label: "Every provider coverage row", area: "component-browser" },
   { id: "component-browser.provider-open", label: "Open one provider", area: "component-browser" },
-  { id: "component-browser.provider-assert", label: "Your answer for one artifact", area: "component-browser" },
-  { id: "component-browser.provider-prefer-set", label: "Prefer one provider for the whole set", area: "component-browser" },
-  { id: "component-browser.provider-prefer-asset", label: "Prefer one provider for one asset", area: "component-browser" },
-  { id: "component-browser.provider-browser", label: "Provider trip controls", area: "component-browser" },
-  { id: "component-browser.provider-show", label: "Show the provider page", area: "component-browser" },
-  { id: "component-browser.provider-return", label: "Return To Stockroom", area: "component-browser" },
   { id: "component-browser.provider-import", label: "Import downloaded files", area: "component-browser" },
-  { id: "component-browser.provider-progress", label: "Download progress", area: "component-browser" },
-  { id: "component-browser.provider-report", label: "Provider run report", area: "component-browser" },
-  { id: "component-browser.provider-sets", label: "Retained verified sets", area: "component-browser" },
+  { id: "component-browser.provider-back", label: "Provider browser Back", area: "component-browser" },
+  { id: "component-browser.provider-forward", label: "Provider browser Forward", area: "component-browser" },
+  { id: "component-browser.provider-reload", label: "Provider browser Reload", area: "component-browser" },
+  { id: "component-browser.provider-viewport", label: "Embedded provider page", area: "component-browser" },
+  { id: "component-browser.provider-status", label: "Model download status", area: "component-browser" },
   { id: "component-browser.identity-sheet", label: "Identity editing sheet", area: "component-browser" },
   { id: "component-browser.identity-field", label: "One editable identity field", area: "component-browser" },
   // The category MOVE control is `detail.category-control` now: the identity sheet's hand-written

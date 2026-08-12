@@ -59,6 +59,7 @@ internal sealed class WebViewWindowHost : IDisposable
     private bool _initialized;
     private bool _providerLoading;
     private string _providerNavigationError = string.Empty;
+    private ProviderViewportRequest? _providerViewportRequest;
     private bool _hidden = true;
     private volatile bool _shuttingDown;
     private bool _closeRequested;
@@ -95,6 +96,10 @@ internal sealed class WebViewWindowHost : IDisposable
         // for the life of the window, and shows a single Stockroom tab until a provider page
         // is actually open.
         _tabStrip = new WindowTabStrip();
+        // Provider navigation now lives inside CAD Models > Manage Models. Keep the proven
+        // navigation controller during rolling compatibility, but remove its window-level UI.
+        _tabStrip.Root.Visibility = Visibility.Collapsed;
+        _tabStrip.Root.IsHitTestVisible = false;
         _tabStrip.StockroomTab.Click += (_, _) => HideProviderBrowser();
         _tabStrip.ProviderTab.Click += (_, _) => ShowActiveProviderBrowser();
         _tabStrip.BackButton.Click += (_, _) => NavigateProviderHistory(back: true);
@@ -375,7 +380,13 @@ internal sealed class WebViewWindowHost : IDisposable
                 await EnsureProviderBrowserReadyAsync()
                     .ConfigureAwait(true);
                 SyncProviderTab();
-                _webView.Visibility = Visibility.Collapsed;
+                if (!TryApplyProviderViewport())
+                {
+                    _providerSurface.Visibility = Visibility.Collapsed;
+                    _webView.Visibility = Visibility.Visible;
+                    return true;
+                }
+                _webView.Visibility = Visibility.Visible;
                 _providerSurface.Visibility = Visibility.Visible;
                 _tabStrip.SelectProvider();
                 UpdateProviderChrome();
@@ -926,13 +937,35 @@ internal sealed class WebViewWindowHost : IDisposable
     {
         var surface = new Grid
         {
-            Margin = new Thickness(24, 0, 24, 24),
+            HorizontalAlignment = HorizontalAlignment.Left,
+            VerticalAlignment = VerticalAlignment.Top,
             Background = new SolidColorBrush(Color.FromRgb(17, 21, 29)),
             Visibility = Visibility.Collapsed,
         };
         providerContent = new Grid();
         surface.Children.Add(providerContent);
         return surface;
+    }
+
+    private bool TryApplyProviderViewport()
+    {
+        if (_providerViewportRequest is not ProviderViewportRequest request
+            || !_providerLeases.TryGetActive(out _, out var context)
+            || !ProviderViewportLayout.TryResolve(
+                request,
+                context.ComponentId,
+                _webView.ActualWidth,
+                _webView.ActualHeight,
+                out var layout)
+            || layout is null)
+        {
+            return false;
+        }
+
+        _providerSurface.Margin = new Thickness(layout.X, layout.Y, 0, 0);
+        _providerSurface.Width = layout.Width;
+        _providerSurface.Height = layout.Height;
+        return true;
     }
 
     private WebView2? ActiveProviderWebView()
@@ -1529,6 +1562,40 @@ internal sealed class WebViewWindowHost : IDisposable
                           purpose
                         });
                       });
+                    },
+                    setProviderViewport(viewport) {
+                      if (
+                        !viewport ||
+                        typeof viewport.componentId !== "string" ||
+                        typeof viewport.visible !== "boolean" ||
+                        ![viewport.x, viewport.y, viewport.width, viewport.height]
+                          .every(Number.isFinite)
+                      ) {
+                        throw new Error("Invalid provider viewport.");
+                      }
+                      webview.postMessage({
+                        schema: "stockroom.host.provider-viewport",
+                        component_id: viewport.componentId,
+                        visible: viewport.visible,
+                        x: viewport.x,
+                        y: viewport.y,
+                        width: viewport.width,
+                        height: viewport.height
+                      });
+                    },
+                    providerCommand(request) {
+                      if (
+                        !request ||
+                        typeof request.componentId !== "string" ||
+                        !["back", "forward", "reload"].includes(request.command)
+                      ) {
+                        throw new Error("Invalid provider browser command.");
+                      }
+                      webview.postMessage({
+                        schema: "stockroom.host.provider-command",
+                        component_id: request.componentId,
+                        command: request.command
+                      });
                     }
                   });
                 }
@@ -1705,6 +1772,80 @@ internal sealed class WebViewWindowHost : IDisposable
             using var document = JsonDocument.Parse(
                 eventArguments.WebMessageAsJson);
             var root = document.RootElement;
+            if (root.TryGetProperty("schema", out var commandSchema)
+                && commandSchema.ValueKind == JsonValueKind.String
+                && commandSchema.GetString() == "stockroom.host.provider-command")
+            {
+                HandoffCodec.RequireExactObject(
+                    root,
+                    "provider browser command",
+                    "schema",
+                    "component_id",
+                    "command");
+                var componentId = HandoffCodec.GetRequiredString(root, "component_id");
+                var command = HandoffCodec.GetRequiredString(root, "command");
+                if (!_providerLeases.TryGetActive(out _, out var activeContext)
+                    || !string.Equals(
+                        componentId,
+                        activeContext.ComponentId,
+                        StringComparison.Ordinal))
+                {
+                    return;
+                }
+                switch (command)
+                {
+                    case "back":
+                        NavigateProviderHistory(back: true);
+                        break;
+                    case "forward":
+                        NavigateProviderHistory(back: false);
+                        break;
+                    case "reload":
+                        RefreshActiveProvider();
+                        break;
+                    default:
+                        return;
+                }
+                return;
+            }
+            if (root.TryGetProperty("schema", out var viewportSchema)
+                && viewportSchema.ValueKind == JsonValueKind.String
+                && viewportSchema.GetString() == "stockroom.host.provider-viewport")
+            {
+                HandoffCodec.RequireExactObject(
+                    root,
+                    "provider viewport request",
+                    "schema",
+                    "component_id",
+                    "visible",
+                    "x",
+                    "y",
+                    "width",
+                    "height");
+                if (!root.TryGetProperty("visible", out var visible)
+                    || visible.ValueKind is not (JsonValueKind.True or JsonValueKind.False))
+                {
+                    return;
+                }
+                var request = new ProviderViewportRequest(
+                    HandoffCodec.GetRequiredString(root, "component_id"),
+                    visible.GetBoolean(),
+                    RequiredFiniteDouble(root, "x"),
+                    RequiredFiniteDouble(root, "y"),
+                    RequiredFiniteDouble(root, "width"),
+                    RequiredFiniteDouble(root, "height"));
+                _providerViewportRequest = request;
+                if (!request.Visible || !TryApplyProviderViewport())
+                {
+                    _providerSurface.Visibility = Visibility.Collapsed;
+                    _webView.Visibility = Visibility.Visible;
+                }
+                else if (_providerSurface.Visibility == Visibility.Visible)
+                {
+                    _webView.Visibility = Visibility.Visible;
+                }
+                return;
+            }
             HandoffCodec.RequireExactObject(
                 root,
                 "renderer picker request",
@@ -1790,6 +1931,18 @@ internal sealed class WebViewWindowHost : IDisposable
                     ["paths"] = paths,
                     ["error"] = error,
                 }));
+    }
+
+    private static double RequiredFiniteDouble(JsonElement root, string name)
+    {
+        if (!root.TryGetProperty(name, out var value)
+            || value.ValueKind != JsonValueKind.Number
+            || !value.TryGetDouble(out var result)
+            || !double.IsFinite(result))
+        {
+            throw new WindowHostException($"{name} is invalid");
+        }
+        return result;
     }
 
     private void OnNavigationStarting(

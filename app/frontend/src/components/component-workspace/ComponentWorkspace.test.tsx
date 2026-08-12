@@ -658,7 +658,7 @@ describe("the Manage menu", () => {
       "Edit Class and Classification...",
       "Review Missing Specifications...",
       "Refresh Component Data",
-      "Review CAD Sources...",
+      "Manage Models",
       "View Data Provenance...",
       "Delete Component...",
     ]);
@@ -680,7 +680,7 @@ describe("the Manage menu", () => {
       onDelete: () => {},
     });
     expect(items.find((item) => item.id === "refresh")!.label).toBe("Refresh Component Data");
-    expect(items.filter((item) => item.label.endsWith("...")).length).toBe(items.length - 1);
+    expect(items.filter((item) => item.label.endsWith("...")).length).toBe(items.length - 2);
     expect(items[items.length - 1].id).toBe("delete");
     expect(items[items.length - 1].separated).toBe(true);
   });
