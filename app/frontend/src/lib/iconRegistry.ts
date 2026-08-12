@@ -59,6 +59,20 @@ export interface IconEntry {
   body: string;
 }
 
+/**
+ * A selectable icon from a separately-loaded library. Unlike `IconEntry`, a catalogue entry is
+ * not a persisted application icon id: choosing one stores its sanitised SVG body as the selected
+ * application's existing icon override.
+ */
+export interface IconCatalogEntry {
+  id: string;
+  label: string;
+  family: string;
+  terms: readonly string[];
+  body: string;
+  viewBox: string;
+}
+
 export const ICON_REGISTRY: IconEntry[] = [
   // ---- primary: the icons.tsx `Svg` helper set (viewBox 24, strokeWidth 1.9, class .ico) --------
   {

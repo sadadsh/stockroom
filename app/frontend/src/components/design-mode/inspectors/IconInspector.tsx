@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { lazy, Suspense, useState } from "react";
 import { useCopyFormatter, useText } from "../../../lib/copy";
 import { useDevMode } from "../../../lib/devMode";
 import { isSafeElementValue } from "../../../lib/elementLayout";
@@ -7,15 +7,20 @@ import { resolveIcon, sanitizeIconBody } from "../../iconResolve";
 import { Icon } from "../../Icon";
 import type { DomainInspectorProps } from "./types";
 
+const IconBrowser = lazy(() => import("../IconBrowser").then((module) => ({ default: module.IconBrowser })));
+
 export function IconInspector(props: DomainInspectorProps) {
   const dev = useDevMode();
   const iconDomains = props.inspections.flatMap((inspection) => inspection.icons);
   const iconIds = [...new Set(iconDomains.flatMap((icon) => icon.iconId ? [icon.iconId] : []))];
   const iconId = props.inspection.icons[0]?.iconId ?? iconIds[0];
   const [size, setSize] = useState("");
+  const [catalogOpen, setCatalogOpen] = useState(false);
   const emptyLabel = useText("design-studio.inspector.icon.empty", "This target has no editable interface icon.");
   const unregisteredLabel = useText("design-studio.inspector.icon.unregistered", "The icon is not registered.");
   const resetLabel = useText("design-studio.inspector.icon.reset", "Reset Icon");
+  const browseCatalogLabel = useText("design-studio.inspector.icon.browse-catalog", "Browse Icon Catalog");
+  const loadingCatalogLabel = useText("design-studio.inspector.icon.loading-catalog", "Loading icon catalog…");
   const swapAria = useCopyFormatter("design-studio.inspector.icon.swap-aria", "Swap to {icon}");
   const geometryLabel = useText("design-studio.inspector.icon.geometry", "Sanitized Outline");
   const geometryAria = useText("design-studio.inspector.icon.geometry-aria", "Edit Icon SVG Markup");
@@ -50,6 +55,17 @@ export function IconInspector(props: DomainInspectorProps) {
           </button>
         ))}
       </div>
+      <button type="button" onClick={() => setCatalogOpen((open) => !open)} className="mt-3 rounded-control border border-line px-2 py-1 text-2xs font-semibold text-t2 hover:text-t1">
+        {browseCatalogLabel}
+      </button>
+      {catalogOpen ? (
+        <Suspense fallback={<p className="mt-3 text-2xs text-t3">{loadingCatalogLabel}</p>}>
+          <IconBrowser targetViewBox={entry.viewBox} onSelect={(selected) => {
+            iconIds.forEach((id) => dev.setIconBody(id, sanitizeIconBody(selected.body)));
+            setCatalogOpen(false);
+          }} />
+        </Suspense>
+      ) : null}
       {entry.body !== undefined ? (
         <label className="mt-3 block text-xs text-t2">
           {geometryLabel}
