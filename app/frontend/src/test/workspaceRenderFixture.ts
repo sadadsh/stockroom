@@ -47,6 +47,8 @@ export function workspaceRenderFixture(
       onFindDatasheet: noop,
     },
     cad: {
+      view: "models",
+      onView: noop,
       layout: over.layout ?? "all",
       onLayout: noop,
       onCompareSources: noop,

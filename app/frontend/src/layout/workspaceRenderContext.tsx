@@ -21,7 +21,7 @@ import type { DatasheetTarget } from "../components/component-workspace/datashee
 import type { ManageMenuItem } from "../components/component-workspace/ManageMenu";
 import type { SpecFilter } from "../components/component-workspace/specificationRows";
 import type { WorkspaceActivity } from "../components/component-workspace/WorkspaceStatusBar";
-import type { RepresentationLayout } from "../lib/uiSession";
+import type { CadWorkspaceView, RepresentationLayout } from "../lib/uiSession";
 
 export interface WorkspaceHeaderSlice {
   manageItems: ManageMenuItem[];
@@ -33,6 +33,8 @@ export interface WorkspaceHeaderSlice {
 }
 
 export interface WorkspaceCadSlice {
+  view: CadWorkspaceView;
+  onView: (view: CadWorkspaceView) => void;
   /** `all` expands the three; a kind expands that one and compacts the other two. */
   layout: RepresentationLayout;
   onLayout: (layout: RepresentationLayout) => void;

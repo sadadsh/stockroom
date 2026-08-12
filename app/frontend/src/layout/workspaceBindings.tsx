@@ -291,9 +291,11 @@ function ArrangeableWorkspace({
 export function WorkspaceDocumentView({
   context,
   overlays,
+  bodyOverride,
 }: {
   context: WorkspaceRenderContext;
   overlays?: ReactNode;
+  bodyOverride?: ReactNode;
 }) {
   const conditions = useWorkspaceConditions(context.dossier);
   const layout = useWorkspaceLayout();
@@ -302,7 +304,22 @@ export function WorkspaceDocumentView({
       <WorkspaceOverlaysContext.Provider value={overlays ?? null}>
         <LayoutRuntimeScope conditions={conditions}>
           <ArrangeableWorkspace layout={layout}>
-            <LayoutDocumentView document={layout} bindings={WORKSPACE_LAYOUT_BINDINGS} />
+            {bodyOverride ? (
+              <div data-dev-id="component-browser.root" className="flex h-full min-h-0 flex-col overflow-hidden">
+                <div data-dev-id={componentDevId(context.componentId)} className="flex min-h-0 flex-1 flex-col overflow-hidden">
+                  {findRegion(layout, WORKSPACE_REGION.headerBand) ? (
+                    <LayoutRegionScope region={findRegion(layout, WORKSPACE_REGION.headerBand)!} bindings={WORKSPACE_LAYOUT_BINDINGS} />
+                  ) : null}
+                  {bodyOverride}
+                  {findRegion(layout, WORKSPACE_REGION.statusBand) ? (
+                    <LayoutRegionScope region={findRegion(layout, WORKSPACE_REGION.statusBand)!} bindings={WORKSPACE_LAYOUT_BINDINGS} />
+                  ) : null}
+                </div>
+                {overlays}
+              </div>
+            ) : (
+              <LayoutDocumentView document={layout} bindings={WORKSPACE_LAYOUT_BINDINGS} />
+            )}
           </ArrangeableWorkspace>
         </LayoutRuntimeScope>
       </WorkspaceOverlaysContext.Provider>

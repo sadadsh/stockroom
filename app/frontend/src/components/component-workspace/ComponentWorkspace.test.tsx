@@ -34,6 +34,7 @@ import { ToastProvider } from "../../lib/toast";
 import {
   defaultUiSession,
   openComponentInSession,
+  readUiSession,
   resetUiSessionForTests,
 } from "../../lib/uiSession";
 import {
@@ -206,10 +207,25 @@ describe("the three-column workspace", () => {
   // arrives - is `layout/engineInvariants.test.tsx`, which holds it for arbitrary documents rather
   // than only for the one that ships today.
 
-  it("has no per-component tab strip and no information tabs", async () => {
+  it("uses only the CAD Models tabs and has no information tab strip", async () => {
     await open();
-    expect(document.querySelectorAll('[role="tab"]')).toHaveLength(0);
-    expect(document.querySelectorAll('[role="tablist"]')).toHaveLength(0);
+    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual([
+      "Models",
+      "Manage Models",
+    ]);
+    expect(document.querySelectorAll('[role="tablist"]')).toHaveLength(1);
+  });
+
+  it("opens Manage Models inside the component while keeping its identity", async () => {
+    const user = userEvent.setup();
+    await open();
+
+    await user.click(screen.getByRole("tab", { name: "Manage Models" }));
+
+    expect(screen.getByTestId("manage-models-workspace")).toBeVisible();
+    expect(columns()).toHaveLength(0);
+    expect(node("component-browser.header-mpn")).toBeVisible();
+    expect(readUiSession().component_views[ID]?.cad_view).toBe("manage-models");
   });
 
   it("moves a splitter, persists the new proportions locally, and restores them", async () => {

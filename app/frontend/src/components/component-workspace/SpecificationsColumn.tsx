@@ -59,6 +59,8 @@ export function SpecificationsColumn({
         onFindDatasheet: noop,
       },
       cad: {
+        view: "models",
+        onView: noop,
         layout: "all",
         onLayout: noop,
         onCompareSources: noop,

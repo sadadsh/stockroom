@@ -33,7 +33,7 @@ SESSION_SCHEMA = "stockroom.ui-session"
 # v2 adds the opened-component workspace: which components are open as tabs, which one is
 # active, and each one's own view state. A stored v1 document upgrades on read (see
 # `_migrated`), so an existing install keeps its route, filters, and picker anchor.
-SESSION_VERSION = 2
+SESSION_VERSION = 3
 DRAFT_SCHEMA = "stockroom.intake-draft"
 DRAFT_VERSION = 1
 
@@ -57,6 +57,7 @@ _MAX_EVENT_SEQUENCE = (1 << 63) - 1
 # document without limit; the frontend evicts the least-recently-active tab at the same bound.
 _MAX_OPEN_COMPONENTS = 12
 _INFO_TABS = {"overview", "specifications", "sourcing", "sources"}
+_CAD_VIEWS = {"models", "manage-models"}
 # Both are MEMBERSHIP vocabularies: the layout is validated against a set and the tool map is
 # addressed by key, so neither sequence reaches a screen. The CAD column stacks 3D Model, Footprint,
 # Symbol, and the layout set is written in that order so reading this file does not suggest otherwise.
@@ -506,7 +507,7 @@ def _component_view(value: object, field: str) -> dict:
     obj = _expect_exact(
         value,
         field=field,
-        required={"info_tab", "representation_layout", "representation_tool"},
+        required={"info_tab", "cad_view", "representation_layout", "representation_tool"},
     )
     tools = _expect_exact(
         obj["representation_tool"],
@@ -515,6 +516,7 @@ def _component_view(value: object, field: str) -> dict:
     )
     return {
         "info_tab": _enum(obj["info_tab"], _INFO_TABS, f"{field}.info_tab"),
+        "cad_view": _enum(obj["cad_view"], _CAD_VIEWS, f"{field}.cad_view"),
         "representation_layout": _enum(
             obj["representation_layout"],
             _REPRESENTATION_LAYOUTS,
@@ -559,15 +561,24 @@ def _migrated(value: object) -> object:
     """
     if type(value) is not dict:
         return value
-    if value.get("schema") != SESSION_SCHEMA or value.get("version") != 1:
+    if value.get("schema") != SESSION_SCHEMA or value.get("version") not in {1, 2}:
         return value
     upgraded = dict(value)
-    selected = upgraded.get("selected_ids")
-    component = selected.get("component") if type(selected) is dict else None
-    upgraded["version"] = 2
-    upgraded["open_components"] = [component] if type(component) is str and component else []
-    upgraded["active_component"] = component if type(component) is str and component else None
-    upgraded["component_views"] = {}
+    if upgraded["version"] == 1:
+        selected = upgraded.get("selected_ids")
+        component = selected.get("component") if type(selected) is dict else None
+        upgraded["version"] = 2
+        upgraded["open_components"] = [component] if type(component) is str and component else []
+        upgraded["active_component"] = component if type(component) is str and component else None
+        upgraded["component_views"] = {}
+    if upgraded["version"] == 2:
+        views = upgraded.get("component_views")
+        if type(views) is dict:
+            upgraded["component_views"] = {
+                key: {**entry, "cad_view": "models"} if type(entry) is dict else entry
+                for key, entry in views.items()
+            }
+        upgraded["version"] = SESSION_VERSION
     return upgraded
 
 

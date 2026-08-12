@@ -52,7 +52,13 @@
 <div class="flex min-h-0 flex-none flex-col" style="width: 423.46px;">
 <section data-dev-id="component-browser.column-cad" data-workspace-column="cad" class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden border-l border-line first:border-l-0">
 <header class="flex h-[24px] flex-none items-center gap-2 border-b border-line bg-band px-2">
-<span class="ui-panel-title min-w-0 truncate">CAD Assets</span>
+<span class="ui-panel-title min-w-0 truncate">
+<span class="flex items-center gap-2">CAD Assets<div role="tablist" aria-label="CAD Models" class="flex items-center gap-1">
+<button type="button" role="tab" aria-selected="true" data-dev-id="component-browser.cad-tab-models" class="ui-control-label rounded-control px-2 py-0.5 bg-control-pressed text-t1">Models</button>
+<button type="button" role="tab" aria-selected="false" data-dev-id="component-browser.cad-tab-manage-models" class="ui-control-label rounded-control px-2 py-0.5 text-t2 hover:bg-control-hover">Manage Models</button>
+</div>
+</span>
+</span>
 <span class="flex-none">
 <button class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-control border transition-[color,background-color,border-color] duration-100 ease-out ui-control-label disabled:cursor-not-allowed disabled:border-line disabled:bg-control-pressed disabled:text-t5 disabled:hover:brightness-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus h-[22px] px-2 text-xs border-line-dark bg-control-bottom text-t1 hover:bg-control-hover active:bg-control-pressed" data-dev-id="component-browser.compare-sources">Compare Sources</button>
 </span>

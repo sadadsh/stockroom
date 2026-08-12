@@ -35,6 +35,7 @@ import { Button } from "../primitives";
 import { CadAssetModule } from "./CadAssetModule";
 import { REPRESENTATION_KINDS } from "./cadAssetSet";
 import { PreferredSourceControl } from "./PreferredSourceControl";
+import { CadWorkspaceTabs } from "./ManageModelsWorkspace";
 import {
   WorkspaceColumnFrame,
   WorkspaceColumnScroller,
@@ -158,7 +159,12 @@ export function CadTitleStripPart() {
   if (!workspace || !state) return null;
   return (
     <WorkspaceColumnTitleStrip
-      title={<Text id="component-browser.column-cad">CAD Assets</Text>}
+      title={
+        <span className="flex items-center gap-2">
+          <Text id="component-browser.column-cad">CAD Assets</Text>
+          <CadWorkspaceTabs view={workspace.cad.view} onView={workspace.cad.onView} />
+        </span>
+      }
       meta={`${state.attached}/${REPRESENTATION_KINDS.length}`}
       action={
         <Button

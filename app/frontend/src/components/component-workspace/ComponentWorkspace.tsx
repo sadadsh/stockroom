@@ -55,6 +55,7 @@ import type { PreviewKind } from "../PreviewModal";
 import { ErrorState, LoadingState } from "../primitives";
 import { WorkspaceShellDialogs, type ShellDialog } from "./ShellActions";
 import { WorkspaceSurfaces, type WorkspaceSurface } from "./WorkspaceSurfaces";
+import { ManageModelsWorkspace } from "./ManageModelsWorkspace";
 import { previewKindFor } from "./cadAssetSet";
 import { manageMenuItems, shellManageItems } from "./manageActions";
 import { cadFocusKind, type QualitySegmentKind } from "./componentIdentity";
@@ -230,6 +231,8 @@ export function ComponentWorkspace({
       onFindDatasheet: () => setSurface("provenance"),
     },
     cad: {
+      view: view.cad_view,
+      onView: (cadView) => patchView({ cad_view: cadView }),
       layout: view.representation_layout,
       onLayout: (layout: RepresentationLayout) => patchView({ representation_layout: layout }),
       onCompareSources: () => setSurface("cad-sources"),
@@ -267,6 +270,15 @@ export function ComponentWorkspace({
   return (
     <WorkspaceDocumentView
       context={context}
+      bodyOverride={
+        view.cad_view === "manage-models" ? (
+          <ManageModelsWorkspace
+            componentId={componentId}
+            dossier={dossier}
+            onView={(cadView) => patchView({ cad_view: cadView })}
+          />
+        ) : undefined
+      }
       overlays={
         <>
           <WorkspaceShellDialogs

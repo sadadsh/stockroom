@@ -12,7 +12,7 @@ import { api } from "../api/client";
 import type { EnrichmentResult } from "../api/types";
 
 export const UI_SESSION_SCHEMA = "stockroom.ui-session" as const;
-export const UI_SESSION_VERSION = 2 as const;
+export const UI_SESSION_VERSION = 3 as const;
 export const INTAKE_DRAFT_SCHEMA = "stockroom.intake-draft" as const;
 export const INTAKE_DRAFT_VERSION = 1 as const;
 
@@ -23,6 +23,7 @@ export type OpenSurface = "search" | "add_part" | "complete_part" | null;
 
 /** The four questions the opened component answers. Closed vocabulary, persisted per component. */
 export type ComponentInfoTab = "overview" | "specifications" | "sourcing" | "sources";
+export type CadWorkspaceView = "models" | "manage-models";
 /**
  * Which representation the column focuses. `all` shows the three stacked.
  *
@@ -36,6 +37,7 @@ export type RepresentationLayout = "all" | "model" | "footprint" | "symbol";
 /** One opened component's view state. Bounded, non-secret, and meaningless without the record. */
 export interface ComponentViewState {
   info_tab: ComponentInfoTab;
+  cad_view: CadWorkspaceView;
   representation_layout: RepresentationLayout;
   representation_tool: { symbol: string; footprint: string; model: string };
 }
@@ -53,6 +55,8 @@ export const COMPONENT_INFO_TABS: readonly ComponentInfoTab[] = [
   "sources",
 ];
 
+export const CAD_WORKSPACE_VIEWS: readonly CadWorkspaceView[] = ["models", "manage-models"];
+
 export const REPRESENTATION_LAYOUTS: readonly RepresentationLayout[] = [
   "all",
   "model",
@@ -63,6 +67,7 @@ export const REPRESENTATION_LAYOUTS: readonly RepresentationLayout[] = [
 export function defaultComponentView(): ComponentViewState {
   return {
     info_tab: "overview",
+    cad_view: "models",
     representation_layout: "all",
     representation_tool: { symbol: "", footprint: "", model: "" },
   };
@@ -315,6 +320,7 @@ const SNAPSHOT_KEYS = [
 
 const COMPONENT_VIEW_KEYS = [
   "info_tab",
+  "cad_view",
   "representation_layout",
   "representation_tool",
 ] as const;
@@ -446,6 +452,7 @@ function parseComponentView(value: unknown): ComponentViewState | null {
     !tools ||
     !exactKeys(tools, REPRESENTATION_TOOL_KEYS) ||
     !COMPONENT_INFO_TABS.includes(object.info_tab as ComponentInfoTab) ||
+    !CAD_WORKSPACE_VIEWS.includes(object.cad_view as CadWorkspaceView) ||
     !REPRESENTATION_LAYOUTS.includes(object.representation_layout as RepresentationLayout)
   ) {
     return null;
@@ -456,6 +463,7 @@ function parseComponentView(value: unknown): ComponentViewState | null {
   if (symbol === null || footprint === null || model === null) return null;
   return {
     info_tab: object.info_tab as ComponentInfoTab,
+    cad_view: object.cad_view as CadWorkspaceView,
     representation_layout: object.representation_layout as RepresentationLayout,
     representation_tool: { symbol, footprint, model },
   };
@@ -499,20 +507,30 @@ function parseComponentViews(
 export function migrateUiSession(value: unknown): unknown {
   const object = plainObject(value);
   if (!object || object.schema !== UI_SESSION_SCHEMA) return value;
-  if (object.version !== 1) return value;
-  const selected = plainObject(object.selected_ids);
-  const component = typeof selected?.component === "string" ? selected.component : null;
-  const { version: _version, ...rest } = object;
-  return {
-    ...rest,
-    version: UI_SESSION_VERSION,
-    // The one open component a v1 snapshot could describe is whatever the picker had selected, so
-    // the upgrade reopens exactly the component the person was last looking at. `selected_ids`
-    // KEEPS it: that field still drives the picker's highlighted row.
-    open_components: component ? [component] : [],
-    active_component: component,
-    component_views: {},
-  };
+  let migrated: Record<string, unknown> = object;
+  if (migrated.version === 1) {
+    const selected = plainObject(migrated.selected_ids);
+    const component = typeof selected?.component === "string" ? selected.component : null;
+    const { version: _version, ...rest } = migrated;
+    migrated = {
+      ...rest,
+      version: 2,
+      open_components: component ? [component] : [],
+      active_component: component,
+      component_views: {},
+    };
+  }
+  if (migrated.version === 2) {
+    const rawViews = plainObject(migrated.component_views);
+    const views = Object.fromEntries(
+      Object.entries(rawViews ?? {}).map(([id, raw]) => {
+        const view = plainObject(raw);
+        return [id, view ? { ...view, cad_view: "models" } : raw];
+      }),
+    );
+    migrated = { ...migrated, version: UI_SESSION_VERSION, component_views: views };
+  }
+  return migrated;
 }
 
 export function parseUiSession(value: unknown): UiSessionSnapshotV2 | null {

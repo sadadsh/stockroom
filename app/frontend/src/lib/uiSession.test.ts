@@ -33,6 +33,17 @@ function v1Snapshot(): Record<string, unknown> {
   return { ...rest, version: 1 };
 }
 
+function v2Snapshot(componentId = "part-42"): Record<string, unknown> {
+  const snapshot = defaultUiSession() as unknown as Record<string, unknown>;
+  snapshot.version = 2;
+  snapshot.open_components = [componentId];
+  snapshot.active_component = componentId;
+  const view = { ...defaultComponentView() } as Record<string, unknown>;
+  delete view.cad_view;
+  snapshot.component_views = { [componentId]: view };
+  return snapshot;
+}
+
 /** Open `count` components in order, so the bound and the eviction order are exercised honestly. */
 function withOpen(count: number): UiSessionSnapshotV2 {
   let snapshot = defaultUiSession();
@@ -181,7 +192,7 @@ describe("durable UI session", () => {
   });
 });
 
-describe("UI session v1 -> v2 migration", () => {
+describe("UI session migrations", () => {
   beforeEach(() => {
     resetUiSessionForTests();
   });
@@ -209,13 +220,42 @@ describe("UI session v1 -> v2 migration", () => {
     expect(parsed?.component_filters.query).toBe("usb");
     expect(parsed?.component_list_anchor).toEqual({ part_id: "part-40", offset_px: 18 });
     expect(parsed?.event_sequence).toBe(917);
-    expect(parsed?.version).toBe(2);
+    expect(parsed?.version).toBe(3);
     // The one component a v1 snapshot could describe becomes the one open tab, and the picker
     // selection that named it is KEPT: it still drives the highlighted row.
     expect(parsed?.selected_ids.component).toBe("part-42");
     expect(parsed?.open_components).toEqual(["part-42"]);
     expect(parsed?.active_component).toBe("part-42");
     expect(parsed?.component_views).toEqual({});
+  });
+
+  it("adds the Models CAD view when upgrading an exact v2 component workspace", () => {
+    const parsed = parseUiSession(v2Snapshot());
+
+    expect(parsed?.version).toBe(3);
+    expect(parsed?.component_views["part-42"]?.cad_view).toBe("models");
+  });
+
+  it("keeps Manage Models scoped to one open component", () => {
+    const snapshot = defaultUiSession();
+    snapshot.open_components = ["a", "b"];
+    snapshot.active_component = "a";
+    snapshot.component_views = {
+      a: { ...defaultComponentView(), cad_view: "manage-models" },
+      b: { ...defaultComponentView(), cad_view: "models" },
+    };
+
+    expect(parseUiSession(snapshot)?.component_views).toEqual(snapshot.component_views);
+  });
+
+  it("rejects a component CAD view outside the closed vocabulary", () => {
+    const snapshot = defaultUiSession();
+    snapshot.open_components = ["a"];
+    snapshot.component_views = {
+      a: { ...defaultComponentView(), cad_view: "downloads" as "models" },
+    };
+
+    expect(parseUiSession(snapshot)).toBeNull();
   });
 
   it("migrates a v1 snapshot with no selection to an empty strip", () => {
@@ -229,7 +269,7 @@ describe("UI session v1 -> v2 migration", () => {
   });
 
   it("falls back to defaults for an unknown or newer version", () => {
-    expect(parseUiSession({ ...defaultUiSession(), version: 3 })).toBeNull();
+    expect(parseUiSession({ ...defaultUiSession(), version: 4 })).toBeNull();
     expect(parseUiSession({ ...v1Snapshot(), version: 0 })).toBeNull();
     // A payload that is not this schema at all is passed through untouched, then rejected.
     const foreign = { ...defaultUiSession(), schema: "something.else" };
@@ -340,6 +380,7 @@ describe("opened components", () => {
     expect(parsed).toEqual(snapshot);
     expect(componentView(parsed!, "a")).toEqual({
       info_tab: "sourcing",
+      cad_view: "models",
       representation_layout: "footprint",
       representation_tool: { symbol: "", footprint: "altium", model: "" },
     });

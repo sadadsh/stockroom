@@ -29,6 +29,7 @@ def _v1() -> dict:
 def _view(**overrides) -> dict:
     view = {
         "info_tab": "overview",
+        "cad_view": "models",
         "representation_layout": "all",
         "representation_tool": {"symbol": "kicad", "footprint": "kicad", "model": "kicad"},
     }
@@ -36,9 +37,17 @@ def _view(**overrides) -> dict:
     return view
 
 
+def _v2() -> dict:
+    snapshot = default_snapshot()
+    snapshot["version"] = 2
+    for view in snapshot["component_views"].values():
+        view.pop("cad_view", None)
+    return snapshot
+
+
 def test_the_default_snapshot_is_the_current_version_with_no_open_tabs():
     snapshot = default_snapshot()
-    assert snapshot["version"] == SESSION_VERSION == 2
+    assert snapshot["version"] == SESSION_VERSION == 3
     assert snapshot["open_components"] == []
     assert snapshot["active_component"] is None
     assert snapshot["component_views"] == {}
@@ -49,10 +58,28 @@ def test_a_stored_v1_document_upgrades_instead_of_being_discarded():
     stored["route"] = "projects"
     stored["component_filters"]["query"] = "stm32"
     upgraded = normalize_snapshot(stored)
-    assert upgraded["version"] == 2
+    assert upgraded["version"] == 3
     # Everything the person had is still there.
     assert upgraded["route"] == "projects"
     assert upgraded["component_filters"]["query"] == "stm32"
+
+
+def test_a_stored_v2_component_view_upgrades_to_models():
+    stored = _v2()
+    stored["open_components"] = ["a"]
+    stored["active_component"] = "a"
+    stored["component_views"] = {"a": _view()}
+    upgraded = normalize_snapshot(stored)
+    assert upgraded["version"] == 3
+    assert upgraded["component_views"]["a"]["cad_view"] == "models"
+
+
+def test_an_off_vocabulary_cad_view_is_rejected():
+    snapshot = default_snapshot()
+    snapshot["open_components"] = ["a"]
+    snapshot["component_views"] = {"a": _view(cad_view="downloads")}
+    with pytest.raises(ValueError):
+        normalize_snapshot(snapshot)
 
 
 def test_the_v1_selected_component_becomes_its_open_tab():
