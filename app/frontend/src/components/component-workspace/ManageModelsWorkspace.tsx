@@ -1,6 +1,9 @@
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { ComponentDossier } from "../../api/dossierTypes";
 import { Text, useText } from "../../lib/copy";
 import type { CadWorkspaceView } from "../../lib/uiSession";
+import { bestCompleteProvider, orderedManageModelsProviders } from "./manageModelsModel";
+import { ProviderList } from "./ProviderList";
 
 export function CadWorkspaceTabs({
   view,
@@ -41,13 +44,40 @@ export function CadWorkspaceTabs({
 
 export function ManageModelsWorkspace({
   componentId,
-  dossier: _dossier,
+  dossier,
   onView,
+  onOpenProvider,
 }: {
   componentId: string;
   dossier: ComponentDossier;
   onView: (view: CadWorkspaceView) => void;
+  onOpenProvider?: (providerId: string) => void;
 }) {
+  const providers = useMemo(
+    () => orderedManageModelsProviders(dossier.cadSourceCoverage),
+    [dossier.cadSourceCoverage],
+  );
+  const bestProvider = bestCompleteProvider(providers);
+  const initialProviderId = bestProvider?.row.id ?? providers[0]?.row.id ?? null;
+  const [selectedProviderId, setSelectedProviderId] = useState<string | null>(initialProviderId);
+  const lastAutomaticOpen = useRef<string | null>(null);
+
+  useEffect(() => {
+    setSelectedProviderId(initialProviderId);
+    lastAutomaticOpen.current = null;
+  }, [componentId, initialProviderId]);
+
+  useEffect(() => {
+    if (!bestProvider || !onOpenProvider) return;
+    const automaticOpenKey = `${componentId}:${bestProvider.row.id}`;
+    if (lastAutomaticOpen.current === automaticOpenKey) return;
+    lastAutomaticOpen.current = automaticOpenKey;
+    onOpenProvider(bestProvider.row.id);
+  }, [bestProvider, componentId, onOpenProvider]);
+
+  const selectedProvider =
+    providers.find((provider) => provider.row.id === selectedProviderId) ?? providers[0] ?? null;
+
   return (
     <section
       data-testid="manage-models-workspace"
@@ -61,8 +91,22 @@ export function ManageModelsWorkspace({
         </h2>
         <CadWorkspaceTabs view="manage-models" onView={onView} />
       </header>
-      <div className="flex min-h-0 flex-1 items-center justify-center text-sm text-t3">
-        <Text id="component-browser.manage-models-loading">Checking providers</Text>
+      <div className="flex min-h-0 flex-1">
+        <ProviderList
+          providers={providers}
+          selectedId={selectedProvider?.row.id ?? null}
+          onSelect={setSelectedProviderId}
+        />
+        <div className="flex min-w-0 flex-1 items-center justify-center text-sm text-t3">
+          {selectedProvider ? (
+            <span>
+              <Text id="component-browser.manage-models-open-provider">Open provider</Text>{" "}
+              <strong className="font-medium text-t2">{selectedProvider.row.label}</strong>
+            </span>
+          ) : (
+            <Text id="component-browser.manage-models-no-providers">No providers found</Text>
+          )}
+        </div>
       </div>
     </section>
   );
