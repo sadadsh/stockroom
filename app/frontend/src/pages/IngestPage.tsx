@@ -538,7 +538,7 @@ function BlockedFetchCard({
         {candidates.length > 0 ? (
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-xs text-t3">
-              <Text id="ingest.blocked-corrections">Did you mean:</Text>
+              <Text id="ingest.blocked-corrections">Possible match:</Text>
             </span>
             {candidates.map((candidate) => (
               <Button

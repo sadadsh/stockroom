@@ -74,7 +74,12 @@ export function ValueSlider({
         max={max}
         step={step}
         value={draft}
-        onChange={(event) => setDraft(event.currentTarget.value)}
+        onChange={(event) => {
+          const raw = event.currentTarget.value;
+          setDraft(raw);
+          const parsed = Number.parseFloat(raw);
+          if (Number.isFinite(parsed)) onChange(clamp(parsed, min, max));
+        }}
         onBlur={(event) => commit(event.currentTarget.value)}
         onKeyDown={(event) => {
           if (event.key === "Enter") {

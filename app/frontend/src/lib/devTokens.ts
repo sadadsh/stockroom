@@ -401,7 +401,7 @@ export const DEV_TOKENS: DevToken[] = [
     group: "Borders",
     kind: "color",
     themed: true,
-    default: { dark: "#464a4f", light: "#b9bec4" },
+    default: { dark: "#383b3f", light: "#d7dade" },
   },
   {
     cssVar: "--c-line2",
@@ -409,7 +409,7 @@ export const DEV_TOKENS: DevToken[] = [
     group: "Borders",
     kind: "color",
     themed: true,
-    default: { dark: "#565b61", light: "#a8aeb5" },
+    default: { dark: "#45494e", light: "#c8ccd1" },
   },
   {
     cssVar: "--c-edge",

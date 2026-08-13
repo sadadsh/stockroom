@@ -245,7 +245,7 @@ describe("the opened component renders the same DOM it shipped with", () => {
     await expectTree(
       "populated",
       await renderWorkspace(populatedDossier()),
-      "73635-6a745b54-c7dfbea3",
+      "72459-88ee8841-203b49e5",
     );
   });
 
@@ -254,12 +254,12 @@ describe("the opened component renders the same DOM it shipped with", () => {
     await expectTree(
       "populated-developer",
       await renderWorkspace(populatedDossier()),
-      "104359-902a0209-42ed563b",
+      "103183-34b46afc-25827402",
     );
   });
 
   it("draws a component nobody has sourced identically", async () => {
-    await expectTree("sparse", await renderWorkspace(sparseDossier()), "29661-a6e5e880-80e551cc");
+    await expectTree("sparse", await renderWorkspace(sparseDossier()), "29421-342f7b06-e15d6e92");
   });
 
   it("draws a component nobody has sourced identically in developer mode", async () => {
@@ -269,7 +269,7 @@ describe("the opened component renders the same DOM it shipped with", () => {
     await expectTree(
       "sparse-developer",
       await renderWorkspace(sparseDossier()),
-      "47549-f36bd063-6329ce46",
+      "47264-f50f0a78-3c530b43",
     );
   });
 
@@ -284,7 +284,7 @@ describe("the opened component renders the same DOM it shipped with", () => {
     resetUiSessionForTests(openComponentInSession(defaultUiSession(), FIXTURE_COMPONENT_ID));
     mockApi.partDossier.mockRejectedValue(new ApiError(500, "no"));
     const view = provide(<ComponentWorkspace componentId={FIXTURE_COMPONENT_ID} />);
-    await expectTree("failed", await settle(view.container), "1343-0a62ff4d-c388a020");
+    await expectTree("failed", await settle(view.container), "1298-6a57dd27-5791f462");
   });
 
   it("draws the empty workspace identically", async () => {

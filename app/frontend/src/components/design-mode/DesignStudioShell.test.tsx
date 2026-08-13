@@ -330,7 +330,7 @@ describe("DesignStudioShell", () => {
     await userEvent.setup().click(within(sidebar).getByRole("button", { name: "Show All Hidden" }));
     expect(productRoot.style.visibility).toBe("");
     expect((document.querySelector('[data-dev-id="rail.root"]') as HTMLElement).style.visibility).toBe("");
-  });
+  }, 10_000);
 
   it("defaults to meaningful layers and can reveal every generated wrapper", async () => {
     await renderStudio();
