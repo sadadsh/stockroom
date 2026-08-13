@@ -1,11 +1,12 @@
 """Source precedence: which answer holds the slot, and what happened to the others.
 
-One order, applied to every field, in one place:
+One order, applied to every component fact, in one place:
 
     reviewed manual override
+    > Mouser
+    > DigiKey
     > manufacturer datasheet
-    > manufacturer API or official page
-    > trusted authorized distributor
+    > other trusted sources
     > CAD provider
     > parsed or inferred
 
@@ -17,12 +18,9 @@ nobody opens. Two sources disagreeing about a part is data about the part.
 Ties inside a tier are settled by the registry's own provider order and then by the source key,
 so the answer never depends on which source happened to be merged first.
 
-That is also where the owner's distributor ranking lives. Mouser, DigiKey and LCSC are one tier
-because they are one CLASS of evidence - a distributor's own catalogue record - and the ranking
-between them (Mouser > DigiKey > LCSC) is the order they are declared in
-`stockroom.providers`. Ordering them by position rather than by tier keeps the five-tier
-vocabulary intact and keeps all three honestly below the manufacturer's own word: a distributor
-answer can never beat the datasheet, whichever distributor it is.
+The source tier remains visible provenance. Selection is deliberately narrower: Mouser is the
+fixed first answer, DigiKey fills gaps, and the manufacturer datasheet fills what neither API
+supplies. LCSC remains useful for procurement and CAD discovery, never specification authority.
 """
 
 from __future__ import annotations
@@ -31,6 +29,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 
 from stockroom.dossier.units import NormalizedValue, comparable_key
+from stockroom.enrich.apply import specification_authority_rank
 from stockroom.providers import all_providers
 
 # The tiers, strongest first. The order of this tuple IS the precedence.
@@ -141,12 +140,16 @@ class Resolution:
         return len({comparable_key(item.normalized) for item in self.candidates})
 
 
-def _sort_key(item: Candidate, pinned: str) -> tuple[int, int, int, int, str]:
+def _sort_key(item: Candidate, pinned: str) -> tuple[int, int, int, int, int, str]:
+    fixed_rank = specification_authority_rank(item.source)
     return (
         # A reviewed VALUE override is the strongest decision there is and stays above a pin: a
         # person who typed an answer has said more than a person who chose whose answer to read.
         0 if item.tier == "manual_override" else 1,
-        0 if pinned and item.source.casefold() == pinned else 1,
+        # Component facts use one non-editable source order: Mouser, DigiKey, datasheet.
+        # A historical preferred-source pin cannot silently reverse that product rule.
+        fixed_rank if fixed_rank is not None else 3,
+        0 if fixed_rank is None and pinned and item.source.casefold() == pinned else 1,
         TIER_RANK.get(item.tier, len(SOURCE_TIERS)),
         _PROVIDER_ORDER.get(item.source.casefold(), len(_PROVIDER_ORDER)),
         item.source.casefold(),
@@ -168,7 +171,14 @@ def resolve(candidates: Sequence[Candidate], *, pinned_source: str = "") -> Reso
     if not candidates:
         return Resolution(preferred=None, candidates=(), conflict_state="none")
     pinned = str(pinned_source or "").strip().casefold()
-    in_force = pinned if any(item.source.casefold() == pinned for item in candidates) else ""
+    has_fixed_authority = any(
+        specification_authority_rank(item.source) is not None for item in candidates
+    )
+    in_force = (
+        pinned
+        if not has_fixed_authority and any(item.source.casefold() == pinned for item in candidates)
+        else ""
+    )
     ordered = tuple(sorted(candidates, key=lambda item: _sort_key(item, in_force)))
     preferred = ordered[0]
     distinct = {comparable_key(item.normalized) for item in ordered}

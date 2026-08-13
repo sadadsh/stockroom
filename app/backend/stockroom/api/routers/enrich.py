@@ -13,6 +13,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import Response
 
 from stockroom.api.errors import ApiError
+from stockroom.enrich.apply import spec_updates, specification_evidence
 from stockroom.enrich.pipeline import EnrichmentPipeline
 from stockroom.enrich.schema import SOURCED_FIELDS, EnrichmentResult, Sourced
 
@@ -76,6 +77,18 @@ def _add_plan(r: EnrichmentResult) -> dict | None:
 
 
 def _result_dto(r: EnrichmentResult) -> dict:
+    selected_specs = {
+        label: {
+            "value": value,
+            "source": sourced.source,
+            "confidence": sourced.confidence,
+        }
+        for label, value, sourced in spec_updates(r)
+    }
+    selected_spec_conflicts = {
+        label: [_sourced_dto(sourced) for sourced in answers]
+        for label, answers in specification_evidence(r)
+    }
     return {
         "category": r.category,
         # A2: the FULL pulled depth, not just identity + specs. Every single-valued canonical
@@ -100,6 +113,11 @@ def _result_dto(r: EnrichmentResult) -> dict:
             {"qty": p.qty, "price": p.price, "currency": p.currency} for p in r.price_breaks
         ],
         "specs": {k: _sourced_dto(v) for k, v in r.specs.items()},
+        # The exact fact set the Add commit is allowed to persist. Keeping this server-selected
+        # prevents the review UI and the backend refresh lane from applying different authority
+        # rules to the same lookup.
+        "selected_specs": selected_specs,
+        "selected_spec_conflicts": selected_spec_conflicts,
         # every kept disagreement between sources, all values with their origins (owner
         # 2026-07-24: "display all of it and only merge stuff thats identical")
         "spec_conflicts": {

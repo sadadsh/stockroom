@@ -39,9 +39,8 @@ const INTERNAL_SPEC_KEYS = new Set(["product_url", ...SPEC_HIDDEN_KEYS]);
 
 const normSpec = (v: unknown) => String(v ?? "").trim().toLowerCase();
 
-/** Every spec disagreement around this candidate: the API-vs-API conflicts the backend
- * kept (result.spec_conflicts) plus any ZIP-vs-pull difference, folded per key. Identical
- * values (normalized) never appear - they merged. */
+/** Every allowed spec disagreement around this candidate, already ordered by the backend's
+ * fixed Mouser, DigiKey, datasheet authority. Legacy payloads retain their former conflict bag. */
 export function pulledSpecConflicts(
   candidate: StagingCandidate,
   result: EnrichmentResult,
@@ -54,19 +53,21 @@ export function pulledSpecConflicts(
     }
     byKey.set(key, list);
   };
-  for (const [key, sourced] of Object.entries(result.spec_conflicts ?? {})) {
+  const selectedConflicts = result.selected_spec_conflicts ?? result.spec_conflicts ?? {};
+  for (const [key, sourced] of Object.entries(selectedConflicts)) {
     if (INTERNAL_SPEC_KEYS.has(key)) continue;
     for (const s of sourced) add(key, String(s.value ?? ""), s.source);
   }
-  const candidateSpecs = (candidate.specs ?? {}) as Record<string, unknown>;
-  for (const [key, zipValue] of Object.entries(candidateSpecs)) {
-    if (INTERNAL_SPEC_KEYS.has(key) || zipValue == null) continue;
-    const pulled = result.specs?.[key];
-    if (pulled == null) continue;
-    if (normSpec(pulled.value) === normSpec(zipValue)) continue;
-    // the pulled value leads (it wins the slot), the files' answer follows
-    add(key, String(pulled.value ?? ""), pulled.source);
-    add(key, String(zipValue), "files");
+  if (result.selected_spec_conflicts == null) {
+    const candidateSpecs = (candidate.specs ?? {}) as Record<string, unknown>;
+    for (const [key, zipValue] of Object.entries(candidateSpecs)) {
+      if (INTERNAL_SPEC_KEYS.has(key) || zipValue == null) continue;
+      const pulled = result.specs?.[key];
+      if (pulled == null) continue;
+      if (normSpec(pulled.value) === normSpec(zipValue)) continue;
+      add(key, String(pulled.value ?? ""), pulled.source);
+      add(key, String(zipValue), "files");
+    }
   }
   // sorted by key so the block reads the same across pulls (the backend dict order
   // varies per lookup, which made the two themes' shots disagree)
@@ -86,14 +87,28 @@ export function mergeResultIntoCandidate(
   const description = sv(result.description);
   const pkg = sv(result.package);
 
-  // The pulled parametric specs win for their keys (the distributor data is
-  // authoritative); the internal product_url marker never becomes a spec row.
+  // The backend selects the one permitted fact projection: Mouser, then DigiKey, then the
+  // manufacturer datasheet. Older fixtures predate `selected_specs`, so they retain their
+  // original generic spec payload for compatibility.
+  const selectedSpecs = result.selected_specs ?? result.specs;
   const specs: Record<string, unknown> = { ...candidate.specs };
-  for (const [k, v] of Object.entries(result.specs)) {
+  const enrichment: NonNullable<StagingCandidate["enrichment"]> = {
+    ...(candidate.enrichment ?? {}),
+  };
+  for (const [k, v] of Object.entries(selectedSpecs)) {
     if (k === "product_url" || v == null) continue;
     specs[k] = String(v.value ?? "");
+    enrichment[k] = { source: v.source, confidence: v.confidence };
   }
-  if (pkg && specs.Package == null) specs.Package = pkg;
+  if (result.selected_specs == null && pkg && specs.Package == null) {
+    specs.Package = pkg;
+    if (result.package) {
+      enrichment.Package = {
+        source: result.package.source,
+        confidence: result.package.confidence,
+      };
+    }
+  }
 
   const stockNum =
     result.stock != null && Number.isFinite(Number(result.stock.value))
@@ -154,6 +169,12 @@ export function mergeResultIntoCandidate(
     alternates[key] = values.map((v) => ({ value: v.value, source: v.source, confidence: "" }));
   }
   for (const [key, sourced] of Object.entries(result.field_conflicts ?? {})) {
+    if (
+      result.selected_specs &&
+      ["package", "lifecycle", "lead_time", "country_of_origin", "tariff_rate"].includes(key)
+    ) {
+      continue;
+    }
     if (sourced.length < 2) continue;
     alternates[key] = sourced.map((s) => ({
       value: String(s.value ?? ""),
@@ -172,6 +193,7 @@ export function mergeResultIntoCandidate(
     display_name: candidate.display_name || mpn,
     category: candidate.category || result.category,
     specs,
+    enrichment,
     purchase,
   };
 }

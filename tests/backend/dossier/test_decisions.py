@@ -189,29 +189,29 @@ def test_a_persons_own_earlier_answer_is_not_offered_as_a_source_to_prefer():
         set_preferred_source(record, "tolerance", "manual")
 
 
-def test_a_preferred_source_promotes_that_source_without_dropping_the_others():
+def test_a_legacy_preferred_source_cannot_reverse_fixed_fact_authority():
     record = _contested()
     assert _row(record)["preferredSource"]["sourceId"] == "mouser"
     set_preferred_source(record, "tolerance", "digikey", reviewed_by="user")
     row = _row(record)
-    assert row["preferredSource"]["sourceId"] == "digikey"
-    assert row["preferredValue"] == "2%"
+    assert row["preferredSource"]["sourceId"] == "mouser"
+    assert row["preferredValue"] == "1%"
     assert set(_sources(row)) == {"mouser", "digikey"}
 
 
-def test_a_pinned_field_reports_the_disagreement_as_settled_rather_than_open():
+def test_a_legacy_pin_does_not_settle_a_fixed_source_disagreement():
     record = _contested()
     set_preferred_source(record, "tolerance", "digikey")
     row = _row(record)
-    assert row["conflictState"] == "resolved"
-    assert row["preferredSourcePin"]["inForce"] is True
+    assert row["conflictState"] == "conflicting"
+    assert row["preferredSourcePin"]["inForce"] is False
 
 
-def test_a_pin_follows_its_source_rather_than_copying_what_it_said():
+def test_a_legacy_pin_does_not_follow_a_lower_ranked_source():
     record = _contested()
     set_preferred_source(record, "tolerance", "digikey")
     record.alternates["Tolerance"][1] = SourcedValue(value="5%", source="digikey")
-    assert _row(record)["preferredValue"] == "5%"
+    assert _row(record)["preferredValue"] == "1%"
 
 
 def test_a_pin_never_becomes_an_empty_manual_answer():
@@ -240,14 +240,14 @@ def test_a_reviewed_value_outranks_a_pin_and_the_pin_says_it_is_not_in_force():
     assert row["preferredSourcePin"]["inForce"] is False
 
 
-def test_clearing_the_override_hands_the_field_back_to_the_pin():
+def test_clearing_the_override_hands_the_field_back_to_fixed_authority():
     record = _contested()
     set_preferred_source(record, "tolerance", "digikey")
     set_override(record, "tolerance", "0.5%")
     clear_override(record, "tolerance")
     row = _row(record)
-    assert row["preferredValue"] == "2%"
-    assert row["preferredSourcePin"]["inForce"] is True
+    assert row["preferredValue"] == "1%"
+    assert row["preferredSourcePin"]["inForce"] is False
 
 
 def test_clearing_a_preferred_source_returns_the_field_to_computed_precedence():
@@ -338,7 +338,7 @@ def test_repinning_to_another_source_records_the_one_it_took_over_from():
     set_preferred_source(record, "tolerance", "mouser")
     pin = _row(record)["preferredSourcePin"]
     assert pin["sourceId"] == "mouser"
-    assert pin["replacedSource"] == "digikey"
+    assert pin["replacedSource"] == "mouser"
 
 
 # ------------------------------------------- the reason, and whether it was checked

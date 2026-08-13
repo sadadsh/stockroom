@@ -79,6 +79,33 @@ def test_an_expected_field_with_no_value_is_missing_and_is_still_emitted():
     assert item["displayValue"] == ""
 
 
+def test_the_component_screen_does_not_invent_missing_specification_rows():
+    record = records.microcontroller(
+        specs={"Voltage - Supply": "1.8 V to 3.6 V"},
+        enrichment={
+            "Voltage - Supply": EnrichmentField(source="mouser", confidence="high")
+        },
+    )
+
+    dossier = component_dossier(record)
+    shown = [
+        *dossier["keySpecifications"],
+        *[
+            item
+            for group in dossier["specificationGroups"]
+            for item in group["specifications"]
+        ],
+    ]
+
+    assert {item["key"] for item in shown} == {"supply_voltage"}
+    assert all(item["displayValue"] for item in shown)
+    assert dossier["qualitySummary"]["stateCounts"]["missing"] == 0
+    assert not any(
+        item["id"].startswith("specification.missing.")
+        for item in dossier["qualitySummary"]["attention"]
+    )
+
+
 def test_a_field_nobody_reported_is_not_reported_and_is_not_a_gap():
     item = _by_key(records.microcontroller())["debug_interface"]
     assert item["verificationState"] == "not_reported"
@@ -167,7 +194,7 @@ def test_a_field_only_lcsc_reports_is_shown_and_attributed_to_lcsc():
     assert item["conflictState"] == "none"
 
 
-def test_the_datasheet_still_holds_the_slot_against_all_three_distributors():
+def test_mouser_holds_the_slot_against_digikey_lcsc_and_the_datasheet():
     record = records.resistor()
     record.alternates = {
         "Resistance": [
@@ -178,9 +205,9 @@ def test_the_datasheet_still_holds_the_slot_against_all_three_distributors():
         ]
     }
     item = _by_key(record)["resistance"]
-    assert item["preferredValue"] == "1.0 kOhms"
-    assert item["preferredSource"]["tier"] == "manufacturer_datasheet"
-    assert item["preferredSource"]["sourceId"] == "datasheet"
+    assert item["preferredValue"] == "1.1 kOhms"
+    assert item["preferredSource"]["tier"] == "authorized_distributor"
+    assert item["preferredSource"]["sourceId"] == "mouser"
     assert {entry["sourceId"] for entry in item["sourceCandidates"]} >= {
         "mouser",
         "digikey",
@@ -332,20 +359,15 @@ def test_a_row_whose_group_the_category_never_declared_still_reaches_the_sheet()
     # row, so it folds into `Package and Mechanical` (see `GROUP_PARENT`). What this test protects is
     # that the row REACHES the sheet, so it is asserted about the row rather than about the heading -
     # a heading is a presentation decision and the missing row was the actual bug.
-    dossier = component_dossier(records.resistor())
+    dossier = component_dossier(
+        records.resistor(specs={**records.resistor().specs, "Mounting Type": "Surface Mount"})
+    )
     on_screen = {item["key"] for item in dossier["keySpecifications"]} | {
         item["key"]
         for group in dossier["specificationGroups"]
         for item in group["specifications"]
     }
     assert "mounting_type" in on_screen
-    # A resistor's case code is in `construction_termination`, which the resistor schema also never
-    # declares, and it is not a key specification - so it is the undeclared-group case with nothing
-    # else carrying it. It is read under the universal heading that group refines.
-    package = next(
-        group for group in dossier["specificationGroups"] if group["id"] == "package_mechanical"
-    )
-    assert "case_code" in {item["key"] for item in package["specifications"]}
 
 
 def test_a_group_with_nothing_but_inapplicable_rows_is_never_a_heading():
@@ -368,35 +390,15 @@ def test_a_group_with_nothing_but_inapplicable_rows_is_never_a_heading():
     assert ruled_out["interface"]["verificationState"] == "not_applicable"
 
 
-def test_a_group_whose_only_row_is_an_expected_gap_is_still_a_heading():
-    # The opposite case, and the reason the rule is about the STATE rather than about emptiness:
-    # `Environmental and Reliability` holds one row for a capacitor, the operating temperature nobody
-    # supplied, and the category expects it. A Missing row is real content and a reader has to be
-    # able to reach it - dropping a heading for having no VALUES would hide exactly the gaps this
-    # sheet exists to show.
-    #
-    # It used to be stated on `Tolerance and Stability`, whose one row was the capacitor's tolerance.
-    # That row is a key specification and is now read in the headline block instead, so the same rule
-    # is stated on the universal group that still demonstrates it. A universal group never folds - see
-    # `GROUP_PARENT` - so one Missing row under it is exactly the case being protected.
+def test_a_group_whose_only_row_is_an_expected_gap_is_not_invented():
     groups = {
         group["id"]: group
         for group in component_dossier(records.capacitor())["specificationGroups"]
     }
-    assert "environmental_reliability" in groups
-    states = {
-        item["key"]: item["verificationState"]
-        for item in groups["environmental_reliability"]["specifications"]
-    }
-    assert states == {"operating_temperature": "missing"}
+    assert "environmental_reliability" not in groups
 
 
-def test_an_inapplicable_row_still_renders_beside_real_ones():
-    # A group is kept or dropped WHOLE; it is not filtered row by row. Where the heading is earned
-    # by real content, the rows that do not apply stay visible under it, so a reader looking for
-    # one learns it does not exist for this part instead of wondering whether it was dropped.
-    # A connector with a stated Type earns `Functional`, and the gate function and logic family
-    # the connector schema rules out are read there.
+def test_an_inapplicable_row_does_not_render_beside_real_ones():
     record = records.connector()
     record.specs["Type"] = "Header"
     groups = {
@@ -407,8 +409,8 @@ def test_an_inapplicable_row_still_renders_beside_real_ones():
         for item in groups["functional"]["specifications"]
     }
     assert states["component_type"] == "unverified"
-    assert states["gate_function"] == "not_applicable"
-    assert states["logic_family"] == "not_applicable"
+    assert "gate_function" not in states
+    assert "logic_family" not in states
 
 
 def test_the_rule_is_about_the_rows_and_never_about_the_group_itself():
@@ -431,7 +433,9 @@ def test_a_refinement_holding_one_row_is_read_under_the_heading_it_refines():
     # `Tolerance and Stability`, `Temperature Characteristics`, `Construction and Termination` and
     # `Mounting` - so the sheet spent one header line per line of data and the anchor strip offered
     # seven destinations that were each a single row. One header per row is an index, not a grouping.
-    dossier = component_dossier(records.capacitor())
+    dossier = component_dossier(
+        records.capacitor(specs={**records.capacitor().specs, "Case Code": "0402"})
+    )
     ids = {group["id"] for group in dossier["specificationGroups"]}
     assert not ids & {
         "capacitance",
@@ -454,19 +458,32 @@ def test_a_refinement_with_enough_under_it_keeps_its_own_heading():
     # peripherals group carries three rows, which is a grouping worth separating, so it stands.
     groups = {
         group["id"]: group
-        for group in component_dossier(records.microcontroller())["specificationGroups"]
+        for group in component_dossier(
+            records.microcontroller(
+                specs={
+                    **records.microcontroller().specs,
+                    "ADC Channels": "16",
+                    "DAC Channels": "2",
+                    "Timers": "12",
+                }
+            )
+        )["specificationGroups"]
     }
     assert "analog_digital_peripherals" in groups
     assert groups["analog_digital_peripherals"]["count"] >= 2
 
 
-def test_a_universal_group_never_folds_even_holding_one_row():
+def test_a_universal_group_never_folds_when_one_sourced_row_is_present():
     # A universal group IS the parent. `Environmental and Reliability` holds one row on a capacitor
     # and keeps its heading, because there is no more general place for it to be read and a reader
     # navigating the anchor strip for the temperature range has to have somewhere to land.
     groups = {
         group["id"]: group
-        for group in component_dossier(records.capacitor())["specificationGroups"]
+        for group in component_dossier(
+            records.capacitor(
+                specs={**records.capacitor().specs, "Operating Temperature": "-40 C to 85 C"}
+            )
+        )["specificationGroups"]
     }
     assert groups["environmental_reliability"]["count"] == 1
 

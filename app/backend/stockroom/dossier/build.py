@@ -117,17 +117,10 @@ def _attention(record, specifications: Specifications) -> list[dict[str, Any]]:
             )
 
     for item in specifications.records:
-        if item["verificationState"] == "missing":
-            items.append(
-                {
-                    "id": f"specification.missing.{item['key']}",
-                    "severity": "warning",
-                    "title": f"{item['label']} Is Missing",
-                    "detail": "This specification is expected for this kind of component.",
-                    "action": f"edit-specification:{item['key']}",
-                }
-            )
-        elif item["conflictState"] == "conflicting":
+        # Category schemas still measure completeness internally, but an absent vendor fact is
+        # not a specification the component screen may invent. Only sourced facts can create a
+        # specification attention item.
+        if item["conflictState"] == "conflicting":
             offered = len(item["sourceCandidates"])
             items.append(
                 {
@@ -167,6 +160,8 @@ def _quality_summary(
 ) -> dict[str, Any]:
     counts = dict.fromkeys(VERIFICATION_STATES, 0)
     for item in specifications.records:
+        if item["preferredValue"] is None:
+            continue
         counts[item["verificationState"]] += 1
     attention = _attention(record, specifications)
     return {
@@ -312,6 +307,18 @@ def component_dossier(
     """
     schema = resolve_schema(record)
     specifications = build_specifications(record, schema)
+    key_specifications = [
+        item for item in specifications.key_specifications if item["preferredValue"] is not None
+    ]
+    specification_groups = []
+    for group in specifications.groups:
+        rows = [
+            item
+            for item in group["specifications"]
+            if item["preferredValue"] is not None
+        ]
+        if rows:
+            specification_groups.append({**group, "specifications": rows, "count": len(rows)})
     record_fields = _record_fields(record, specifications)
     resolved = [*specifications.records, *record_fields]
     documents = build_documents(record)
@@ -324,8 +331,10 @@ def component_dossier(
         "schemaVersion": DOSSIER_SCHEMA_VERSION,
         "identity": _identity(record, schema, specifications),
         "qualitySummary": _quality_summary(record, schema, specifications),
-        "keySpecifications": list(specifications.key_specifications),
-        "specificationGroups": list(specifications.groups),
+        # The screen lists facts a permitted source actually supplied. Expected/recommended
+        # schema gaps remain in completeness diagnostics, never as fabricated `Missing` rows.
+        "keySpecifications": key_specifications,
+        "specificationGroups": specification_groups,
         "cadAssets": build_cad_assets(record, schema, sources),
         "cadSourceCoverage": sources,
         "supplySummary": supply_summary(

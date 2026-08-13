@@ -15,6 +15,7 @@ from stockroom.dossier.categories import (
     resolve_schema,
 )
 from stockroom.dossier.fields import FIELDS_BY_KEY
+from stockroom.dossier.specifications import build_specifications
 from stockroom.dossier.vocabulary import GROUP_LABELS, UNIVERSAL_GROUPS
 from stockroom.model.category import CATEGORIES
 from stockroom.model.part import PartRecord
@@ -54,7 +55,10 @@ def test_every_filed_category_resolves_to_a_schema():
 
 
 def _key_specs(record) -> list[str]:
-    return [item["key"] for item in component_dossier(record)["keySpecifications"]]
+    return [
+        item["key"]
+        for item in build_specifications(record, resolve_schema(record)).key_specifications
+    ]
 
 
 def test_the_four_families_do_not_share_a_key_specification_set():
@@ -114,7 +118,17 @@ def test_a_category_specific_group_is_rendered_for_the_category_that_earns_it():
     # `mating_retention` and `electrical_ratings` hold one each and are read under the universal
     # headings they refine.
     mcu_groups = {
-        item["id"] for item in component_dossier(records.microcontroller())["specificationGroups"]
+        item["id"]
+        for item in component_dossier(
+            records.microcontroller(
+                specs={
+                    **records.microcontroller().specs,
+                    "ADC Channels": "16",
+                    "DAC Channels": "2",
+                    "Timers": "12",
+                }
+            )
+        )["specificationGroups"]
     }
     assert "analog_digital_peripherals" in mcu_groups
     # The category boundary is still enforced: a resistor never grows a connector's heading, and its
@@ -125,7 +139,9 @@ def test_a_category_specific_group_is_rendered_for_the_category_that_earns_it():
         item["id"] for item in resistor["specificationGroups"]
     }
     # And a connector's mating facts still reach the sheet, under the heading they refine.
-    connector = component_dossier(records.connector())
+    connector = component_dossier(
+        records.connector(specs={**records.connector().specs, "Retention Type": "Friction"})
+    )
     placed = {
         item["key"]: group["id"]
         for group in connector["specificationGroups"]

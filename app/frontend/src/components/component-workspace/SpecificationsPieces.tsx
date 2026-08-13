@@ -3,8 +3,8 @@
  *
  * Not behind an Overview, not behind a tab, not behind a View All, not in a modal. This is the
  * thing a person opens a component to read, so it is the thing that is on screen when the component
- * opens - every group expanded, every EXPECTED row present whether or not anybody supplied a value,
- * and a toolbar of FILTERS rather than a set of pages.
+ * opens - every sourced row present, with absent schema expectations kept out of the visible fact
+ * list, and a toolbar of FILTERS rather than a set of pages.
  *
  * The search box and the four filters NARROW this list. Neither of them navigates, replaces the
  * column or opens a second surface: the rows that answer stay exactly where they were, in the

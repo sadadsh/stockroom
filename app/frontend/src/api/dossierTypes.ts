@@ -13,9 +13,8 @@
 /**
  * What we know about ONE specification. Six named situations, never collapsed into "unknown".
  *
- * `missing` is the category expecting a field nobody supplied - a real gap that MUST render as a
- * row. `not_reported` is nobody supplying a field the category does not require, which is not a
- * gap. The difference cannot be inferred from an empty string, which is exactly why it is sent.
+ * `missing` and `not_reported` remain internal completeness states. The opened component only
+ * renders facts a source supplied, while diagnostics retain the distinction.
  */
 export type VerificationState =
   | "missing"

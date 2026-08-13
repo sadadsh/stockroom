@@ -919,9 +919,7 @@ describe("the specification column", () => {
     const alternate = within(row).getByRole("listitem");
     expect(alternate).toHaveTextContent("0–70");
     expect(alternate).toHaveTextContent("Mouser");
-    expect(
-      within(alternate).getByRole("button", { name: "Use Mouser Value" }),
-    ).toBeInTheDocument();
+    expect(within(alternate).queryByRole("button", { name: /Use .* Value/ })).toBeNull();
   });
 
   it("filters rather than paginates, and the header's quality summary drives the filter", async () => {

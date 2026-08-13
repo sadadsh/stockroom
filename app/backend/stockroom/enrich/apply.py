@@ -31,29 +31,88 @@ FIELD_SPEC_LABELS: dict[str, str] = {
 }
 
 
+def specification_authority_rank(source: object) -> int | None:
+    """The fixed fact-authority order for specifications and classification.
+
+    Mouser leads, DigiKey fills the gaps, and a manufacturer datasheet fills what neither
+    catalogue supplies.  Distributor HTML variants retain their provider family, while LCSC,
+    CAD providers and generic scrapes are deliberately outside this fact boundary.
+    """
+    key = str(source or "").strip().casefold()
+    if key == "mouser" or key.startswith(("mouser_", "mouser-")):
+        return 0
+    if key == "digikey" or key.startswith(("digikey_", "digikey-")):
+        return 1
+    if key in {"datasheet", "manufacturer_datasheet"}:
+        return 2
+    return None
+
+
+def ordered_specification_answers(
+    primary: Sourced | None, alternatives: list[Sourced] | tuple[Sourced, ...] = ()
+) -> tuple[Sourced, ...]:
+    """Allowed answers in the one fixed order, without duplicate source/value pairs."""
+    unique: list[Sourced] = []
+    seen: set[tuple[str, str]] = set()
+    for sourced in ([primary] if primary is not None else []) + list(alternatives):
+        rank = specification_authority_rank(sourced.source)
+        if rank is None:
+            continue
+        identity = (str(sourced.source).casefold(), str(sourced.value).strip().casefold())
+        if identity in seen:
+            continue
+        seen.add(identity)
+        unique.append(sourced)
+    return tuple(
+        sorted(unique, key=lambda sourced: specification_authority_rank(sourced.source) or 0)
+    )
+
+
+def specification_evidence(
+    result: EnrichmentResult,
+) -> list[tuple[str, tuple[Sourced, ...]]]:
+    """Every allowed fact and its ordered competing answers, keyed by display label."""
+    out: dict[str, tuple[Sourced, ...]] = {}
+
+    def collect(label: str, primary: Sourced | None, conflicts: list[Sourced]) -> None:
+        answers = ordered_specification_answers(primary, conflicts)
+        if not answers or label in out:
+            return
+        out[label] = answers
+
+    collect("Package", result.package, result.field_conflicts.get("package", []))
+    for label, sourced in result.specs.items():
+        if label == "product_url":
+            continue
+        collect(label, sourced, result.spec_conflicts.get(label, []))
+    for field_name, label in FIELD_SPEC_LABELS.items():
+        sourced = getattr(result, field_name, None)
+        collect(label, sourced, result.field_conflicts.get(field_name, []))
+    return list(out.items())
+
+
 def spec_updates(result: EnrichmentResult) -> list[tuple[str, object, Sourced]]:
-    """Every (spec label, value, origin) this result implies, in write order: the resolved
-    package, each parametric spec, then the canonical fields that live as specs.
+    """Every selected (spec label, value, origin), in stable write order.
 
     Values are NOT coerced to str - a tariff rate is a float whose 0.0 means "confirmed no
     tariff", and turning that into "0.0" would make a real measurement look like a label.
     `product_url` is excluded: it is a purchase-link mechanism, not a spec row.
     """
-    out: list[tuple[str, object, Sourced]] = []
-    if result.package is not None:
-        out.append(("Package", str(result.package.value), result.package))
-    for label, sourced in result.specs.items():
-        if label == "product_url":
-            continue
-        out.append((label, str(sourced.value), sourced))
-    for field_name, label in FIELD_SPEC_LABELS.items():
-        sourced = getattr(result, field_name, None)
-        if sourced is not None:
-            out.append((label, sourced.value, sourced))
-    return out
+    return [
+        (label, answers[0].value, answers[0]) for label, answers in specification_evidence(result)
+    ]
 
 
 def conflict_entries(result: EnrichmentResult) -> dict[str, list[Sourced]]:
     """Every kept disagreement, both namespaces folded into the one key space a record's
     `alternates` uses (a spec label, or a canonical field name in lower_snake)."""
-    return {**result.spec_conflicts, **result.field_conflicts}
+    specification_fields = {"package", *FIELD_SPEC_LABELS}
+    record_fields = {
+        key: entries
+        for key, entries in result.field_conflicts.items()
+        if key not in specification_fields
+    }
+    specification_fields = {
+        label: list(answers) for label, answers in specification_evidence(result)
+    }
+    return {**record_fields, **specification_fields}

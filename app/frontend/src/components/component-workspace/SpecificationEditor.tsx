@@ -6,16 +6,14 @@
  * sit in the disclosure the row already opened. A "complete component" flow for one field is the
  * failure this replaces - it turned a two-character correction into a workflow.
  *
- * Seven decisions travel together because they are one decision. What the value is, what unit it
- * is in, what KIND of value it is, whose answer is in force, why, whether the reviewer stands
- * behind it, and whether it outranks the sources at all. Splitting them across two writes would
- * let half a decision land.
+ * The reviewed value, unit, kind, reason and verification state travel in one write. Source
+ * authority is fixed elsewhere and is not another editor control.
  *
  * Nothing is sent until the category's own rules pass. Every rule comes from the `constraint` the
  * dossier already sent - a floor, a ceiling, a unit, a list of allowed values - so a refusal
  * arrives instantly and, more to the point, says what the correction is.
  */
-import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import type { SpecificationRecord, ValueType } from "../../api/dossierTypes";
 import type { SpecificationWrite } from "../../api/queries";
 import { Text, useCopyFormatter, useText } from "../../lib/copy";
@@ -28,9 +26,6 @@ import {
   type SpecDraft,
   type SpecEditRefusal,
 } from "./specificationEditing";
-
-/** The source a value can be taken from. `manual` is the reviewer's own answer. */
-const REVIEWED_SOURCE = "manual:reviewed";
 
 /**
  * The names the value types read under.
@@ -79,26 +74,20 @@ export function SpecificationEditor({
   const [value, setValue] = useState(record.displayValue);
   const [unit, setUnit] = useState(record.unit || record.constraint?.unit || "");
   const [valueType, setValueType] = useState<ValueType>(() => editableValueType(record));
-  const [sourceId, setSourceId] = useState(REVIEWED_SOURCE);
   const [reason, setReason] = useState(record.override?.note ?? "");
   const [verified, setVerified] = useState(record.override?.verified ?? true);
-  // Whether the reviewed value outranks every source. Unchecking it does not throw the entry
-  // away: it says "believe this source instead", which is the other decision this field can carry.
-  const [preferOverride, setPreferOverride] = useState(true);
   const [refusal, setRefusal] = useState<SpecEditRefusal | null>(null);
   const valueRef = useRef<HTMLInputElement | HTMLSelectElement | null>(null);
 
   const valueLabel = useCopyFormatter("component-browser.spec-editor-value", "{label} value");
   const unitLabel = useText("component-browser.spec-editor-unit", "Unit");
   const typeLabel = useText("component-browser.spec-editor-type", "Value Kind");
-  const sourceLabel = useText("component-browser.spec-editor-source", "Source");
   const reasonLabel = useText("component-browser.spec-editor-reason", "Reason");
   const reasonHint = useText("component-browser.spec-editor-reason-hint", "What decided this value");
   const verificationLabel = useText(
     "component-browser.spec-editor-verification",
     "Verification Status",
   );
-  const reviewedSource = useText("component-browser.spec-editor-reviewed", "Reviewed Value");
   const verifiedWord = useText("component-browser.spec-verified", "Verified");
   const unverifiedWord = useText("component-browser.spec-unverified", "Unverified");
   const valueTypeLabels = useValueTypeLabels();
@@ -111,32 +100,12 @@ export function SpecificationEditor({
   }, []);
 
   const allowed = record.constraint?.allowed ?? [];
-  const pinnable = useMemo(
-    () => record.sourceCandidates.filter((candidate) => candidate.sourceId !== ""),
-    [record.sourceCandidates],
-  );
-  const reviewed = sourceId === REVIEWED_SOURCE;
-
   function submit(): void {
-    if (!reviewed) {
-      // Believing a source is not a value edit, so nothing about the typed entry is validated
-      // against the category: the source's own answer is what lands.
-      setRefusal(null);
-      void onSubmit({ kind: "set-preferred-source", key: record.key, sourceId });
-      return;
-    }
     const draft: SpecDraft = { value, unit, valueType };
     const problem = validateSpecificationEdit(record, draft);
     setRefusal(problem);
     if (problem) {
       valueRef.current?.focus();
-      return;
-    }
-    if (!preferOverride) {
-      // The reviewer typed a value but does not want it to outrank the sources. There is no such
-      // thing as a stored-but-ignored manual answer, so the honest write is to withdraw whatever
-      // override is in force and leave the field to its ranked sources.
-      void onSubmit({ kind: "clear-override", key: record.key });
       return;
     }
     void onSubmit({
@@ -170,7 +139,7 @@ export function SpecificationEditor({
               }}
               data-dev-id="component-browser.spec-override-input"
               value={value}
-              disabled={busy || !reviewed}
+              disabled={busy}
               onChange={(event) => setValue(event.target.value)}
               className={FIELD_CLASS}
             >
@@ -190,7 +159,7 @@ export function SpecificationEditor({
               type="text"
               data-dev-id="component-browser.spec-override-input"
               value={value}
-              disabled={busy || !reviewed}
+              disabled={busy}
               onChange={(event) => setValue(event.target.value)}
               onKeyDown={(event) => {
                 if (event.key !== "Enter") return;
@@ -208,7 +177,7 @@ export function SpecificationEditor({
             type="text"
             data-dev-id="component-browser.spec-editor-unit"
             value={unit}
-            disabled={busy || !reviewed}
+            disabled={busy}
             onChange={(event) => setUnit(event.target.value)}
             // Narrow on purpose: a unit selector that is wider than the value it qualifies makes
             // the qualifier look like the measurement.
@@ -221,7 +190,7 @@ export function SpecificationEditor({
             id={`${fieldId}-type`}
             data-dev-id="component-browser.spec-editor-type"
             value={valueType}
-            disabled={busy || !reviewed}
+            disabled={busy}
             onChange={(event) => setValueType(event.target.value as ValueType)}
             className={FIELD_CLASS}
           >
@@ -235,30 +204,12 @@ export function SpecificationEditor({
       </div>
 
       <div className="flex flex-wrap items-center gap-1.5">
-        <EditorField id={`${fieldId}-source`} label={sourceLabel}>
-          <select
-            id={`${fieldId}-source`}
-            data-dev-id="component-browser.spec-editor-source"
-            value={sourceId}
-            disabled={busy}
-            onChange={(event) => setSourceId(event.target.value)}
-            className={FIELD_CLASS}
-          >
-            <option value={REVIEWED_SOURCE}>{reviewedSource}</option>
-            {pinnable.map((candidate) => (
-              <option key={candidate.sourceId} value={candidate.sourceId}>
-                {`${candidate.sourceLabel} · ${candidate.displayValue}`}
-              </option>
-            ))}
-          </select>
-        </EditorField>
-
         <EditorField id={`${fieldId}-verification`} label={verificationLabel}>
           <select
             id={`${fieldId}-verification`}
             data-dev-id="component-browser.spec-editor-verification"
             value={verified ? "verified" : "unverified"}
-            disabled={busy || !reviewed}
+            disabled={busy}
             onChange={(event) => setVerified(event.target.value === "verified")}
             className={FIELD_CLASS}
           >
@@ -274,26 +225,12 @@ export function SpecificationEditor({
             data-dev-id="component-browser.spec-editor-reason"
             placeholder={reasonHint}
             value={reason}
-            disabled={busy || !reviewed}
+            disabled={busy}
             onChange={(event) => setReason(event.target.value)}
             className={FIELD_CLASS}
           />
         </EditorField>
       </div>
-
-      <label className="ui-control-label flex items-center gap-1.5">
-        <input
-          type="checkbox"
-          data-dev-id="component-browser.spec-editor-prefer"
-          checked={preferOverride}
-          disabled={busy || !reviewed}
-          onChange={(event) => setPreferOverride(event.target.checked)}
-          className="h-3 w-3 accent-[var(--c-acc)]"
-        />
-        <Text id="component-browser.spec-editor-prefer">
-          Prefer this value over all sources
-        </Text>
-      </label>
 
       {refusal || failure ? (
         // Directly beneath the controls, at 10px, naming the rule that was broken or the write

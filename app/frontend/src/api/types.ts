@@ -493,6 +493,10 @@ export interface EnrichmentResult {
   catalog?: Record<string, CatalogProductData>;
   price_breaks: EnrichPriceBreak[];
   specs: Record<string, SourcedField | null>;
+  /** Exact Mouser-first fact projection selected by the backend for persistence. */
+  selected_specs?: Record<string, SourcedField>;
+  /** Allowed competing answers for those facts, already in fixed authority order. */
+  selected_spec_conflicts?: Record<string, SourcedField[]>;
   // Every kept disagreement between sources for a spec key: all values with their
   // origins (merge-only-identical, owner 2026-07-24). Optional so fixtures/older
   // payloads without it still type-check.

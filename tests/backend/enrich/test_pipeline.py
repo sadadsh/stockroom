@@ -971,16 +971,17 @@ class _CatOnlySource:
     exactly the shape the LCSC/DigiKey legs contribute for a part whose identity is already
     known."""
 
-    def __init__(self, product_category: str, description: str = ""):
+    def __init__(self, product_category: str, description: str = "", source: str = "mouser"):
         self._pc = product_category
         self._desc = description
+        self._source = source
 
     def enrich(self, mpn, category, remaining):
         r = EnrichmentResult()
         if self._pc:
-            r.specs["Product Category"] = Sourced(self._pc, "lcsc", "high")
+            r.specs["Product Category"] = Sourced(self._pc, self._source, "high")
         if self._desc:
-            r.description = Sourced(self._desc, "lcsc", "high")
+            r.description = Sourced(self._desc, self._source, "high")
         return r
 
 
@@ -1027,11 +1028,8 @@ def test_a_cached_lookup_is_classified_too(tmp_path):
     assert pipe.enrich("TPD6E05U06RVZR", "Other").category == "Diodes"
 
 
-def test_classification_uses_every_source_not_just_the_winner(tmp_path):
-    """Owner, 2026-07-26: "find the BEST classification across sources rather than taking one
-    and giving up". DigiKey's "Circuit Protection" names no component kind; LCSC's "ESD
-    Protection Diodes / TVS Diodes" does. Whichever of them happens to win the single Product
-    Category slot, the classifier must see both before it falls through to the description."""
+def test_classification_ignores_an_lcsc_category_even_when_it_would_classify(tmp_path):
+    """LCSC may contribute an offer or CAD discovery, but it cannot file the component."""
     from stockroom.enrich.pipeline import fill_category
 
     r = EnrichmentResult(category="Other")
@@ -1041,7 +1039,7 @@ def test_classification_uses_every_source_not_just_the_winner(tmp_path):
         Sourced("ESD Protection Diodes / TVS Diodes", "lcsc", "high"),
     ]
     fill_category(r)
-    assert r.category == "Diodes"
+    assert r.category == "Other"
 
 
 def test_a_losing_description_can_classify_when_no_category_does(tmp_path):

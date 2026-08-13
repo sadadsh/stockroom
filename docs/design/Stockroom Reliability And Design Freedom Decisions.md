@@ -276,3 +276,20 @@ Separators use low-contrast structural tokens instead of outlining routine conte
 themes keep stronger boundaries for the application frame, floating surfaces, active inputs, tables
 that require column tracking, and the selected editing target; nested cards, rows, labels, and quiet
 actions must not recreate a grid of boxes.
+
+### Component Data Authority And Commit Boundary
+
+An exact Add Part lookup asks Mouser first and DigiKey second. Manufacturer datasheets may verify or
+fill facts those catalogue APIs do not provide. LCSC and browser-derived pages may still contribute a
+purchase link, stock, or CAD discovery, but they do not decide specification values or the component
+category. An absent fact is not materialized as a synthetic `Missing` specification row; Stockroom
+shows only facts a permitted source supplied and never invents an engineering value.
+
+Mouser is the fixed winner when Mouser and DigiKey disagree. Every competing answer remains visible
+as evidence, but routine component editing does not offer a source-ranking control. A reviewed manual
+value is still an explicit override rather than a new source priority.
+
+The Add Part commit boundary must carry every selected specification, its source and confidence,
+procurement fields that live as specifications, provider catalogue data, both distributor offers, and
+all disagreements. A successful lookup is not complete evidence until the newly created component
+dossier renders that same data after persistence.

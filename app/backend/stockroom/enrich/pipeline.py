@@ -14,7 +14,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import quote
 
-from stockroom.enrich.apply import conflict_entries, spec_updates
+from stockroom.enrich.apply import (
+    conflict_entries,
+    ordered_specification_answers,
+    spec_updates,
+)
 from stockroom.enrich.cache import TtlCache
 from stockroom.enrich.datasheet import extract_datasheet_specs, fetch_datasheet
 from stockroom.enrich.distributor_url import (
@@ -200,7 +204,7 @@ def _classification_signals(result: EnrichmentResult):
 
     def tier(primary, alternates):
         out = []
-        for sourced in [primary, *alternates]:
+        for sourced in ordered_specification_answers(primary, alternates):
             if sourced is None:
                 continue
             text = str(sourced.value).strip()

@@ -725,15 +725,21 @@ function stagedFromDraft(id: number, saved: IntakeDraftCandidate): Staged {
 }
 
 function PulledSummary({ result }: { result: EnrichmentResult }) {
+  const selected = result.selected_specs;
   const rows = (
     [
       ["ingest.pulled-mpn", "MPN", sv(result.mpn)],
       ["ingest.pulled-manufacturer", "Manufacturer", sv(result.manufacturer)],
       ["ingest.pulled-description", "Description", sv(result.description)],
-      ["ingest.pulled-package", "Package", sv(result.package)],
+      [
+        "ingest.pulled-package",
+        "Package",
+        selected ? sv(selected.Package) : sv(result.package),
+      ],
     ] as [string, string, string][]
   ).filter(([, , v]) => v);
-  const specCount = Object.keys(result.specs).filter((k) => k !== "product_url").length;
+  const shownSpecs = selected ?? result.specs;
+  const specCount = Object.keys(shownSpecs).filter((k) => k !== "product_url").length;
   if (rows.length === 0 && specCount === 0) {
     return (
       <span className="text-sm text-warn">
@@ -776,11 +782,12 @@ function PulledSummary({ result }: { result: EnrichmentResult }) {
 // (merge-only-identical); internal keys (product_url, the photo URL) never show as rows.
 function PulledSpecTable({ result }: { result: EnrichmentResult }) {
   const pulledSpecsLabel = useText("ingest.pulled-specs-label", "Pulled Specs");
-  const conflicts = result.spec_conflicts ?? {};
+  const specs = result.selected_specs ?? result.specs;
+  const conflicts = result.selected_spec_conflicts ?? result.spec_conflicts ?? {};
   // one pass: a shown key is selected and projected together, rather than walking the spec bag
   // once to drop the hidden/empty keys and again to build the rows
   const specRows: { key: string; value: string; conflict: SourcedField[] | undefined }[] = [];
-  for (const [k, v] of Object.entries(result.specs)) {
+  for (const [k, v] of Object.entries(specs)) {
     if (SPEC_HIDDEN_KEYS.has(k) || k === "product_url" || v == null) continue;
     const value = String(v.value ?? "");
     if (value.trim() === "") continue;

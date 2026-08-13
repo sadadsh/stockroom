@@ -272,9 +272,8 @@ export function SpecificationRow({
 /**
  * The evidence behind one value: what is in force, what else was offered, and what can be done.
  *
- * Every control here has an endpoint behind it. `Use <Source> Value` sets the preferred source,
- * `Add Override` records a reviewed value, `Clear Override` withdraws one, and `View Source` opens
- * the place the source can actually be read. A control with nowhere to go is not rendered at all.
+ * Source ordering is fixed by the product. This surface shows competing evidence, permits an
+ * explicit reviewed override, and opens the source when a real destination exists.
  */
 function SpecificationEvidence({
   record,
@@ -306,10 +305,6 @@ function SpecificationEvidence({
   // NOT named `use...`: it is the formatter a hook returned, not a hook, and it is called inside a
   // `.map()` below. A plain function wearing the hook prefix makes the rules-of-hooks check
   // unenforceable exactly where it matters, and reads as a conditional hook call to anyone scanning.
-  const applyValueLabel = useCopyFormatter(
-    "component-browser.spec-use-value",
-    "Use {source} Value",
-  );
   const viewSourceLabel = useCopyFormatter("component-browser.spec-view-source", "View {source}");
   const writeFailed = useText(
     "component-browser.spec-write-failed",
@@ -413,21 +408,6 @@ function SpecificationEvidence({
                 {`${candidate.sourceLabel} · ${candidate.tierLabel}`}
                 <RetrievedAt at={candidate.retrievedAt} />
               </span>
-              <Button
-                small
-                data-dev-id="component-browser.spec-use-alternate"
-                data-source-id={candidate.sourceId}
-                disabled={busy}
-                onClick={() =>
-                  void run({
-                    kind: "set-preferred-source",
-                    key: record.key,
-                    sourceId: candidate.sourceId,
-                  })
-                }
-              >
-                {applyValueLabel({ source: candidate.sourceLabel })}
-              </Button>
               {sourceUrl(candidate.sourceId) ? (
                 <a
                   data-dev-id="component-browser.spec-view-source"
@@ -495,16 +475,6 @@ function SpecificationEvidence({
               onClick={() => void run({ kind: "clear-override", key: record.key })}
             >
               <Text id="component-browser.spec-clear-override">Clear Override</Text>
-            </Button>
-          ) : null}
-          {preferred && !overridden && record.sourceCandidates.length > 1 ? (
-            <Button
-              small
-              data-dev-id="component-browser.spec-clear-preferred-source"
-              disabled={busy}
-              onClick={() => void run({ kind: "clear-preferred-source", key: record.key })}
-            >
-              <Text id="component-browser.spec-clear-preferred-source">Use Ranked Source</Text>
             </Button>
           ) : null}
         </div>

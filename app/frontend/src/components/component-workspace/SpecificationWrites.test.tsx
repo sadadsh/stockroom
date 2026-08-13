@@ -256,57 +256,16 @@ describe("what a specification row shows before anything is written", () => {
   });
 });
 
-describe("putting one source's value in force", () => {
-  it("calls the preferred-source endpoint and replaces the dossier wholesale", async () => {
+describe("fixed specification source authority", () => {
+  it("shows competing evidence without source-ranking controls", async () => {
     const user = userEvent.setup();
-    const settled = dossierWith(
-      disputed({
-        displayValue: "3.0",
-        verificationState: "unverified",
-        conflictState: "resolved",
-        preferredSource: MOUSER,
-      }),
-    );
-    mockApi.setSpecificationPreferredSource.mockResolvedValue(settled);
     await open(dossierWith(disputed()));
 
     const row = await evidenceFor(user, "supply_voltage");
-    await user.click(within(row).getByRole("button", { name: "Use Mouser Value" }));
-
-    await waitFor(() =>
-      expect(mockApi.setSpecificationPreferredSource).toHaveBeenCalledWith(
-        ID,
-        "supply_voltage",
-        "mouser",
-      ),
-    );
-    // Every consequence lands at once, because the whole document was replaced: the value, the
-    // row's state, and the header's own conflict count.
-    await waitFor(() =>
-      expect(
-        document.querySelector<HTMLElement>('[data-spec-key="supply_voltage"]')!.dataset.specState,
-      ).toBe("unverified"),
-    );
-    expect(document.querySelector<HTMLElement>('[data-spec-value]')).toBeNull();
-    expect(
-      document.querySelector<HTMLElement>(devIdSelector("component-browser.quality-summary"))!
-        .dataset.conflicts,
-    ).toBe("0");
-  });
-
-  it("goes back to the ranked source when the person withdraws the choice", async () => {
-    const user = userEvent.setup();
-    mockApi.clearSpecificationPreferredSource.mockResolvedValue(dossierWith(disputed()));
-    await open(dossierWith(disputed()));
-
-    const row = await evidenceFor(user, "supply_voltage");
-    await user.click(within(row).getByRole("button", { name: "Use Ranked Source" }));
-    await waitFor(() =>
-      expect(mockApi.clearSpecificationPreferredSource).toHaveBeenCalledWith(
-        ID,
-        "supply_voltage",
-      ),
-    );
+    expect(within(row).queryByRole("button", { name: /Use .* Value/ })).toBeNull();
+    expect(within(row).queryByRole("button", { name: "Use Ranked Source" })).toBeNull();
+    expect(mockApi.setSpecificationPreferredSource).not.toHaveBeenCalled();
+    expect(mockApi.clearSpecificationPreferredSource).not.toHaveBeenCalled();
   });
 });
 
@@ -483,18 +442,6 @@ describe("a write that does not save", () => {
     expect(row).toHaveTextContent("3.3 V");
   });
 
-  it("survives an endpoint that is not there yet, and still refuses to look saved", async () => {
-    const user = userEvent.setup();
-    // The other half of the contract being built: a 404 is a real answer while the route lands.
-    mockApi.setSpecificationPreferredSource.mockRejectedValue(new ApiError(404, "Not Found"));
-    await open(dossierWith(disputed()));
-
-    const row = await evidenceFor(user, "supply_voltage");
-    await user.click(within(row).getByRole("button", { name: "Use Mouser Value" }));
-
-    expect(await within(row).findByRole("alert")).toHaveTextContent("Not Found");
-    expect(row.dataset.specState).toBe("conflicting");
-  });
 });
 
 describe("a constraint the category itself declares", () => {
@@ -562,16 +509,14 @@ describe("the attached editor covers the whole decision", () => {
     const row = await editorFor(user, "supply_voltage");
     const editor = within(row);
 
-    // Seven decisions travel together because they are one decision.
+    // The value decision is explicit; source precedence is fixed by the product.
     expect(editor.getByRole("textbox", { name: "Supply Voltage value" })).toBeInTheDocument();
     expect(editor.getByRole("textbox", { name: "Unit" })).toHaveValue("V");
     expect(editor.getByRole("combobox", { name: "Value Kind" })).toHaveValue("quantity");
-    expect(editor.getByRole("combobox", { name: "Source" })).toBeInTheDocument();
+    expect(editor.queryByRole("combobox", { name: "Source" })).toBeNull();
     expect(editor.getByRole("combobox", { name: "Verification Status" })).toHaveValue("verified");
     expect(editor.getByRole("textbox", { name: "Reason" })).toBeInTheDocument();
-    expect(
-      editor.getByRole("checkbox", { name: "Prefer this value over all sources" }),
-    ).toBeChecked();
+    expect(editor.queryByRole("checkbox", { name: "Prefer this value over all sources" })).toBeNull();
   });
 
   it("keeps every label on screen while the field is being typed into", async () => {
@@ -610,23 +555,16 @@ describe("the attached editor covers the whole decision", () => {
     );
   });
 
-  it("takes a source's answer instead when the source control names one", async () => {
+  it("never converts a reviewed value edit into a source-ranking write", async () => {
     const user = userEvent.setup();
-    mockApi.setSpecificationPreferredSource.mockResolvedValue(dossierWith(disputed()));
+    mockApi.setSpecificationOverride.mockResolvedValue(dossierWith(disputed()));
     await open(dossierWith(disputed()));
     const row = await editorFor(user, "supply_voltage");
 
-    await user.selectOptions(within(row).getByRole("combobox", { name: "Source" }), "mouser");
     await user.click(within(row).getByRole("button", { name: "Save Value" }));
 
-    await waitFor(() =>
-      expect(mockApi.setSpecificationPreferredSource).toHaveBeenCalledWith(
-        ID,
-        "supply_voltage",
-        "mouser",
-      ),
-    );
-    expect(mockApi.setSpecificationOverride).not.toHaveBeenCalled();
+    await waitFor(() => expect(mockApi.setSpecificationOverride).toHaveBeenCalled());
+    expect(mockApi.setSpecificationPreferredSource).not.toHaveBeenCalled();
   });
 
   it("refuses a value the category's own rule forbids, and says what the rule is", async () => {

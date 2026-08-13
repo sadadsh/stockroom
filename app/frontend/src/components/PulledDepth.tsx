@@ -225,8 +225,12 @@ export function PulledDepth({ result }: { result: EnrichmentResult }) {
     result.stock != null && Number.isFinite(Number(result.stock.value))
       ? Number(result.stock.value)
       : null;
-  const lifecycle = sv(result.lifecycle);
-  const lead = sv(result.lead_time);
+  const lifecycle = result.selected_specs
+    ? sv(result.selected_specs.Lifecycle)
+    : sv(result.lifecycle);
+  const lead = result.selected_specs
+    ? sv(result.selected_specs["Lead Time"])
+    : sv(result.lead_time);
   const breaks = result.price_breaks ?? [];
   const best =
     breaks.length > 0

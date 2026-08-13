@@ -77,7 +77,7 @@ def test_an_unattributed_value_is_the_weakest_tier_not_an_override():
     assert source_tier("") == "parsed"
 
 
-def test_the_datasheet_beats_a_distributor_which_beats_a_cad_provider():
+def test_mouser_beats_the_datasheet_which_beats_a_cad_provider():
     resolution = resolve(
         [
             _candidate("3", "ultralibrarian"),
@@ -85,10 +85,10 @@ def test_the_datasheet_beats_a_distributor_which_beats_a_cad_provider():
             _candidate("2", "datasheet"),
         ]
     )
-    assert resolution.preferred.source == "datasheet"
+    assert resolution.preferred.source == "mouser"
     assert [item.source for item in resolution.candidates] == [
-        "datasheet",
         "mouser",
+        "datasheet",
         "ultralibrarian",
     ]
 
@@ -149,7 +149,7 @@ def test_a_field_only_one_distributor_reports_is_still_shown_and_attributed_to_i
         assert resolution.conflict_state == "none"
 
 
-def test_the_datasheet_still_beats_all_three_distributors():
+def test_mouser_is_the_fixed_winner_over_digikey_lcsc_and_the_datasheet():
     resolution = resolve(
         [
             _candidate("1", "mouser"),
@@ -158,11 +158,11 @@ def test_the_datasheet_still_beats_all_three_distributors():
             _candidate("4", "datasheet"),
         ]
     )
-    assert resolution.preferred.source == "datasheet"
+    assert resolution.preferred.source == "mouser"
     assert [item.source for item in resolution.candidates] == [
-        "datasheet",
         "mouser",
         "digikey",
+        "datasheet",
         "lcsc",
     ]
 
@@ -216,10 +216,11 @@ def test_a_pinned_source_is_preferred_without_any_candidate_being_dropped():
 
 def test_a_pin_settles_a_disagreement_rather_than_leaving_it_open():
     resolution = resolve(
-        [_candidate("1", "digikey"), _candidate("2", "mouser")], pinned_source="mouser"
+        [_candidate("1", "snapeda"), _candidate("2", "ultralibrarian")],
+        pinned_source="snapeda",
     )
     assert resolution.conflict_state == "resolved"
-    assert resolution.pinned_source == "mouser"
+    assert resolution.pinned_source == "snapeda"
 
 
 def test_a_pin_on_agreeing_sources_is_still_not_a_conflict():

@@ -381,4 +381,39 @@ describe("IngestPage network-only Add A Part", () => {
     expect(table).not.toHaveTextContent("mouser.com/x");
     expect(screen.queryByRole("button", { name: /browse/i })).not.toBeInTheDocument();
   });
+
+  it("shows only the server-selected Mouser-first specification projection", async () => {
+    mockApi.enrichPart.mockResolvedValue({ job_id: "authority-1" });
+    mockApi.openJobStream.mockResolvedValue(
+      streamOf({
+        ...EMPTY_RESULT,
+        category: "Switches",
+        mpn: sourced("ADG714BRUZ-REEL"),
+        manufacturer: sourced("Analog Devices"),
+        specs: {
+          "Supply Voltage": sourced("3.3 V", "lcsc"),
+          "LCSC Internal Category": sourced("123", "lcsc"),
+        },
+        selected_specs: {
+          "Supply Voltage": sourced("5 V", "mouser"),
+          "Current Rating": sourced("30 mA", "digikey"),
+        },
+        selected_spec_conflicts: {
+          "Supply Voltage": [sourced("5 V", "mouser"), sourced("4.8 V", "digikey")],
+        },
+      } as EnrichmentResult),
+    );
+    wrapper(<IngestPage />);
+    const user = userEvent.setup();
+
+    await user.type(screen.getByLabelText("Product link or part number"), "ADG714BRUZ-REEL");
+    await user.click(screen.getByRole("button", { name: "Look Up" }));
+
+    const table = await screen.findByRole("region", { name: "Pulled Specs" });
+    expect(table).toHaveTextContent("5 V");
+    expect(table).toHaveTextContent("4.8 V");
+    expect(table).toHaveTextContent("30 mA");
+    expect(table).not.toHaveTextContent("3.3 V");
+    expect(table).not.toHaveTextContent("LCSC Internal Category");
+  });
 });

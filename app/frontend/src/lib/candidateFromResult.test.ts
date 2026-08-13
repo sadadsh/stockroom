@@ -100,6 +100,60 @@ describe("mergeResultIntoCandidate", () => {
     expect(merged.catalog).toEqual(catalog);
   });
 
+  it("commits only the backend-selected Mouser-first specifications with provenance", () => {
+    const selected = {
+      "Supply Voltage": { value: "5 V", source: "mouser", confidence: "high" },
+      "Current Rating": { value: "30 mA", source: "digikey", confidence: "high" },
+      Lifecycle: { value: "Active", source: "mouser", confidence: "high" },
+      "Lead Time": { value: "12 Weeks", source: "mouser", confidence: "high" },
+      "Country of Origin": { value: "Philippines", source: "mouser", confidence: "high" },
+      "US Tariff %": { value: 0, source: "mouser", confidence: "high" },
+    };
+    const result = {
+      ...RESULT,
+      specs: {
+        "Supply Voltage": { value: "3.3 V", source: "lcsc", confidence: "medium" },
+        "LCSC Internal Category": { value: "123", source: "lcsc", confidence: "medium" },
+      },
+      selected_specs: selected,
+      spec_conflicts: {
+        "Supply Voltage": [
+          { value: "3.3 V", source: "lcsc", confidence: "medium" },
+          { value: "5 V", source: "mouser", confidence: "high" },
+        ],
+      },
+      selected_spec_conflicts: {
+        "Supply Voltage": [
+          { value: "5 V", source: "mouser", confidence: "high" },
+          { value: "4.8 V", source: "digikey", confidence: "high" },
+          { value: "4.5 V", source: "datasheet", confidence: "high" },
+        ],
+      },
+    } as EnrichmentResult & { selected_specs: typeof selected };
+
+    const merged = mergeResultIntoCandidate(ZIP_CANDIDATE, result, "");
+
+    expect(merged.specs).toMatchObject({
+      "Supply Voltage": "5 V",
+      "Current Rating": "30 mA",
+      Lifecycle: "Active",
+      "Lead Time": "12 Weeks",
+      "Country of Origin": "Philippines",
+      "US Tariff %": "0",
+    });
+    expect(merged.specs?.["LCSC Internal Category"]).toBeUndefined();
+    expect(merged.enrichment).toMatchObject({
+      "Supply Voltage": { source: "mouser", confidence: "high" },
+      "Current Rating": { source: "digikey", confidence: "high" },
+      Lifecycle: { source: "mouser", confidence: "high" },
+    });
+    expect(merged.alternates?.["Supply Voltage"]?.map((item) => item.source)).toEqual([
+      "mouser",
+      "digikey",
+      "datasheet",
+    ]);
+  });
+
   it("derives the vendor from the host", () => {
     expect(vendorFromUrl("https://www.mouser.com/a")).toBe("Mouser");
     expect(vendorFromUrl("https://lcsc.com/a")).toBe("LCSC");
