@@ -22,9 +22,7 @@ def _frontend_revision() -> str:
     from stockroom.api.app import _FRONTEND_DIST
 
     try:
-        document = json.loads(
-            (_FRONTEND_DIST / "build-identity.json").read_text(encoding="utf-8")
-        )
+        document = json.loads((_FRONTEND_DIST / "build-identity.json").read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return ""
     version = document.get("version") if isinstance(document, dict) else None
@@ -56,25 +54,42 @@ def update_router(require_token) -> APIRouter:
             except (OSError, ValueError):
                 pass
         if ctx.app_repo is None:
-            return _with_frontend_revision({
-                "update_available": False,
-                "state": UpdateState.NO_REMOTE,
-                "detail": "this installation is not managed by an application checkout",
-                "current_revision": "",
-                "target_revision": "",
-                "channel": "unmanaged",
-                "automatic_on_launch": False,
-                "check_interval_seconds": 120,
-            })
+            return _with_frontend_revision(
+                {
+                    "update_available": False,
+                    "state": UpdateState.NO_REMOTE,
+                    "detail": "this installation is not managed by an application checkout",
+                    "current_revision": "",
+                    "target_revision": "",
+                    "channel": "unmanaged",
+                    "automatic_on_launch": False,
+                    "check_interval_seconds": 120,
+                }
+            )
         return _with_frontend_revision(AppUpdater(ctx.app_repo).check())
 
     @r.post("/apply")
     def apply(request: Request) -> dict:
         ctx = request.app.state.ctx
-        if (
-            getattr(ctx, "update_convergence", None) is not None
-            or getattr(ctx, "convergence_status_path", None) is not None
-        ):
+        convergence = getattr(ctx, "update_convergence", None)
+        activate_ready = getattr(convergence, "activate_ready", None)
+        if callable(activate_ready):
+            accepted = bool(activate_ready())
+            return {
+                "state": "updating" if accepted else UpdateState.BLOCKED,
+                "updated": False,
+                "detail": (
+                    "Restarting into the verified release."
+                    if accepted
+                    else "No verified release is ready to apply."
+                ),
+                "restart_requested": False,
+                "frontend_reload_requested": False,
+                "seamless_handoff_requested": accepted,
+                "activated_revision": "",
+                "rolled_back": False,
+            }
+        if convergence is not None or getattr(ctx, "convergence_status_path", None) is not None:
             return {
                 "state": UpdateState.BLOCKED,
                 "updated": False,

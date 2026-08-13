@@ -50,10 +50,17 @@ def test_check_uses_the_hosts_observable_automatic_convergence_state(client, app
     }
 
     class _Convergence:
+        activated = False
+
         def status(self):
             return expected
 
-    app_ctx.update_convergence = _Convergence()
+        def activate_ready(self):
+            self.activated = True
+            return True
+
+    convergence = _Convergence()
+    app_ctx.update_convergence = convergence
 
     response = client.get("/api/update/check")
 
@@ -63,10 +70,11 @@ def test_check_uses_the_hosts_observable_automatic_convergence_state(client, app
     apply = client.post("/api/update/apply")
 
     assert apply.status_code == 200
-    assert apply.json()["state"] == UpdateState.BLOCKED
+    assert apply.json()["state"] == "updating"
     assert apply.json()["updated"] is False
     assert apply.json()["restart_requested"] is False
-    assert "persistent window host" in apply.json()["detail"]
+    assert apply.json()["seamless_handoff_requested"] is True
+    assert convergence.activated is True
 
 
 def test_handed_off_worker_reads_the_host_convergence_status_file(client, app_ctx, tmp_path):

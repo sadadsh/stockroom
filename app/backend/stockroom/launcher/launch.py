@@ -123,9 +123,7 @@ def _cad_converter_store() -> Path:
     override = os.environ.get("STOCKROOM_TOOLS_DIR", "").strip()
     if override:
         return Path(override)
-    local_app_data = os.environ.get("LOCALAPPDATA") or str(
-        Path.home() / "AppData" / "Local"
-    )
+    local_app_data = os.environ.get("LOCALAPPDATA") or str(Path.home() / "AppData" / "Local")
     return Path(local_app_data) / "Stockroom" / "Tools"
 
 
@@ -198,7 +196,10 @@ def webview2_installed() -> bool:
     except ImportError:  # pragma: no cover - non-Windows
         return True
     roots = [
-        (winreg.HKEY_LOCAL_MACHINE, rf"SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{_WEBVIEW2_GUID}"),
+        (
+            winreg.HKEY_LOCAL_MACHINE,
+            rf"SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{_WEBVIEW2_GUID}",
+        ),
         (winreg.HKEY_LOCAL_MACHINE, rf"SOFTWARE\Microsoft\EdgeUpdate\Clients\{_WEBVIEW2_GUID}"),
         (winreg.HKEY_CURRENT_USER, rf"SOFTWARE\Microsoft\EdgeUpdate\Clients\{_WEBVIEW2_GUID}"),
     ]
@@ -237,7 +238,10 @@ def _install_webview2() -> None:  # pragma: no cover - real Windows shell-out
             "then relaunch."
         )
     proc = subprocess.run(
-        [setup, "/silent", "/install"], capture_output=True, text=True, creationflags=_NO_WINDOW,
+        [setup, "/silent", "/install"],
+        capture_output=True,
+        text=True,
+        creationflags=_NO_WINDOW,
     )
     # Do not trust the exit code alone: the bootstrapper can exit 0 on a partial/no-op install.
     if proc.returncode != 0 or not webview2_installed():
@@ -439,6 +443,16 @@ def _reconcile_pull(workdir: Path, git: str) -> None:
     the user's parts are preserved. A plain ff-only would get permanently stuck the moment the first
     part is added. Every failure (offline, or the rare real conflict) is swallowed after aborting a
     half-applied rebase, so the launch always proceeds on the last-good checkout (honest degradation)."""
+    from stockroom.api.updater import archive_legacy_runtime_overrides
+    from stockroom.vcs.repo import GitError, GitRepo
+
+    try:
+        repository = GitRepo(workdir, git_binary=git)
+    except GitError:
+        repository = None
+    if repository is not None:
+        archive_legacy_runtime_overrides(repository)
+
     def run_git(*args: str) -> subprocess.CompletedProcess[str]:
         return subprocess.run(
             [git, "-C", str(workdir), *args],
@@ -461,8 +475,12 @@ def _uv_sync(workdir: Path) -> None:  # pragma: no cover - real shell-out
     # Capture output so a failure (offline, proxy, cert) surfaces as a readable message the
     # entry-point dialog can show, not a bare CalledProcessError into a windowed void.
     proc = subprocess.run(
-        [_uv_bin(), "sync", "--frozen", "--no-dev"], cwd=str(workdir),
-        capture_output=True, text=True, env=_child_env(), creationflags=_NO_WINDOW,
+        [_uv_bin(), "sync", "--frozen", "--no-dev"],
+        cwd=str(workdir),
+        capture_output=True,
+        text=True,
+        env=_child_env(),
+        creationflags=_NO_WINDOW,
     )
     if proc.returncode != 0:
         raise RuntimeError(
@@ -483,15 +501,21 @@ def _ensure_browsers(workdir: Path) -> None:  # pragma: no cover - real shell-ou
     Get Files as ready without its required provider runtimes."""
     failures: list[str] = []
     for args, what in (
-        (["run", "--frozen", "--no-sync", "python", "-m", "playwright", "install", "chromium"],
-         "Chromium"),
+        (
+            ["run", "--frozen", "--no-sync", "python", "-m", "playwright", "install", "chromium"],
+            "Chromium",
+        ),
         (["run", "--frozen", "--no-sync", "python", "-m", "camoufox", "fetch"], "Camoufox"),
     ):
         detail = ""
         for _attempt in range(2):
             proc = subprocess.run(
-                [_uv_bin(), *args], cwd=str(workdir),
-                capture_output=True, text=True, env=_child_env(), creationflags=_NO_WINDOW,
+                [_uv_bin(), *args],
+                cwd=str(workdir),
+                capture_output=True,
+                text=True,
+                env=_child_env(),
+                creationflags=_NO_WINDOW,
             )
             if proc.returncode == 0:
                 break
@@ -510,8 +534,13 @@ def _spawn_host(workdir: Path) -> int:  # pragma: no cover - real shell-out
     # re-validate against the network on every launch (that would break offline relaunch).
     proc = subprocess.run(
         [_uv_bin(), "run", "--frozen", "--no-sync", "python", "-m", "stockroom.host.run"],
-        cwd=str(workdir), env=_child_env(), creationflags=_NO_WINDOW,
-        capture_output=True, text=True, encoding="utf-8", errors="replace",
+        cwd=str(workdir),
+        env=_child_env(),
+        creationflags=_NO_WINDOW,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
     )
     if proc.returncode not in (0, EXIT_RESTART):
         detail = ((proc.stderr or proc.stdout) or "").strip()

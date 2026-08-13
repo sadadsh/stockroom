@@ -93,6 +93,26 @@ describe("deriveUpdateStanding", () => {
     });
   });
 
+  it("names a verified staged release as ready", () => {
+    expect(
+      deriveUpdateStanding({
+        data: {
+          update_available: true,
+          state: "ready",
+          convergence_phase: "ready",
+          current_release_id: "release-0.7.0.1",
+          target_release_id: "release-0.7.0.2",
+        },
+        checking: false,
+        failed: false,
+      }),
+    ).toMatchObject({
+      standing: "ready",
+      currentRevision: "release-0.7.0.1",
+      targetRevision: "release-0.7.0.2",
+    });
+  });
+
   it("does not claim an available target it cannot identify", () => {
     expect(
       deriveUpdateStanding({

@@ -1229,9 +1229,7 @@ class HostReleaseBoundary:
             self._reload_window(self._public_base_url)
         else:
             if adoption_receipt.window is None:
-                raise HostReleaseRouteError(
-                    "window adoption receipt is missing from rollback"
-                )
+                raise HostReleaseRouteError("window adoption receipt is missing from rollback")
             try:
                 replacement.rollback(adoption_receipt.window)
             except BaseException as exc:
@@ -1369,6 +1367,8 @@ class ProductionUpdateRuntime:
         )
         self._condition = threading.Condition()
         self._pending: VerifiedReleaseSet | None = None
+        self._activation_requested = False
+        self._activate_on_launch_release_id: str | None = None
         self._stop = False
         self._started = False
         self._closed = False
@@ -1397,13 +1397,29 @@ class ProductionUpdateRuntime:
             minimum_retry_backoff_seconds=minimum_retry_backoff_seconds,
             maximum_retry_backoff_seconds=maximum_retry_backoff_seconds,
         )
+        staged_before_launch = self._broker.status().last_verified_release_id
+        if staged_before_launch and staged_before_launch != self._current_release_id:
+            self._activate_on_launch_release_id = staged_before_launch
 
     def _offer_verified_release(self, release: VerifiedReleaseSet) -> None:
         with self._condition:
             if self._stop:
                 return
             self._pending = release
+            if release.release_id == self._activate_on_launch_release_id:
+                self._activation_requested = True
             self._condition.notify_all()
+
+    def activate_ready(self) -> bool:
+        """Activate the fully staged release after an explicit Restart Now action."""
+
+        with self._condition:
+            if self._pending is None or self._stop:
+                return False
+            self._activation_requested = True
+            self._condition.notify_all()
+        self._write_status()
+        return True
 
     def start(self) -> None:
         with self._condition:
@@ -1459,9 +1475,7 @@ class ProductionUpdateRuntime:
     ):
         replacement = self._window_replacement
         if replacement is None:
-            raise HostReleaseBoundaryError(
-                "production provider browser is unavailable"
-            )
+            raise HostReleaseBoundaryError("production provider browser is unavailable")
         return replacement.provider_browser_surface(
             staging_root=staging_root,
             component_id=component_id,
@@ -1483,9 +1497,7 @@ class ProductionUpdateRuntime:
     def show_active_provider_browser(self) -> None:
         replacement = self._window_replacement
         if replacement is None:
-            raise HostReleaseBoundaryError(
-                "production provider browser is unavailable"
-            )
+            raise HostReleaseBoundaryError("production provider browser is unavailable")
         replacement.show_active_provider_browser()
 
     def close_active_provider_browser(self) -> None:
@@ -1497,12 +1509,15 @@ class ProductionUpdateRuntime:
     def _activate_loop(self) -> None:
         while True:
             with self._condition:
-                if self._pending is None and not self._stop:
+                if (self._pending is None or not self._activation_requested) and not self._stop:
                     self._condition.wait(0.25)
                 if self._stop and self._pending is None:
                     return
+                if self._pending is None or not self._activation_requested:
+                    continue
                 release = self._pending
                 self._pending = None
+                self._activation_requested = False
             self._write_status()
             if release is None:
                 continue
@@ -1549,9 +1564,13 @@ class ProductionUpdateRuntime:
         elif broker.phase is UpdateBrokerPhase.RETRY_WAIT:
             phase = broker.phase.value
             state = "offline" if blocker == "repository_offline" else "blocked"
-        elif broker.phase is UpdateBrokerPhase.STAGED and target and target == current:
-            phase = ReleaseActivationPhase.ACTIVE.value
-            state = "up_to_date"
+        elif broker.phase is UpdateBrokerPhase.STAGED and target:
+            if target == current:
+                phase = ReleaseActivationPhase.ACTIVE.value
+                state = "up_to_date"
+            else:
+                phase = "ready"
+                state = "ready"
         elif broker.phase is UpdateBrokerPhase.CHECKING:
             phase = broker.phase.value
             state = "checking"
@@ -1566,17 +1585,21 @@ class ProductionUpdateRuntime:
             f"Automatic release convergence is blocked: {blocker}."
             if blocker
             else (
-                "A verified release is being adopted automatically."
+                "A verified release is being adopted."
                 if state == "updating"
                 else (
-                    "The signed release repository confirms this installation is current."
-                    if state == "up_to_date"
-                    else "Checking the signed release repository."
+                    "A verified release is ready. Restart now or close Stockroom to apply it."
+                    if state == "ready"
+                    else (
+                        "The signed release repository confirms this installation is current."
+                        if state == "up_to_date"
+                        else "Checking the signed release repository."
+                    )
                 )
             )
         )
         return {
-            "automatic_apply": True,
+            "automatic_apply": False,
             "automatic_on_launch": True,
             "blocking_reason": blocker,
             "channel": "production",

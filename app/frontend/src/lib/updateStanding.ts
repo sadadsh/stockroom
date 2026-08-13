@@ -4,6 +4,7 @@ export type UpdateStanding =
   | "checking"
   | "current"
   | "available"
+  | "ready"
   | "updating"
   | "retrying"
   | "blocked"
@@ -224,6 +225,14 @@ export function deriveUpdateStanding({
       currentRevision,
       targetRevision,
       detail: data.detail || "Checking the application remote for the latest revision.",
+    };
+  }
+  if (data.state === "ready" && targetRevision) {
+    return {
+      standing: "ready",
+      currentRevision,
+      targetRevision,
+      detail: data.detail || "A verified release is ready to apply.",
     };
   }
   // Nothing is in flight and the backend has answered - so the backend's revision and this

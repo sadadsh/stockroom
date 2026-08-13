@@ -153,3 +153,17 @@ geometry, source files, placements, nets, pad coordinates, or engineering primit
 geometry remains protected while its Stockroom container and typed presentation controls are editable.
 All color-bearing element, interaction-state, and CAD presentation values are written into the active
 Light or Dark theme patch; geometry, visibility, content, and arrangement remain shared global edits.
+
+### Trusted Update Recovery Boundary
+
+The packaged `Root.json` remains the only trust bootstrap. Machine-local TUF metadata is a cache,
+not an authority: a missing, empty, truncated, or invalid cached root is quarantined and restored
+atomically from the packaged root or the newest locally retained root that chains back to it. A
+valid cached root is never silently replaced, preserving TUF rollback protection and root rotation.
+
+Release downloads stage into a new immutable generation and are health-checked before activation.
+The running generation is not edited in place. Activation occurs on the next launch or an explicit
+Restart Now, retains the previous accepted generation for rollback, and leaves the library, personal
+Design Studio Draft, and Applied Design outside release directories. Update status reports Current,
+Downloading, Ready, Offline, Blocked, Retry, or Rollback from durable host state rather than guessing
+from a Git checkout.

@@ -13,7 +13,13 @@ logic with no real shell-out."""
 
 from __future__ import annotations
 
+import hashlib
+import json
+import os
+import shutil
+import tempfile
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Callable
 
 from stockroom.vcs.repo import GitRepo
@@ -41,6 +47,85 @@ class UpdateResult:
     rolled_back: bool = False
 
 
+_LEGACY_RUNTIME_OVERRIDE_PATHS = frozenset(
+    {
+        "app/frontend/src/lib/copy.overrides.ts",
+        "app/frontend/src/lib/element.overrides.ts",
+        "app/frontend/src/lib/token.overrides.ts",
+    }
+)
+
+
+def archive_legacy_runtime_overrides(
+    repo: GitRepo,
+    archive_root: Path | None = None,
+) -> Path | None:
+    """Preserve and clear the old generated source overrides that blocked updates.
+
+    This migration is deliberately narrow. Only unstaged modifications to the
+    three retired generated override modules are accepted. Any other tracked or
+    staged work remains untouched and keeps automatic updating blocked.
+    """
+
+    changes = [line for line in repo.status_porcelain() if not line.startswith("??")]
+    if not changes:
+        return None
+    selected: list[tuple[str, Path, bytes]] = []
+    for line in changes:
+        if len(line) < 4 or line[:2] != " M":
+            return None
+        relative = line[3:].replace("\\", "/")
+        if relative not in _LEGACY_RUNTIME_OVERRIDE_PATHS:
+            return None
+        source = repo.root.joinpath(*relative.split("/"))
+        try:
+            data = source.read_bytes()
+        except OSError:
+            return None
+        selected.append((relative, source, data))
+
+    digest = hashlib.sha256()
+    digest.update(repo.head().encode("ascii", errors="ignore"))
+    for relative, _source, data in sorted(selected):
+        digest.update(relative.encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(data)
+        digest.update(b"\0")
+    root = Path(archive_root or (repo.root.parent / "Legacy Runtime Overrides"))
+    root.mkdir(parents=True, exist_ok=True)
+    destination = root / f"{repo.head()[:12]}-{digest.hexdigest()[:16]}"
+    temporary = Path(tempfile.mkdtemp(prefix=".Incoming-", dir=root))
+    try:
+        for relative, _source, data in selected:
+            archived = temporary.joinpath(*relative.split("/"))
+            archived.parent.mkdir(parents=True, exist_ok=True)
+            archived.write_bytes(data)
+        (temporary / "Archive.json").write_text(
+            json.dumps(
+                {
+                    "schema": "stockroom-legacy-runtime-overrides/1",
+                    "source_revision": repo.head(),
+                    "paths": sorted(relative for relative, _source, _data in selected),
+                },
+                sort_keys=True,
+                separators=(",", ":"),
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        if destination.exists():
+            for relative, _source, data in selected:
+                if destination.joinpath(*relative.split("/")).read_bytes() != data:
+                    return None
+        else:
+            os.replace(temporary, destination)
+        repo.restore_paths([source for _relative, source, _data in selected])
+        return destination
+    finally:
+        if temporary.exists():
+            shutil.rmtree(temporary, ignore_errors=True)
+
+
 def _looks_offline(reason: str) -> bool:
     r = reason.lower()
     return any(
@@ -66,6 +151,7 @@ class AppUpdater:
         release_activation: Callable[[str], object] | None = None,
         active_revision: Callable[[], str] | None = None,
         active_health: Callable[[], object] | None = None,
+        legacy_override_archive: Path | None = None,
     ):
         self.repo = repo
         self._uv = uv_runner or (lambda: None)
@@ -74,6 +160,7 @@ class AppUpdater:
         self._release_activation = release_activation
         self._active_revision = active_revision or self.repo.head
         self._active_health = active_health
+        self._legacy_override_archive = legacy_override_archive
 
     def _check_identity(self) -> dict:
         """Stable, non-secret delivery facts the Settings UI can explain.
@@ -218,6 +305,11 @@ class AppUpdater:
                 seamless_handoff_requested=ok,
                 activated_revision=revision,
                 rolled_back=rolled_back,
+            )
+        if self.repo.has_tracked_changes():
+            archive_legacy_runtime_overrides(
+                self.repo,
+                self._legacy_override_archive,
             )
         if self.repo.has_tracked_changes():
             return UpdateResult(

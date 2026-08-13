@@ -110,6 +110,69 @@ def test_update_reconciles_a_disjoint_local_commit_by_rebase(tmp_path):
     assert ran["uv"] and ran["restart"]
 
 
+def test_update_archives_only_legacy_runtime_overrides_before_fast_forward(tmp_path):
+    origin = tmp_path / "origin"
+    origin.mkdir()
+    remote = GitRepo(origin)
+    remote.init()
+    tracked = {
+        "app/frontend/src/lib/copy.overrides.ts": "export const copy = {};\n",
+        "app/frontend/src/lib/element.overrides.ts": "export const elements = {};\n",
+        "app/frontend/src/lib/token.overrides.ts": "export const tokens = {};\n",
+        "app.py": "v1\n",
+    }
+    for relative, content in tracked.items():
+        path = origin / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(content, encoding="utf-8")
+    remote.commit("v1", [origin / relative for relative in tracked])
+    clone = tmp_path / "clone"
+    local = GitRepo(clone)
+    local.clone_from(origin)
+    edited = "export const copy = { owner: 'legacy' };\n"
+    (clone / "app/frontend/src/lib/copy.overrides.ts").write_text(
+        edited,
+        encoding="utf-8",
+    )
+    (origin / "app.py").write_text("v2\n", encoding="utf-8")
+    remote.commit("v2", [origin / "app.py"])
+    archive_root = tmp_path / "Legacy Runtime Overrides"
+
+    result = AppUpdater(
+        local,
+        uv_runner=lambda: None,
+        restart=lambda: None,
+        legacy_override_archive=archive_root,
+    ).update()
+
+    assert result.state == UpdateState.UPDATED
+    assert (clone / "app.py").read_text(encoding="utf-8") == "v2\n"
+    assert local.has_tracked_changes() is False
+    archives = [path for path in archive_root.iterdir() if path.is_dir()]
+    assert len(archives) == 1
+    archived = archives[0] / "app/frontend/src/lib/copy.overrides.ts"
+    assert archived.read_text(encoding="utf-8") == edited
+
+
+def test_update_never_archives_an_unrecognized_dirty_application_file(tmp_path):
+    o, origin, local, clone = _origin_and_clone(tmp_path)
+    (clone / "app.py").write_text("owner work\n", encoding="utf-8")
+    (origin / "app.py").write_text("v2\n", encoding="utf-8")
+    o.commit("v2", [origin / "app.py"])
+    archive_root = tmp_path / "Legacy Runtime Overrides"
+
+    result = AppUpdater(
+        local,
+        uv_runner=lambda: None,
+        restart=lambda: None,
+        legacy_override_archive=archive_root,
+    ).update()
+
+    assert result.state == UpdateState.BLOCKED
+    assert (clone / "app.py").read_text(encoding="utf-8") == "owner work\n"
+    assert not archive_root.exists()
+
+
 def test_check_fetches_so_a_fresh_remote_commit_is_seen(tmp_path):
     o, origin, c, clone = _origin_and_clone(tmp_path)
     (origin / "app.py").write_text("v2\n", encoding="utf-8")

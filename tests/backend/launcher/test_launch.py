@@ -26,10 +26,7 @@ def test_app_workdir_uses_localappdata_on_windows(monkeypatch, tmp_path):
     monkeypatch.delenv("STOCKROOM_APP_DIR", raising=False)
     monkeypatch.setattr("stockroom.launcher.launch._os_name", lambda: "nt")
     monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "Local"))
-    assert (
-        app_workdir()
-        == tmp_path / "Local" / "Stockroom" / "Continuous Runtime" / "App"
-    )
+    assert app_workdir() == tmp_path / "Local" / "Stockroom" / "Continuous Runtime" / "App"
 
 
 def test_app_workdir_uses_xdg_on_posix(monkeypatch, tmp_path):
@@ -106,27 +103,90 @@ def test_reconcile_pull_rebases_local_library_commits_onto_remote_app_updates(tm
         return subprocess.run([git, "-C", str(repo), *args], capture_output=True, text=True)
 
     origin = tmp_path / "origin.git"
-    subprocess.run([git, "init", "--bare", "-b", "main", str(origin)], check=True, capture_output=True)
+    subprocess.run(
+        [git, "init", "--bare", "-b", "main", str(origin)], check=True, capture_output=True
+    )
     seed = tmp_path / "seed"
     subprocess.run([git, "clone", str(origin), str(seed)], check=True, capture_output=True)
-    g(seed, "config", "user.email", "t@t"); g(seed, "config", "user.name", "t")
+    g(seed, "config", "user.email", "t@t")
+    g(seed, "config", "user.name", "t")
     (seed / "app").mkdir()
     (seed / "app" / "main.py").write_text("v1", encoding="utf-8")
-    g(seed, "add", "."); g(seed, "commit", "-m", "app v1"); g(seed, "push", "-u", "origin", "main")
+    g(seed, "add", ".")
+    g(seed, "commit", "-m", "app v1")
+    g(seed, "push", "-u", "origin", "main")
 
     managed = tmp_path / "A"
     subprocess.run([git, "clone", str(origin), str(managed)], check=True, capture_output=True)
-    g(managed, "config", "user.email", "a@a"); g(managed, "config", "user.name", "a")
+    g(managed, "config", "user.email", "a@a")
+    g(managed, "config", "user.name", "a")
     (managed / "libraries" / "Main" / "parts").mkdir(parents=True)
-    (managed / "libraries" / "Main" / "parts" / "r10k.json").write_text('{"id":"r10k"}', encoding="utf-8")
-    g(managed, "add", "."); g(managed, "commit", "-m", "add r10k")
+    (managed / "libraries" / "Main" / "parts" / "r10k.json").write_text(
+        '{"id":"r10k"}', encoding="utf-8"
+    )
+    g(managed, "add", ".")
+    g(managed, "commit", "-m", "add r10k")
 
     (seed / "app" / "main.py").write_text("v2", encoding="utf-8")  # a remote app-code update
-    g(seed, "add", "."); g(seed, "commit", "-m", "app v2"); g(seed, "push")
+    g(seed, "add", ".")
+    g(seed, "commit", "-m", "app v2")
+    g(seed, "push")
 
     launch._reconcile_pull(managed, git)
-    assert (managed / "app" / "main.py").read_text(encoding="utf-8") == "v2"  # remote update applied
+    assert (managed / "app" / "main.py").read_text(
+        encoding="utf-8"
+    ) == "v2"  # remote update applied
     assert (managed / "libraries" / "Main" / "parts" / "r10k.json").exists()  # local part preserved
+
+
+def test_reconcile_pull_archives_legacy_generated_overrides_before_update(tmp_path):
+    git = shutil.which("git")
+    assert git is not None
+
+    def g(repo, *args):
+        return subprocess.run(
+            [git, "-C", str(repo), *args],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+
+    origin = tmp_path / "origin.git"
+    seed = tmp_path / "seed"
+    subprocess.run(
+        [git, "init", "--bare", "-b", "main", str(origin)],
+        check=True,
+        capture_output=True,
+    )
+    subprocess.run([git, "clone", str(origin), str(seed)], check=True, capture_output=True)
+    g(seed, "config", "user.email", "t@t")
+    g(seed, "config", "user.name", "t")
+    override = seed / "app/frontend/src/lib/copy.overrides.ts"
+    override.parent.mkdir(parents=True)
+    override.write_text("export const copy = {};\n", encoding="utf-8")
+    (seed / "app.py").write_text("v1\n", encoding="utf-8")
+    g(seed, "add", ".")
+    g(seed, "commit", "-m", "v1")
+    g(seed, "push", "-u", "origin", "HEAD:main")
+
+    managed = tmp_path / "Managed"
+    subprocess.run([git, "clone", str(origin), str(managed)], check=True, capture_output=True)
+    local_override = managed / "app/frontend/src/lib/copy.overrides.ts"
+    local_override.write_text("export const copy = { owner: true };\n", encoding="utf-8")
+    (seed / "app.py").write_text("v2\n", encoding="utf-8")
+    g(seed, "add", "app.py")
+    g(seed, "commit", "-m", "v2")
+    g(seed, "push")
+
+    launch._reconcile_pull(managed, git)
+
+    assert (managed / "app.py").read_text(encoding="utf-8") == "v2\n"
+    assert local_override.read_text(encoding="utf-8") == "export const copy = {};\n"
+    archived = list(
+        (tmp_path / "Legacy Runtime Overrides").glob("*/app/frontend/src/lib/copy.overrides.ts")
+    )
+    assert len(archived) == 1
+    assert archived[0].read_text(encoding="utf-8") == "export const copy = { owner: true };\n"
 
 
 # -- supervise (the self-update relaunch loop) ---------------------------------
@@ -154,7 +214,10 @@ def test_supervise_relaunches_on_restart_then_stops(tmp_path):
 
 def test_supervise_returns_the_host_exit_code(tmp_path):
     code = supervise(
-        tmp_path, spawn=lambda _wd: 7, uv_sync=lambda _wd: None, ensure=lambda _wd: None,
+        tmp_path,
+        spawn=lambda _wd: 7,
+        uv_sync=lambda _wd: None,
+        ensure=lambda _wd: None,
         ensure_browsers=lambda _wd: None,
     )
     assert code == 7
@@ -194,8 +257,13 @@ def test_supervise_signals_the_browsers_splash_phase(tmp_path):
     # window is not a frozen blank while Chromium/Camoufox download.
     phases: list[str] = []
     supervise(
-        tmp_path, spawn=lambda _wd: 0, uv_sync=lambda _wd: None, ensure=lambda _wd: None,
-        update=lambda _wd: None, webview2=lambda: None, ensure_browsers=lambda _wd: None,
+        tmp_path,
+        spawn=lambda _wd: 0,
+        uv_sync=lambda _wd: None,
+        ensure=lambda _wd: None,
+        update=lambda _wd: None,
+        webview2=lambda: None,
+        ensure_browsers=lambda _wd: None,
         progress=phases.append,
     )
     assert "browsers" in phases
@@ -410,9 +478,7 @@ def test_supervise_guarantees_webview2_after_clone_before_sync(tmp_path):
     assert order == ["ensure", "webview2", "cad_converter", "sync", "spawn"]
 
 
-def test_bundled_cad_converter_is_atomically_provisioned_for_child(
-    monkeypatch, tmp_path
-):
+def test_bundled_cad_converter_is_atomically_provisioned_for_child(monkeypatch, tmp_path):
     bundle = tmp_path / "bundle"
     source = bundle / "cad-converter"
     source.mkdir(parents=True)
@@ -435,9 +501,7 @@ def test_bundled_cad_converter_is_atomically_provisioned_for_child(
     assert launch._child_env()["STOCKROOM_CAD_CONVERTER"] == str(installed)
 
 
-def test_bundled_cad_converter_repairs_a_corrupt_installed_tree(
-    monkeypatch, tmp_path
-):
+def test_bundled_cad_converter_repairs_a_corrupt_installed_tree(monkeypatch, tmp_path):
     bundle = tmp_path / "bundle"
     source = bundle / "cad-converter"
     source.mkdir(parents=True)
@@ -465,8 +529,13 @@ def test_bundled_cad_converter_repairs_a_corrupt_installed_tree(
 def test_supervise_emits_progress_phases_in_order(tmp_path):
     phases = []
     supervise(
-        tmp_path, ensure=lambda _wd: None, update=lambda _wd: None, webview2=lambda: None,
-        uv_sync=lambda _wd: None, ensure_browsers=lambda _wd: None, spawn=lambda _wd: 0,
+        tmp_path,
+        ensure=lambda _wd: None,
+        update=lambda _wd: None,
+        webview2=lambda: None,
+        uv_sync=lambda _wd: None,
+        ensure_browsers=lambda _wd: None,
+        spawn=lambda _wd: 0,
         progress=phases.append,
     )
     assert phases == [
@@ -489,8 +558,13 @@ def test_supervise_signals_starting_only_once_across_restarts(tmp_path):
         return EXIT_RESTART if calls["n"] < 2 else 0  # one self-update restart, then quit
 
     supervise(
-        tmp_path, ensure=lambda _wd: None, update=lambda _wd: None, webview2=lambda: None,
-        uv_sync=lambda _wd: None, ensure_browsers=lambda _wd: None, spawn=spawn,
+        tmp_path,
+        ensure=lambda _wd: None,
+        update=lambda _wd: None,
+        webview2=lambda: None,
+        uv_sync=lambda _wd: None,
+        ensure_browsers=lambda _wd: None,
+        spawn=spawn,
         progress=phases.append,
     )
     assert phases.count("starting") == 1  # only before the FIRST spawn

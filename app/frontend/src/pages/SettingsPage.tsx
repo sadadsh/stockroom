@@ -509,6 +509,10 @@ function MachineSetupBand({
               <Badge tone="neutral">
                 <Text id="settings.delivery.updating">Updating</Text>
               </Badge>
+            ) : updateStanding === "ready" ? (
+              <Badge tone="warn">
+                <Text id="settings.delivery.ready">Prepared</Text>
+              </Badge>
             ) : updateStanding === "available" ? (
               <Badge tone="warn">
                 {updateBehind > 0 ? (
@@ -534,7 +538,7 @@ function MachineSetupBand({
           </p>
         </div>
         <div className="flex flex-none flex-col items-end gap-1.5">
-          {updateStanding === "available" ? (
+          {["available", "ready"].includes(updateStanding) ? (
             <Button small variant="accent" onClick={onOpenUpdates}>
               <Text id="settings.delivery.review">Review Update</Text>
             </Button>
@@ -1693,9 +1697,28 @@ function GitHubSection() {
 
 function UpdateSection() {
   const { query: check, view: standing } = useUpdateStanding();
+  const { toast } = useToast();
+  const [restarting, setRestarting] = useState(false);
   const targetRevision = updateTargetRevision(check.data);
   const branchUnknown = useText("settings.update.branch-unknown", "Unknown");
   const revisionMissing = useText("settings.update.revision-unavailable", "Unavailable");
+  const restartNotice = useText(
+    "settings.update.restart-notice",
+    "Restarting into the verified release.",
+  );
+  const restartNow = async () => {
+    setRestarting(true);
+    try {
+      const result = await api.applyUpdate();
+      if (!result.seamless_handoff_requested) throw new Error(result.detail);
+      toast(restartNotice, "ok");
+      await check.refetch();
+    } catch (error) {
+      toast(errMsg(error), "err");
+    } finally {
+      setRestarting(false);
+    }
+  };
 
   return (
     <>
@@ -1775,6 +1798,12 @@ function UpdateSection() {
                     <Text id="settings.update.status-ready">Update available to install</Text>
                   )}
                 </span>
+              ) : standing.standing === "ready" ? (
+                <span className="text-warn">
+                  <Text id="settings.update.status-release-ready">
+                    A verified release is prepared
+                  </Text>
+                </span>
               ) : standing.standing === "updating" ? (
                 <span className="text-acc">
                   <Text id="settings.update.status-updating">Automatic adoption of the validated release...</Text>
@@ -1835,9 +1864,18 @@ function UpdateSection() {
         </>
       )}
       <p className="mt-3 text-xs leading-relaxed text-t3">
-        <Text id="settings.update.lede">Each installation follows the same validated remote revision on its own. New releases are staged beside the running app, health-checked, and adopted without closing this window; a failed release rolls back to the last sound backend.</Text>
+        <Text id="settings.update.lede">New releases are staged beside the running app and health-checked. Restart Now applies a prepared release; otherwise Stockroom applies it when next opened. A failed release rolls back to the last sound backend.</Text>
       </p>
       <div className="mt-3.5 flex flex-wrap items-center gap-2">
+        {standing.standing === "ready" ? (
+          <Button small variant="accent" disabled={restarting} onClick={() => void restartNow()}>
+            {restarting ? (
+              <Text id="settings.update.restarting-now">Restarting</Text>
+            ) : (
+              <Text id="settings.update.restart-now">Restart Now</Text>
+            )}
+          </Button>
+        ) : null}
         <a
           href="https://github.com/sadadsh/stockroom/releases"
           target="_blank"
@@ -1882,7 +1920,11 @@ function GeneralGroup() {
           hint="Stockroom checks its validated application branch at two-minute intervals and adopts a sound update on its own, without closing this window."
           hintId="settings.update.hint"
           summary={
-            updateStanding.standing === "available" ? (
+            updateStanding.standing === "ready" ? (
+              <Badge tone="warn">
+                <Text id="settings.summary.update-ready">Prepared</Text>
+              </Badge>
+            ) : updateStanding.standing === "available" ? (
               <Badge tone="warn">
                 <Text id="settings.summary.update-available">Update Available</Text>
               </Badge>

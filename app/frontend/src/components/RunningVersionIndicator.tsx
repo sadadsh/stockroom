@@ -11,6 +11,7 @@ const STANDING_TONE = {
   checking: "text-t3",
   current: "text-ok-text",
   available: "text-warn",
+  ready: "text-warn",
   updating: "text-acc",
   retrying: "text-warn",
   blocked: "text-err-text",
@@ -25,6 +26,7 @@ const STANDING_DOT: Record<UpdateStanding, BadgeTone> = {
   checking: "neutral",
   current: "ok",
   available: "warn",
+  ready: "warn",
   updating: "neutral",
   retrying: "warn",
   blocked: "err",
@@ -63,6 +65,7 @@ export function RunningVersionIndicator({
     checking: useText("update.standing.checking", "Checking…"),
     current: useText("update.standing.current", "Current"),
     available: useText("update.standing.available", "Update Available"),
+    ready: useText("update.standing.ready", "Prepared"),
     updating: useText("update.standing.updating", "Updating…"),
     retrying: useText("update.standing.retrying", "Rerunning…"),
     blocked: useText("update.standing.blocked", "Blocked"),
@@ -74,7 +77,7 @@ export function RunningVersionIndicator({
   // while this window still runs an older bundle. A disagreement is information, so both sides of
   // it are on screen instead of one quietly winning.
   const other =
-    view.standing === "available" && view.targetRevision
+    ["available", "ready"].includes(view.standing) && view.targetRevision
       ? updateIdentity(view.targetRevision)
       : view.standing === "restart_required" && view.currentRevision
         ? updateIdentity(view.currentRevision)
@@ -83,7 +86,7 @@ export function RunningVersionIndicator({
   const accessibleVersion = `running ${running.kind} ${running.value}`;
   const accessibleOther = !other
     ? ""
-    : view.standing === "available"
+    : ["available", "ready"].includes(view.standing)
       ? `, target ${other.kind} ${other.value}`
       : `, backend ${other.kind} ${other.value}`;
   const identityPrefix =

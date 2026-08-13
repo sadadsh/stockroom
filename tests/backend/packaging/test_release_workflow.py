@@ -23,7 +23,7 @@ def named_step(job_name: str, name: str) -> dict[str, Any]:
 def test_release_workflow_parses_and_has_least_privilege_jobs() -> None:
     assert WORKFLOW["name"] == "Stockroom Windows Release"
     assert WORKFLOW["permissions"] == {}
-    assert WORKFLOW["on"]["push"]["tags"] == ["v*"]
+    assert WORKFLOW["on"]["push"] == {"branches": ["main"], "tags": ["v*"]}
     assert WORKFLOW["on"]["workflow_dispatch"]["inputs"]["version"]["required"] == "true"
 
     build = WORKFLOW["jobs"]["build-windows-package"]
@@ -35,6 +35,7 @@ def test_release_workflow_parses_and_has_least_privilege_jobs() -> None:
     assert publish["runs-on"] == "ubuntu-24.04"
     assert publish["permissions"] == {"actions": "read", "contents": "write"}
     assert "github.ref_type == 'tag'" in publish["if"]
+    assert "github.ref == 'refs/heads/main'" in publish["if"]
 
     checkout = named_step("build-windows-package", "Check Out The Exact Release Revision")
     setup_uv = named_step("build-windows-package", "Install Pinned uv")
@@ -46,13 +47,30 @@ def test_release_workflow_parses_and_has_least_privilege_jobs() -> None:
     }
 
 
+def test_main_push_gets_one_immutable_build_number_release() -> None:
+    metadata = named_step("build-windows-package", "Resolve And Validate Release Metadata")
+    publish = named_step("publish-github-release", "Publish Signed Windows Prerelease")
+
+    assert metadata["env"]["AUTOMATIC_BASE_VERSION"] == "0.7.0"
+    assert metadata["env"]["GITHUB_RUN_NUMBER"] == "${{ github.run_number }}"
+    assert (
+        '$version = "$($env:AUTOMATIC_BASE_VERSION).$($env:GITHUB_RUN_NUMBER)"' in metadata["run"]
+    )
+    assert '"release_tag=v$version`n"' in metadata["run"]
+    assert publish["env"]["STOCKROOM_RELEASE_TAG"] == (
+        "${{ needs.build-windows-package.outputs.release_tag }}"
+    )
+    assert "gh release create $env:STOCKROOM_RELEASE_TAG" in publish["run"]
+    assert "--target $env:GITHUB_SHA" in publish["run"]
+
+
 def test_every_external_action_is_pinned_to_an_exact_commit() -> None:
     references = re.findall(r"^\s*uses:\s*([^#\s]+)", WORKFLOW_TEXT, flags=re.MULTILINE)
     assert set(references) == {
-            "actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
-            "actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093",
-            "actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1",
-            "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+        "actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+        "actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093",
+        "actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1",
+        "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
         "astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86",
     }
     assert all(
@@ -93,15 +111,9 @@ def test_signing_secrets_are_step_scoped_and_always_destroyed() -> None:
     assert WORKFLOW_TEXT.count("${{ secrets.WINDOWS_CERT_PASSWORD }}") == 1
     assert materialize["env"] == {
         "WINDOWS_CERT_BASE64": "${{ secrets.WINDOWS_CERT_BASE64 }}",
-        "STOCKROOM_TUF_TARGETS_KEY_BASE64": (
-            "${{ secrets.STOCKROOM_TUF_TARGETS_KEY_BASE64 }}"
-        ),
-        "STOCKROOM_TUF_SNAPSHOT_KEY_BASE64": (
-            "${{ secrets.STOCKROOM_TUF_SNAPSHOT_KEY_BASE64 }}"
-        ),
-        "STOCKROOM_TUF_TIMESTAMP_KEY_BASE64": (
-            "${{ secrets.STOCKROOM_TUF_TIMESTAMP_KEY_BASE64 }}"
-        ),
+        "STOCKROOM_TUF_TARGETS_KEY_BASE64": ("${{ secrets.STOCKROOM_TUF_TARGETS_KEY_BASE64 }}"),
+        "STOCKROOM_TUF_SNAPSHOT_KEY_BASE64": ("${{ secrets.STOCKROOM_TUF_SNAPSHOT_KEY_BASE64 }}"),
+        "STOCKROOM_TUF_TIMESTAMP_KEY_BASE64": ("${{ secrets.STOCKROOM_TUF_TIMESTAMP_KEY_BASE64 }}"),
     }
     for role in ("TARGETS", "SNAPSHOT", "TIMESTAMP"):
         secret = f"${{{{ secrets.STOCKROOM_TUF_{role}_KEY_BASE64 }}}}"
@@ -167,7 +179,7 @@ def test_only_the_exact_verified_release_asset_set_can_be_published() -> None:
         line for line in verify.splitlines() if "Stockroom.exe" in line
     )
     assert "Release staging contains a file outside the exact publication allowlist." in verify
-    assert "gh release upload $env:GITHUB_REF_NAME @assets" in publish
+    assert "gh release upload $env:STOCKROOM_RELEASE_TAG @assets" in publish
     assert "--clobber" not in publish
     assert "Published release assets are immutable" in publish
     assert "asset outside the release allowlist" in publish

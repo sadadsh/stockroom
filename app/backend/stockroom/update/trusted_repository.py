@@ -51,6 +51,24 @@ class ReleaseSetVerificationError(TrustedRepositoryError):
     """A release target set is incomplete, mixed, unsafe, or corrupt."""
 
 
+class _WindowsSafeUpdater(Updater):
+    """Persist the current trusted root atomically without requiring a symlink.
+
+    python-tuf normally exposes ``root.json`` as a symlink into ``root_history``.
+    Ordinary packaged Windows applications do not have symlink privilege, so
+    that final cache step can fail after the trusted history was written and
+    leave update checks permanently blocked. The root bytes copied here have
+    already been accepted by ``TrustedMetadataSet``; the versioned history
+    remains the rotation and rollback authority.
+    """
+
+    def _update_root_symlink(self) -> None:
+        version = self._trusted_set.root.version
+        root_directory = Path(self._dir, "root_history")
+        trusted_root = (root_directory / f"{version}.root.json").read_bytes()
+        self._persist_file(os.fspath(Path(self._dir, "root.json")), trusted_root)
+
+
 @dataclass(frozen=True, slots=True)
 class VerifiedReleaseSet:
     """A complete verified set that has been atomically published to staging."""
@@ -77,15 +95,9 @@ class TrustedReleaseRepository:
         fetcher: FetcherInterface | None = None,
     ) -> None:
         self._bootstrap_root = _validate_bootstrap_root(bootstrap_root)
-        self._metadata_base_url = _validate_repository_url(
-            metadata_base_url, "metadata_base_url"
-        )
-        self._target_base_url = _validate_repository_url(
-            target_base_url, "target_base_url"
-        )
-        self._metadata_directory = (
-            Path(state_directory).resolve() / "Trusted Metadata"
-        )
+        self._metadata_base_url = _validate_repository_url(metadata_base_url, "metadata_base_url")
+        self._target_base_url = _validate_repository_url(target_base_url, "target_base_url")
+        self._metadata_directory = Path(state_directory).resolve() / "Trusted Metadata"
         self._staging_directory = Path(staging_directory).resolve()
         if self._metadata_directory == self._staging_directory:
             raise ValueError("Trusted metadata and staged releases need separate directories.")
@@ -161,7 +173,7 @@ class TrustedReleaseRepository:
 
     def _new_updater(self) -> Updater:
         try:
-            return Updater(
+            return _WindowsSafeUpdater(
                 metadata_dir=os.fspath(self._metadata_directory),
                 metadata_base_url=self._metadata_base_url,
                 target_base_url=self._target_base_url,
@@ -265,13 +277,8 @@ def verify_local_release_set(
     release_directory = Path(directory)
     if not release_directory.is_absolute():
         raise ValueError("local release directory must be absolute")
-    if (
-        not expected_release_id
-        or _SHA256_PATTERN.fullmatch(expected_manifest_sha256) is None
-    ):
-        raise ReleaseSetVerificationError(
-            "The packaged release identity is invalid."
-        )
+    if not expected_release_id or _SHA256_PATTERN.fullmatch(expected_manifest_sha256) is None:
+        raise ReleaseSetVerificationError("The packaged release identity is invalid.")
     manifest_path = release_directory / RELEASE_MANIFEST_NAME
     try:
         manifest_bytes = manifest_path.read_bytes()
@@ -281,19 +288,13 @@ def verify_local_release_set(
         ) from exc
     manifest_sha256 = hashlib.sha256(manifest_bytes).hexdigest()
     if manifest_sha256 != expected_manifest_sha256:
-        raise ReleaseSetVerificationError(
-            "The packaged release manifest digest is invalid."
-        )
+        raise ReleaseSetVerificationError("The packaged release manifest digest is invalid.")
     try:
         manifest = ReleaseManifest.from_bytes(manifest_bytes)
     except ReleaseManifestError as exc:
-        raise ReleaseSetVerificationError(
-            "The packaged release manifest is invalid."
-        ) from exc
+        raise ReleaseSetVerificationError("The packaged release manifest is invalid.") from exc
     if manifest.release_id != expected_release_id:
-        raise ReleaseSetVerificationError(
-            "The packaged release manifest identity is invalid."
-        )
+        raise ReleaseSetVerificationError("The packaged release manifest identity is invalid.")
     _verify_release_tree(
         release_directory,
         manifest=manifest,
@@ -313,9 +314,7 @@ def _validate_bootstrap_root(bootstrap_root: bytes) -> bytes:
         metadata = Metadata.from_bytes(bootstrap_root)
         if not isinstance(metadata.signed, Root):
             raise PinnedRootError("Pinned TUF bootstrap metadata is not a root role.")
-        metadata.signed.verify_delegate(
-            Root.type, metadata.signed_bytes, metadata.signatures
-        )
+        metadata.signed.verify_delegate(Root.type, metadata.signed_bytes, metadata.signatures)
     except PinnedRootError:
         raise
     except (
@@ -341,15 +340,11 @@ def _validate_repository_url(value: str, field: str) -> str:
         or parsed.query
         or parsed.fragment
     ):
-        raise ValueError(
-            f"{field} must be an HTTPS URL without credentials, query, or fragment."
-        )
+        raise ValueError(f"{field} must be an HTTPS URL without credentials, query, or fragment.")
     return value
 
 
-def _verify_manifest_target_binding(
-    target_info: TargetFile, manifest: ReleaseManifest
-) -> None:
+def _verify_manifest_target_binding(target_info: TargetFile, manifest: ReleaseManifest) -> None:
     expected_custom = {
         "stockroom": {
             "kind": "release-manifest",
@@ -482,8 +477,7 @@ def _build_verified_set(
     manifest_sha256: str,
 ) -> VerifiedReleaseSet:
     members = {
-        member.path: directory.joinpath(*member.path.split("/"))
-        for member in manifest.members
+        member.path: directory.joinpath(*member.path.split("/")) for member in manifest.members
     }
     return VerifiedReleaseSet(
         release_id=manifest.release_id,

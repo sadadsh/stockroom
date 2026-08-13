@@ -390,9 +390,7 @@ class _WindowReplacement:
         self.events.append(("rollback", self.pointer()))
 
     def start_initial(self, release: AcceptedRelease | None = None) -> object:
-        self.events.append(
-            ("start", None if release is None else release.release_id)
-        )
+        self.events.append(("start", None if release is None else release.release_id))
         return object()
 
     def wait_until_closed(self) -> int:
@@ -705,9 +703,7 @@ def test_window_commit_failure_remains_reversible_and_restores_prior_release(
             ("rollback", candidate.release_id),
         ]
         assert store.verify_startup(control).current.release_id == current.release_id
-        assert httpx.get(f"{stable_url}/version").json() == {
-            "release_id": current.release_id
-        }
+        assert httpx.get(f"{stable_url}/version").json() == {"release_id": current.release_id}
         assert observed_window == []
     finally:
         _close(server, server_thread, boundary, control, fence)
@@ -752,7 +748,7 @@ def test_post_adoption_health_failure_rolls_back_replacement_without_commit(
         _close(server, server_thread, boundary, control, fence)
 
 
-def test_tuf_broker_runtime_activates_real_worker_and_exposes_sanitized_state(
+def test_tuf_broker_runtime_stages_then_activates_only_after_restart_now(
     tmp_path: Path,
 ) -> None:
     runtime_parts = _runtime(tmp_path, candidate_mode="ok")
@@ -788,6 +784,17 @@ def test_tuf_broker_runtime_activates_real_worker_and_exposes_sanitized_state(
     )
     try:
         runtime.start()
+        deadline = time.monotonic() + 5
+        while runtime.status()["state"] != "ready" and time.monotonic() < deadline:
+            time.sleep(0.01)
+        ready = runtime.status()
+        assert ready["current_release_id"] != candidate.release_id, ready
+        assert ready["target_release_id"] == candidate.release_id
+        assert ready["state"] == "ready"
+        assert ready["automatic_apply"] is False
+        assert httpx.get(f"{stable_url}/version").json() != {"release_id": candidate.release_id}
+
+        assert runtime.activate_ready() is True
         deadline = time.monotonic() + 5
         while (
             runtime.status()["current_release_id"] != candidate.release_id

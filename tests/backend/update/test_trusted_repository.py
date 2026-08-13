@@ -129,8 +129,7 @@ class TemporarySignedRepository:
 
         targets_role = Targets(
             version=version,
-            expires=targets_expires
-            or datetime.now(timezone.utc) + timedelta(days=7),
+            expires=targets_expires or datetime.now(timezone.utc) + timedelta(days=7),
             targets=target_files,
         )
         targets_metadata = Metadata(targets_role)
@@ -139,13 +138,8 @@ class TemporarySignedRepository:
 
         snapshot_role = Snapshot(
             version=version,
-            expires=snapshot_expires
-            or datetime.now(timezone.utc) + timedelta(days=2),
-            meta={
-                "targets.json": MetaFile.from_data(
-                    version, targets_bytes, ["sha256"]
-                )
-            },
+            expires=snapshot_expires or datetime.now(timezone.utc) + timedelta(days=2),
+            meta={"targets.json": MetaFile.from_data(version, targets_bytes, ["sha256"])},
         )
         snapshot_metadata = Metadata(snapshot_role)
         snapshot_metadata.sign(self._signers["snapshot"])
@@ -153,11 +147,8 @@ class TemporarySignedRepository:
 
         timestamp_role = Timestamp(
             version=version,
-            expires=timestamp_expires
-            or datetime.now(timezone.utc) + timedelta(hours=12),
-            snapshot_meta=MetaFile.from_data(
-                version, snapshot_bytes, ["sha256"]
-            ),
+            expires=timestamp_expires or datetime.now(timezone.utc) + timedelta(hours=12),
+            snapshot_meta=MetaFile.from_data(version, snapshot_bytes, ["sha256"]),
         )
         timestamp_metadata = Metadata(timestamp_role)
         timestamp_metadata.sign(self._signers["timestamp"])
@@ -274,6 +265,38 @@ def test_stages_every_signed_member_as_one_atomic_immutable_set(tmp_path: Path) 
     assert any("Release Manifest.json" in url for url in fetcher.requests)
 
 
+def test_recovers_corrupt_cached_root_without_windows_symlink_privilege(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    payloads = _payloads()
+    manifest = _manifest(payloads)
+    repository = TemporarySignedRepository(tmp_path / "repository")
+    repository.publish(manifest, payloads)
+    client = _client(
+        repository,
+        tmp_path,
+        TemporaryRepositoryFetcher(repository.root),
+    )
+    trusted = tmp_path / "client-state" / "Trusted Metadata"
+    trusted.mkdir(parents=True)
+    (trusted / "root.json").write_bytes(b"")
+
+    def refuse_symlink(*_args: object, **_kwargs: object) -> None:
+        raise OSError("symbolic links require an unavailable Windows privilege")
+
+    monkeypatch.setattr("os.symlink", refuse_symlink)
+
+    release = client.stage_release()
+
+    root = trusted / "root.json"
+    assert release.release_id == manifest["release_id"]
+    assert root.is_file()
+    assert not root.is_symlink()
+    assert root.read_bytes() == repository.bootstrap_root
+    assert (trusted / "root_history" / "1.root.json").read_bytes() == (repository.bootstrap_root)
+
+
 def test_tuf_binding_preserves_v2_skipped_release_compatibility(
     tmp_path: Path,
 ) -> None:
@@ -327,9 +350,7 @@ def test_expired_tuf_metadata_blocks_acceptance_and_leaves_no_partial_release(
         targets_expires=expired if expired_role == "targets" else None,
         timestamp_expires=expired if expired_role == "timestamp" else None,
     )
-    client = _client(
-        repository, tmp_path, TemporaryRepositoryFetcher(repository.root)
-    )
+    client = _client(repository, tmp_path, TemporaryRepositoryFetcher(repository.root))
 
     with pytest.raises(RepositoryRefreshError):
         client.stage_release()
@@ -342,9 +363,7 @@ def test_persisted_tuf_state_rejects_repository_rollback(tmp_path: Path) -> None
     manifest = _manifest(payloads)
     repository = TemporarySignedRepository(tmp_path / "repository")
     repository.publish(manifest, payloads, version=2)
-    client = _client(
-        repository, tmp_path, TemporaryRepositoryFetcher(repository.root)
-    )
+    client = _client(repository, tmp_path, TemporaryRepositoryFetcher(repository.root))
     accepted = client.stage_release()
 
     repository.publish(manifest, payloads, version=1)
@@ -361,9 +380,7 @@ def test_release_id_can_never_be_reused_for_different_signed_bytes(tmp_path: Pat
     manifest = _manifest(payloads)
     repository = TemporarySignedRepository(tmp_path / "repository")
     repository.publish(manifest, payloads, version=1)
-    client = _client(
-        repository, tmp_path, TemporaryRepositoryFetcher(repository.root)
-    )
+    client = _client(repository, tmp_path, TemporaryRepositoryFetcher(repository.root))
     accepted = client.stage_release()
     accepted_backend = accepted.members["Backend/Stockroom.pyz"].read_bytes()
 
@@ -402,9 +419,7 @@ def test_signed_member_from_another_release_is_rejected(tmp_path: Path) -> None:
         payloads,
         member_release_override="2026.07.20.9",
     )
-    client = _client(
-        repository, tmp_path, TemporaryRepositoryFetcher(repository.root)
-    )
+    client = _client(repository, tmp_path, TemporaryRepositoryFetcher(repository.root))
 
     with pytest.raises(ReleaseSetVerificationError, match="signed manifest"):
         client.stage_release()
@@ -423,9 +438,7 @@ def test_corrupt_payload_never_becomes_a_visible_release(tmp_path: Path) -> None
     prefixed_path = target_info.get_prefixed_paths()[0]
     target_file = repository.targets_directory.joinpath(*prefixed_path.split("/"))
     target_file.write_bytes(b"corrupt")
-    client = _client(
-        repository, tmp_path, TemporaryRepositoryFetcher(repository.root)
-    )
+    client = _client(repository, tmp_path, TemporaryRepositoryFetcher(repository.root))
 
     with pytest.raises(ReleaseSetVerificationError):
         client.stage_release()

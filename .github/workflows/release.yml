@@ -2,6 +2,8 @@ name: Stockroom Windows Release
 
 on:
   push:
+    branches:
+      - main
     tags:
       - "v*"
   workflow_dispatch:
@@ -28,6 +30,7 @@ jobs:
       contents: read
     outputs:
       version: ${{ steps.release-metadata.outputs.version }}
+      release_tag: ${{ steps.release-metadata.outputs.release_tag }}
     env:
       GIT_TERMINAL_PROMPT: "0"
       GCM_INTERACTIVE: "never"
@@ -70,6 +73,8 @@ jobs:
         shell: pwsh
         env:
           MANUAL_VERSION: ${{ inputs.version }}
+          AUTOMATIC_BASE_VERSION: "0.7.0"
+          GITHUB_RUN_NUMBER: ${{ github.run_number }}
           STOCKROOM_WINDOWS_PUBLISHER: ${{ vars.STOCKROOM_WINDOWS_PUBLISHER }}
           STOCKROOM_WINDOWS_FEED_BASE_URI: ${{ vars.STOCKROOM_WINDOWS_FEED_BASE_URI }}
           STOCKROOM_MINGIT_URL: ${{ vars.STOCKROOM_MINGIT_URL }}
@@ -110,6 +115,12 @@ jobs:
               throw "Release tags must begin with v."
             }
             $version = $env:GITHUB_REF_NAME.Substring(1)
+          }
+          elseif ($env:GITHUB_REF -ceq "refs/heads/main") {
+            if ($env:GITHUB_RUN_NUMBER -notmatch "^[1-9][0-9]*$") {
+              throw "The GitHub build number must be a positive integer."
+            }
+            $version = "$($env:AUTOMATIC_BASE_VERSION).$($env:GITHUB_RUN_NUMBER)"
           }
           else {
             $version = $env:MANUAL_VERSION
@@ -196,7 +207,8 @@ jobs:
           )
           [IO.File]::AppendAllText(
             $env:GITHUB_OUTPUT,
-            "version=$version`n",
+            "version=$version`n" +
+              "release_tag=v$version`n",
             $utf8
           )
 
@@ -735,7 +747,7 @@ jobs:
 
   publish-github-release:
     name: Publish GitHub Prerelease
-    if: ${{ github.event_name == 'push' && github.ref_type == 'tag' }}
+    if: ${{ github.event_name == 'push' && (github.ref_type == 'tag' || github.ref == 'refs/heads/main') }}
     needs: build-windows-package
     runs-on: ubuntu-24.04
     timeout-minutes: 10
@@ -790,6 +802,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           STOCKROOM_PACKAGE_VERSION: ${{ needs.build-windows-package.outputs.version }}
+          STOCKROOM_RELEASE_TAG: ${{ needs.build-windows-package.outputs.release_tag }}
         run: |
           Set-StrictMode -Version Latest
           $ErrorActionPreference = "Stop"
@@ -824,7 +837,7 @@ jobs:
             $packageName
           )
           $existing = @(
-            & gh release view $env:GITHUB_REF_NAME --json assets --jq ".assets[].name"
+            & gh release view $env:STOCKROOM_RELEASE_TAG --json assets --jq ".assets[].name"
           )
           $releaseExists = $LASTEXITCODE -eq 0
           if ($releaseExists) {
@@ -835,17 +848,26 @@ jobs:
             if ($existing.Count -gt 0) {
               throw "Published release assets are immutable; use a new package and TUF metadata version."
             }
-            & gh release edit $env:GITHUB_REF_NAME `
+            & gh release edit $env:STOCKROOM_RELEASE_TAG `
               --prerelease `
-              --title "Stockroom $($env:GITHUB_REF_NAME)" `
+              --title "Stockroom $($env:STOCKROOM_RELEASE_TAG)" `
               --notes-file $notesPath
           }
           else {
-            & gh release create $env:GITHUB_REF_NAME `
-              --verify-tag `
-              --prerelease `
-              --title "Stockroom $($env:GITHUB_REF_NAME)" `
-              --notes-file $notesPath
+            if ($env:GITHUB_REF_TYPE -eq "tag") {
+              & gh release create $env:STOCKROOM_RELEASE_TAG `
+                --verify-tag `
+                --prerelease `
+                --title "Stockroom $($env:STOCKROOM_RELEASE_TAG)" `
+                --notes-file $notesPath
+            }
+            else {
+              & gh release create $env:STOCKROOM_RELEASE_TAG `
+                --target $env:GITHUB_SHA `
+                --prerelease `
+                --title "Stockroom $($env:STOCKROOM_RELEASE_TAG)" `
+                --notes-file $notesPath
+            }
           }
           if ($LASTEXITCODE -ne 0) {
             throw "GitHub prerelease creation or update failed."
@@ -859,12 +881,12 @@ jobs:
             "release-assets/$feedName",
             "release-assets/SHA256SUMS.txt"
           )
-          & gh release upload $env:GITHUB_REF_NAME @assets
+          & gh release upload $env:STOCKROOM_RELEASE_TAG @assets
           if ($LASTEXITCODE -ne 0) {
             throw "GitHub prerelease asset upload failed."
           }
           $published = @(
-            & gh release view $env:GITHUB_REF_NAME --json assets --jq ".assets[].name"
+            & gh release view $env:STOCKROOM_RELEASE_TAG --json assets --jq ".assets[].name"
           )
           if (
             $LASTEXITCODE -ne 0 -or

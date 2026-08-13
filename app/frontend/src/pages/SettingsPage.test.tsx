@@ -564,6 +564,25 @@ describe("SettingsPage — sync + kicad + update", () => {
     expect(mockApi.applyUpdate).not.toHaveBeenCalled();
   });
 
+  it("applies a verified ready release only after Restart Now", async () => {
+    mockApi.checkUpdate.mockResolvedValue({
+      update_available: true,
+      state: "ready",
+      convergence_phase: "ready",
+      current_release_id: "release-0.7.0.1",
+      target_release_id: "release-0.7.0.2",
+      automatic_on_launch: true,
+      automatic_apply: false,
+    } as never);
+    renderPage();
+    await openSettings("settings.update");
+
+    expect(await screen.findByText(/verified release is prepared/i)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /restart now/i }));
+
+    expect(mockApi.applyUpdate).toHaveBeenCalledTimes(1);
+  });
+
   it("does not offer to apply when up to date", async () => {
     renderPage();
     await openSettings("settings.update");
