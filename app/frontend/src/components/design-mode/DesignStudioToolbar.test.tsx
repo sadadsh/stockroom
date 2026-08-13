@@ -33,7 +33,7 @@ vi.mock("../../lib/theme", () => ({ useTheme: () => ({ theme: "dark", toggle: vi
 function renderToolbar() {
   return render(
     <DesignStudioToolbar
-      mode="browse"
+      mode="preview"
       onModeChange={vi.fn()}
       presentation={false}
       onPresentationChange={vi.fn()}

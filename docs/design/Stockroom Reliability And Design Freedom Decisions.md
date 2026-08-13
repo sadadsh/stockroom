@@ -35,6 +35,19 @@ The provider document uses a dedicated native WebView positioned inside a dragga
 React modal. The primary Stockroom WebView remains on the app. Close hides the surface without
 canceling the acquisition workflow.
 
+### Provider Browsing Is Person Driven
+
+Manage Models provides quick links to major providers plus an editable ordinary address. Stockroom
+may construct the correct part-specific landing URL, then stops controlling the provider page. It
+does not choose formats, operate provider controls, or automate account and download flows. Native
+download interception begins only when a file lands and reports the exact detected, accepted,
+rejected, and missing artifacts.
+
+The acquisition starts with a registered EDA multiselect. KiCad and Altium are available first, at
+least one remains selected, and the task requests only selected EDA symbol and footprint formats.
+A shared 3D model is collected once when required. The selection is task-bound so changing a later
+preference cannot reinterpret an already running or retained acquisition.
+
 ### Releases Stay Immutable
 
 The frozen launcher activates verified immutable release generations. It never updates production
@@ -69,3 +82,11 @@ Design Document v2 removes legacy scope selection, stores global target override
 unresolved identities as orphaned edits. Loading v1 is a migration, not a destructive rewrite:
 legacy overrides are mapped where deterministic authority exists and otherwise remain visible for
 manual remapping.
+
+### Preview And Edit Mode Boundary
+
+Design Studio has one operating boundary: Preview leaves Stockroom fully interactive, while Edit
+enables both selection and direct layout manipulation. The former Browse, Inspect, and Arrange
+states remain accepted only as persisted preference migration inputs; they are never shown as
+separate modes. Design Studio chrome is marked as protected and excluded from generated target
+selection, while authored and generated product identities use the same selection path.

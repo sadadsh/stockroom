@@ -57,8 +57,10 @@ function parseViewport(raw: string): StudioViewport | undefined {
   return RESPONSIVE_VIEWPORT_PRESETS.some((preset) => preset.id === raw) ? raw as StudioViewport : undefined;
 }
 
-function parseMode(raw: string): "browse" | "inspect" | "arrange" | undefined {
-  return raw === "browse" || raw === "inspect" || raw === "arrange" ? raw : undefined;
+function parseMode(raw: string): "preview" | "edit" | undefined {
+  if (raw === "preview" || raw === "browse") return "preview";
+  if (raw === "edit" || raw === "inspect" || raw === "arrange") return "edit";
+  return undefined;
 }
 
 function clampPanelWidth(value: number): number {
@@ -118,7 +120,7 @@ export function DesignStudioShell({ children }: { children: ReactNode }) {
   const [grid, setGrid] = useState(() => readPref("design_studio_grid", GRID_KEY, parseBoolean, false));
   const [snap, setSnap] = useState(() => readPref("design_studio_snap", SNAP_KEY, parseBoolean, true));
   const [lastScenario] = useState(() => readPref("design_studio_last_scenario", LAST_SCENARIO_KEY, parseString, "global.real-data"));
-  const [preferredMode] = useState(() => readPref("design_studio_mode", MODE_KEY, parseMode, "browse"));
+  const [preferredMode] = useState(() => readPref("design_studio_mode", MODE_KEY, parseMode, "preview"));
   const previewRegionRef = useRef<HTMLDivElement | null>(null);
   const [previewRegionWidth, setPreviewRegionWidth] = useState(0);
   const closingRef = useRef(false);
@@ -147,7 +149,7 @@ export function DesignStudioShell({ children }: { children: ReactNode }) {
   const showInspectorLabel = useText("design-studio.panel.inspector-show", "Show Inspector");
 
   const mode = dev.studioMode;
-  const changeMode = useCallback((next: "browse" | "inspect" | "arrange") => {
+  const changeMode = useCallback((next: "preview" | "edit") => {
     dev.setStudioMode(next);
     writePref("design_studio_mode", next, MODE_KEY);
   }, [dev.setStudioMode]);
@@ -162,13 +164,13 @@ export function DesignStudioShell({ children }: { children: ReactNode }) {
 
   const close = useCallback(() => {
     closingRef.current = true;
-    changeMode("browse");
+    changeMode("preview");
     setPresentation(false);
     studio.close();
     focusStudioEntry();
   }, [changeMode, studio]);
   const changePresentation = useCallback((next: boolean) => {
-    if (next) dev.setStudioMode("browse");
+    if (next) dev.setStudioMode("preview");
     setPresentation(next);
     writePref("design_studio_presentation", next, PRESENTATION_KEY);
   }, [dev.setStudioMode]);
@@ -198,7 +200,7 @@ export function DesignStudioShell({ children }: { children: ReactNode }) {
       if (event.key !== "Escape") return;
       if (openEscapeLayerCount() > 0) return;
       event.preventDefault();
-      if (mode !== "browse") changeMode("browse");
+      if (mode !== "preview") changeMode("preview");
       else close();
     };
     window.addEventListener("keydown", onKeyDown);
@@ -207,7 +209,7 @@ export function DesignStudioShell({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (studio.enabled) return;
-    if (mode !== "browse") changeMode("browse");
+    if (mode !== "preview") changeMode("preview");
     if (presentation) setPresentation(false);
   }, [changeMode, mode, presentation, studio.enabled]);
 

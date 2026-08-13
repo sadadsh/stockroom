@@ -40,6 +40,7 @@
  * class it BELONGS TO. `lib/applyElementOverrides.ts` resolves an id through whichever contract it
  * declares, so the two never quietly collapse into one another.
  */
+import { designIdSelector, isGeneratedDesignId } from "./designIdentity";
 
 import { DEV_ID_BY_ID } from "./devIds";
 
@@ -193,6 +194,9 @@ export function devRoleSelector(devId: string): string {
  * reaching every element that carries it directly AND every instance that declares it as its role.
  */
 export function nodesForDevId(devId: string, root: ParentNode = document): HTMLElement[] {
+  if (isGeneratedDesignId(devId)) {
+    return Array.from(root.querySelectorAll<HTMLElement>(designIdSelector(devId)));
+  }
   const selector =
     devIdScope(devId) === "instance"
       ? devIdSelector(devId)

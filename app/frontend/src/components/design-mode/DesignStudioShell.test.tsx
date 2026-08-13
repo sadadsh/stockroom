@@ -157,7 +157,7 @@ describe("DesignStudioShell", () => {
     await userEvent.setup().click(screen.getByRole("button", { name: "Design Studio" }));
 
     expect(screen.getByRole("complementary", { name: "Screens And States" })).toBeVisible();
-    expect(screen.getByRole("button", { name: "Browse" })).toHaveAttribute(
+    expect(screen.getByRole("button", { name: "Preview" })).toHaveAttribute(
       "aria-pressed",
       "true",
     );
@@ -192,7 +192,7 @@ describe("DesignStudioShell", () => {
       design_studio_last_scenario: "global.onboarding.open",
       design_studio_viewport: "desktop-1920",
       design_studio_custom_viewport_width: 1777,
-      design_studio_mode: "inspect",
+      design_studio_mode: "edit",
       design_studio_zoom: 75,
       design_studio_grid: true,
       design_studio_snap: false,
@@ -203,7 +203,7 @@ describe("DesignStudioShell", () => {
     await waitFor(() => expect(document.querySelector('[data-scenario-id="global.onboarding.open"]')).toBeInTheDocument());
     expect(screen.getByLabelText("Viewport")).toHaveValue("desktop-1920");
     expect(screen.getByLabelText("Zoom")).toHaveValue("75");
-    expect(within(screen.getByLabelText("Studio Mode")).getByRole("button", { name: "Inspect" })).toHaveAttribute("aria-pressed", "true");
+    expect(within(screen.getByLabelText("Studio Mode")).getByRole("button", { name: "Edit" })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByRole("button", { name: "Grid" })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByRole("button", { name: "Snap" })).toHaveAttribute("aria-pressed", "false");
     expect(screen.getByRole("button", { name: "Presentation Mode" })).toHaveAttribute("aria-pressed", "false");
@@ -302,24 +302,24 @@ describe("DesignStudioShell", () => {
   it("collapses every editor region without hiding Stockroom chrome", async () => {
     const { container } = await renderStudio();
     await userEvent.setup().click(
-      within(screen.getByLabelText("Studio Mode")).getByRole("button", { name: "Inspect" }),
+      within(screen.getByLabelText("Studio Mode")).getByRole("button", { name: "Edit" }),
     );
     await userEvent.setup().click(screen.getByRole("button", { name: "Presentation Mode" }));
 
     expect(screen.queryByRole("complementary", { name: "Screens And States" })).not.toBeInTheDocument();
     expect(screen.queryByRole("complementary", { name: "Inspector" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Browse" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "Preview" })).toHaveAttribute("aria-pressed", "true");
     expect(container.querySelector('[data-dev-id="rail.root"]')).toBeVisible();
   });
 
-  it("uses Escape to return to Browse before closing and restores focus to the rail entry", async () => {
+  it("uses Escape to return to Preview before closing and restores focus to the rail entry", async () => {
     const { entry } = await renderStudio();
     await userEvent.setup().click(
-      within(screen.getByLabelText("Studio Mode")).getByRole("button", { name: "Inspect" }),
+      within(screen.getByLabelText("Studio Mode")).getByRole("button", { name: "Edit" }),
     );
 
     fireEvent.keyDown(window, { key: "Escape" });
-    expect(screen.getByRole("button", { name: "Browse" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "Preview" })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByRole("region", { name: "Stockroom Preview" })).toBeVisible();
 
     fireEvent.keyDown(window, { key: "Escape" });
@@ -332,24 +332,14 @@ describe("DesignStudioShell", () => {
     const studioMode = within(screen.getByLabelText("Studio Mode"));
     const devPanel = within(screen.getByRole("complementary", { name: "Dev mode" }));
 
-    await userEvent.setup().click(devPanel.getByRole("button", { name: "Inspect" }));
-    expect(studioMode.getByRole("button", { name: "Inspect" })).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
-
-    await userEvent.setup().click(devPanel.getByRole("button", { name: "Arrange" }));
-    expect(studioMode.getByRole("button", { name: "Inspect" })).toHaveAttribute(
-      "aria-pressed",
-      "false",
-    );
-    expect(studioMode.getByRole("button", { name: "Arrange" })).toHaveAttribute(
+    await userEvent.setup().click(devPanel.getByRole("button", { name: "Edit" }));
+    expect(studioMode.getByRole("button", { name: "Edit" })).toHaveAttribute(
       "aria-pressed",
       "true",
     );
 
     fireEvent.keyDown(window, { key: "Escape" });
-    expect(studioMode.getByRole("button", { name: "Browse" })).toHaveAttribute(
+    expect(studioMode.getByRole("button", { name: "Preview" })).toHaveAttribute(
       "aria-pressed",
       "true",
     );
@@ -372,7 +362,7 @@ describe("DesignStudioShell", () => {
       expect(screen.queryByRole("dialog", { name: "About Stockroom" })).not.toBeInTheDocument(),
     );
     expect(screen.getByRole("region", { name: "Stockroom Preview" })).toBeVisible();
-    expect(screen.getByRole("button", { name: "Browse" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "Preview" })).toHaveAttribute("aria-pressed", "true");
     await waitFor(() => expect(aboutButton).toHaveFocus());
   });
 
@@ -387,7 +377,7 @@ describe("DesignStudioShell", () => {
 
     await waitFor(() => expect(screen.queryByTestId("column-picker")).not.toBeInTheDocument());
     expect(screen.getByRole("region", { name: "Stockroom Preview" })).toBeVisible();
-    expect(screen.getByRole("button", { name: "Browse" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "Preview" })).toHaveAttribute("aria-pressed", "true");
 
     await userEvent.setup().keyboard("{Escape}");
     await waitFor(() => expect(screen.queryByRole("region", { name: "Stockroom Preview" })).toBeNull());

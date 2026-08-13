@@ -42,7 +42,7 @@ import { useDevModeSave } from "./devModeSave";
 import { useDevModeSelection } from "./devModeSelection";
 import { useDevModeToggle } from "./devModeToggle";
 
-export type StudioMode = "browse" | "inspect" | "arrange";
+export type StudioMode = "preview" | "edit";
 
 export interface DevModeContextValue {
   enabled: boolean;
@@ -223,7 +223,7 @@ const DEFAULT: DevModeContextValue = {
   selectDevId: noop,
   inspect: false,
   toggleInspect: noop,
-  studioMode: "browse",
+  studioMode: "preview",
   setStudioMode: noop,
   showIds: false,
   toggleShowIds: noop,
@@ -262,24 +262,20 @@ export function DevModeProvider({ children }: { children: ReactNode }) {
   useApplyDraftOverrides(draft.tokens, draft.elements, theme);
   const { api: selectionApi, setInspectMode } = useDevModeSelection();
   const saveApi = useDevModeSave(draft);
-  const studioMode: StudioMode = toggleApi.editMode
-    ? "arrange"
-    : selectionApi.inspect
-      ? "inspect"
-      : "browse";
+  const studioMode: StudioMode = toggleApi.editMode || selectionApi.inspect ? "edit" : "preview";
   const setStudioMode = useCallback((mode: StudioMode) => {
-    setInspectMode(mode === "inspect");
-    setArrangeMode(mode === "arrange");
+    setInspectMode(mode === "edit");
+    setArrangeMode(false);
   }, [setArrangeMode, setInspectMode]);
   const toggleInspect = useCallback(() => {
-    setStudioMode(studioMode === "inspect" ? "browse" : "inspect");
+    setStudioMode(studioMode === "edit" ? "preview" : "edit");
   }, [setStudioMode, studioMode]);
   const toggleEditMode = useCallback(() => {
-    setStudioMode(studioMode === "arrange" ? "browse" : "arrange");
+    setStudioMode(studioMode === "edit" ? "preview" : "edit");
   }, [setStudioMode, studioMode]);
 
   useEffect(() => {
-    if (!enabled) setStudioMode("browse");
+    if (!enabled) setStudioMode("preview");
   }, [enabled, setStudioMode]);
 
   // Reset all is one draft action - all six slices clear together, the arrangement included - plus

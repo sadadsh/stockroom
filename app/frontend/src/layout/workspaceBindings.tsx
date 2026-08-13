@@ -272,10 +272,11 @@ function ArrangeableWorkspace({
   layout: LayoutDocument;
   children: ReactNode;
 }) {
-  const { editMode, setLayoutDraft } = useDevMode();
+  const { studioMode, setLayoutDraft } = useDevMode();
+  const editing = studioMode === "edit";
   return (
-    <ArrangeSurfaceProvider active={editMode} layout={layout} onLayout={setLayoutDraft}>
-      <LayoutPlacementChromeProvider chrome={editMode ? ArrangePlacementChrome : null}>
+    <ArrangeSurfaceProvider active={editing} layout={layout} onLayout={setLayoutDraft}>
+      <LayoutPlacementChromeProvider chrome={editing ? ArrangePlacementChrome : null}>
         {children}
       </LayoutPlacementChromeProvider>
     </ArrangeSurfaceProvider>

@@ -28,7 +28,7 @@ interface DesignStudioToolbarProps {
   onClose: () => void;
 }
 
-const MODES: readonly StudioMode[] = ["browse", "inspect", "arrange"];
+const MODES: readonly StudioMode[] = ["preview", "edit"];
 
 function titleCase(value: string): string {
   return value.charAt(0).toUpperCase() + value.slice(1);

@@ -91,9 +91,9 @@ function clickButton(label: string) {
   fireEvent.click(screen.getByRole("button", { name: label }));
 }
 
-// Turn Inspect on, then inspect-click the given element (its closest [data-dev-id] is selected).
+// Turn Edit on, then edit-click the given element (its closest design identity is selected).
 function inspectClick(el: Element) {
-  clickButton("Inspect");
+  clickButton("Edit");
   fireEvent.click(el);
 }
 
@@ -364,7 +364,8 @@ describe("DevPanel inspect-first shell", () => {
     render(<Harness />);
     toggleDevMode();
     clickButton("Show IDs");
-    const count = document.querySelectorAll("[data-dev-id]").length;
+    const count = Array.from(document.querySelectorAll("[data-dev-id],[data-design-id]"))
+      .filter((element) => !element.closest("[data-design-studio-chrome]")).length;
     expect(screen.getAllByTestId("dev-id-badge")).toHaveLength(count);
   });
 

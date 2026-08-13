@@ -48,6 +48,7 @@ function rectOf(el: Element): { left: number; top: number; width: number; height
 
 /** Technical drawings select their registered presentation root, never an engineering descendant. */
 function selectableTarget(target: Element): Element | null {
+  if (target.closest("[data-design-studio-chrome]")) return null;
   const productRoot = document.querySelector("[data-design-product-root]");
   if (productRoot && !productRoot.contains(target)) return null;
   const localRoot = target.closest(DESIGN_TARGET_SELECTOR);
@@ -137,7 +138,8 @@ export function DevInspector() {
       return;
     }
     function enumerate() {
-      const nodes = Array.from(document.querySelectorAll(DESIGN_TARGET_SELECTOR));
+      const nodes = Array.from(document.querySelectorAll(DESIGN_TARGET_SELECTOR))
+        .filter((element) => !element.closest("[data-design-studio-chrome]"));
       setBadges(
         nodes.map((el) => {
           const id = designIdOf(el) ?? "";

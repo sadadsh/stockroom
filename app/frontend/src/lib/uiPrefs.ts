@@ -35,7 +35,7 @@ export interface UiPrefs {
   design_studio_last_scenario?: string;
   design_studio_viewport?: "desktop-1366" | "desktop-1600" | "desktop-1920" | "custom";
   design_studio_custom_viewport_width?: number;
-  design_studio_mode?: "browse" | "inspect" | "arrange";
+  design_studio_mode?: "preview" | "edit";
   design_studio_zoom?: number;
   design_studio_grid?: boolean;
   design_studio_snap?: boolean;

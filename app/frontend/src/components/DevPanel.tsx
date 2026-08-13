@@ -360,21 +360,16 @@ function Toolbar({ search, setSearch }: { search: string; setSearch: (s: string)
   // Arrange is the one toolbar label that goes through the copy layer, because it is the switch for
   // a surface whose own labels do (see `design-mode/ArrangePanel.tsx` for why the string form and
   // not `<Text>`). Inspect and Show IDs stay the editor's own chrome, per this file's header.
-  const arrangeLabel = useText("design.arrange-mode", "Arrange");
+  const editLabel = useText("design.edit-mode", "Edit");
   return (
     <div className="flex shrink-0 items-center gap-1.5 border-b border-line px-3.5 py-2">
       <ToggleButton
-        pressed={dev.studioMode === "inspect"}
-        onClick={() => dev.setStudioMode(dev.studioMode === "inspect" ? "browse" : "inspect")}
-        label="Inspect"
-      />
-      <ToggleButton pressed={dev.showIds} onClick={dev.toggleShowIds} label="Show IDs" />
-      <ToggleButton
-        pressed={dev.studioMode === "arrange"}
-        onClick={() => dev.setStudioMode(dev.studioMode === "arrange" ? "browse" : "arrange")}
-        label={arrangeLabel}
+        pressed={dev.studioMode === "edit"}
+        onClick={() => dev.setStudioMode(dev.studioMode === "edit" ? "preview" : "edit")}
+        label={editLabel}
         devId="design.edit-toggle"
       />
+      <ToggleButton pressed={dev.showIds} onClick={dev.toggleShowIds} label="Show IDs" />
       <input
         type="search"
         aria-label="Search ids"
@@ -1581,7 +1576,7 @@ export function DevPanel({
   if (!dev.enabled) return null;
 
   return (
-    <aside aria-label="Dev mode" className="flex h-full min-h-0 w-full flex-col bg-popover">
+    <aside data-design-studio-chrome="true" aria-label="Dev mode" className="flex h-full min-h-0 w-full flex-col bg-popover">
       <header className="flex shrink-0 items-center gap-2 border-b border-line px-3.5 py-3">
         <span className="rounded-control bg-acc px-1.5 py-0.5 text-2xs font-semibold text-acc-on">
           DEV
