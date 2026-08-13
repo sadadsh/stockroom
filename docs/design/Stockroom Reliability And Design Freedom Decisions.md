@@ -314,3 +314,10 @@ gesture; whole-screen hiding remains an explicit reversible command in Layers.
 The product preview is protected by a Design Studio recovery boundary. A render exception leaves the
 fixed editor chrome and an Undo recovery action visible instead of replacing Stockroom with an empty
 canvas. Draft application remains atomic and the last accepted document remains recoverable.
+# Canvas-First Design Studio Simplification
+
+- Ordinary Design Studio now has one canvas, one contextual inspector, and closed-by-default Screens and Layers drawers.
+- View settings are progressively disclosed; developer IDs, tokens, diagnostics, source saving, and publishing are isolated in Developer Tools.
+- Each editing capability has one ordinary home. Legacy editors may remain available only behind Developer Tools while migrations complete.
+- The icon picker is a large offline multi-library visual catalog rather than a narrow Font Awesome list.
+- Automated tests prove contracts; representative user workflows and screenshots determine whether the result is simple and polished.

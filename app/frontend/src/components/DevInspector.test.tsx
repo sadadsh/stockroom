@@ -226,9 +226,10 @@ describe("DevInspector", () => {
     fireEvent.click(screen.getByRole("button", { name: "Complete Part" }));
 
     expect(screen.getByRole("button", { name: "Move Complete Part" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Rotate Complete Part" })).toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: /Resize Complete Part/ })).toHaveLength(8);
     expect(screen.getByRole("button", { name: "Hide Complete Part" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "More actions for Complete Part" }));
+    expect(screen.getByRole("button", { name: "Rotate Complete Part" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Detach Complete Part" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Bring Complete Part Forward" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Send Complete Part Backward" })).toBeInTheDocument();
@@ -241,6 +242,7 @@ describe("DevInspector", () => {
     on("toggle-inspect");
     const target = screen.getByRole("button", { name: "Complete Part" });
     fireEvent.click(target);
+    fireEvent.click(screen.getByRole("button", { name: "More actions for Complete Part" }));
 
     fireEvent.click(screen.getByRole("button", { name: "Bring Complete Part Forward" }));
     expect(target).toHaveStyle({ zIndex: "1" });
@@ -257,6 +259,7 @@ describe("DevInspector", () => {
     on("toggle-inspect");
     const target = screen.getByRole("button", { name: "Complete Part" });
     fireEvent.click(target);
+    fireEvent.click(screen.getByRole("button", { name: "More actions for Complete Part" }));
 
     const rotate = screen.getByRole("button", { name: "Rotate Complete Part" });
     fireEvent.keyDown(rotate, { key: "ArrowRight" });
@@ -277,6 +280,7 @@ describe("DevInspector", () => {
       toJSON: () => ({}),
     });
     fireEvent.click(target);
+    fireEvent.click(screen.getByRole("button", { name: "More actions for Complete Part" }));
 
     const rotate = screen.getByRole("button", { name: "Rotate Complete Part" });
     fireEvent(rotate, new MouseEvent("pointerdown", { bubbles: true, clientX: 70, clientY: 0 }));
@@ -392,6 +396,7 @@ describe("DevInspector", () => {
       toJSON: () => ({}),
     });
     fireEvent.click(target);
+    fireEvent.click(screen.getByRole("button", { name: "More actions for Complete Part" }));
 
     fireEvent.click(screen.getByRole("button", { name: "Detach Complete Part" }));
     expect(target).toHaveStyle({ position: "absolute", width: "100px", height: "40px" });

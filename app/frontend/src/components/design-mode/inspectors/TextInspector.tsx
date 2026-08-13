@@ -54,8 +54,8 @@ export function TextInspector(props: DomainInspectorProps) {
       <div className="mt-3">
         <h4 className="ui-property-label mb-1">{typographyLabel}</h4>
         {TYPE_PROPS.map((property) => (
-          <label key={property} className="grid grid-cols-[minmax(0,1fr)_104px] items-center gap-2 py-1 text-xs text-t2">
-            {property.split("-").map((part) => part[0].toUpperCase() + part.slice(1)).join(" ")}
+          <label key={property} className="block py-2 text-xs text-t2">
+            <span className="mb-1 block">{property.split("-").map((part) => part[0].toUpperCase() + part.slice(1)).join(" ")}</span>
             <VisualCssControl
               property={property}
               ariaLabel={propertyAria({ property })}

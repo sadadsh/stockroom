@@ -176,7 +176,17 @@ function selectableTarget(target: Element): Element | null {
  * The ID ITSELF is always shown verbatim beside this - the label is context, never a substitute.
  */
 function labelFor(id: string, el: Element | null): string {
-  if (isGeneratedDesignId(id)) return "Generated Stockroom element";
+  if (isGeneratedDesignId(id)) {
+    const explicit = el?.getAttribute("aria-label") || el?.getAttribute("title");
+    if (explicit) return explicit;
+    const names: Record<string, string> = {
+      a: "Link", button: "Button", div: "Container", footer: "Footer", header: "Header",
+      img: "Image", input: "Input", label: "Label", li: "List Item", main: "Main Content",
+      nav: "Navigation", section: "Section", select: "Select", span: "Text", svg: "Icon",
+      table: "Table", textarea: "Text Area", ul: "List",
+    };
+    return names[el?.tagName.toLowerCase() ?? ""] ?? "Stockroom Element";
+  }
   const entry = DEV_ID_BY_ID.get(id);
   if (entry) return entry.label;
   if (devIdScope(id) !== "instance") return "";
@@ -201,6 +211,7 @@ export function DevInspector() {
   const [badges, setBadges] = useState<Badge[]>([]);
   const [selection, setSelection] = useState<SelectedTarget[]>([]);
   const [selectionRect, setSelectionRect] = useState<Hover["rect"] | null>(null);
+  const [selectionActionsOpen, setSelectionActionsOpen] = useState(false);
   const gestureRef = useRef<Gesture | null>(null);
   const draftRef = useRef(dev.draft);
   useEffect(() => {
@@ -243,6 +254,7 @@ export function DevInspector() {
         const withoutDuplicate = current.filter((item) => item.id !== id);
         return [...withoutDuplicate, selected];
       });
+      setSelectionActionsOpen(false);
       selectDevId(id);
       selectVars(usedVarsForElement(el));
       const copy = target?.closest("[data-copy-id]") ?? null;
@@ -676,22 +688,7 @@ export function DevInspector() {
           }}
         >
           <div className="absolute left-0 top-full mt-1 flex max-w-[280px] flex-col gap-1 rounded-control border border-line2 bg-popover px-2 py-1.5 shadow-pop">
-            <div className="flex items-baseline gap-1.5">
-              <span className="font-mono text-2xs font-semibold text-t1">{hover.id}</span>
-              <span className="truncate text-2xs text-t3">{hover.label}</span>
-            </div>
-            {hover.vars.length > 0 ? (
-              <div className="flex flex-wrap gap-1">
-                {hover.vars.map((v) => (
-                  <span
-                    key={v}
-                    className="rounded-[3px] bg-raise2 px-1 py-0.5 font-mono text-2xs text-t2"
-                  >
-                    {v}
-                  </span>
-                ))}
-              </div>
-            ) : null}
+            <span className="truncate text-xs font-semibold text-t1">{hover.label}</span>
           </div>
         </div>
       ) : null}
@@ -723,15 +720,18 @@ export function DevInspector() {
         >
           <div className="pointer-events-auto absolute bottom-full left-0 mb-2 flex items-center gap-1 rounded-control border border-line2 bg-popover p-1 shadow-pop">
             <span className="max-w-40 truncate px-1 text-2xs font-semibold text-t1">{selectionName}</span>
-            {geometryEditable ? <>
-              <button type="button" aria-label={`Move ${selectionName}`} title={`Move ${selectionName}`} onPointerDown={(event) => beginGesture(event, "move")} onKeyDown={moveByKeyboard} className="rounded-control px-1.5 py-1 text-xs text-t1 hover:bg-control-hover">Move</button>
-              <button type="button" aria-label={`Rotate ${selectionName}`} title={`Rotate ${selectionName}`} onPointerDown={(event) => beginGesture(event, "rotate")} onKeyDown={rotateByKeyboard} className="rounded-control px-1.5 py-1 text-xs text-t1 hover:bg-control-hover">Rotate</button>
-            </> : null}
+            {geometryEditable ? <button type="button" aria-label={`Move ${selectionName}`} title={`Move ${selectionName}`} onPointerDown={(event) => beginGesture(event, "move")} onKeyDown={moveByKeyboard} className="rounded-control bg-acc px-2 py-1 text-xs font-semibold text-acc-on">Move</button> : null}
             <button type="button" aria-label={`${hidden ? "Show" : "Hide"} ${selectionName}`} onClick={toggleVisibility} className="rounded-control px-1.5 py-1 text-xs text-t1 hover:bg-control-hover">{hidden ? "Show" : "Hide"}</button>
-            {geometryEditable ? <button type="button" aria-label={`${dev.draft.elements[primary.id]?.position === "absolute" ? "Flow" : "Detach"} ${selectionName}`} onClick={toggleDetached} className="rounded-control px-1.5 py-1 text-xs text-t1 hover:bg-control-hover">{dev.draft.elements[primary.id]?.position === "absolute" ? "Flow" : "Detach"}</button> : null}
-            <button type="button" aria-label={`Bring ${selectionName} Forward`} onClick={() => adjustLayer(1)} className="rounded-control px-1.5 py-1 text-xs text-t1 hover:bg-control-hover">Forward</button>
-            <button type="button" aria-label={`Send ${selectionName} Backward`} onClick={() => adjustLayer(-1)} className="rounded-control px-1.5 py-1 text-xs text-t1 hover:bg-control-hover">Back</button>
-            <button type="button" aria-label={`Reset ${selectionName}`} onClick={resetSelection} className="rounded-control px-1.5 py-1 text-xs text-t1 hover:bg-control-hover">Reset</button>
+            <div className="relative">
+              <button type="button" aria-expanded={selectionActionsOpen} aria-label={`More actions for ${selectionName}`} onClick={() => setSelectionActionsOpen((open) => !open)} className="rounded-control px-2 py-1 text-xs text-t1 hover:bg-control-hover">More</button>
+              {selectionActionsOpen ? <div className="absolute left-0 top-full mt-1 grid min-w-36 gap-0.5 rounded-control bg-popover p-1 shadow-pop">
+                {geometryEditable ? <button type="button" aria-label={`Rotate ${selectionName}`} title={`Rotate ${selectionName}`} onPointerDown={(event) => beginGesture(event, "rotate")} onKeyDown={rotateByKeyboard} className="rounded-control px-2 py-1 text-left text-xs text-t1 hover:bg-control-hover">Rotate</button> : null}
+                {geometryEditable ? <button type="button" aria-label={`${dev.draft.elements[primary.id]?.position === "absolute" ? "Flow" : "Detach"} ${selectionName}`} onClick={toggleDetached} className="rounded-control px-2 py-1 text-left text-xs text-t1 hover:bg-control-hover">{dev.draft.elements[primary.id]?.position === "absolute" ? "Return To Flow" : "Detach"}</button> : null}
+                <button type="button" aria-label={`Bring ${selectionName} Forward`} onClick={() => adjustLayer(1)} className="rounded-control px-2 py-1 text-left text-xs text-t1 hover:bg-control-hover">Bring Forward</button>
+                <button type="button" aria-label={`Send ${selectionName} Backward`} onClick={() => adjustLayer(-1)} className="rounded-control px-2 py-1 text-left text-xs text-t1 hover:bg-control-hover">Send Backward</button>
+                <button type="button" aria-label={`Reset ${selectionName}`} onClick={resetSelection} className="rounded-control px-2 py-1 text-left text-xs text-t1 hover:bg-control-hover">Reset</button>
+              </div> : null}
+            </div>
           </div>
           {geometryEditable ? RESIZE_DIRECTIONS.map((direction) => (
             <button
@@ -740,7 +740,7 @@ export function DevInspector() {
               aria-label={`Resize ${selectionName} ${direction[0].toUpperCase()}${direction.slice(1)}`}
               onPointerDown={(event) => beginGesture(event, direction)}
               onKeyDown={(event) => resizeByKeyboard(event, direction)}
-              className="pointer-events-auto absolute size-3 -translate-x-1/2 -translate-y-1/2 rounded-full border border-acc bg-surface shadow-card"
+              className="pointer-events-auto absolute size-2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-acc bg-surface shadow-card"
               style={HANDLE_POSITION[direction]}
             />
           )) : null}

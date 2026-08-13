@@ -90,16 +90,21 @@ afterEach(() => {
 });
 
 describe("InspectorPanel", () => {
-  it("groups every editing capability into four plain-language sections", async () => {
+  function openGroup(name: string) {
+    const button = screen.getByRole("button", { name });
+    if (button.getAttribute("aria-expanded") !== "true") fireEvent.click(button);
+  }
+
+  it("groups every editing capability into six plain-language sections", async () => {
     render(<Harness />);
     fireEvent.click(screen.getByRole("button", { name: "Select First" }));
 
-    expect(screen.getByText("Box 1 · Text 1 · Icon 1")).toBeInTheDocument();
-    for (const facet of ["Arrangement", "Appearance", "Content", "Advanced"]) {
-      expect(screen.getByRole("tab", { name: facet })).toBeEnabled();
+    expect(screen.getAllByText("First Action")).toHaveLength(2);
+    for (const facet of ["Quick", "Arrangement", "Appearance", "Content", "States", "Advanced"]) {
+      expect(screen.getByRole("button", { name: facet })).toBeEnabled();
     }
-    expect(screen.getAllByRole("tab")).toHaveLength(4);
-    fireEvent.click(screen.getByRole("tab", { name: "Content" }));
+    expect(screen.queryAllByRole("tab")).toHaveLength(0);
+    openGroup("Content");
     fireEvent.change(screen.getByLabelText("Icon Stroke"), { target: { value: "2.4" } });
     await waitFor(() => {
       const draft = JSON.parse(screen.getByTestId("inspector-draft").textContent ?? "{}") as {
@@ -113,16 +118,19 @@ describe("InspectorPanel", () => {
   it("opens the complete offline icon library instead of hiding it behind quick picks", async () => {
     render(<Harness />);
     fireEvent.click(screen.getByRole("button", { name: "Select First" }));
-    fireEvent.click(screen.getByRole("tab", { name: "Content" }));
+    openGroup("Content");
+    fireEvent.click(screen.getByRole("button", { name: "Choose Icon" }));
 
     expect(await screen.findByRole("searchbox", { name: "Search Icon Catalog" })).toBeVisible();
-    expect(await screen.findByText("2,163 offline Font Awesome Free icons")).toBeVisible();
+    expect(await screen.findByText(/offline icons/)).toBeVisible();
+    expect(screen.getByRole("combobox", { name: "Icon Library" })).toContainHTML("Lucide");
   });
 
   it("offers the complete library for a raw automatically exposed interface SVG", async () => {
     render(<Harness />);
     fireEvent.click(screen.getByRole("button", { name: "Select Raw Icon" }));
-    fireEvent.click(screen.getByRole("tab", { name: "Content" }));
+    openGroup("Content");
+    fireEvent.click(screen.getByRole("button", { name: "Choose Icon" }));
 
     expect(await screen.findByRole("searchbox", { name: "Search Icon Catalog" })).toBeVisible();
     expect(screen.queryByText("The icon is not registered.")).toBeNull();
@@ -131,11 +139,12 @@ describe("InspectorPanel", () => {
   it("adds an offline icon to a text-only element", async () => {
     render(<Harness />);
     fireEvent.click(screen.getByRole("button", { name: "Select Text Only" }));
-    fireEvent.click(screen.getByRole("tab", { name: "Content" }));
+    openGroup("Content");
+    fireEvent.click(screen.getByRole("button", { name: "Choose Icon" }));
 
     const search = await screen.findByRole("searchbox", { name: "Search Icon Catalog" });
     fireEvent.change(search, { target: { value: "github" } });
-    fireEvent.click(await screen.findByRole("button", { name: "Select github" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Select github from Font Awesome brands" }));
 
     await waitFor(() => {
       const draft = JSON.parse(screen.getByTestId("inspector-draft").textContent ?? "{}") as {
@@ -152,7 +161,7 @@ describe("InspectorPanel", () => {
   it("applies Main Specifications text settings only to that selected text target", async () => {
     render(<Harness />);
     fireEvent.click(screen.getByRole("button", { name: "Select Text Only" }));
-    fireEvent.click(screen.getByRole("tab", { name: "Content" }));
+    openGroup("Content");
     fireEvent.change(screen.getByLabelText("Text font-size Value"), { target: { value: "22" } });
 
     await waitFor(() => {
@@ -171,7 +180,6 @@ describe("InspectorPanel", () => {
     expect(first.style.display).toBe("");
     expect(second.style.display).toBe("");
 
-    fireEvent.click(screen.getByRole("tab", { name: "Arrangement" }));
     fireEvent.click(screen.getByRole("button", { name: "Remove From Arrangement" }));
     await waitFor(() => {
       expect(first.style.display).toBe("none");
@@ -193,21 +201,24 @@ describe("InspectorPanel", () => {
       render(<Harness />);
       fireEvent.click(screen.getByRole("button", { name: "Select First" }));
 
-      fireEvent.click(screen.getByRole("tab", { name: "Content" }));
+      openGroup("Advanced");
       expect(screen.getByLabelText("Text Domain Preview")).toHaveTextContent(copyIds.join(" "));
+      expect(screen.getByLabelText("Icon Domain Preview")).toHaveTextContent(iconIds.join(" "));
+      openGroup("Advanced");
+      openGroup("Content");
       fireEvent.change(screen.getByLabelText("Text Content"), { target: { value: "Global Text" } });
       expect(screen.getByLabelText("Text font-size Value")).toHaveAttribute("type", "range");
       fireEvent.change(screen.getByLabelText("Text font-size Value"), { target: { value: "18" } });
 
-      expect(screen.getByLabelText("Icon Domain Preview")).toHaveTextContent(iconIds.join(" "));
       fireEvent.change(screen.getByLabelText("Icon Color"), { target: { value: "#123456" } });
       expect(screen.getByLabelText("Icon Color")).toHaveAttribute("type", "color");
       fireEvent.change(screen.getByLabelText("Icon Size"), { target: { value: "28" } });
       fireEvent.change(screen.getByLabelText("Treatment"), { target: { value: "solid" } });
       fireEvent.change(screen.getByLabelText("Alignment"), { target: { value: "text-top" } });
       fireEvent.change(screen.getByLabelText("Accessible Label"), { target: { value: "Add item" } });
-      const nextIcon = screen.getAllByRole("button", { name: /^Swap to / })[0]!;
-      fireEvent.click(nextIcon);
+      fireEvent.click(screen.getByRole("button", { name: "Choose Icon" }));
+      fireEvent.change(await screen.findByRole("searchbox", { name: "Search Icon Catalog" }), { target: { value: "github" } });
+      fireEvent.click(await screen.findByRole("button", { name: "Select github from Font Awesome brands" }));
       const body = screen.queryByLabelText("Edit Icon SVG Markup");
       if (body) fireEvent.change(body, { target: { value: '<path d="M2 2h20" />' } });
 
@@ -246,7 +257,7 @@ describe("InspectorPanel", () => {
   it("accepts only the validated property grammar in Advanced", async () => {
     render(<Harness />);
     fireEvent.click(screen.getByRole("button", { name: "Select First" }));
-    fireEvent.click(screen.getByRole("tab", { name: "Advanced" }));
+    openGroup("Advanced");
 
     expect(screen.getByText(/DOM structure cannot be edited/i)).toBeInTheDocument();
     expect(screen.queryByLabelText(/HTML|JavaScript/i)).not.toBeInTheDocument();
@@ -267,7 +278,7 @@ describe("InspectorPanel", () => {
     render(<Harness />);
     fireEvent.click(screen.getByRole("button", { name: "Select First" }));
     const target = document.querySelector<HTMLButtonElement>('[data-dev-id="detail.action[first]"]')!;
-    fireEvent.click(screen.getByRole("tab", { name: "Appearance" }));
+    openGroup("States");
 
     fireEvent.click(screen.getByRole("button", { name: "Disabled" }));
     expect(target).toBeDisabled();
@@ -306,6 +317,7 @@ describe("InspectorPanel", () => {
     const first = document.querySelector<HTMLElement>('[data-dev-id="detail.action[first]"]')!;
     const second = document.querySelector<HTMLElement>('[data-dev-id="detail.action[second]"]')!;
 
+    openGroup("Arrangement");
     expect(screen.getByLabelText("Width Value")).toHaveAttribute("type", "range");
     expect(screen.getByLabelText("Display Value")).toHaveRole("combobox");
     fireEvent.change(screen.getByLabelText("Width Value"), { target: { value: "240" } });
@@ -313,7 +325,7 @@ describe("InspectorPanel", () => {
     fireEvent.click(screen.getByRole("button", { name: "Reset Width" }));
     await waitFor(() => expect(first.style.width).toBe(""));
 
-    fireEvent.click(screen.getByRole("tab", { name: "Arrangement" }));
+    openGroup("Quick");
     fireEvent.click(screen.getByRole("button", { name: "Remove From Arrangement" }));
     await waitFor(() => expect(second.style.display).toBe("none"));
     fireEvent.click(screen.getByRole("button", { name: "Target" }));

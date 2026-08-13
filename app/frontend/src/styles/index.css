@@ -503,12 +503,13 @@
   }
 }
 
-/* Design Studio preview grid: a toolbar preference, never a shipped application style. */
-.design-studio-preview-grid {
+/* Design Studio preview grid: rendered above the product so every snap line remains legible. */
+.design-studio-preview-grid-overlay {
   background-image:
     linear-gradient(to right, var(--c-line) 1px, transparent 1px),
     linear-gradient(to bottom, var(--c-line) 1px, transparent 1px);
   background-size: var(--design-studio-grid-size, 8px) var(--design-studio-grid-size, 8px);
+  opacity: 0.55;
 }
 
 .design-studio-resizer {

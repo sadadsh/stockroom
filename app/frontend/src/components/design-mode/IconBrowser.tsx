@@ -1,12 +1,10 @@
-import { useMemo, useRef, useState } from "react";
-import { observeElementRect, useVirtualizer } from "@tanstack/react-virtual";
-import { searchIconCatalog } from "../../design-studio/fontAwesomeRegistry";
+import { useEffect, useMemo, useState } from "react";
+import { fontAwesomeCatalogEntries, loadOfflineIconCollections, offlineIconFamilies, searchOfflineIcons } from "../../design-studio/offlineIconRegistry";
 import { useCopyFormatter, useText } from "../../lib/copy";
 import type { IconCatalogEntry } from "../../lib/iconRegistry";
 import { sanitizeIconMarkup } from "../iconResolve";
 
-const ROW_HEIGHT = 52;
-const INITIAL_RECT = { width: 320, height: 260 };
+const MAX_VISIBLE_RESULTS = 500;
 
 function fittedBody(entry: IconCatalogEntry, targetViewBox: string): string {
   const values = targetViewBox.trim().split(/\s+/).map(Number);
@@ -28,60 +26,61 @@ export function IconBrowser({
   targetViewBox: string;
 }) {
   const [query, setQuery] = useState("");
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const entries = useMemo(() => searchIconCatalog(query), [query]);
+  const [family, setFamily] = useState("");
+  const [extraEntries, setExtraEntries] = useState<readonly IconCatalogEntry[]>([]);
+  const entries = useMemo(() => searchOfflineIcons(query, family, extraEntries), [extraEntries, family, query]);
+  const visibleEntries = entries.slice(0, MAX_VISIBLE_RESULTS);
+  const families = useMemo(() => offlineIconFamilies(), []);
+  useEffect(() => {
+    let active = true;
+    void loadOfflineIconCollections().then((loaded) => { if (active) setExtraEntries(loaded); });
+    return () => { active = false; };
+  }, []);
   const catalogAria = useText("design-studio.icon-catalog.aria", "Offline Icon Catalog");
   const searchLabel = useText("design-studio.icon-catalog.search", "Search Icon Catalog");
   const searchPlaceholder = useText("design-studio.icon-catalog.search-placeholder", "Search labels, terms, or icon sets");
   const resultsAria = useText("design-studio.icon-catalog.results", "Icon Search Results");
-  const selectAria = useCopyFormatter("design-studio.icon-catalog.select", "Select {icon}");
-  const countLabel = useCopyFormatter("design-studio.icon-catalog.count", "{count} offline Font Awesome Free icons");
-  const virtualizer = useVirtualizer({
-    count: entries.length,
-    getScrollElement: () => scrollRef.current,
-    getItemKey: (index) => entries[index]?.id ?? index,
-    estimateSize: () => ROW_HEIGHT,
-    overscan: 8,
-    initialRect: INITIAL_RECT,
-    observeElementRect: (instance, callback) => observeElementRect(instance, (rect) => callback(rect.height > 0 ? rect : INITIAL_RECT)),
-  });
-
+  const selectAria = useCopyFormatter("design-studio.icon-catalog.select", "Select {icon} from {family}");
+  const countLabel = useCopyFormatter("design-studio.icon-catalog.count", "{count} offline icons");
+  const allLibrariesLabel = useText("design-studio.icon-catalog.all-libraries", "All Libraries");
+  const libraryLabel = useText("design-studio.icon-catalog.library", "Icon Library");
   return (
     <section className="mt-3 pt-3" aria-label={catalogAria}>
+      <div className="grid grid-cols-[1fr_9rem] gap-2">
       <label className="block text-xs text-t2">
-        {searchLabel}
+        <span className="sr-only">{searchLabel}</span>
         <input
           type="search"
           aria-label={searchLabel}
           value={query}
           onChange={(event) => setQuery(event.currentTarget.value)}
           placeholder={searchPlaceholder}
-          className="mt-1 w-full rounded-control border border-line bg-field px-2 py-1.5 text-2xs text-t1 outline-none focus:border-acc"
+          className="w-full rounded-control bg-field px-2 py-1.5 text-2xs text-t1 outline-none focus:ring-1 focus:ring-acc"
         />
       </label>
-      <div ref={scrollRef} className="mt-2 max-h-64 overflow-auto rounded-control border border-line bg-field" aria-label={resultsAria}>
-        <div style={{ height: `${virtualizer.getTotalSize()}px`, position: "relative" }}>
-          {virtualizer.getVirtualItems().map((item) => {
-            const entry = entries[item.index];
-            if (!entry) return null;
-            return (
+      <select aria-label={libraryLabel} value={family} onChange={(event) => setFamily(event.currentTarget.value)} className="rounded-control bg-field px-2 text-2xs text-t1">
+        <option value="">{allLibrariesLabel}</option>
+        {families.map((item) => <option key={item} value={item}>{item}</option>)}
+      </select>
+      </div>
+      <div className="mt-2 max-h-[60vh] overflow-auto rounded-control bg-field p-2" aria-label={resultsAria}>
+        <div className="grid grid-cols-4 gap-1 sm:grid-cols-6 lg:grid-cols-8">
+          {visibleEntries.map((entry) => (
               <button
                 key={entry.id}
                 type="button"
-                aria-label={selectAria({ icon: entry.label })}
+                aria-label={selectAria({ icon: entry.label, family: entry.family })}
                 onClick={() => onSelect({ ...entry, body: sanitizeIconMarkup(fittedBody(entry, targetViewBox)) })}
-                className="absolute left-0 flex w-full items-center gap-2 px-2 text-left text-t2 hover:bg-raise2 hover:text-t1"
-                style={{ height: `${item.size}px`, transform: `translateY(${item.start}px)` }}
+                className="flex min-h-20 min-w-0 flex-col items-center justify-center gap-2 rounded-control p-2 text-center text-t2 hover:bg-raise2 hover:text-t1"
               >
-                <svg className="h-4 w-4 shrink-0" viewBox={entry.viewBox} fill="currentColor" aria-hidden="true" dangerouslySetInnerHTML={{ __html: sanitizeIconMarkup(entry.body) }} />
-                <span className="min-w-0 flex-1 truncate text-2xs font-semibold">{entry.label}</span>
-                <span className="text-2xs text-t3">{entry.family}</span>
+                <svg className="h-7 w-7 shrink-0" viewBox={entry.viewBox} fill="currentColor" aria-hidden="true" dangerouslySetInnerHTML={{ __html: sanitizeIconMarkup(entry.body) }} />
+                <span className="w-full truncate text-2xs font-semibold">{entry.label}</span>
+                <span className="w-full truncate text-[9px] text-t3">{entry.family}</span>
               </button>
-            );
-          })}
+          ))}
         </div>
       </div>
-      <p className="mt-2 text-2xs text-t3">{countLabel({ count: entries.length.toLocaleString() })}</p>
+      <p className="mt-2 text-2xs text-t3">{countLabel({ count: entries.length.toLocaleString() })} · {(fontAwesomeCatalogEntries().length + extraEntries.length).toLocaleString()} total</p>
     </section>
   );
 }

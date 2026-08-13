@@ -10,10 +10,10 @@ describe("IconBrowser", () => {
     render(<IconBrowser onSelect={select} targetViewBox="0 0 24 24" />);
 
     await user.type(screen.getByRole("searchbox", { name: "Search Icon Catalog" }), "github");
-    await user.click(await screen.findByRole("button", { name: "Select github" }));
+    await user.click(await screen.findByRole("button", { name: "Select github from Font Awesome brands" }));
 
     expect(select).toHaveBeenCalledWith(expect.objectContaining({
-      family: "brands",
+      family: "Font Awesome brands",
       label: "github",
       body: expect.not.stringContaining("http"),
     }));

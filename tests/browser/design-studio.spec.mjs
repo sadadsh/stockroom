@@ -124,8 +124,16 @@ function createStudio(page, baseUrl) {
         await page.locator('[aria-label="Design Studio Breadcrumb"]').waitFor({ state: "visible" });
       }
       mark = productEffects.length;
-      await page.locator(`[data-scenario-catalog-id="${id}"]`).click();
+      const scenarioButton = page.locator(`[data-scenario-catalog-id="${id}"]`);
+      if (!(await scenarioButton.isVisible())) {
+        await page.getByLabel("Design Studio Drawers").getByRole("button", { name: "Screens", exact: true }).click();
+      }
+      await page.getByRole("searchbox", { name: "Search Screens And States" }).fill(id);
+      await scenarioButton.click();
       await page.locator(`[data-scenario-id="${id}"]`).waitFor({ state: "attached" });
+      await page.getByRole("searchbox", { name: "Search Screens And States" }).fill("");
+      const screensToggle = page.getByLabel("Design Studio Drawers").getByRole("button", { name: "Screens", exact: true });
+      if ((await screensToggle.getAttribute("aria-pressed")) === "true") await screensToggle.click();
     },
     liveProductRequests() {
       return productEffects.slice(mark);
@@ -139,11 +147,13 @@ function createStudio(page, baseUrl) {
     },
     async setViewport(viewport) {
       await page.setViewportSize({ width: viewport.width, height: viewport.height });
+      await page.getByRole("button", { name: "View", exact: true }).click();
       await page.getByLabel("Viewport", { exact: true }).selectOption(viewport.preset);
+      await page.getByRole("button", { name: "View", exact: true }).click();
     },
     async close() {
       if (await page.locator('[aria-label="Design Studio Breadcrumb"]').count()) {
-        await page.getByRole("button", { name: "Close Design Studio" }).click();
+        await page.getByRole("button", { name: "Exit", exact: true }).click();
       }
     },
   };
@@ -171,19 +181,49 @@ async function assertVisibleTargets(page, scenario) {
 }
 
 async function representativeClickThrough(page, studio) {
+  async function exerciseControl(control) {
+    await control.focus();
+    await page.locator("[data-design-product-root]").waitFor({ state: "visible" });
+    await control.press("ArrowRight");
+    await page.getByRole("button", { name: "Undo", exact: true }).waitFor({ state: "visible" });
+    assert.equal(await page.getByRole("button", { name: "Undo", exact: true }).isEnabled(), true);
+    await page.getByRole("button", { name: "Undo", exact: true }).click();
+  }
   await studio.open("components.full-data");
   const modes = page.getByLabel("Studio Mode");
   await modes.getByRole("button", { name: "Edit", exact: true }).click();
   await page.locator('[data-dev-id="shell.root"]').click({ position: { x: 10, y: 10 } });
-  for (const domain of ["Box", "Text", "Icon", "Arrangement", "Behavior", "States", "Advanced"]) {
+  await page.screenshot({ path: path.join(evidenceRoot, "representative-edit.png"), fullPage: false });
+  await page.locator('[data-design-product-root] [data-icon-id="nav.components"]').first().click();
+  await page.getByRole("button", { name: "View", exact: true }).click();
+  const grid = page.getByRole("button", { name: "Grid", exact: true });
+  if ((await grid.getAttribute("aria-pressed")) !== "true") await grid.click();
+  const snap = page.getByRole("button", { name: "Snap", exact: true });
+  if ((await snap.getAttribute("aria-pressed")) !== "true") await snap.click();
+  await page.getByLabel("Grid Size Exact", { exact: true }).fill("12");
+  await page.getByRole("button", { name: "View", exact: true }).click();
+  await page.locator('[aria-label="Stockroom Preview"][data-grid-size="12"][data-snap="on"]').waitFor({ state: "visible" });
+  await exerciseControl(page.getByRole("button", { name: /^Move / }).first());
+  await exerciseControl(page.getByRole("button", { name: /^Resize .* East$/ }).first());
+  await page.getByRole("button", { name: /^More actions for / }).click();
+  await exerciseControl(page.getByRole("button", { name: /^Rotate / }).first());
+  await page.getByRole("button", { name: "Content", exact: true }).click();
+  await page.getByRole("button", { name: "Choose Icon", exact: true }).first().click();
+  await page.getByRole("dialog", { name: "Choose Icon" }).waitFor({ state: "visible" });
+  await page.getByRole("searchbox", { name: "Search Icon Catalog" }).waitFor({ state: "visible" });
+  await page.getByRole("option", { name: "Lucide", exact: true }).waitFor({ state: "attached", timeout: 30_000 });
+  await page.screenshot({ path: path.join(evidenceRoot, "representative-icon-library.png"), fullPage: false });
+  await page.keyboard.press("Escape");
+  for (const domain of ["Quick", "Arrangement", "Appearance", "Content", "States", "Advanced"]) {
     const button = page.getByRole("button", { name: domain, exact: true });
     if (await button.count()) await button.first().click();
   }
   await modes.getByRole("button", { name: "Preview", exact: true }).click();
-  await page.getByRole("button", { name: "Hide Screens And States", exact: true }).click();
-  await page.getByRole("button", { name: "Show Screens And States", exact: true }).click();
-  await page.getByRole("button", { name: "Hide Inspector", exact: true }).click();
-  await page.getByRole("button", { name: "Show Inspector", exact: true }).click();
+  const drawers = page.getByLabel("Design Studio Drawers");
+  await drawers.getByRole("button", { name: "Screens", exact: true }).click();
+  await drawers.getByRole("button", { name: "Screens", exact: true }).click();
+  await drawers.getByRole("button", { name: "Layers", exact: true }).click();
+  await drawers.getByRole("button", { name: "Layers", exact: true }).click();
   await page.screenshot({ path: path.join(evidenceRoot, "representative-click-through.png"), fullPage: false });
 }
 
@@ -260,6 +300,8 @@ try {
   // task-owned machine-config root and an edit made through the product UI.
   await studio.open("global.real-data");
   await studio.setTheme("dark");
+  await page.getByRole("button", { name: "View", exact: true }).click();
+  await page.getByRole("button", { name: "Developer Tools", exact: true }).click();
   await page.getByRole("tab", { name: "Tokens", exact: true }).click();
   const showAll = page.getByRole("button", { name: "Show All", exact: true });
   if (await showAll.count()) await showAll.click();
@@ -303,6 +345,9 @@ try {
   if ((await restartedPage.locator("html").getAttribute("data-theme")) !== "dark") {
     await restartedPage.getByTitle("Switch Preview Theme").click();
   }
+  await restartedPage.getByRole("button", { name: "View", exact: true }).click();
+  await restartedPage.getByRole("button", { name: "Developer Tools", exact: true }).click();
+  await restartedPage.getByRole("tab", { name: "Tokens", exact: true }).click();
   const restoredAccent = restartedPage.getByLabel("Accent value", { exact: true });
   await restoredAccent.waitFor({ state: "visible" });
   await restartedPage.waitForFunction(

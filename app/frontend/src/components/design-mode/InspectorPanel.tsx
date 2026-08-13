@@ -25,7 +25,7 @@ import { StatesInspector } from "./inspectors/StatesInspector";
 import { TextInspector } from "./inspectors/TextInspector";
 import { CadPresentationInspector } from "./inspectors/CadPresentationInspector";
 
-type InspectorFacet = "layout" | "appearance" | "content" | "advanced";
+type InspectorFacet = "quick" | "layout" | "appearance" | "content" | "states" | "advanced";
 
 function rootElement(root?: Element): Element {
   return root ?? document.documentElement;
@@ -57,25 +57,28 @@ function inspectionsFor(root: Element, ids: readonly string[]): TargetInspection
 export function InspectorPanel({ root }: { root?: Element; integrated?: boolean } = {}) {
   const dev = useDevMode();
   const studio = useOptionalDesignStudio();
-  const defaultFacet: InspectorFacet = "layout";
-  const [facetState, setFacetState] = useState<{ targetId: string | null; value: InspectorFacet }>(() => ({ targetId: dev.selectedDevId, value: defaultFacet }));
-  const facet = facetState.targetId === dev.selectedDevId ? facetState.value : defaultFacet;
-  const setFacet = (value: InspectorFacet) => setFacetState({ targetId: dev.selectedDevId, value });
+  const defaultFacet: InspectorFacet = "quick";
+  const [openState, setOpenState] = useState<{ targetId: string | null; values: InspectorFacet[] }>(() => ({ targetId: dev.selectedDevId, values: [defaultFacet] }));
+  const openFacets = openState.targetId === dev.selectedDevId ? openState.values : [defaultFacet];
+  const toggleFacet = (value: InspectorFacet) => setOpenState((current) => {
+    const values = current.targetId === dev.selectedDevId ? current.values : [defaultFacet];
+    return {
+      targetId: dev.selectedDevId,
+      values: values.includes(value) ? values.filter((item) => item !== value) : [...values, value],
+    };
+  });
   const resolvedRoot = rootElement(root);
   const inspection = useMemo(
     () => inspectionFor(resolvedRoot, dev.selectedDevId),
     [dev.selectedDevId, resolvedRoot],
   );
   const contextualInspectorLabel = useText("design-studio.inspector.context", "Contextual Inspector");
-  const targetDomainsLabel = useText("design-studio.inspector.target-domains", "Target Domains");
-  const inspectorDomainsLabel = useText("design-studio.inspector.domains", "Inspector Domains");
-  const boxLabel = useText("design-studio.inspector.domain.box", "Box");
-  const textLabel = useText("design-studio.inspector.domain.text", "Text");
-  const iconLabel = useText("design-studio.inspector.domain.icon", "Icon");
+  const selectHint = useText("design-studio.inspector.select-hint", "Click anything in Stockroom to edit it.");
+  const inspectorDomainsLabel = useText("design-studio.inspector.domains", "Inspector Groups");
   const layoutLabel = useText("design-studio.inspector.domain.layout", "Arrangement");
+  const quickLabel = useText("design-studio.inspector.domain.quick", "Quick");
   const appearanceLabel = useText("design-studio.inspector.domain.appearance", "Appearance");
   const contentLabel = useText("design-studio.inspector.domain.content", "Content");
-  const behaviorLabel = useText("design-studio.inspector.domain.behavior", "Behavior");
   const statesLabel = useText("design-studio.inspector.domain.states", "States");
   const advancedLabel = useText("design-studio.inspector.domain.advanced", "Advanced");
   const screenLabel = useText("design-studio.inspector.scope.screen", "Screen");
@@ -87,9 +90,11 @@ export function InspectorPanel({ root }: { root?: Element; integrated?: boolean 
   const textDomainPreviewLabel = useText("design-studio.inspector.domain.text-preview", "Text Domain Preview");
   const iconDomainPreviewLabel = useText("design-studio.inspector.domain.icon-preview", "Icon Domain Preview");
   const facets: readonly { id: InspectorFacet; label: string }[] = [
+    { id: "quick", label: quickLabel },
     { id: "layout", label: layoutLabel },
     { id: "appearance", label: appearanceLabel },
     { id: "content", label: contentLabel },
+    { id: "states", label: statesLabel },
     { id: "advanced", label: advancedLabel },
   ];
   const affectedTargetIds = useMemo(
@@ -105,7 +110,12 @@ export function InspectorPanel({ root }: { root?: Element; integrated?: boolean 
     [affectedTargetIds, resolvedRoot],
   );
 
-  if (!dev.enabled || !inspection) return null;
+  if (!dev.enabled) return null;
+  if (!inspection) return (
+    <section aria-label={contextualInspectorLabel} className="grid min-h-48 place-items-center px-6 text-center">
+      <p className="text-sm text-t2">{selectHint}</p>
+    </section>
+  );
 
   const domainOverrideIds = (domain: EditableTargetDomain) => {
     const ids = new Set<string>();
@@ -191,41 +201,45 @@ export function InspectorPanel({ root }: { root?: Element; integrated?: boolean 
   };
   const textContentIds = inspection.editTargets.text.contentIds;
   const iconContentIds = inspection.editTargets.icon.contentIds;
+  const facetContent = (value: InspectorFacet) => {
+    if (value === "quick") return <LayoutInspector {...inspectorProps} />;
+    if (value === "layout") return <BoxInspector {...inspectorProps} section="layout" />;
+    if (value === "appearance") return <BoxInspector {...inspectorProps} section="appearance" />;
+    if (value === "states") return <StatesInspector {...inspectorProps} />;
+    if (value === "advanced") return <>
+      <div className="px-3.5 py-2 font-mono text-2xs text-t3">
+        <div aria-label={textDomainPreviewLabel}>{textContentIds.join(" ")}</div>
+        <div aria-label={iconDomainPreviewLabel}>{iconContentIds.join(" ")}</div>
+      </div>
+      <BehaviorInspector {...inspectorProps} />
+      <AdvancedInspector {...inspectorProps} />
+    </>;
+    return <>
+      <TextInspector {...inspectorProps} />
+      <IconInspector {...inspectorProps} />
+      <CadPresentationInspector {...inspectorProps} />
+    </>;
+  };
   return (
     <section aria-label={contextualInspectorLabel}>
       <div className="px-3.5 py-2.5">
         <div className="flex items-baseline justify-between gap-2">
           <div>
-            <div className="ui-property-label">{targetDomainsLabel}</div>
-            <div className="mt-0.5 text-xs font-semibold text-t1">
-              {boxLabel} {inspection.summary.boxes} · {textLabel} {inspection.summary.texts} · {iconLabel} {inspection.summary.icons}
-            </div>
+            <div className="truncate text-sm font-semibold text-t1">{inspection.target.textContent?.replace(/\s+/g, " ").trim().slice(0, 48) || contextualInspectorLabel}</div>
           </div>
-          <span className="rounded-control bg-raise2 px-1.5 py-0.5 text-2xs text-t2">
-            {inspection.summary.behaviors} {behaviorLabel} · {inspection.summary.states} {statesLabel}
-          </span>
         </div>
       </div>
 
-      <div role="tablist" aria-label={inspectorDomainsLabel} className="flex flex-wrap gap-1 bg-band/50 px-3.5 py-1.5">
+      <div aria-label={inspectorDomainsLabel} className="space-y-1 px-2">
         {facets.map((item) => (
-          <button key={item.id} type="button" role="tab" aria-selected={facet === item.id} onClick={() => setFacet(item.id)} className={`rounded-control px-2 py-1 text-2xs font-semibold ${facet === item.id ? "bg-raise2 text-t1" : "text-t3 hover:text-t2"}`}>
-            {item.label}
-          </button>
+          <section key={item.id} className="rounded-control bg-field/35">
+            <button type="button" aria-expanded={openFacets.includes(item.id)} onClick={() => toggleFacet(item.id)} className="flex h-8 w-full items-center justify-between rounded-control px-2.5 text-left text-xs font-semibold text-t2 hover:bg-raise2 hover:text-t1">
+              {item.label}<span aria-hidden="true">{openFacets.includes(item.id) ? "−" : "+"}</span>
+            </button>
+            {openFacets.includes(item.id) ? <div>{facetContent(item.id)}</div> : null}
+          </section>
         ))}
       </div>
-
-      {facet === "content" ? (
-        <div className="px-3.5 py-2 font-mono text-2xs text-t3">
-          <div aria-label={textDomainPreviewLabel}>{textContentIds.join(" ")}</div>
-          <div aria-label={iconDomainPreviewLabel}>{iconContentIds.join(" ")}</div>
-        </div>
-      ) : null}
-
-      {facet === "layout" ? <><LayoutInspector {...inspectorProps} /><BoxInspector {...inspectorProps} section="layout" /></> : null}
-      {facet === "appearance" ? <><BoxInspector {...inspectorProps} section="appearance" /><StatesInspector {...inspectorProps} /></> : null}
-      {facet === "content" ? <><TextInspector {...inspectorProps} /><IconInspector {...inspectorProps} /><CadPresentationInspector {...inspectorProps} /></> : null}
-      {facet === "advanced" ? <><BehaviorInspector {...inspectorProps} /><AdvancedInspector {...inspectorProps} /></> : null}
 
       <div className="mt-2 bg-band/50 px-3.5 py-2">
         <div className="ui-property-label mb-1.5">{resetLabel}</div>

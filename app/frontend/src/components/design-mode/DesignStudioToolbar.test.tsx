@@ -64,14 +64,33 @@ describe("DesignStudioToolbar local Apply", () => {
   it("shows Draft Only before a design is explicitly applied", () => {
     renderToolbar();
     expect(screen.getByText("Draft")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Apply" })).toBeEnabled();
+  });
+
+  it("keeps secondary display controls inside one View menu", async () => {
+    renderToolbar();
+
+    expect(screen.queryByLabelText("Viewport")).not.toBeInTheDocument();
+    expect(screen.queryByRole("slider", { name: "Grid Size" })).not.toBeInTheDocument();
+    await userEvent.setup().click(screen.getByRole("button", { name: "View" }));
+
+    expect(screen.getByLabelText("Viewport")).toBeVisible();
     expect(screen.getByRole("slider", { name: "Grid Size" })).toHaveValue("8");
-    expect(screen.getByRole("button", { name: "Set" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Presentation" })).toBeVisible();
+  });
+
+  it("uses one clear Apply action and a short Exit action", () => {
+    renderToolbar();
+    expect(screen.getByRole("button", { name: "Apply" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Exit" })).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Set" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Close Design Studio" })).not.toBeInTheDocument();
   });
 
   it("shows the active machine revision after Apply", () => {
     studio.appliedRevision = "1234567890abcdef";
     renderToolbar();
-    expect(screen.getByText("Set On This PC · 12345678")).toBeVisible();
+    expect(screen.getByText("Applied · 12345678")).toBeVisible();
   });
 
   it("never applies a fixture-backed preview", async () => {
@@ -79,7 +98,7 @@ describe("DesignStudioToolbar local Apply", () => {
     studio.activeScenarioId = studio.activeScenario.id;
     renderToolbar();
 
-    const button = screen.getByRole("button", { name: "Set" });
+    const button = screen.getByRole("button", { name: "Apply" });
     expect(button).toBeDisabled();
     await userEvent.setup().click(button);
     expect(applyLocal).not.toHaveBeenCalled();
@@ -88,7 +107,7 @@ describe("DesignStudioToolbar local Apply", () => {
   it("applies the personal draft only after the person presses Apply", async () => {
     renderToolbar();
 
-    await userEvent.setup().click(screen.getByRole("button", { name: "Set" }));
+    await userEvent.setup().click(screen.getByRole("button", { name: "Apply" }));
     expect(applyLocal).toHaveBeenCalledOnce();
   });
 });

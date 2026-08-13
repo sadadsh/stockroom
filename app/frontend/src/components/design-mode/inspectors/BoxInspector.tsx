@@ -20,17 +20,18 @@ function PropertyRow({ property, ...props }: { property: string } & DomainInspec
   const resetLabel = useText("design-studio.inspector.box.reset", "Reset");
   const label = labelOf(property);
   return (
-    <div className="grid grid-cols-[minmax(0,1fr)_104px_auto] items-center gap-2 py-1">
-      <label className="truncate text-xs text-t2" htmlFor={`box-${property}`}>{label}</label>
+    <div className="py-2">
+      <div className="mb-1 flex items-center justify-between gap-2">
+        <label className="truncate text-xs text-t2" htmlFor={`box-${property}`}>{label}</label>
+        <button type="button" aria-label={resetAria({ property: label })} onClick={() => props.resetDomainProperty("box", property)} className="text-2xs font-semibold text-t3 hover:text-t1">{resetLabel}</button>
+      </div>
       <VisualCssControl property={property} ariaLabel={valueAria({ property: label })} value={resolved} onCommit={(value) => props.setDomainProperty("box", property, value)} />
-      <button type="button" aria-label={resetAria({ property: label })} onClick={() => props.resetDomainProperty("box", property)} className="text-2xs font-semibold text-t3 hover:text-t1">{resetLabel}</button>
     </div>
   );
 }
 
 export function BoxInspector(props: DomainInspectorProps & { section?: "layout" | "appearance" }) {
   const section = props.section;
-  const note = useText("design-studio.inspector.box.advanced-note", "Position, inset, overflow, gradients, borders, shadows, flex, and grid values remain visible in Advanced when accepted in the validated application grammar.");
   return (
     <div className="px-3.5 py-2">
       {GROUPS.filter(([group]) => !section || group === section).map(([, title, properties]) => (
@@ -39,7 +40,6 @@ export function BoxInspector(props: DomainInspectorProps & { section?: "layout" 
           {properties.map((property) => <PropertyRow key={property} property={property} {...props} />)}
         </section>
       ))}
-      <p className="mt-2 text-2xs leading-relaxed text-t3">{note}</p>
     </div>
   );
 }

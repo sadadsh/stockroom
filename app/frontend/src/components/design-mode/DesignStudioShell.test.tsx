@@ -133,6 +133,31 @@ async function renderStudio() {
   return { ...result, entry };
 }
 
+async function openView() {
+  const button = screen.getByRole("button", { name: "View" });
+  if (button.getAttribute("aria-expanded") !== "true") await userEvent.setup().click(button);
+}
+
+async function openDrawer(name: "Screens" | "Layers") {
+  const existing = screen.queryByRole("complementary", { name });
+  if (existing) return existing;
+  await userEvent.setup().click(screen.getByRole("button", { name }));
+  return screen.getByRole("complementary", { name });
+}
+
+async function chooseScenario(name: string | RegExp) {
+  const drawer = await openDrawer("Screens");
+  const search = within(drawer).getByRole("searchbox", { name: "Search Screens And States" });
+  await userEvent.setup().clear(search);
+  await userEvent.setup().type(search, typeof name === "string" ? name : name.source.replaceAll("^", "").replaceAll("$", ""));
+  const match = within(drawer).getAllByRole("button").find((button) => {
+    const text = button.textContent ?? "";
+    return typeof name === "string" ? text.startsWith(name) : name.test(text);
+  });
+  expect(match).toBeDefined();
+  await userEvent.setup().click(match!);
+}
+
 beforeEach(() => {
   window.history.replaceState({}, "", "/#route=components");
   window.__STOCKROOM_UI__ = { rail_collapsed: false };
@@ -152,11 +177,14 @@ afterEach(() => {
 });
 
 describe("DesignStudioShell", () => {
-  it("opens from the visible rail entry and starts with the simple screen-first workflow", async () => {
+  it("opens canvas-first with Preview active and every drawer closed", async () => {
     renderApp();
     await userEvent.setup().click(screen.getByRole("button", { name: "Design Studio" }));
 
-    expect(screen.getByRole("complementary", { name: "Screens And States" })).toBeVisible();
+    expect(screen.queryByRole("complementary", { name: "Screens" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("complementary", { name: "Inspector" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Screens" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Layers" })).toBeVisible();
     expect(screen.getByRole("button", { name: "Preview" })).toHaveAttribute(
       "aria-pressed",
       "true",
@@ -166,10 +194,13 @@ describe("DesignStudioShell", () => {
         .getByRole("region", { name: "Stockroom Preview" })
         .querySelector('[data-dev-id="shell.root"]'),
     ).toBeVisible();
+    await openView();
+    expect(screen.getByLabelText("Zoom")).toHaveValue("0");
   });
 
   it("previews the exact desktop presets and an explicit custom width", async () => {
     await renderStudio();
+    await openView();
     const preview = screen.getByRole("region", { name: "Stockroom Preview" });
     const frame = preview.firstElementChild as HTMLElement;
     const viewport = screen.getByLabelText("Viewport");
@@ -199,6 +230,7 @@ describe("DesignStudioShell", () => {
       design_studio_presentation: false,
     };
     await renderStudio();
+    await openView();
 
     await waitFor(() => expect(document.querySelector('[data-scenario-id="global.onboarding.open"]')).toBeInTheDocument());
     expect(screen.getByLabelText("Viewport")).toHaveValue("desktop-1920");
@@ -207,24 +239,28 @@ describe("DesignStudioShell", () => {
     expect(screen.getByRole("button", { name: "Grid" })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByRole("slider", { name: "Grid Size" })).toHaveValue("12");
     expect(screen.getByRole("button", { name: "Snap" })).toHaveAttribute("aria-pressed", "false");
-    expect(screen.getByRole("button", { name: "Presentation Mode" })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByRole("button", { name: "Presentation" })).toHaveAttribute("aria-pressed", "false");
   });
 
   it("changes the visible and snapping grid from 1 to 64 pixels", async () => {
     await renderStudio();
+    await openView();
     const gridSize = screen.getByRole("slider", { name: "Grid Size" });
     const preview = screen.getByRole("region", { name: "Stockroom Preview" });
 
     expect(gridSize).toHaveValue("8");
+    fireEvent.click(screen.getByRole("button", { name: "Grid" }));
     fireEvent.change(gridSize, { target: { value: "24" } });
     expect(preview).toHaveAttribute("data-grid-size", "24");
-    expect(preview.style.getPropertyValue("--design-studio-grid-size")).toBe("24px");
+    expect(Number.parseFloat(preview.style.getPropertyValue("--design-studio-grid-size"))).toBeGreaterThan(20);
+    expect(preview.querySelector('[data-design-grid-overlay="true"]')).toBeInTheDocument();
     fireEvent.change(gridSize, { target: { value: "100" } });
     expect(gridSize).toHaveValue("64");
   });
 
   it("fits and visibly frames a wide canvas with keyboard and pointer panning", async () => {
     await renderStudio();
+    await openView();
     await userEvent.setup().selectOptions(screen.getByLabelText("Viewport"), "desktop-1920");
     await userEvent.setup().selectOptions(screen.getByLabelText("Zoom"), "0");
     const preview = screen.getByRole("region", { name: "Stockroom Preview" });
@@ -273,6 +309,7 @@ describe("DesignStudioShell", () => {
     }
     vi.stubGlobal("ResizeObserver", ResizeObserverStub);
     await renderStudio();
+    await openView();
     await userEvent.setup().selectOptions(screen.getByLabelText("Viewport"), "desktop-1920");
     await userEvent.setup().selectOptions(screen.getByLabelText("Zoom"), "0");
     const preview = screen.getByRole("region", { name: "Stockroom Preview" });
@@ -303,7 +340,7 @@ describe("DesignStudioShell", () => {
 
   it("lists only rendered stable targets and exposes their hierarchy without index keys", async () => {
     await renderStudio();
-    const sidebar = screen.getByRole("complementary", { name: "Screens And States" });
+    const sidebar = await openDrawer("Layers");
     const rail = within(sidebar).getByRole("button", { name: "Navigation rail" });
     expect(rail).toHaveAttribute("data-target-key", "dev:rail.root");
     expect(within(sidebar).queryByRole("button", { name: "About dialog" })).toBeNull();
@@ -315,7 +352,7 @@ describe("DesignStudioShell", () => {
 
   it("keeps hidden targets as ghost rows and can blank then restore the product", async () => {
     await renderStudio();
-    const sidebar = screen.getByRole("complementary", { name: "Screens And States" });
+    const sidebar = await openDrawer("Layers");
     const rail = within(sidebar).getByRole("button", { name: "Navigation rail" });
     await userEvent.setup().click(rail);
     await userEvent.setup().click(within(sidebar).getByRole("button", { name: "Hide Selected" }));
@@ -334,7 +371,7 @@ describe("DesignStudioShell", () => {
 
   it("defaults to meaningful layers and can reveal every generated wrapper", async () => {
     await renderStudio();
-    const sidebar = screen.getByRole("complementary", { name: "Screens And States" });
+    const sidebar = await openDrawer("Layers");
     expect(within(sidebar).getByRole("button", { name: "All Elements" })).toHaveAttribute("aria-pressed", "false");
     const before = within(sidebar).queryAllByRole("button", { name: /Element · auto\./ }).length;
     await userEvent.setup().click(within(sidebar).getByRole("button", { name: "All Elements" }));
@@ -347,9 +384,10 @@ describe("DesignStudioShell", () => {
     await userEvent.setup().click(
       within(screen.getByLabelText("Studio Mode")).getByRole("button", { name: "Edit" }),
     );
-    await userEvent.setup().click(screen.getByRole("button", { name: "Presentation Mode" }));
+    await openView();
+    await userEvent.setup().click(screen.getByRole("button", { name: "Presentation" }));
 
-    expect(screen.queryByRole("complementary", { name: "Screens And States" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("complementary", { name: "Screens" })).not.toBeInTheDocument();
     expect(screen.queryByRole("complementary", { name: "Inspector" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Preview" })).toHaveAttribute("aria-pressed", "true");
     expect(container.querySelector('[data-dev-id="rail.root"]')).toBeVisible();
@@ -372,6 +410,8 @@ describe("DesignStudioShell", () => {
 
   it("shares one mode authority with the retained Dev panel controls", async () => {
     const { entry } = await renderStudio();
+    await openView();
+    await userEvent.setup().click(screen.getByRole("button", { name: "Developer Tools" }));
     const studioMode = within(screen.getByLabelText("Studio Mode"));
     const devPanel = within(screen.getByRole("complementary", { name: "Dev mode" }));
 
@@ -429,17 +469,18 @@ describe("DesignStudioShell", () => {
 
   it("gives panel resizers named keyboard controls", async () => {
     await renderStudio();
+    await openDrawer("Screens");
     const resizer = screen.getByRole("separator", { name: "Resize Screens And States Panel" });
-    const before = screen.getByRole("complementary", { name: "Screens And States" }).getAttribute("style");
+    const before = screen.getByRole("complementary", { name: "Screens" }).getAttribute("style");
 
     fireEvent.keyDown(resizer, { key: "ArrowRight" });
 
-    expect(screen.getByRole("complementary", { name: "Screens And States" }).getAttribute("style")).not.toBe(before);
+    expect(screen.getByRole("complementary", { name: "Screens" }).getAttribute("style")).not.toBe(before);
   });
 
   it("keeps a failed fixture-preview panel preference dirty and flushes it in Real Data", async () => {
     await renderStudio();
-    await userEvent.setup().click(screen.getByRole("button", { name: /^Onboarding Open/ }));
+    await chooseScenario("Onboarding Open");
     const resizer = screen.getByRole("separator", { name: "Resize Screens And States Panel" });
     const fetchMock = vi.mocked(fetch);
     fetchMock.mockClear();
@@ -455,7 +496,7 @@ describe("DesignStudioShell", () => {
       ),
     ).toHaveLength(0);
 
-    await userEvent.setup().click(screen.getByRole("button", { name: "Real Data" }));
+    await chooseScenario("Real Data");
     await waitFor(() => expect(fetchMock.mock.calls.some(
       ([input, init]) => String(input).includes("/api/settings") && init?.method === "PATCH" &&
         String(init.body).includes("design_studio_left_width"),
@@ -480,7 +521,7 @@ describe("DesignStudioShell", () => {
     bridges.pywebview = { api: { pick_folder: legacyPicker } };
     await renderStudio();
 
-    await userEvent.setup().click(screen.getByRole("button", { name: /^cubemx picker/i }));
+    await chooseScenario(/cubemx picker/i);
     const pickerCase = await waitFor(() => {
       const element = document.querySelector<HTMLElement>('[data-scenario-picker="cubemx"]');
       expect(element).toBeVisible();
@@ -497,6 +538,7 @@ describe("DesignStudioShell", () => {
 
   it("shows the six built-in variations and manages custom inheritance and deletion", async () => {
     await renderStudio();
+    await openDrawer("Layers");
     for (const title of ["Full Data", "Compact", "Purchasing", "CAD Review", "Minimal", "Custom"]) {
       expect(screen.getByRole("button", { name: new RegExp(`^${title}$`) })).toBeInTheDocument();
     }

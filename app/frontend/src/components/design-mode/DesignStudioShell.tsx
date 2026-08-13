@@ -17,9 +17,9 @@ import { PREVIEW_EFFECT_BLOCKED_EVENT, type PreviewEffectError } from "../../des
 import { useToast } from "../../lib/toast";
 import { DEFAULT_DESIGN_GRID_SIZE, finiteDesignGridSize } from "../../design-studio/gridSize";
 import { DesignPreviewBoundary } from "./DesignPreviewBoundary";
+import { InspectorPanel } from "./InspectorPanel";
+import { Icon } from "../Icon";
 
-const LEFT_COLLAPSED_KEY = "stockroom.design-studio.left-collapsed";
-const RIGHT_COLLAPSED_KEY = "stockroom.design-studio.right-collapsed";
 const LEFT_WIDTH_KEY = "stockroom.design-studio.left-width";
 const RIGHT_WIDTH_KEY = "stockroom.design-studio.right-width";
 const LAST_SCENARIO_KEY = "stockroom.design-studio.last-scenario";
@@ -91,6 +91,7 @@ function PanelResizer({
   const resize = (delta: number) => onChange(clampPanelWidth(value + delta * direction));
   return (
     <button
+      data-design-studio-chrome="true"
       type="button"
       role="separator"
       aria-label={label}
@@ -105,9 +106,9 @@ function PanelResizer({
         event.preventDefault();
         resize(event.key === "ArrowRight" ? 16 : -16);
       }}
-      className="design-studio-resizer flex w-[18px] flex-none items-center justify-center bg-band text-2xs text-t3 hover:bg-control-hover hover:text-t1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-acc"
+      className="design-studio-resizer w-1.5 flex-none cursor-col-resize bg-line/40 hover:bg-acc focus-visible:outline focus-visible:outline-2 focus-visible:outline-acc"
     >
-      <span className="[writing-mode:vertical-rl]">{resizeLabel}</span>
+      <span className="sr-only">{resizeLabel}</span>
     </button>
   );
 }
@@ -119,7 +120,7 @@ export function DesignStudioShell({ children }: { children: ReactNode }) {
   const [presentation, setPresentation] = useState(() => readPref("design_studio_presentation", PRESENTATION_KEY, parseBoolean, false));
   const [viewport, setViewport] = useState<StudioViewport>(() => readPref("design_studio_viewport", VIEWPORT_KEY, parseViewport, "desktop-1366"));
   const [customViewportWidth, setCustomViewportWidth] = useState(() => readPref("design_studio_custom_viewport_width", CUSTOM_VIEWPORT_WIDTH_KEY, parseNumber, 1366));
-  const [zoom, setZoom] = useState(() => readPref("design_studio_zoom", ZOOM_KEY, parseNumber, 100));
+  const [zoom, setZoom] = useState(() => readPref("design_studio_zoom", ZOOM_KEY, parseNumber, 0));
   const [grid, setGrid] = useState(() => readPref("design_studio_grid", GRID_KEY, parseBoolean, false));
   const [gridSize, setGridSize] = useState(() => readPref(
     "design_studio_grid_size",
@@ -135,27 +136,22 @@ export function DesignStudioShell({ children }: { children: ReactNode }) {
   const closingRef = useRef(false);
   const restoredOpenRef = useRef(false);
   const panStart = useRef<{ x: number; y: number; left: number; top: number } | null>(null);
-  const [leftCollapsed, setLeftCollapsed] = useState(() =>
-    readPref("design_studio_left_collapsed", LEFT_COLLAPSED_KEY, parseBoolean, false),
-  );
-  const [rightCollapsed, setRightCollapsed] = useState(() =>
-    readPref("design_studio_right_collapsed", RIGHT_COLLAPSED_KEY, parseBoolean, false),
-  );
+  const [leftDrawer, setLeftDrawer] = useState<"screens" | "layers" | null>(null);
+  const [developerOpen, setDeveloperOpen] = useState(false);
   const [leftWidth, setLeftWidth] = useState(() =>
     readPref("design_studio_left_width", LEFT_WIDTH_KEY, parsePanelWidth, 270),
   );
   const [rightWidth, setRightWidth] = useState(() =>
     readPref("design_studio_right_width", RIGHT_WIDTH_KEY, parsePanelWidth, 340),
   );
-  const screensLabel = useText("design-studio.panel.screens", "Screens And States");
-  const hideScreensLabel = useText("design-studio.panel.screens-hide", "Hide Screens And States");
-  const showScreensLabel = useText("design-studio.panel.screens-show", "Show Screens And States");
+  const screensLabel = useText("design-studio.panel.screens", "Screens");
+  const layersLabel = useText("design-studio.panel.layers", "Layers");
+  const closeDrawerLabel = useText("design-studio.panel.close", "Close Drawer");
   const previewLabel = useText("design-studio.preview", "Stockroom Preview");
   const panCueLabel = useText("design-studio.pan-cue", "Drag canvas or press arrow controls to pan");
   const fitLabel = useText("design-studio.zoom.fit", "Fit");
   const inspectorLabel = useText("design-studio.panel.inspector", "Inspector");
-  const hideInspectorLabel = useText("design-studio.panel.inspector-hide", "Hide Inspector");
-  const showInspectorLabel = useText("design-studio.panel.inspector-show", "Show Inspector");
+  const developerLabel = useText("design-studio.developer", "Developer Tools");
 
   const mode = dev.studioMode;
   const changeMode = useCallback((next: "preview" | "edit") => {
@@ -241,14 +237,6 @@ export function DesignStudioShell({ children }: { children: ReactNode }) {
     };
   }, [studio.enabled]);
 
-  const setLeftPanelCollapsed = (collapsed: boolean) => {
-    setLeftCollapsed(collapsed);
-    writePref("design_studio_left_collapsed", collapsed, LEFT_COLLAPSED_KEY);
-  };
-  const setRightPanelCollapsed = (collapsed: boolean) => {
-    setRightCollapsed(collapsed);
-    writePref("design_studio_right_collapsed", collapsed, RIGHT_COLLAPSED_KEY);
-  };
   const resizeLeft = (width: number) => {
     setLeftWidth(width);
     writePref("design_studio_left_width", width, LEFT_WIDTH_KEY);
@@ -268,7 +256,7 @@ export function DesignStudioShell({ children }: { children: ReactNode }) {
     transformOrigin: "top center",
   };
   const previewRegionStyle = {
-    "--design-studio-grid-size": `${gridSize * fitScale}px`,
+    "--design-studio-grid-size": `${gridSize}px`,
   } as CSSProperties;
 
   const changeViewport = (next: StudioViewport) => {
@@ -351,28 +339,58 @@ export function DesignStudioShell({ children }: { children: ReactNode }) {
           onGridSizeChange={changeGridSize}
           snap={snap}
           onSnapChange={changeSnap}
+          onDeveloperOpen={() => setDeveloperOpen(true)}
           onClose={close}
         />
       ) : null}
       <div className={studio.enabled ? "flex min-h-0 flex-1" : "contents"}>
-        {studio.enabled && !presentation && !leftCollapsed ? (
+        {studio.enabled && !presentation ? (
+          <nav data-design-studio-chrome="true" aria-label="Design Studio Drawers" className="flex w-11 flex-none flex-col gap-1 bg-band p-1.5">
+            <button
+              type="button"
+              aria-label={screensLabel}
+              aria-pressed={leftDrawer === "screens"}
+              onClick={() => setLeftDrawer((open) => open === "screens" ? null : "screens")}
+              title={screensLabel}
+              className="grid h-9 place-items-center rounded-control text-t2 hover:bg-control-hover hover:text-t1 aria-pressed:bg-control-pressed aria-pressed:text-t1"
+            >
+              <Icon id="nav.components" className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              aria-label={layersLabel}
+              aria-pressed={leftDrawer === "layers"}
+              onClick={() => setLeftDrawer((open) => open === "layers" ? null : "layers")}
+              title={layersLabel}
+              className="grid h-9 place-items-center rounded-control text-t2 hover:bg-control-hover hover:text-t1 aria-pressed:bg-control-pressed aria-pressed:text-t1"
+            >
+              <Icon id="finder.filter" className="h-4 w-4" />
+            </button>
+          </nav>
+        ) : null}
+
+        {studio.enabled && !presentation && leftDrawer ? (
           <>
             <aside
-              aria-label={screensLabel}
-              className="flex min-h-0 flex-none flex-col border-r border-line bg-surface"
+              data-design-studio-chrome="true"
+              aria-label={leftDrawer === "screens" ? screensLabel : layersLabel}
+              className="flex min-h-0 flex-none flex-col bg-surface shadow-card"
               style={{ width: leftWidth }}
             >
-              <div className="flex items-center justify-end bg-band px-2 py-1">
+              <div className="flex h-9 items-center justify-between px-3">
+                <strong className="text-xs">{leftDrawer === "screens" ? screensLabel : layersLabel}</strong>
                 <button
                   type="button"
-                  onClick={() => setLeftPanelCollapsed(true)}
-                  className="rounded-control px-2 py-0.5 text-xs text-t2 hover:bg-control-hover hover:text-t1"
+                  aria-label={closeDrawerLabel}
+                  onClick={() => setLeftDrawer(null)}
+                  className="rounded-control px-2 py-1 text-xs text-t2 hover:bg-control-hover hover:text-t1"
                 >
-                  {hideScreensLabel}
+                  ×
                 </button>
               </div>
-              <ScenarioCatalog />
-              <LayersHierarchyPanel />
+              <DesignPreviewBoundary resetKey={`${leftDrawer}:${studio.activeScenario?.id ?? "real-data"}`} onRecover={() => setLeftDrawer(null)}>
+                {leftDrawer === "screens" ? <ScenarioCatalog /> : <LayersHierarchyPanel />}
+              </DesignPreviewBoundary>
             </aside>
             <PanelResizer
               label="Resize Screens And States Panel"
@@ -381,15 +399,6 @@ export function DesignStudioShell({ children }: { children: ReactNode }) {
               onChange={resizeLeft}
             />
           </>
-        ) : studio.enabled && !presentation ? (
-          <button
-            type="button"
-            aria-label={showScreensLabel}
-            onClick={() => setLeftPanelCollapsed(false)}
-            className="w-[26px] flex-none border-r border-line bg-band text-2xs text-t2 [writing-mode:vertical-rl] hover:bg-control-hover hover:text-t1"
-          >
-            {screensLabel}
-          </button>
         ) : null}
 
         <div
@@ -407,28 +416,28 @@ export function DesignStudioShell({ children }: { children: ReactNode }) {
           style={studio.enabled ? previewRegionStyle : undefined}
           className={
             studio.enabled
-              ? "min-w-0 flex-1 overflow-auto bg-field p-2 " +
-                (grid ? "design-studio-preview-grid" : "")
+              ? "min-w-0 flex-1 overflow-auto bg-field p-2"
               : "contents"
           }
         >
           <div
             data-design-product-root="true"
-            className={studio.enabled ? "mx-auto min-h-full overflow-hidden border border-line bg-surface shadow-pop" : "contents"}
+            className={studio.enabled ? "relative mx-auto min-h-full overflow-hidden border border-line bg-surface shadow-pop" : "contents"}
             style={studio.enabled ? previewStyle : undefined}
           >
             <DesignPreviewBoundary resetKey={JSON.stringify(dev.draft)} onRecover={dev.undo}>
               <ArrangePreferencesProvider snap={snap} gridSize={gridSize}>{children}</ArrangePreferencesProvider>
             </DesignPreviewBoundary>
+            {studio.enabled && grid ? <div aria-hidden="true" data-design-grid-overlay="true" className="design-studio-preview-grid-overlay pointer-events-none absolute inset-0 z-[180]" /> : null}
           </div>
           {studio.enabled ? (
-            <div className="sticky bottom-2 left-2 z-10 w-fit rounded-control border border-line bg-popover/90 px-2 py-1 text-2xs text-t2" data-dev-id="design.pan-cue">
+            <div data-design-studio-chrome="true" className="sticky bottom-2 left-2 z-10 w-fit rounded-control border border-line bg-popover/90 px-2 py-1 text-2xs text-t2" data-dev-id="design.pan-cue">
               {zoom === 0 ? `${fitLabel} · ` : ""}{panCueLabel}
             </div>
           ) : null}
         </div>
 
-        {studio.enabled && !presentation && !rightCollapsed ? (
+        {studio.enabled && !presentation && (developerOpen || mode === "edit") ? (
           <>
             <PanelResizer
               label="Resize Inspector Panel"
@@ -437,31 +446,29 @@ export function DesignStudioShell({ children }: { children: ReactNode }) {
               onChange={resizeRight}
             />
             <aside
-              aria-label={inspectorLabel}
-              className="flex min-h-0 flex-none flex-col border-l border-line bg-popover"
+              data-design-studio-chrome="true"
+              aria-label={developerOpen ? developerLabel : inspectorLabel}
+              className="flex min-h-0 flex-none flex-col bg-popover shadow-card"
               style={{ width: rightWidth }}
             >
-              <div className="flex items-center justify-end bg-band px-2 py-1">
+              <div className="flex h-9 items-center justify-between px-3">
+                <strong className="text-xs">{developerOpen ? developerLabel : inspectorLabel}</strong>
                 <button
                   type="button"
-                  onClick={() => setRightPanelCollapsed(true)}
-                  className="rounded-control px-2 py-0.5 text-xs text-t2 hover:bg-control-hover hover:text-t1"
+                  aria-label={closeDrawerLabel}
+                  onClick={() => developerOpen ? setDeveloperOpen(false) : changeMode("preview")}
+                  className="rounded-control px-2 py-1 text-xs text-t2 hover:bg-control-hover hover:text-t1"
                 >
-                  {hideInspectorLabel}
+                  ×
                 </button>
               </div>
-              <DevPanel fixturePreview={studio.activeScenario !== null} onClose={close} />
+              <DesignPreviewBoundary resetKey={`${dev.selectedDevId ?? "none"}:${JSON.stringify(dev.draft)}`} onRecover={dev.undo}>
+                {developerOpen
+                  ? <DevPanel fixturePreview={studio.activeScenario !== null} onClose={() => setDeveloperOpen(false)} />
+                  : <div className="min-h-0 flex-1 overflow-y-auto"><InspectorPanel /></div>}
+              </DesignPreviewBoundary>
             </aside>
           </>
-        ) : studio.enabled && !presentation ? (
-          <button
-            type="button"
-            aria-label={showInspectorLabel}
-            onClick={() => setRightPanelCollapsed(false)}
-            className="w-[26px] flex-none border-l border-line bg-band text-2xs text-t2 [writing-mode:vertical-rl] hover:bg-control-hover hover:text-t1"
-          >
-            {inspectorLabel}
-          </button>
         ) : null}
       </div>
     </div>
