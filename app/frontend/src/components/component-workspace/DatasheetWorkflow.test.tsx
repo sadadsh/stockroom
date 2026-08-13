@@ -274,13 +274,14 @@ describe("the datasheet viewer", () => {
     expect(wanted.id).not.toEqual(arrivesFirst.id);
   });
 
-  it("loads a URL-only datasheet from the URL rather than the file endpoint", async () => {
+  it("loads a URL-only datasheet through Stockroom instead of a CORS-prone remote fetch", async () => {
     const user = userEvent.setup();
-    await open(withDocuments(makeDocument({ localPath: "", isPreferred: true })));
+    const remote = makeDocument({ localPath: "", isPreferred: true });
+    await open(withDocuments(remote));
     await user.click(node("component-browser.header-datasheet"));
 
     await screen.findByTestId("pdf-page");
-    expect(mockApi.documentFile).not.toHaveBeenCalled();
+    expect(mockApi.documentFile).toHaveBeenCalledWith(ID, remote.id);
   });
 
   it("navigates by page, by the document's own outline, and zooms and rotates", async () => {

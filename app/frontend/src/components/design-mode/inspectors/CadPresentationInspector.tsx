@@ -73,8 +73,8 @@ export function CadPresentationInspector({ inspection }: DomainInspectorProps) {
       </div>
       {target.kind === "symbol" ? (
         <div className="mt-3 grid grid-cols-2 gap-2">
-          <PresentationText label="Stroke" ariaLabel={valueAria({ label: "Stroke" })} value={(presentation as SymbolPresentationOverride).stroke ?? ""} onCommit={(value) => set({ stroke: value }, true)} />
-          <PresentationText label="Fill" ariaLabel={valueAria({ label: "Fill" })} value={(presentation as SymbolPresentationOverride).fill ?? ""} onCommit={(value) => set({ fill: value }, true)} />
+          <PresentationColor label="Stroke" ariaLabel={valueAria({ label: "Stroke" })} value={(presentation as SymbolPresentationOverride).stroke ?? "#9ca3af"} onCommit={(value) => set({ stroke: value }, true)} />
+          <PresentationColor label="Fill" ariaLabel={valueAria({ label: "Fill" })} value={(presentation as SymbolPresentationOverride).fill ?? "#000000"} onCommit={(value) => set({ fill: value }, true)} />
         </div>
       ) : null}
       {target.kind === "footprint" ? (
@@ -82,11 +82,11 @@ export function CadPresentationInspector({ inspection }: DomainInspectorProps) {
           <h5 className="ui-property-label">{layerColors}</h5>
           <div className="mt-1 grid grid-cols-2 gap-2">
             {["copper", "mask", "paste", "silkscreen", "fabrication", "courtyard"].map((layer) => (
-              <PresentationText
+              <PresentationColor
                 key={layer}
                 label={FIELD_LABELS[layer] ?? layer[0].toUpperCase() + layer.slice(1)}
                 ariaLabel={valueAria({ label: FIELD_LABELS[layer] ?? layer })}
-                value={(presentation as FootprintPresentationOverride).layerColors?.[layer] ?? ""}
+                value={(presentation as FootprintPresentationOverride).layerColors?.[layer] ?? "#9ca3af"}
                 onCommit={(value) => set({ layerColors: { ...(presentation as FootprintPresentationOverride).layerColors, [layer]: value } }, true)}
               />
             ))}
@@ -95,8 +95,8 @@ export function CadPresentationInspector({ inspection }: DomainInspectorProps) {
       ) : null}
       {target.kind === "model3d" ? (
         <div className="mt-3 grid grid-cols-2 gap-2">
-          <PresentationText label="Background" ariaLabel={valueAria({ label: "Background" })} value={(presentation as Model3dPresentationOverride).background ?? ""} onCommit={(value) => set({ background: value }, true)} />
-          <PresentationText label="Tint" ariaLabel={valueAria({ label: "Tint" })} value={(presentation as Model3dPresentationOverride).tint ?? ""} onCommit={(value) => set({ tint: value }, true)} />
+          <PresentationColor label="Background" ariaLabel={valueAria({ label: "Background" })} value={(presentation as Model3dPresentationOverride).background ?? "#111827"} onCommit={(value) => set({ background: value }, true)} />
+          <PresentationColor label="Tint" ariaLabel={valueAria({ label: "Tint" })} value={(presentation as Model3dPresentationOverride).tint ?? "#ffffff"} onCommit={(value) => set({ tint: value }, true)} />
           <label className="text-xs text-t2">{materialLabel}
             <select
               value={(presentation as Model3dPresentationOverride).material ?? "realistic"}
@@ -110,7 +110,7 @@ export function CadPresentationInspector({ inspection }: DomainInspectorProps) {
           </label>
           <label className="text-xs text-t2">{alphaLabel}
             <input
-              type="number"
+              type="range"
               min={0}
               max={1}
               step={0.05}
@@ -128,18 +128,16 @@ export function CadPresentationInspector({ inspection }: DomainInspectorProps) {
   );
 }
 
-function PresentationText({ label, ariaLabel, value, onCommit }: { label: string; ariaLabel: string; value: string; onCommit: (value: string) => void }) {
+function PresentationColor({ label, ariaLabel, value, onCommit }: { label: string; ariaLabel: string; value: string; onCommit: (value: string) => void }) {
   return (
     <label className="text-xs text-t2">
       {label}
       <input
+        type="color"
         aria-label={ariaLabel}
-        defaultValue={value}
-        onBlur={(event) => {
-          const next = event.currentTarget.value.trim();
-          if (next) onCommit(next);
-        }}
-        className="mt-1 w-full rounded-control border border-line bg-field px-2 py-1 text-2xs text-t1"
+        value={value}
+        onChange={(event) => onCommit(event.currentTarget.value)}
+        className="mt-1 h-7 w-full cursor-pointer rounded-control border border-line bg-field p-0.5"
       />
     </label>
   );

@@ -128,7 +128,7 @@ def test_a_document_of_an_unknown_part_is_not_found(client, app_ctx):
     assert client.get(_url(_document_id(record, "Datasheet"), part_id="nope")).status_code == 404
 
 
-def test_a_url_only_document_says_to_open_its_source_instead(client, app_ctx):
+def test_a_url_only_pdf_is_proxied_for_the_in_app_reader(client, app_ctx, monkeypatch):
     record = _add_part(
         app_ctx,
         documents=[
@@ -140,9 +140,39 @@ def test_a_url_only_document_says_to_open_its_source_instead(client, app_ctx):
             )
         ],
     )
+    calls = []
+
+    def fetch(url, destination, **_kwargs):
+        calls.append(url)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_bytes(_PDF)
+        return destination
+
+    monkeypatch.setattr("stockroom.api.routers.library.fetch_datasheet", fetch)
+    response = client.get(_url(_document_id(record, "Datasheet")))
+    assert response.status_code == 200
+    assert response.content == _PDF
+    assert calls == ["https://industrial.panasonic.com/erj.pdf"]
+
+
+def test_a_url_only_document_refuses_private_network_fetches(client, app_ctx, monkeypatch):
+    record = _add_part(
+        app_ctx,
+        documents=[
+            PartDocument(
+                document_type="datasheet",
+                title="Datasheet",
+                source_type="manufacturer",
+                remote_url="https://localhost/secret.pdf",
+            )
+        ],
+    )
+    monkeypatch.setattr(
+        "stockroom.api.routers.library.fetch_datasheet",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("must not fetch")),
+    )
     response = client.get(_url(_document_id(record, "Datasheet")))
     assert response.status_code == 404
-    assert "source page" in response.json()["detail"]
 
 
 def test_a_stored_file_that_has_gone_missing_is_reported_not_crashed(client, app_ctx):

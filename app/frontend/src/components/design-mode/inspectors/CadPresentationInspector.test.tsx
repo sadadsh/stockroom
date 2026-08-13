@@ -49,6 +49,7 @@ describe("CadPresentationInspector", () => {
     const inspection = inspectTarget(document.body, "component-browser.asset");
     render(<CadPresentationInspector inspection={inspection} inspections={[inspection]} affectedTargetIds={[inspection.id]} setDomainProperty={vi.fn()} resetDomainProperty={vi.fn()} />);
 
+    expect(screen.getByLabelText("CAD Stroke Value")).toHaveAttribute("type", "color");
     fireEvent.click(screen.getByRole("checkbox", { name: "Outline" }));
     expect(studio.setCadPresentation).toHaveBeenCalledWith("cad.symbol", "symbol", { body: false }, false);
     fireEvent.click(screen.getByRole("button", { name: "Reset CAD Presentation" }));

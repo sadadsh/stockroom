@@ -259,7 +259,7 @@ export function DevModeProvider({ children }: { children: ReactNode }) {
   } = useDevModeHistory(draft, restore);
   const { api: toggleApi, enabled, clearSelectedCopy, setArrangeMode } = useDevModeToggle();
   useDevModeHistoryKeys(enabled, undo, redo);
-  useApplyDraftOverrides(draft.tokens, draft.elements, theme);
+  useApplyDraftOverrides(draft.tokens, draft.elements, draft.icons, theme);
   const { api: selectionApi, setInspectMode } = useDevModeSelection();
   const saveApi = useDevModeSave(draft);
   const studioMode: StudioMode = toggleApi.editMode || selectionApi.inspect ? "edit" : "preview";

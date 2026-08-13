@@ -28,7 +28,7 @@ _LAST_STATUS_STATES: dict[str, str] = {
 }
 
 
-def _source_state(source, partial: EnrichmentResult) -> str:
+def source_state(source, partial: EnrichmentResult) -> str:
     """The honest verdict for one consulted distributor source.
 
     The adapter's own ``last_status`` is the primary signal (the official adapters swallow
@@ -124,15 +124,29 @@ class SourceRegistry:
         self.sources = list(sources)
 
     def enrich(self, mpn: str, category: str, want: set[str] | None = None,
-               progress=None) -> EnrichmentResult:
+               progress=None, *, initial: EnrichmentResult | None = None,
+               exhaustive: bool = False,
+               skip_vendor_keys: set[str] | None = None,
+               skip_source_names: set[str] | None = None) -> EnrichmentResult:
         remaining = set(want) if want is not None else set(DEFAULT_WANT)
-        result = EnrichmentResult(category=category)
+        result = initial if initial is not None else EnrichmentResult(category=category)
+        skipped = {key.strip().lower() for key in (skip_vendor_keys or set())}
+        skipped_names = {name.strip().lower() for name in (skip_source_names or set())}
         # Every distributor source we have not consulted YET. A source counts as consulted the
         # moment it has been asked - including when it fails - so a dead API can never hold the
         # walk open waiting for an answer that is not coming.
-        unconsulted = {id(s) for s in self.sources if getattr(s, "vendor_key", "")}
+        unconsulted = {
+            id(s)
+            for s in self.sources
+            if getattr(s, "vendor_key", "").strip().lower() not in skipped
+            and getattr(s, "vendor_key", "")
+        }
         for source in self.sources:
-            if not remaining:
+            vendor = getattr(source, "vendor_key", "").strip().lower()
+            source_name = getattr(source, "name", "").strip().lower()
+            if vendor in skipped or source_name in skipped_names:
+                continue
+            if not remaining and not exhaustive:
                 break
             # A source opts into optional kwargs by declaring them (or **kwargs), so the
             # walk stays backward compatible: a source that declares neither keeps its
@@ -144,7 +158,6 @@ class SourceRegistry:
                 kwargs["resolved"] = result
             if progress is not None and _accepts_kw(source.enrich, "progress"):
                 kwargs["progress"] = progress
-            vendor = getattr(source, "vendor_key", "")
             try:
                 partial = source.enrich(mpn, category, set(remaining), **kwargs)
             except EnrichError:
@@ -166,11 +179,12 @@ class SourceRegistry:
                     result.source_states[vendor] = "unavailable"
                 continue
             if vendor:
-                result.source_states[vendor] = _source_state(source, partial)
+                result.source_states[vendor] = source_state(source, partial)
             if vendor:
                 record_vendor_offer(result, vendor, partial)
             result.merge_missing(partial)
-            remaining -= result.filled_fields()
+            if not exhaustive:
+                remaining -= result.filled_fields()
             if not unconsulted:
                 remaining.discard(DIST_SOURCING)
         return result

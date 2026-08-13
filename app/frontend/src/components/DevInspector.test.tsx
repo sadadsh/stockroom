@@ -1,5 +1,6 @@
 import { render, screen, fireEvent } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { createPortal } from "react-dom";
 import { ThemeProvider } from "../lib/theme";
 import { DevModeProvider, useDevMode } from "../lib/devMode";
 import { DevInspector } from "./DevInspector";
@@ -39,7 +40,7 @@ function Harness({ onAppClick }: { onAppClick?: () => void }) {
     <ThemeProvider>
       <DevModeProvider>
         <Probe />
-        <div data-design-product-root data-dev-id="components.stage" data-snap="on" data-grid="8">
+        <div data-design-product-root data-dev-id="components.stage" data-snap="on" data-grid-size="8">
           <button
             type="button"
             data-dev-id="detail.complete-part"
@@ -48,6 +49,8 @@ function Harness({ onAppClick }: { onAppClick?: () => void }) {
           >
             Complete Part
           </button>
+          <span data-testid="stockroom-copy" data-copy-id="brand.stockroom" data-design-id="auto.text.1234567">Stockroom</span>
+          <span data-testid="mpn-copy" data-copy-id="component-browser.copy-mpn-object" data-design-id="auto.text.1234567">MPN</span>
           <div data-dev-id="detail.readiness" className="bg-raise">
             <svg className="ico" viewBox="0 0 24 24" data-testid="ico">
               <path d="M4 12h16" />
@@ -57,6 +60,12 @@ function Harness({ onAppClick }: { onAppClick?: () => void }) {
             <svg data-dev-id="detail.technical-shape" data-testid="technical-shape"><path d="M0 0h10" /></svg>
           </div>
         </div>
+        {createPortal(
+          <div data-dev-id="provider.backdrop">
+            <button type="button" data-dev-id="provider.close">Close Provider</button>
+          </div>,
+          document.body,
+        )}
         <DevInspector />
       </DevModeProvider>
     </ThemeProvider>
@@ -116,6 +125,30 @@ describe("DevInspector", () => {
     expect(screen.getByTestId("selected")).toHaveTextContent("component-browser.symbol-canvas");
   });
 
+  it("selects Stockroom-owned portal controls outside the product root", () => {
+    render(<Harness />);
+    on("toggle-dev");
+    on("toggle-inspect");
+
+    fireEvent.click(screen.getByRole("button", { name: "Close Provider" }));
+
+    expect(screen.getByTestId("selected")).toHaveTextContent("provider.close");
+  });
+
+  it("selects the exact MPN copy target instead of the shared Text component", () => {
+    render(<Harness />);
+    on("toggle-dev");
+    on("toggle-inspect");
+    fireEvent.click(screen.getByTestId("stockroom-copy"));
+    const stockroomId = screen.getByTestId("selected").textContent;
+
+    fireEvent.click(screen.getByTestId("mpn-copy"));
+    const mpnId = screen.getByTestId("selected").textContent;
+
+    expect(mpnId).toMatch(/^auto\.copy\./);
+    expect(mpnId).not.toBe(stockroomId);
+  });
+
   it("inspect-off is zero behaviour change: the app click fires and nothing is selected", () => {
     const appClick = vi.fn();
     render(<Harness onAppClick={appClick} />);
@@ -148,17 +181,53 @@ describe("DevInspector", () => {
     expect(screen.getByTestId("selected")).toHaveTextContent("none");
   });
 
-  it("gives every selected Stockroom element one move grip and eight resize handles", () => {
+  it("gives every selected Stockroom element move, rotate, hide, reset, and eight resize controls", () => {
     render(<Harness />);
     on("toggle-dev");
     on("toggle-inspect");
     fireEvent.click(screen.getByRole("button", { name: "Complete Part" }));
 
     expect(screen.getByRole("button", { name: "Move Complete Part" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Rotate Complete Part" })).toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: /Resize Complete Part/ })).toHaveLength(8);
     expect(screen.getByRole("button", { name: "Hide Complete Part" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Detach Complete Part" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Reset Complete Part" })).toBeInTheDocument();
+  });
+
+  it("rotates from the keyboard as one undoable edit", () => {
+    render(<Harness />);
+    on("toggle-dev");
+    on("toggle-inspect");
+    const target = screen.getByRole("button", { name: "Complete Part" });
+    fireEvent.click(target);
+
+    const rotate = screen.getByRole("button", { name: "Rotate Complete Part" });
+    fireEvent.keyDown(rotate, { key: "ArrowRight" });
+    expect(target).toHaveStyle({ transform: "rotate(15deg)" });
+
+    on("undo");
+    expect(target.style.transform).toBe("");
+  });
+
+  it("rotates around the target center with a pointer gesture", () => {
+    render(<Harness />);
+    on("toggle-dev");
+    on("toggle-inspect");
+    const target = screen.getByRole("button", { name: "Complete Part" });
+    Object.defineProperty(target, "offsetWidth", { configurable: true, value: 100 });
+    vi.spyOn(target, "getBoundingClientRect").mockReturnValue({
+      x: 20, y: 30, left: 20, top: 30, right: 120, bottom: 70, width: 100, height: 40,
+      toJSON: () => ({}),
+    });
+    fireEvent.click(target);
+
+    const rotate = screen.getByRole("button", { name: "Rotate Complete Part" });
+    fireEvent(rotate, new MouseEvent("pointerdown", { bubbles: true, clientX: 70, clientY: 0 }));
+    fireEvent(window, new MouseEvent("pointermove", { bubbles: true, clientX: 120, clientY: 50 }));
+    fireEvent(window, new MouseEvent("pointerup", { bubbles: true, clientX: 120, clientY: 50 }));
+
+    expect(target).toHaveStyle({ transform: "rotate(90deg)" });
   });
 
   it("hides globally and restores the selected element with one undo", () => {

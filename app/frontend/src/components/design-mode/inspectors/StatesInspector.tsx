@@ -5,10 +5,11 @@ import {
 } from "../../../design-studio/previewState";
 import { useCopyFormatter, useText } from "../../../lib/copy";
 import { useDevMode } from "../../../lib/devMode";
-import { isSafeElementValue, isThemeSpecificElementProp } from "../../../lib/elementLayout";
+import { isThemeSpecificElementProp } from "../../../lib/elementLayout";
 import { setDraftElementProperty } from "../../../lib/devModeDraft";
 import { useOptionalDesignStudio } from "../../../design-studio/DesignStudioProvider";
 import type { DomainInspectorProps } from "./types";
+import { VisualCssControl } from "./VisualCssControl";
 
 export function StatesInspector({ inspection, affectedTargetIds }: DomainInspectorProps) {
   const dev = useDevMode();
@@ -50,25 +51,20 @@ export function StatesInspector({ inspection, affectedTargetIds }: DomainInspect
             return (
               <label key={`${state}-${property}`} className="grid grid-cols-[minmax(0,1fr)_104px] items-center gap-2 py-1 text-xs text-t2">
                 {property.split("-").map((part) => part[0].toUpperCase() + part.slice(1)).join(" ")}
-                <input
-                  aria-label={propertyAria({ property: property.split("-").map((part) => part[0].toUpperCase() + part.slice(1)).join(" ") })}
-                  defaultValue={dev.elementOverridesFor(overrideId)?.[property] ?? ""}
-                  onBlur={(event) => {
-                    const value = event.currentTarget.value.trim();
+                <VisualCssControl
+                  property={property}
+                  ariaLabel={propertyAria({ property: property.split("-").map((part) => part[0].toUpperCase() + part.slice(1)).join(" ") })}
+                  value={dev.elementOverridesFor(overrideId)?.[property] ?? getComputedStyle(inspection.target).getPropertyValue(property)}
+                  onCommit={(value) => {
                     const stateIds = affectedTargetIds.map((id) => `${id}::state:${state}`);
-                    if (!value) {
-                      for (const stateId of stateIds) dev.resetElementProp(stateId, property);
-                    } else if (isSafeElementValue(property, value)) {
-                      if (studio && isThemeSpecificElementProp(property)) {
-                        studio.replaceResolvedDraftAtomically(
-                          setDraftElementProperty(dev.draft, stateIds, property, value),
-                        );
-                      } else {
-                        for (const stateId of stateIds) dev.setElementProp(stateId, property, value);
-                      }
+                    if (studio && isThemeSpecificElementProp(property)) {
+                      studio.replaceResolvedDraftAtomically(
+                        setDraftElementProperty(dev.draft, stateIds, property, value),
+                      );
+                    } else {
+                      for (const stateId of stateIds) dev.setElementProp(stateId, property, value);
                     }
                   }}
-                  className="w-full rounded-control border border-line bg-field px-2 py-1 text-2xs font-mono text-t1 outline-none focus:border-acc"
                 />
               </label>
             );

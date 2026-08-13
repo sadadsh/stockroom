@@ -38,6 +38,7 @@ export interface UiPrefs {
   design_studio_mode?: "preview" | "edit";
   design_studio_zoom?: number;
   design_studio_grid?: boolean;
+  design_studio_grid_size?: number;
   design_studio_snap?: boolean;
   design_studio_presentation?: boolean;
   /** Ephemeral host launch chord; never persisted through writePref. */

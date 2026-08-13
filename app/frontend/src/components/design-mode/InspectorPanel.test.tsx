@@ -20,6 +20,15 @@ function Controls() {
       </button>
       <button type="button" onClick={dev.undo}>Undo Inspector</button>
       <button type="button" onClick={() => dev.setToken("--c-acc", "#123456")}>Set Accent</button>
+      <button
+        type="button"
+        onClick={() => {
+          if (!dev.enabled) dev.toggle();
+          dev.selectDevId("auto.raw-svg.0abc123");
+        }}
+      >
+        Select Raw Icon
+      </button>
       <output data-testid="inspector-draft">{JSON.stringify(dev.draft)}</output>
     </>
   );
@@ -57,6 +66,7 @@ function Harness() {
             <svg data-icon-id="action.search" viewBox="0 0 24 24"><path d="M6 12h12" /></svg>
           </button>
         </section>
+        <svg data-design-id="auto.raw-svg.0abc123" viewBox="0 0 24 24"><path d="M3 12h18" /></svg>
         <output data-testid="activation-count">{activations}</output>
         <InspectorPanel />
       </DevModeProvider>
@@ -86,8 +96,26 @@ describe("InspectorPanel", () => {
         icons: Record<string, { strokeWidth?: number }>;
       };
       expect(draft.icons["action.add"]?.strokeWidth).toBe(2.4);
-      expect(draft.icons["action.edit"]?.strokeWidth).toBe(2.4);
+      expect(draft.icons["action.edit"]).toBeUndefined();
     });
+  });
+
+  it("opens the complete offline icon library instead of hiding it behind quick picks", async () => {
+    render(<Harness />);
+    fireEvent.click(screen.getByRole("button", { name: "Select First" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Content" }));
+
+    expect(await screen.findByRole("searchbox", { name: "Search Icon Catalog" })).toBeVisible();
+    expect(await screen.findByText("2,163 offline Font Awesome Free icons")).toBeVisible();
+  });
+
+  it("offers the complete library for a raw automatically exposed interface SVG", async () => {
+    render(<Harness />);
+    fireEvent.click(screen.getByRole("button", { name: "Select Raw Icon" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Content" }));
+
+    expect(await screen.findByRole("searchbox", { name: "Search Icon Catalog" })).toBeVisible();
+    expect(screen.queryByText("The icon is not registered.")).toBeNull();
   });
 
   it("edits every global occurrence and removal is undoable", async () => {
@@ -113,24 +141,23 @@ describe("InspectorPanel", () => {
   });
 
   it(
-    "applies Text and Icon operations to every global semantic occurrence",
+    "keeps content edits on the exact selected copy and icon while styling semantic occurrences",
     async () => {
-      const copyIds = ["detail.action.copy", "detail.action.second.copy"];
-      const iconIds = ["action.add", "action.edit"];
+      const copyIds = ["detail.action.copy"];
+      const iconIds = ["action.add"];
       render(<Harness />);
       fireEvent.click(screen.getByRole("button", { name: "Select First" }));
 
       fireEvent.click(screen.getByRole("tab", { name: "Content" }));
       expect(screen.getByLabelText("Text Domain Preview")).toHaveTextContent(copyIds.join(" "));
       fireEvent.change(screen.getByLabelText("Text Content"), { target: { value: "Global Text" } });
-      fireEvent.change(screen.getByLabelText("Text font-size Value"), { target: { value: "18px" } });
-      fireEvent.blur(screen.getByLabelText("Text font-size Value"));
+      expect(screen.getByLabelText("Text font-size Value")).toHaveAttribute("type", "range");
+      fireEvent.change(screen.getByLabelText("Text font-size Value"), { target: { value: "18" } });
 
       expect(screen.getByLabelText("Icon Domain Preview")).toHaveTextContent(iconIds.join(" "));
       fireEvent.change(screen.getByLabelText("Icon Color"), { target: { value: "#123456" } });
-      fireEvent.blur(screen.getByLabelText("Icon Color"));
-      fireEvent.change(screen.getByLabelText("Icon Size"), { target: { value: "28px" } });
-      fireEvent.blur(screen.getByLabelText("Icon Size"));
+      expect(screen.getByLabelText("Icon Color")).toHaveAttribute("type", "color");
+      fireEvent.change(screen.getByLabelText("Icon Size"), { target: { value: "28" } });
       fireEvent.change(screen.getByLabelText("Treatment"), { target: { value: "solid" } });
       fireEvent.change(screen.getByLabelText("Alignment"), { target: { value: "text-top" } });
       fireEvent.change(screen.getByLabelText("Accessible Label"), { target: { value: "Add item" } });
@@ -148,6 +175,8 @@ describe("InspectorPanel", () => {
         expect(Object.keys(draft.copy).sort()).toEqual([...copyIds].sort());
         expect(Object.keys(draft.icons).sort()).toEqual([...iconIds].sort());
         for (const id of copyIds) expect(draft.copy[id]).toBe("Global Text");
+        expect(draft.copy["detail.action.second.copy"]).toBeUndefined();
+        expect(draft.icons["action.edit"]).toBeUndefined();
         for (const id of iconIds) {
           expect(draft.icons[id]?.swapToId ?? draft.icons[id]?.body).toBeTruthy();
           expect(draft.icons[id]).toMatchObject({ treatment: "solid", alignment: "text-top", a11yLabel: "Add item" });
@@ -204,7 +233,6 @@ describe("InspectorPanel", () => {
     expect(screen.getByTestId("activation-count")).toHaveTextContent("0");
 
     fireEvent.change(screen.getByLabelText("State Color"), { target: { value: "#123456" } });
-    fireEvent.blur(screen.getByLabelText("State Color"));
     await waitFor(() => {
       const draft = JSON.parse(screen.getByTestId("inspector-draft").textContent ?? "{}") as {
         elements: Record<string, Record<string, string>>;
@@ -233,8 +261,9 @@ describe("InspectorPanel", () => {
     const first = document.querySelector<HTMLElement>('[data-dev-id="detail.action[first]"]')!;
     const second = document.querySelector<HTMLElement>('[data-dev-id="detail.action[second]"]')!;
 
-    fireEvent.change(screen.getByLabelText("Width Value"), { target: { value: "240px" } });
-    fireEvent.blur(screen.getByLabelText("Width Value"));
+    expect(screen.getByLabelText("Width Value")).toHaveAttribute("type", "range");
+    expect(screen.getByLabelText("Display Value")).toHaveRole("combobox");
+    fireEvent.change(screen.getByLabelText("Width Value"), { target: { value: "240" } });
     await waitFor(() => expect(first.style.width).toBe("240px"));
     fireEvent.click(screen.getByRole("button", { name: "Reset Width" }));
     await waitFor(() => expect(first.style.width).toBe(""));

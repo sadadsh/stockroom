@@ -27,8 +27,14 @@ from stockroom.enrich.extract import extract_all
 from stockroom.enrich.fetch import HttpFetcher, HttpRenderedDomFetcher, RenderedDomFetcher
 from stockroom.enrich.progress import Stage, emit, monotonic, stage_callback
 from stockroom.enrich.ratelimit import SlidingWindowLimiter
-from stockroom.enrich.registry import DEFAULT_WANT, SourceRegistry, record_vendor_offer
+from stockroom.enrich.registry import (
+    DEFAULT_WANT,
+    SourceRegistry,
+    record_vendor_offer,
+    source_state,
+)
 from stockroom.enrich.schema import (
+    SCHEMA_VERSION,
     SOURCED_FIELDS,
     EnrichmentResult,
     Sourced,
@@ -542,7 +548,7 @@ class EnrichmentPipeline:
 
     def enrich(self, mpn: str, category: str, want=None, progress=None) -> EnrichmentResult:
         cached = self.cache.get(mpn)
-        if cached is not None:
+        if cached is not None and cached.get("schema_version") == SCHEMA_VERSION:
             # An instant cache hit does no network work; the job returns straight to a
             # `done`, so no fetching/rendering stage is claimed for it.
             hit = _result_from_cache(cached, category)
@@ -652,6 +658,8 @@ class EnrichmentPipeline:
         neither API carried the part (or none is configured), so the caller renders the page."""
         display = {"mouser": "Mouser", "digikey": "DigiKey"}
         result = EnrichmentResult()
+        lookup_token = token
+        canonical_mpn = ""
         for name, adapter in self._distributor_adapters(vendor):
             # Both APIs share the KiCost-derived Mouser limiter (paced against the ~30/min cap),
             # so a burst of adds never trips a distributor's rate limit.
@@ -659,15 +667,61 @@ class EnrichmentPipeline:
                 self.mouser_limiter.acquire()
             emit(progress, Stage.FETCHING, f"querying {display.get(name, name)}")
             try:
-                partial = adapter.lookup(token)
+                partial = adapter.lookup(lookup_token)
             except Exception:  # noqa: BLE001 - an adapter must never break the paste path
+                result.source_states[name] = "failed"
                 continue
+            result.source_states[name] = source_state(adapter, partial)
+            partial_mpn = str(partial.mpn.value).strip() if partial.mpn is not None else ""
+            if canonical_mpn and partial_mpn and (
+                mpn_identity_key(partial_mpn) != mpn_identity_key(canonical_mpn)
+            ):
+                result.source_states[name] = "unavailable"
+                continue
+            if partial_mpn and not canonical_mpn:
+                canonical_mpn = partial_mpn
+                # The first (pasted-link) distributor resolves its own order number. Every other
+                # distributor is queried with the manufacturer MPN that answer established.
+                lookup_token = canonical_mpn
             # Keep THIS vendor's own buy link, price ladder and live stock, so both survive even
             # though the merged result keeps a single primary of each. The pasted vendor's link is
             # set to the pasted url below. Same helper the registry walk uses, so the paste path
             # and the MPN path can never record per-vendor sourcing differently.
             record_vendor_offer(result, name, partial)
             result.merge_missing(partial)
+        return result
+
+    def _finish_url_enrichment(
+        self,
+        result: EnrichmentResult,
+        *,
+        progress=None,
+    ) -> EnrichmentResult:
+        """Exhaust the non-official source ladder for an exact URL-derived identity."""
+
+        if result.mpn is None or not str(result.mpn.value).strip():
+            self._record_unconfigured_officials(result)
+            return result
+        mpn = str(result.mpn.value).strip()
+        # Official adapters were already queried on the WAF-free route. Continue through passive,
+        # LCSC, page and datasheet sources without spending the same API quota twice. Exhaustive is
+        # intentional: one spec from one source must not suppress every other source's spec bag.
+        self.registry.enrich(
+            mpn,
+            result.category,
+            want=set(DEFAULT_WANT),
+            progress=progress,
+            initial=result,
+            exhaustive=True,
+            skip_vendor_keys={"mouser", "digikey"},
+            # This fallback points at an LCSC search page. The dedicated LCSC source above has
+            # already queried the exact catalogue/product page, while the pasted page itself was
+            # already read (or intentionally avoided through an official API). Rendering a search
+            # page adds no authority and can reintroduce the same anti-bot failure.
+            skip_source_names={"scrape"},
+        )
+        self._record_unconfigured_officials(result)
+        fill_category(result)
         return result
 
     def extract_from_url(self, url: str, progress=None) -> EnrichmentResult:
@@ -685,7 +739,7 @@ class EnrichmentPipeline:
         # A6: the same link returns the same result. A cache hit skips the (nondeterministic)
         # network fetch entirely, so repeat lookups are stable.
         cached = self.url_cache.get(url)
-        if cached is not None:
+        if cached is not None and cached.get("schema_version") == SCHEMA_VERSION:
             return _result_from_cache(cached, cached.get("category", ""))
         sink = monotonic(progress)
         # API-FIRST: a Mouser/DigiKey product link resolves through the official Search API instead
@@ -703,7 +757,7 @@ class EnrichmentPipeline:
                 # the pasted vendor's buy link is the EXACT link the user pasted (its qs token and
                 # all), not the API's canonical rewrite; the other vendor keeps its API link.
                 api.dist_urls[vendor] = url
-                fill_category(api)
+                self._finish_url_enrichment(api, progress=sink)
                 self.url_cache.put(url, _result_to_cache(api))
                 return api
         emit(sink, Stage.FETCHING, "loading the page")
@@ -729,6 +783,16 @@ class EnrichmentPipeline:
         # description before a non-substantive result's lone (challenge/SEO) description is dropped.
         # product_url is excluded from _is_substantive, so adding it above never masks a thin shell.
         _drop_thin_description(result)
+        if _is_substantive(result) and result.mpn is not None:
+            # A rendered LCSC/manufacturer page establishes the exact identity first. Then query
+            # the official distributors by that MPN and exhaust the remaining source ladder.
+            official = self._resolve_via_distributor_apis(
+                "",
+                str(result.mpn.value).strip(),
+                sink,
+            )
+            result.merge_missing(official)
+            self._finish_url_enrichment(result, progress=sink)
         # Cache ONLY a substantive pull, so a one-off thin or Akamai-blocked fetch (which yields
         # just a description) never becomes the cached answer and a retry can still get the page.
         if _is_substantive(result):

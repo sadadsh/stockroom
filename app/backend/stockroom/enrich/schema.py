@@ -17,7 +17,7 @@ from typing import Any
 # Bump when the canonical shape changes; a stored EnrichmentResult records the
 # version it was produced under so a reader can migrate or discard it.
 # v2: added country_of_origin + tariff_rate (the Mouser page's own US-import fields).
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 # Confidence ranked low -> high so a merge can compare sources.
 CONFIDENCE_RANK: dict[str, int] = {"low": 0, "medium": 1, "high": 2}

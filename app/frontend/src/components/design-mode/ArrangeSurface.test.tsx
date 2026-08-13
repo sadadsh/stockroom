@@ -150,14 +150,16 @@ function Surface({
   active,
   start = baseDocument(),
   snap = true,
+  gridSize = 8,
 }: {
   active: boolean;
   start?: LayoutDocument;
   snap?: boolean;
+  gridSize?: number;
 }) {
   const [document_, setDocument] = useState(start);
   return (
-    <ArrangePreferencesProvider snap={snap}>
+    <ArrangePreferencesProvider snap={snap} gridSize={gridSize}>
     <ArrangeSurfaceProvider active={active} layout={document_} onLayout={setDocument}>
       <LayoutPlacementChromeProvider chrome={active ? ArrangePlacementChrome : null}>
         <LayoutDocumentView document={document_} bindings={BINDINGS} />
@@ -319,6 +321,12 @@ describe("direct resize parity", () => {
     render(<Surface active snap={false} start={baseDocument({ alpha: { size: { width: 480 } } })} />);
     fireEvent.keyDown(document.querySelector('[data-arrange-resize="alpha"]')!, { key: "ArrowRight" });
     expect(screen.getByTestId("sizes")).toHaveTextContent("alpha:481");
+  });
+
+  it("uses the selected shell grid size when snap is on", () => {
+    render(<Surface active gridSize={12} start={baseDocument({ alpha: { size: { width: 480 } } })} />);
+    fireEvent.keyDown(document.querySelector('[data-arrange-resize="alpha"]')!, { key: "ArrowRight" });
+    expect(screen.getByTestId("sizes")).toHaveTextContent("alpha:492");
   });
 });
 
@@ -562,14 +570,16 @@ describe("right-clicking a placement", () => {
     expect(screen.getByTestId("sizes")).toHaveTextContent("alpha:-");
   });
 
-  it("ignores an empty free-position input instead of moving the piece to zero", () => {
+  it("uses a visual slider for free positioning", () => {
     const start = baseDocument({ alpha: { position: { x: 16, y: 24 } } });
     const left = start.root.slots[0]?.content as LayoutRegion;
     left.positioning = "free";
     render(<Surface active start={start} />);
     fireEvent.contextMenu(screen.getByTestId("part-alpha"));
-    fireEvent.change(screen.getByLabelText("Position X"), { target: { value: "" } });
-    expect(screen.getByTestId("positions")).toHaveTextContent("alpha:16,24");
+    const position = screen.getByLabelText("Position X");
+    expect(position).toHaveAttribute("type", "range");
+    fireEvent.change(position, { target: { value: "32" } });
+    expect(screen.getByTestId("positions")).toHaveTextContent("alpha:32,24");
   });
 });
 

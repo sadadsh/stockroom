@@ -35,6 +35,7 @@ import {
   type BehaviorOverride,
 } from "./behavior.overrides";
 import { applyElementOverrides, startElementOverrideObserver } from "./applyElementOverrides";
+import { applyGeneratedIconOverrides, startGeneratedIconOverrideObserver } from "./applyIconOverrides";
 
 // The two override blocks: dark colours + shared radii on :root ("root"), light colours on
 // :root[data-theme="light"] ("light"). Defined here (not in the regenerated overrides file) so the
@@ -529,6 +530,7 @@ export function useDevModeDraft(theme: Theme) {
 export function useApplyDraftOverrides(
   tokens: TokenOverrides,
   elements: Record<string, Record<string, string>>,
+  icons: Record<string, IconOverride>,
   theme: Theme,
 ) {
   // Two refs drive the element-override apply: prevElementsRef holds the previously-applied map so a
@@ -536,12 +538,15 @@ export function useApplyDraftOverrides(
   // observer's getter re-applies the current overrides to late-mounted nodes.
   const prevElementsRef = useRef<Record<string, Record<string, string>>>(elements);
   const elementsRef = useRef(elements);
+  const prevIconsRef = useRef<Record<string, IconOverride>>(icons);
+  const iconsRef = useRef(icons);
   // Synced in a layout effect, not during render: render can be replayed or thrown away, and the
   // observer getter would then re-apply overrides from a tree that never committed. Layout effects
   // land before this commit's passive effects, so the apply/observe effect below installs its
   // getter over this render's map.
   useLayoutEffect(() => {
     elementsRef.current = elements;
+    iconsRef.current = icons;
   });
 
   // Apply the committed + edited tokens to the document for the ACTIVE theme (colours are
@@ -566,4 +571,10 @@ export function useApplyDraftOverrides(
     prevElementsRef.current = elements;
     return startElementOverrideObserver(() => elementsRef.current);
   }, [elements]);
+
+  useEffect(() => {
+    applyGeneratedIconOverrides(icons, prevIconsRef.current);
+    prevIconsRef.current = icons;
+    return startGeneratedIconOverrideObserver(() => iconsRef.current);
+  }, [icons]);
 }

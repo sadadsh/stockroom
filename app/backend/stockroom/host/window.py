@@ -238,7 +238,7 @@ class InAppProviderBrowserSurface:
             return True
         numeric_values = cast(tuple[int | float, int | float, int | float, int | float], values)
         x, y, width, height = (float(value) for value in numeric_values)
-        if x < 0 or y < 0 or width < 320 or height < 240 or provider is None or app is None:
+        if x < 0 or y < 0 or width < 320 or height < 240 or app is None:
             return False
         if self._active_component_id is None:
             self._active_component_id = component_id
@@ -247,6 +247,11 @@ class InAppProviderBrowserSurface:
             provider.hide()
             return False
         self._last_provider_viewport = dict(viewport)
+        # React often measures and publishes the modal before the durable capture worker has
+        # acquired its native provider lease. Retaining that valid rectangle is success: the
+        # lease's first show/navigation applies it once the provider WebView exists.
+        if provider is None:
+            return True
         return self._apply_provider_viewport(viewport, focus=True)
 
     def _apply_provider_viewport(
@@ -354,14 +359,13 @@ class InAppProviderBrowserSurface:
                 raise RuntimeError("the Stockroom provider browser is not ready")
             lease_token = _begin_native_webview_download_lease()
             self._active_provider_window = window
-            self._active_component_id = None
-            self._last_provider_viewport = None
 
             chrome = window_chrome()
 
             def show() -> None:
                 # Visibility belongs to the React modal's measured viewport. Showing here would
                 # flash a free-standing provider window before the modal can publish its bounds.
+                self.reapply_provider_viewport()
                 if chrome is not None:
                     chrome.provider_shown()
 
@@ -377,6 +381,7 @@ class InAppProviderBrowserSurface:
                 if type(url) is not str or not url or url != url.strip():
                     raise ValueError("provider URL must be exact non-empty text")
                 window.load_url(url)
+                self.reapply_provider_viewport()
                 if chrome is not None:
                     # The tab is named after the provider whose page this is, and the page is
                     # what the person is looking at once capture has navigated to it.

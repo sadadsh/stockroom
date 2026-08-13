@@ -50,10 +50,30 @@ export function designIdSelector(id: string): string {
   return `[${attribute}="${id.replace(/["\\]/g, "\\$&")}"]`;
 }
 
-function fallbackSemanticKey(element: Element): string {
+function elementSignature(element: Element): string {
+  return [
+    element.localName,
+    element.getAttribute("role") ?? "",
+    element.getAttribute("type") ?? "",
+  ].join("|");
+}
+
+function fallbackSemanticKey(element: Element, siblingOrdinal: number): string {
   const parent = element.parentElement?.closest(DESIGN_TARGET_SELECTOR);
   const parentId = parent ? designIdOf(parent) : "stockroom-root";
-  return [parentId, element.localName, element.getAttribute("role") ?? "", element.getAttribute("type") ?? ""].join("|");
+  return [parentId, elementSignature(element), siblingOrdinal].join("|");
+}
+
+function semanticGeneratedId(element: Element): string | null {
+  for (const [attribute, owner] of [
+    ["data-copy-id", "copy"],
+    ["data-icon-id", "icon"],
+    ["data-layout-piece", "layout"],
+  ] as const) {
+    const value = element.getAttribute(attribute)?.trim();
+    if (value) return runtimeDesignId(owner, value);
+  }
+  return null;
 }
 
 /** Cover DOM emitted through dynamic JSX tags, portals, clones, and imperative Stockroom renderers. */
@@ -61,10 +81,25 @@ export function ensureDesignIdentities(root: ParentNode): void {
   const elements = root instanceof Element
     ? [root, ...Array.from(root.querySelectorAll("*"))]
     : Array.from(root.querySelectorAll("*"));
+  const siblingCounts = new WeakMap<Element, Map<string, number>>();
   for (const element of elements) {
+    const parent = element.parentElement;
+    const signature = elementSignature(element);
+    const counts = parent ? (siblingCounts.get(parent) ?? new Map<string, number>()) : new Map<string, number>();
+    const ordinal = counts.get(signature) ?? 0;
+    counts.set(signature, ordinal + 1);
+    if (parent) siblingCounts.set(parent, counts);
     if (element.closest('[data-design-technical-content="true"]')) continue;
     if (element.localName !== "svg" && element.closest("svg")) continue;
+    if (!element.hasAttribute("data-dev-id")) {
+      const semanticId = semanticGeneratedId(element);
+      const existing = element.getAttribute("data-design-id");
+      if (semanticId && (existing === null || isGeneratedDesignId(existing))) {
+        element.setAttribute("data-design-id", semanticId);
+        continue;
+      }
+    }
     if (designIdOf(element)) continue;
-    assignDesignIdentity(element, `dom-${element.localName}`, fallbackSemanticKey(element));
+    assignDesignIdentity(element, `dom-${element.localName}`, fallbackSemanticKey(element, ordinal));
   }
 }

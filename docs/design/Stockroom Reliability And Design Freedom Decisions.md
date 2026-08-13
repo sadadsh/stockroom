@@ -180,3 +180,53 @@ transaction snapshots, rollback files, and publish comparisons are byte contract
 change because a machine-wide Windows Git preference converts line endings, and provider library
 paths must remain writable beyond the legacy 260-character boundary. These local settings do not
 alter the person's global Git configuration or normalize unrelated repositories.
+
+### Direct Editing Reliability Boundary
+
+Direct selection accepts any Stockroom-owned target in the product tree or an authored Stockroom
+portal, while continuing to reject Design Studio chrome and third-party page internals. Runtime
+fallback identities include a deterministic structural sibling position so unrelated elements can
+never share an accidental override that moves or hides an entire surface.
+
+Rotation is a first-class direct gesture beside move and resize. Pointer rotation is measured around
+the selected target center; keyboard rotation uses one degree in Free mode and fifteen degrees in
+Snap mode. A complete gesture remains one undo entry and Reset restores the prior transform.
+
+Grid visibility, snapping, and cell size are separate settings. Cell size is a persisted integer from
+1 through 64 pixels, drives both direct manipulation systems, and scales its visible preview grid with
+preview zoom. The complete bundled Font Awesome Free library opens directly in Content editing; the
+small same-family icon row is only a convenience, never the apparent library boundary.
+
+Content identity is exact even when appearance is shared. Editing text writes only the selected
+`data-copy-id`, and replacing or relabelling an icon writes only the selected `data-icon-id`; shared
+roles may still carry global layout and appearance styling. A role can never cause an MPN value edit
+to rewrite Stockroom branding or another field.
+
+### Provider Launch And Complete Intake Data Boundary
+
+The React provider modal is the permanent owner of browser chrome and geometry; the native provider
+WebView is only its clipped content surface. A viewport published before the native capture lease is
+ready is retained and applied when that lease opens, so startup ordering can never leave the modal on
+a placeholder. The primary Stockroom WebView is never navigated away from the application.
+
+Adding a component exhausts every eligible data source for the exact manufacturer part number. An
+early Mouser or DigiKey identity hit may lead the merge, but it cannot terminate the LCSC, datasheet,
+or other configured distributor passes. Distributor stock numbers are resolved once to the canonical
+manufacturer part number before another distributor is queried; one distributor's order number is
+never sent to another distributor as if it were the MPN.
+
+Remote PDF datasheets are fetched through Stockroom's authenticated document endpoint, validated as
+public HTTPS PDF bytes, and cached outside the library record. The renderer never asks pdf.js to fetch
+a distributor URL directly, avoiding browser CORS failures while preserving an explicit source-page
+fallback and leaving canonical library data unchanged.
+
+### Visual Property Editing Boundary
+
+Common Design Studio settings are manipulated visually rather than entered as CSS text. Numeric
+geometry, typography, opacity, stroke, viewport, grid, and CAD alpha use bounded sliders; colors use
+native color controls; closed vocabularies use pickers or segmented choices. Every visual control
+writes through the same validated Design Document grammar and remains undoable.
+
+Text entry remains only where text is the actual content: labels, copy, search, accessibility text,
+draft names, and the explicitly named Advanced validated-value escape hatch. Advanced preserves exact
+CSS authoring without making ordinary property editing depend on memorizing CSS syntax.

@@ -57,15 +57,16 @@ interface SelectedTarget {
 }
 
 type ResizeDirection = "north" | "northeast" | "east" | "southeast" | "south" | "southwest" | "west" | "northwest";
-type GestureKind = "move" | ResizeDirection;
+type GestureKind = "move" | "rotate" | ResizeDirection;
 
 interface GesturePreview {
   target: SelectedTarget;
-  original: Record<"position" | "left" | "top" | "width" | "height", string>;
+  original: Record<"position" | "left" | "top" | "width" | "height" | "transform", string>;
   baseLeft: number;
   baseTop: number;
   baseWidth: number;
   baseHeight: number;
+  baseRotation: number;
 }
 
 interface Gesture {
@@ -75,6 +76,9 @@ interface Gesture {
   startY: number;
   scale: number;
   grid: number;
+  centerX: number;
+  centerY: number;
+  startAngle: number;
   previews: GesturePreview[];
 }
 
@@ -107,11 +111,25 @@ function snap(value: number, grid: number): number {
   return Math.round(value / grid) * grid;
 }
 
+function rotationOf(value: string | undefined): number {
+  const match = /^rotate\((-?(?:\d+|\d*\.\d+))deg\)$/.exec(value?.trim() ?? "");
+  return match ? Number(match[1]) : 0;
+}
+
+function rotationValue(value: number): string {
+  const normalized = Math.round(value * 1000) / 1000;
+  return `rotate(${Object.is(normalized, -0) ? 0 : normalized}deg)`;
+}
+
 function gridFor(element: Element): number {
   const root = element.closest("[data-snap]");
   return root?.getAttribute("data-snap") === "on"
-    ? Math.max(1, Number.parseInt(root.getAttribute("data-grid") ?? "8", 10) || 8)
+    ? Math.max(1, Number.parseInt(root.getAttribute("data-grid-size") ?? "8", 10) || 8)
     : 1;
+}
+
+function rotationStepFor(element: Element): number {
+  return element.closest("[data-snap]")?.getAttribute("data-snap") === "on" ? 15 : 1;
 }
 
 function displayLabel(id: string, element: Element): string {
@@ -139,8 +157,7 @@ function withElementChanges(
 /** Technical drawings select their registered presentation root, never an engineering descendant. */
 function selectableTarget(target: Element): Element | null {
   if (target.closest("[data-design-studio-chrome]")) return null;
-  const productRoot = document.querySelector("[data-design-product-root]");
-  if (productRoot && !productRoot.contains(target)) return null;
+  const productRoot = target.closest("[data-design-product-root]");
   const localRoot = target.closest(DESIGN_TARGET_SELECTOR);
   if (!productRoot && !localRoot) return null;
   ensureDesignIdentities(productRoot ?? localRoot!);
@@ -287,10 +304,13 @@ export function DevInspector() {
       const deltaX = (event.clientX - gesture.startX) / gesture.scale;
       const deltaY = (event.clientY - gesture.startY) / gesture.scale;
       const activeElements = draftRef.current.elements;
-      const east = gesture.kind !== "move" && gesture.kind.includes("east");
-      const west = gesture.kind !== "move" && gesture.kind.includes("west");
-      const north = gesture.kind !== "move" && gesture.kind.includes("north");
-      const south = gesture.kind !== "move" && gesture.kind.includes("south");
+      const resizing = gesture.kind !== "move" && gesture.kind !== "rotate";
+      const east = resizing && gesture.kind.includes("east");
+      const west = resizing && gesture.kind.includes("west");
+      const north = resizing && gesture.kind.includes("north");
+      const south = resizing && gesture.kind.includes("south");
+      const currentAngle = Math.atan2(event.clientY - gesture.centerY, event.clientX - gesture.centerX) * 180 / Math.PI;
+      const angleDelta = currentAngle - gesture.startAngle;
       for (const preview of gesture.previews) {
         const { element, id } = preview.target;
         const activeOverride = activeElements[id];
@@ -300,6 +320,12 @@ export function DevInspector() {
             : "relative";
           element.style.left = `${snap(preview.baseLeft + deltaX, gesture.grid)}px`;
           element.style.top = `${snap(preview.baseTop + deltaY, gesture.grid)}px`;
+          continue;
+        }
+        if (gesture.kind === "rotate") {
+          element.style.transform = rotationValue(
+            snap(preview.baseRotation + angleDelta, rotationStepFor(element)),
+          );
           continue;
         }
         if (east || west) {
@@ -328,7 +354,9 @@ export function DevInspector() {
         const props: Record<string, string> = {};
         const properties = gesture.kind === "move"
           ? ["position", "left", "top"]
-          : ["position", "left", "top", "width", "height"];
+          : gesture.kind === "rotate"
+            ? ["transform"]
+            : ["position", "left", "top", "width", "height"];
         for (const property of properties) {
           const value = preview.target.element.style.getPropertyValue(property);
           if (value) props[property] = value;
@@ -401,6 +429,9 @@ export function DevInspector() {
       startY: event.clientY,
       scale,
       grid,
+      centerX: rect.left + rect.width / 2,
+      centerY: rect.top + rect.height / 2,
+      startAngle: Math.atan2(event.clientY - (rect.top + rect.height / 2), event.clientX - (rect.left + rect.width / 2)) * 180 / Math.PI,
       previews: selection.map((target) => {
         const overrides = draftRef.current.elements[target.id] ?? {};
         const targetRect = target.element.getBoundingClientRect();
@@ -418,11 +449,13 @@ export function DevInspector() {
             top: target.element.style.top,
             width: target.element.style.width,
             height: target.element.style.height,
+            transform: target.element.style.transform,
           },
           baseLeft: px(overrides.left),
           baseTop: px(overrides.top),
           baseWidth: px(overrides.width) || targetWidth,
           baseHeight: px(overrides.height) || targetHeight,
+          baseRotation: rotationOf(overrides.transform),
         };
       }),
     };
@@ -484,6 +517,19 @@ export function DevInspector() {
         }
       }
       changes.set(target.id, patch);
+    }
+    commitChanges(changes);
+  }, [commitChanges, selection]);
+
+  const rotateByKeyboard = useCallback((event: ReactKeyboardEvent<HTMLButtonElement>) => {
+    if (selection.length === 0 || !["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key)) return;
+    event.preventDefault();
+    const direction = event.key === "ArrowRight" || event.key === "ArrowUp" ? 1 : -1;
+    const step = rotationStepFor(selection[selection.length - 1].element) * (event.shiftKey ? 10 : 1);
+    const changes = new Map<string, Record<string, string>>();
+    for (const target of selection) {
+      const current = draftRef.current.elements[target.id]?.transform;
+      changes.set(target.id, { transform: rotationValue(rotationOf(current) + direction * step) });
     }
     commitChanges(changes);
   }, [commitChanges, selection]);
@@ -619,6 +665,7 @@ export function DevInspector() {
           <div className="pointer-events-auto absolute bottom-full left-0 mb-2 flex items-center gap-1 rounded-control border border-line2 bg-popover p-1 shadow-pop">
             <span className="max-w-40 truncate px-1 text-2xs font-semibold text-t1">{selectionName}</span>
             <button type="button" aria-label={`Move ${selectionName}`} title={`Move ${selectionName}`} onPointerDown={(event) => beginGesture(event, "move")} onKeyDown={moveByKeyboard} className="rounded-control px-1.5 py-1 text-xs text-t1 hover:bg-control-hover">Move</button>
+            <button type="button" aria-label={`Rotate ${selectionName}`} title={`Rotate ${selectionName}`} onPointerDown={(event) => beginGesture(event, "rotate")} onKeyDown={rotateByKeyboard} className="rounded-control px-1.5 py-1 text-xs text-t1 hover:bg-control-hover">Rotate</button>
             <button type="button" aria-label={`${hidden ? "Show" : "Hide"} ${selectionName}`} onClick={toggleVisibility} className="rounded-control px-1.5 py-1 text-xs text-t1 hover:bg-control-hover">{hidden ? "Show" : "Hide"}</button>
             <button type="button" aria-label={`${dev.draft.elements[primary.id]?.position === "absolute" ? "Flow" : "Detach"} ${selectionName}`} onClick={toggleDetached} className="rounded-control px-1.5 py-1 text-xs text-t1 hover:bg-control-hover">{dev.draft.elements[primary.id]?.position === "absolute" ? "Flow" : "Detach"}</button>
             <button type="button" aria-label={`Reset ${selectionName}`} onClick={resetSelection} className="rounded-control px-1.5 py-1 text-xs text-t1 hover:bg-control-hover">Reset</button>

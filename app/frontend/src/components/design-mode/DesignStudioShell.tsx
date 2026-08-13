@@ -15,6 +15,7 @@ import { ArrangePreferencesProvider } from "./ArrangeSurface";
 import { ScenarioCatalog } from "./ScenarioCatalog";
 import { PREVIEW_EFFECT_BLOCKED_EVENT, type PreviewEffectError } from "../../design-studio/previewEffects";
 import { useToast } from "../../lib/toast";
+import { DEFAULT_DESIGN_GRID_SIZE, finiteDesignGridSize } from "../../design-studio/gridSize";
 
 const LEFT_COLLAPSED_KEY = "stockroom.design-studio.left-collapsed";
 const RIGHT_COLLAPSED_KEY = "stockroom.design-studio.right-collapsed";
@@ -26,6 +27,7 @@ const CUSTOM_VIEWPORT_WIDTH_KEY = "stockroom.design-studio.custom-viewport-width
 const MODE_KEY = "stockroom.design-studio.mode";
 const ZOOM_KEY = "stockroom.design-studio.zoom";
 const GRID_KEY = "stockroom.design-studio.grid";
+const GRID_SIZE_KEY = "stockroom.design-studio.grid-size";
 const SNAP_KEY = "stockroom.design-studio.snap";
 const PRESENTATION_KEY = "stockroom.design-studio.presentation";
 const MIN_PANEL_WIDTH = 210;
@@ -118,6 +120,12 @@ export function DesignStudioShell({ children }: { children: ReactNode }) {
   const [customViewportWidth, setCustomViewportWidth] = useState(() => readPref("design_studio_custom_viewport_width", CUSTOM_VIEWPORT_WIDTH_KEY, parseNumber, 1366));
   const [zoom, setZoom] = useState(() => readPref("design_studio_zoom", ZOOM_KEY, parseNumber, 100));
   const [grid, setGrid] = useState(() => readPref("design_studio_grid", GRID_KEY, parseBoolean, false));
+  const [gridSize, setGridSize] = useState(() => readPref(
+    "design_studio_grid_size",
+    GRID_SIZE_KEY,
+    (raw) => finiteDesignGridSize(raw),
+    DEFAULT_DESIGN_GRID_SIZE,
+  ));
   const [snap, setSnap] = useState(() => readPref("design_studio_snap", SNAP_KEY, parseBoolean, true));
   const [lastScenario] = useState(() => readPref("design_studio_last_scenario", LAST_SCENARIO_KEY, parseString, "global.real-data"));
   const [preferredMode] = useState(() => readPref("design_studio_mode", MODE_KEY, parseMode, "preview"));
@@ -258,6 +266,9 @@ export function DesignStudioShell({ children }: { children: ReactNode }) {
     transform: `scale(${fitScale})`,
     transformOrigin: "top center",
   };
+  const previewRegionStyle = {
+    "--design-studio-grid-size": `${gridSize * fitScale}px`,
+  } as CSSProperties;
 
   const changeViewport = (next: StudioViewport) => {
     setViewport(next);
@@ -274,6 +285,11 @@ export function DesignStudioShell({ children }: { children: ReactNode }) {
   const changeGrid = (next: boolean) => {
     setGrid(next);
     writePref("design_studio_grid", next, GRID_KEY);
+  };
+  const changeGridSize = (next: number) => {
+    const finite = finiteDesignGridSize(next, gridSize);
+    setGridSize(finite);
+    writePref("design_studio_grid_size", finite, GRID_SIZE_KEY);
   };
   const changeSnap = (next: boolean) => {
     setSnap(next);
@@ -330,6 +346,8 @@ export function DesignStudioShell({ children }: { children: ReactNode }) {
           onZoomChange={changeZoom}
           grid={grid}
           onGridChange={changeGrid}
+          gridSize={gridSize}
+          onGridSizeChange={changeGridSize}
           snap={snap}
           onSnapChange={changeSnap}
           onClose={close}
@@ -383,7 +401,9 @@ export function DesignStudioShell({ children }: { children: ReactNode }) {
           role={studio.enabled ? "region" : undefined}
           aria-label={studio.enabled ? previewLabel : undefined}
           data-grid={studio.enabled ? (grid ? "visible" : "hidden") : undefined}
+          data-grid-size={studio.enabled ? gridSize : undefined}
           data-snap={studio.enabled ? (snap ? "on" : "off") : undefined}
+          style={studio.enabled ? previewRegionStyle : undefined}
           className={
             studio.enabled
               ? "min-w-0 flex-1 overflow-auto bg-field p-2 " +
@@ -396,7 +416,7 @@ export function DesignStudioShell({ children }: { children: ReactNode }) {
             className={studio.enabled ? "mx-auto min-h-full overflow-hidden border border-line bg-surface shadow-pop" : "contents"}
             style={studio.enabled ? previewStyle : undefined}
           >
-            <ArrangePreferencesProvider snap={snap}>{children}</ArrangePreferencesProvider>
+            <ArrangePreferencesProvider snap={snap} gridSize={gridSize}>{children}</ArrangePreferencesProvider>
           </div>
           {studio.enabled ? (
             <div className="sticky bottom-2 left-2 z-10 w-fit rounded-control border border-line bg-popover/90 px-2 py-1 text-2xs text-t2" data-dev-id="design.pan-cue">

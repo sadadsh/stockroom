@@ -4,6 +4,7 @@ at thousands of parts (spec section 2.2); part detail loads the canonical record
 
 from __future__ import annotations
 
+import hashlib
 import json
 import mimetypes
 import re
@@ -39,6 +40,9 @@ from stockroom.dossier.cad_preference import (
 )
 from stockroom.dossier.decisions import UnknownSpecification, UnpinnableSource
 from stockroom.dossier.documents import find_document
+from stockroom.enrich.datasheet import fetch_datasheet
+from stockroom.enrich.errors import EnrichError
+from stockroom.enrich.image_proxy import allowed_image_url
 from stockroom.evidence import EvidenceStore
 from stockroom.ingest.candidates import RetainedCandidateStore
 from stockroom.ingest.passive_add import (
@@ -1053,16 +1057,25 @@ def library_router(require_token) -> APIRouter:
         document = find_document(ctx.ops.load_record(part_id), document_id)
         if document is None:
             raise FileNotFoundError(f"part {part_id} references no document {document_id}")
-        if not document["localPath"]:
-            raise FileNotFoundError(
-                f"{document['title']} is a referenced link with no stored copy; open its "
-                "source page instead"
-            )
-        path = _library_document_file(ctx.profile.library.root, document["localPath"])
-        if path is None or not path.is_file():
-            raise FileNotFoundError(
-                f"the stored copy of {document['title']} is no longer in the library"
-            )
+        if document["localPath"]:
+            path = _library_document_file(ctx.profile.library.root, document["localPath"])
+            if path is None or not path.is_file():
+                raise FileNotFoundError(
+                    f"the stored copy of {document['title']} is no longer in the library"
+                )
+        else:
+            remote_url = str(document["remoteUrl"] or "").strip()
+            if not allowed_image_url(remote_url):
+                raise FileNotFoundError(
+                    f"{document['title']} has no readable stored or public HTTPS PDF"
+                )
+            digest = hashlib.sha256(remote_url.encode("utf-8")).hexdigest()
+            path = Path(ctx.enrich_cache_dir) / "document-viewer" / f"{digest}.pdf"
+            if not path.is_file():
+                try:
+                    fetch_datasheet(remote_url, path)
+                except EnrichError as exc:
+                    raise ApiError(502, "the remote datasheet could not be fetched") from exc
         media_type = (
             mimetypes.guess_type(path.name)[0]
             or document["mimeType"]

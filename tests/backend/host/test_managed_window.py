@@ -186,6 +186,37 @@ def test_in_app_provider_surface_applies_modal_viewport_and_commands(monkeypatch
         assert provider_window.hidden_calls == 2
 
 
+def test_in_app_provider_surface_retains_modal_viewport_until_lease_is_ready(monkeypatch) -> None:
+    """React can measure the modal before the backend has opened its native lease."""
+
+    app_window = _Window("http://127.0.0.1:8123/components")
+    app_window.x = 40
+    app_window.y = 30
+    provider_window = _Window("about:blank#stockroom-provider-proof")
+    monkeypatch.setattr(W, "_ACTIVE_WINDOW", app_window)
+    surface = W.InAppProviderBrowserSurface(
+        "http://127.0.0.1:8123",
+        provider_window=lambda: provider_window,
+    )
+    viewport = {
+        "componentId": "part-1",
+        "visible": True,
+        "x": 100,
+        "y": 80,
+        "width": 900,
+        "height": 560,
+    }
+
+    assert surface.set_provider_viewport(viewport) is True
+    assert provider_window.show_calls == 0
+
+    with surface.lease() as lease:
+        lease.navigate("https://www.mouser.com/c/?q=LM358")
+        assert provider_window.move_calls == [(140, 110)]
+        assert provider_window.resize_calls == [(900, 560)]
+        assert provider_window.show_calls == 1
+
+
 class _Webview:
     def __init__(self, window: _Window) -> None:
         self.window = window

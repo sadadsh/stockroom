@@ -508,7 +508,7 @@
   background-image:
     linear-gradient(to right, var(--c-line) 1px, transparent 1px),
     linear-gradient(to bottom, var(--c-line) 1px, transparent 1px);
-  background-size: 16px 16px;
+  background-size: var(--design-studio-grid-size, 8px) var(--design-studio-grid-size, 8px);
 }
 
 .design-studio-resizer {

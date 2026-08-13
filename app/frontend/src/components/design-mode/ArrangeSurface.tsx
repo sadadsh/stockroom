@@ -179,12 +179,14 @@ const ArrangeSnapContext = createContext(8);
 
 export function ArrangePreferencesProvider({
   snap,
+  gridSize = 8,
   children,
 }: {
   snap: boolean;
+  gridSize?: number;
   children: ReactNode;
 }) {
-  return <ArrangeSnapContext.Provider value={snap ? 8 : 1}>{children}</ArrangeSnapContext.Provider>;
+  return <ArrangeSnapContext.Provider value={snap ? gridSize : 1}>{children}</ArrangeSnapContext.Provider>;
 }
 
 /** The arrange surface, or `null` when arrange is off. Everything here degrades to nothing on null. */
@@ -837,7 +839,10 @@ function PieceMenu({ state }: { state: ArrangeMenuState }) {
       {freePosition ? (
         <div className="flex gap-1" data-dev-id="design.piece-position">
           <input
-            type="number"
+            type="range"
+            min={-2048}
+            max={2048}
+            step={surface.snapGrid}
             aria-label={xLabel}
             value={placement.position?.x ?? 0}
             onChange={(event) =>
@@ -850,10 +855,13 @@ function PieceMenu({ state }: { state: ArrangeMenuState }) {
                 ),
               )
             }
-            className="min-w-0 flex-1 rounded-control border border-line bg-field px-1.5 py-1 text-2xs text-t1"
+            className="min-w-0 flex-1 accent-[var(--c-acc)]"
           />
           <input
-            type="number"
+            type="range"
+            min={-2048}
+            max={2048}
+            step={surface.snapGrid}
             aria-label={yLabel}
             value={placement.position?.y ?? 0}
             onChange={(event) =>
@@ -866,7 +874,7 @@ function PieceMenu({ state }: { state: ArrangeMenuState }) {
                 ),
               )
             }
-            className="min-w-0 flex-1 rounded-control border border-line bg-field px-1.5 py-1 text-2xs text-t1"
+            className="min-w-0 flex-1 accent-[var(--c-acc)]"
           />
         </div>
       ) : (

@@ -684,6 +684,81 @@ def test_paste_link_captures_both_distributor_buy_links(tmp_path):
     assert set(r.dist_pns) == {"mouser", "digikey"}
 
 
+def test_paste_link_uses_the_resolved_mpn_for_every_other_distributor(tmp_path):
+    """A Mouser order number is not a DigiKey search identity."""
+
+    from stockroom.enrich.schema import EnrichmentResult, Sourced
+
+    mouser = _FakeMouser(_mouser_full())
+    seen = []
+
+    class _FakeDigiKey:
+        enabled = True
+        last_status = "ok"
+
+        def lookup(self, mpn):
+            seen.append(mpn)
+            r = EnrichmentResult()
+            r.mpn = Sourced("TPD6E05U06RVZR", "digikey", "high")
+            r.specs["Working Voltage"] = Sourced("5.5 V", "digikey", "high")
+            return r
+
+    pipe = EnrichmentPipeline(
+        cache_dir=tmp_path / "c",
+        fetcher=_RaisingFetcher(),
+        mouser=mouser,
+        digikey=_FakeDigiKey(),
+        jlcsearch=_NullJlc(),
+    )
+    r = pipe.extract_from_url(
+        "https://www.mouser.com/ProductDetail/Texas-Instruments/595-TPD6E05U06RVZR"
+    )
+
+    assert mouser.seen == ["595-TPD6E05U06RVZR"]
+    assert seen == ["TPD6E05U06RVZR"]
+    assert r.specs["Working Voltage"].value == "5.5 V"
+
+
+def test_a_mouser_hit_does_not_skip_lcsc_or_the_remaining_spec_sources(tmp_path):
+    """One successful distributor is a merge leader, never an early-stop signal."""
+
+    from stockroom.enrich.registry import SourceRegistry
+
+    class _LcscDepth:
+        name = "lcsc"
+        vendor_key = "lcsc"
+
+        def __init__(self):
+            self.seen = []
+
+        def enrich(self, mpn, category, remaining):
+            self.seen.append((mpn, set(remaining)))
+            r = EnrichmentResult(category=category)
+            r.mpn = Sourced(mpn, "lcsc", "medium")
+            r.specs["Reverse Stand-Off Voltage"] = Sourced("5.5 V", "lcsc", "medium")
+            r.product_url = Sourced("https://www.lcsc.com/product-detail/C123.html", "lcsc", "medium")
+            return r
+
+    depth = _LcscDepth()
+    pipe = EnrichmentPipeline(
+        cache_dir=tmp_path / "c",
+        fetcher=_RaisingFetcher(),
+        mouser=_FakeMouser(_mouser_full()),
+        jlcsearch=_NullJlc(),
+    )
+    pipe.registry = SourceRegistry([depth])
+
+    r = pipe.extract_from_url(
+        "https://www.mouser.com/ProductDetail/Texas-Instruments/TPD6E05U06RVZR"
+    )
+
+    assert depth.seen and depth.seen[0][0] == "TPD6E05U06RVZR"
+    assert r.specs["Reverse Stand-Off Voltage"].value == "5.5 V"
+    assert r.dist_urls["lcsc"] == "https://www.lcsc.com/product-detail/C123.html"
+    assert r.source_states["mouser"] == "success"
+    assert r.source_states["lcsc"] == "success"
+
+
 def test_dist_urls_round_trip_through_the_cache():
     # both buy links must survive caching, so a re-looked-up link keeps both distributors.
     from stockroom.enrich.pipeline import _result_from_cache, _result_to_cache
@@ -693,6 +768,30 @@ def test_dist_urls_round_trip_through_the_cache():
     r.dist_urls = {"mouser": "https://m/x", "digikey": "https://d/y"}
     back = _result_from_cache(_result_to_cache(r), "")
     assert back.dist_urls == {"mouser": "https://m/x", "digikey": "https://d/y"}
+
+
+def test_a_pre_full_source_url_cache_entry_is_refetched(tmp_path):
+    """The repair must replace this PC's previously cached Mouser-only result."""
+
+    from stockroom.enrich.pipeline import _result_to_cache
+    from stockroom.enrich.schema import SCHEMA_VERSION
+
+    url = "https://www.mouser.com/ProductDetail/Texas-Instruments/TPD6E05U06RVZR"
+    mouser = _FakeMouser(_mouser_full())
+    pipe = EnrichmentPipeline(
+        cache_dir=tmp_path / "c",
+        fetcher=_RaisingFetcher(),
+        mouser=mouser,
+        jlcsearch=_NullJlc(),
+    )
+    stale = _result_to_cache(_mouser_full())
+    stale["schema_version"] = SCHEMA_VERSION - 1
+    pipe.url_cache.put(url, stale)
+
+    result = pipe.extract_from_url(url)
+
+    assert mouser.seen == ["TPD6E05U06RVZR"]
+    assert result.source_states["mouser"] == "success"
 
 
 def test_paste_link_falls_back_to_render_when_the_api_misses(tmp_path):

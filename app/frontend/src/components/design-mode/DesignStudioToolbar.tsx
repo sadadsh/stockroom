@@ -9,6 +9,7 @@ import {
   RESPONSIVE_VIEWPORT_PRESETS,
   type StudioViewport,
 } from "../../design-studio/responsiveViewports";
+import { finiteDesignGridSize } from "../../design-studio/gridSize";
 
 interface DesignStudioToolbarProps {
   mode: StudioMode;
@@ -23,6 +24,8 @@ interface DesignStudioToolbarProps {
   onZoomChange: (zoom: number) => void;
   grid: boolean;
   onGridChange: (grid: boolean) => void;
+  gridSize: number;
+  onGridSizeChange: (gridSize: number) => void;
   snap: boolean;
   onSnapChange: (snap: boolean) => void;
   onClose: () => void;
@@ -47,6 +50,8 @@ export function DesignStudioToolbar({
   onZoomChange,
   grid,
   onGridChange,
+  gridSize,
+  onGridSizeChange,
   snap,
   onSnapChange,
   onClose,
@@ -68,6 +73,7 @@ export function DesignStudioToolbar({
   const zoomLabel = useText("design-studio.zoom", "Zoom");
   const fitLabel = useText("design-studio.zoom.fit", "Fit");
   const gridLabel = useText("design-studio.grid", "Grid");
+  const gridSizeLabel = useText("design-studio.grid-size", "Grid Size");
   const snapLabel = useText("design-studio.snap", "Snap");
   const undoLabel = useText("design-studio.undo", "Undo");
   const redoLabel = useText("design-studio.redo", "Redo");
@@ -133,7 +139,7 @@ export function DesignStudioToolbar({
       </label>
       {viewport === "custom" ? (
         <input
-          type="number"
+          type="range"
           aria-label={customViewportLabel}
           min={320}
           max={3840}
@@ -144,7 +150,7 @@ export function DesignStudioToolbar({
               finiteViewportWidth(event.target.value, customViewportWidth),
             )
           }
-          className="h-[22px] w-20 rounded-control border border-line bg-field px-1.5 text-xs text-t1"
+          className="h-[22px] w-20 accent-[var(--c-acc)]"
         />
       ) : null}
 
@@ -163,6 +169,17 @@ export function DesignStudioToolbar({
       </label>
 
       <Button small aria-pressed={grid} onClick={() => onGridChange(!grid)}>{gridLabel}</Button>
+      <input
+        type="range"
+        aria-label={gridSizeLabel}
+        title={gridSizeLabel}
+        min={1}
+        max={64}
+        step={1}
+        value={gridSize}
+        onChange={(event) => onGridSizeChange(finiteDesignGridSize(event.currentTarget.value, gridSize))}
+        className="h-[22px] w-16 accent-[var(--c-acc)]"
+      />
       <Button small aria-pressed={snap} onClick={() => onSnapChange(!snap)}>{snapLabel}</Button>
 
       <span className="mx-1 h-5 w-px bg-line" aria-hidden />

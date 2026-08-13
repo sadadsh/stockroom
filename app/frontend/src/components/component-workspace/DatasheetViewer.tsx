@@ -207,18 +207,12 @@ function DatasheetPdf({
     "This PDF could not be shown.",
   );
 
-  // Load the bytes. A stored file goes through the documents endpoint, because the guard rejects a
-  // plain URL and a viewer handed a 401 would show nothing and say nothing.
+  // Load every PDF through the authenticated document endpoint. It serves local files and safely
+  // proxies public remote PDFs, so pdf.js never depends on distributor CORS policy.
   useEffect(() => {
     let live = true;
     setState({ phase: "loading" });
     setPage(1);
-    if (kind === "remote") {
-      setSource({ url: document.remoteUrl });
-      return () => {
-        live = false;
-      };
-    }
     setSource(null);
     api
       .documentFile(componentId, target.id)

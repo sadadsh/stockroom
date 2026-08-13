@@ -226,8 +226,11 @@ function editTargets(
     ),
     icon: make(
       "icon",
-      domainElementsExceptTarget(icons, target),
-      icons.flatMap((icon) => icon.iconId ? [icon.iconId] : []),
+      uniqueElements(icons.map((icon) => icon.element)),
+      icons.flatMap((icon) => {
+        const id = icon.iconId ?? designIdOf(icon.element);
+        return id ? [id] : [];
+      }),
     ),
   };
 }
@@ -284,7 +287,7 @@ export function elementsForTargetDomainOverride(
     else if (address.domain === "text") {
       elements.push(...domainElementsExceptTarget(textDomains(target), target));
     } else {
-      elements.push(...domainElementsExceptTarget(iconDomains(target), target));
+      elements.push(...iconDomains(target).map((icon) => icon.element));
     }
   }
   return uniqueElements(elements);

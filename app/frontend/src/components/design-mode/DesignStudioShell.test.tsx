@@ -180,9 +180,8 @@ describe("DesignStudioShell", () => {
     expect(frame.style.width).toBe("1920px");
     await userEvent.setup().selectOptions(viewport, "custom");
     const custom = screen.getByLabelText("Custom Viewport Width");
+    expect(custom).toHaveAttribute("type", "range");
     fireEvent.change(custom, { target: { value: "1472" } });
-    expect(frame.style.width).toBe("1472px");
-    fireEvent.change(custom, { target: { value: "" } });
     expect(frame.style.width).toBe("1472px");
   });
 
@@ -195,6 +194,7 @@ describe("DesignStudioShell", () => {
       design_studio_mode: "edit",
       design_studio_zoom: 75,
       design_studio_grid: true,
+      design_studio_grid_size: 12,
       design_studio_snap: false,
       design_studio_presentation: false,
     };
@@ -205,8 +205,22 @@ describe("DesignStudioShell", () => {
     expect(screen.getByLabelText("Zoom")).toHaveValue("75");
     expect(within(screen.getByLabelText("Studio Mode")).getByRole("button", { name: "Edit" })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByRole("button", { name: "Grid" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("slider", { name: "Grid Size" })).toHaveValue("12");
     expect(screen.getByRole("button", { name: "Snap" })).toHaveAttribute("aria-pressed", "false");
     expect(screen.getByRole("button", { name: "Presentation Mode" })).toHaveAttribute("aria-pressed", "false");
+  });
+
+  it("changes the visible and snapping grid from 1 to 64 pixels", async () => {
+    await renderStudio();
+    const gridSize = screen.getByRole("slider", { name: "Grid Size" });
+    const preview = screen.getByRole("region", { name: "Stockroom Preview" });
+
+    expect(gridSize).toHaveValue("8");
+    fireEvent.change(gridSize, { target: { value: "24" } });
+    expect(preview).toHaveAttribute("data-grid-size", "24");
+    expect(preview.style.getPropertyValue("--design-studio-grid-size")).toBe("24px");
+    fireEvent.change(gridSize, { target: { value: "100" } });
+    expect(gridSize).toHaveValue("64");
   });
 
   it("fits and visibly frames a wide canvas with keyboard and pointer panning", async () => {

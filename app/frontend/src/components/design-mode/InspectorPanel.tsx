@@ -189,8 +189,8 @@ export function InspectorPanel({ root }: { root?: Element; integrated?: boolean 
     setDomainProperty,
     resetDomainProperty,
   };
-  const textContentIds = [...new Set(affectedInspections.flatMap((item) => item.editTargets.text.contentIds))];
-  const iconContentIds = [...new Set(affectedInspections.flatMap((item) => item.editTargets.icon.contentIds))];
+  const textContentIds = inspection.editTargets.text.contentIds;
+  const iconContentIds = inspection.editTargets.icon.contentIds;
   return (
     <section aria-label={contextualInspectorLabel} className="border-b border-line">
       <div className="border-b border-line px-3.5 py-2.5">

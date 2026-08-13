@@ -43,6 +43,8 @@ function renderToolbar() {
       onZoomChange={vi.fn()}
       grid={false}
       onGridChange={vi.fn()}
+      gridSize={8}
+      onGridSizeChange={vi.fn()}
       snap={true}
       onSnapChange={vi.fn()}
       onClose={vi.fn()}
@@ -62,6 +64,7 @@ describe("DesignStudioToolbar local Apply", () => {
   it("shows Draft Only before a design is explicitly applied", () => {
     renderToolbar();
     expect(screen.getByText("Draft")).toBeVisible();
+    expect(screen.getByRole("slider", { name: "Grid Size" })).toHaveValue("8");
     expect(screen.getByRole("button", { name: "Set" })).toBeEnabled();
   });
 

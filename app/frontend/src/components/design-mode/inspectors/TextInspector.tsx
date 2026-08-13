@@ -1,8 +1,8 @@
 import { useMemo } from "react";
 import { useCopyFormatter, useText } from "../../../lib/copy";
 import { useDevMode } from "../../../lib/devMode";
-import { isSafeElementValue } from "../../../lib/elementLayout";
 import type { DomainInspectorProps } from "./types";
+import { VisualCssControl } from "./VisualCssControl";
 
 const TYPE_PROPS = [
   "color",
@@ -27,8 +27,8 @@ export function TextInspector(props: DomainInspectorProps) {
   const typographyLabel = useText("design-studio.inspector.text.typography", "Font");
   const propertyAria = useCopyFormatter("design-studio.inspector.text.property-aria", "Text {property} Value");
   const texts = useMemo(
-    () => props.inspections.flatMap((inspection) => inspection.texts),
-    [props.inspections],
+    () => props.inspection.texts,
+    [props.inspection],
   );
   const copyIds = useMemo(
     () => [...new Set(texts.flatMap((text) => text.copyId ? [text.copyId] : []))],
@@ -46,7 +46,7 @@ export function TextInspector(props: DomainInspectorProps) {
           <textarea
             aria-label={contentAria}
             value={dev.resolveCopy(copyId, primary.value)}
-            onChange={(event) => copyIds.forEach((id) => dev.setCopy(id, event.target.value))}
+            onChange={(event) => dev.setCopy(copyId, event.target.value)}
             className="mt-1 min-h-16 w-full resize-y rounded-control border border-line bg-field px-2 py-1.5 text-xs text-t1 outline-none focus:border-acc"
           />
         </label>
@@ -56,15 +56,11 @@ export function TextInspector(props: DomainInspectorProps) {
         {TYPE_PROPS.map((property) => (
           <label key={property} className="grid grid-cols-[minmax(0,1fr)_104px] items-center gap-2 py-1 text-xs text-t2">
             {property.split("-").map((part) => part[0].toUpperCase() + part.slice(1)).join(" ")}
-            <input
-              aria-label={propertyAria({ property })}
-              placeholder={computed.getPropertyValue(property)}
-              onBlur={(event) => {
-                const value = event.currentTarget.value.trim();
-                if (!value) props.resetDomainProperty("text", property);
-                else if (isSafeElementValue(property, value)) props.setDomainProperty("text", property, value);
-              }}
-              className="w-full rounded-control border border-line bg-field px-2 py-1 text-2xs font-mono text-t1 outline-none focus:border-acc"
+            <VisualCssControl
+              property={property}
+              ariaLabel={propertyAria({ property })}
+              value={computed.getPropertyValue(property)}
+              onCommit={(value) => props.setDomainProperty("text", property, value)}
             />
           </label>
         ))}
