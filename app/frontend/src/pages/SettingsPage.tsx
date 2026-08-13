@@ -60,6 +60,7 @@ import {
 import { useUpdateStanding } from "../lib/useUpdateStanding";
 import { pickHostFolder } from "../lib/hostFolderPicker";
 import { useScenarioUiState } from "../design-studio/scenarioState";
+import { useOptionalDesignStudio } from "../design-studio/DesignStudioProvider";
 
 function cx(...parts: Array<string | false | null | undefined>): string {
   return parts.filter(Boolean).join(" ");
@@ -628,6 +629,12 @@ const THEME_OPTIONS: { value: Theme; label: string; id: string }[] = [
 
 function AppearanceSection() {
   const { theme, setTheme } = useTheme();
+  const studio = useOptionalDesignStudio();
+  const { toast } = useToast();
+  const resetAppliedConfirmation = useText(
+    "settings.appearance.reset-applied-confirmation",
+    "Applied design reset. Stockroom is using the shipped design.",
+  );
   return (
     <>
       <div className="flex items-center justify-between">
@@ -654,6 +661,32 @@ function AppearanceSection() {
           ))}
         </div>
       </div>
+      {studio ? (
+        <div className="mt-3 flex items-center justify-between border-t border-line pt-3">
+          <div>
+            <div className="text-sm text-t2">
+              <Text id="settings.appearance.applied-design">Applied Design</Text>
+            </div>
+            <div className="text-xs text-t3">
+              {studio.appliedRevision ? (
+                <Text id="settings.appearance.applied-this-pc">Applied To This PC</Text>
+              ) : (
+                <Text id="settings.appearance.shipped-design">Using Shipped Design</Text>
+              )}
+            </div>
+          </div>
+          <Button
+            small
+            data-dev-id="settings.appearance-reset-applied"
+            disabled={!studio.appliedRevision || studio.appliedState === "applying"}
+            onClick={() => void studio.resetAppliedLocal().then((ok) => {
+              if (ok) toast(resetAppliedConfirmation, "ok");
+            })}
+          >
+            <Text id="settings.appearance.reset-applied">Reset Applied Design</Text>
+          </Button>
+        </div>
+      ) : null}
     </>
   );
 }

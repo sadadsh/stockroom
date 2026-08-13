@@ -109,6 +109,7 @@ import type {
   PersonalDesignPageExitBody,
   PersonalDesignDeleteBody,
   PersonalDesignDeleteResponse,
+  AppliedDesignSaveBody,
 } from "./types";
 
 export class ApiError extends Error {
@@ -439,6 +440,18 @@ export const api = {
 
   designStudioDelete(body: PersonalDesignDeleteBody): Promise<PersonalDesignDeleteResponse> {
     return request<PersonalDesignDeleteResponse>("DELETE", "/api/design-studio/personal", { body });
+  },
+
+  designStudioAppliedGet(): Promise<PersonalDesignResponse> {
+    return request<PersonalDesignResponse>("GET", "/api/design-studio/applied-local");
+  },
+
+  designStudioApplyLocal(body: AppliedDesignSaveBody): Promise<PersonalDesignResponse> {
+    return request<PersonalDesignResponse>("POST", "/api/design-studio/apply-local", { body });
+  },
+
+  designStudioResetLocal(): Promise<PersonalDesignDeleteResponse> {
+    return request<PersonalDesignDeleteResponse>("DELETE", "/api/design-studio/apply-local");
   },
 
   listProjects(): Promise<ProjectSummary[]> {

@@ -31,6 +31,9 @@ vi.mock("../api/client", async (importActual) => {
       designStudioPut: vi.fn(),
       designStudioPutForPageExit: vi.fn(),
       designStudioDelete: vi.fn(),
+      designStudioAppliedGet: vi.fn(),
+      designStudioApplyLocal: vi.fn(),
+      designStudioResetLocal: vi.fn(),
       devStatus: vi.fn(),
       devPromote: vi.fn(),
       devSave: vi.fn(),
@@ -154,9 +157,17 @@ interface StudioCommands {
   replaceDocumentAtomically: (document: DesignDocument) => void;
   undo: () => void;
   promotePersonalDesign: (message: string) => Promise<unknown>;
+  applyLocal: () => Promise<unknown>;
+  resetAppliedLocal: () => Promise<unknown>;
 }
 
-function Probe({ expose }: { expose: (commands: StudioCommands) => void }) {
+function Probe({
+  expose,
+  startOpen,
+}: {
+  expose: (commands: StudioCommands) => void;
+  startOpen: boolean;
+}) {
   const devMode = useDevMode();
   const studio = useDesignStudio();
   useEffect(() => {
@@ -172,6 +183,8 @@ function Probe({ expose }: { expose: (commands: StudioCommands) => void }) {
       replaceDocumentAtomically: studio.replaceDocumentAtomically,
       undo: devMode.undo,
       promotePersonalDesign: studio.promotePersonalDesign,
+      applyLocal: studio.applyLocal,
+      resetAppliedLocal: studio.resetAppliedLocal,
     });
   }, [
     devMode.replaceDraft,
@@ -186,7 +199,12 @@ function Probe({ expose }: { expose: (commands: StudioCommands) => void }) {
     studio.replaceResolvedDraftAtomically,
     studio.setVariation,
     studio.promotePersonalDesign,
+    studio.applyLocal,
+    studio.resetAppliedLocal,
   ]);
+  useEffect(() => {
+    if (startOpen) studio.open();
+  }, [startOpen, studio.open]);
   return (
     <>
       <span data-testid="resolved-copy"><Text id="rail.components">Components</Text></span>
@@ -199,7 +217,11 @@ function Probe({ expose }: { expose: (commands: StudioCommands) => void }) {
   );
 }
 
-function renderStudio(options: { scenarioRegistry?: ScenarioRegistry; includeOnboardingGate?: boolean } = {}) {
+function renderStudio(options: {
+  scenarioRegistry?: ScenarioRegistry;
+  includeOnboardingGate?: boolean;
+  startOpen?: boolean;
+} = {}) {
   const commands: Partial<StudioCommands> = {};
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
@@ -209,7 +231,10 @@ function renderStudio(options: { scenarioRegistry?: ScenarioRegistry; includeOnb
       <ThemeProvider>
         <ToastProvider>
           <DesignStudioProvider scenarioRegistry={options.scenarioRegistry}>
-            <Probe expose={(next) => Object.assign(commands, next)} />
+            <Probe
+              expose={(next) => Object.assign(commands, next)}
+              startOpen={options.startOpen ?? true}
+            />
             {options.includeOnboardingGate ? <OnboardingGate status={ONBOARDING_STATUS} /> : null}
           </DesignStudioProvider>
         </ToastProvider>
@@ -254,6 +279,12 @@ function renderStudio(options: { scenarioRegistry?: ScenarioRegistry; includeOnb
     promotePersonalDesign(message: string) {
       return act(async () => commands.promotePersonalDesign?.(message));
     },
+    applyLocal() {
+      return act(async () => commands.applyLocal?.());
+    },
+    resetAppliedLocal() {
+      return act(async () => commands.resetAppliedLocal?.());
+    },
     queryClient,
   };
 }
@@ -264,6 +295,14 @@ describe("DesignStudioProvider", () => {
     mockApi.designStudioPut.mockReset();
     mockApi.designStudioPutForPageExit.mockReset();
     mockApi.designStudioDelete.mockReset();
+    mockApi.designStudioAppliedGet.mockReset();
+    mockApi.designStudioApplyLocal.mockReset();
+    mockApi.designStudioResetLocal.mockReset();
+    mockApi.designStudioAppliedGet.mockResolvedValue({ revision: null, document: null });
+    mockApi.designStudioPut.mockImplementation(async ({ document }) => ({
+      revision: "draft-r2",
+      document,
+    }));
     mockApi.devStatus.mockReset();
     mockApi.devPromote.mockReset();
     mockApi.devSave.mockReset();
@@ -285,6 +324,51 @@ describe("DesignStudioProvider", () => {
     );
     expect(screen.getByTestId("personal-state")).toHaveTextContent("ready");
     expect(mockApi.designStudioPut).not.toHaveBeenCalled();
+  });
+
+  it("keeps personal edits draft-only until Apply, then uses them after Studio closes", async () => {
+    const shipped = fixtureDocument();
+    const draft = personalDocument();
+    mockApi.designStudioGet.mockResolvedValue({ revision: "draft-r1", document: draft });
+    mockApi.designStudioAppliedGet.mockResolvedValue({ revision: null, document: null });
+    mockApi.designStudioApplyLocal.mockImplementation(async ({ document }) => ({
+      revision: "applied-r1",
+      document,
+    }));
+    const studio = renderStudio({ startOpen: false });
+
+    await waitFor(() => expect(screen.getByTestId("personal-state")).toHaveTextContent("ready"));
+    expect(screen.getByTestId("resolved-copy")).toHaveTextContent("Components");
+
+    studio.open();
+    await waitFor(() => expect(screen.getByTestId("resolved-copy")).toHaveTextContent("My Components"));
+    studio.setCopy("rail.components", "Applied Components");
+    expect(screen.getByTestId("resolved-copy")).toHaveTextContent("Applied Components");
+
+    await studio.applyLocal();
+    expect(mockApi.designStudioApplyLocal).toHaveBeenCalledWith({
+      document: expect.objectContaining({
+        base: expect.objectContaining({ copy: { "rail.components": "Applied Components" } }),
+      }),
+    });
+    await studio.close();
+    expect(screen.getByTestId("resolved-copy")).toHaveTextContent("Applied Components");
+    expect(shipped.base.copy["rail.components"]).toBeUndefined();
+  });
+
+  it("loads an existing applied design outside Studio and resets only that activation", async () => {
+    const applied = fixtureDocument();
+    applied.base.copy["rail.components"] = "Existing Applied Components";
+    mockApi.designStudioGet.mockResolvedValue({ revision: "draft-r1", document: personalDocument() });
+    mockApi.designStudioAppliedGet.mockResolvedValue({ revision: "applied-r1", document: applied });
+    mockApi.designStudioResetLocal.mockResolvedValue({ ok: true });
+    const studio = renderStudio({ startOpen: false });
+
+    await waitFor(() => expect(screen.getByTestId("resolved-copy")).toHaveTextContent("Existing Applied Components"));
+    await studio.resetAppliedLocal();
+    expect(mockApi.designStudioResetLocal).toHaveBeenCalledOnce();
+    expect(screen.getByTestId("resolved-copy")).toHaveTextContent("Components");
+    expect(screen.getByTestId("studio-document")).toHaveTextContent("My Components");
   });
 
   it.each(["success", "promotion-failure"] as const)(
@@ -324,7 +408,8 @@ describe("DesignStudioProvider", () => {
 
       const result = await studio.promotePersonalDesign("Promote personal design");
 
-      expect(calls).toEqual(["status", "promote"]);
+      expect(calls[calls.length - 1]).toBe("promote");
+      expect(calls.slice(0, -1).every((call) => call === "status")).toBe(true);
       expect(result).toEqual(
         outcome === "success"
           ? expect.objectContaining({ state: "success", commit: "b".repeat(40) })

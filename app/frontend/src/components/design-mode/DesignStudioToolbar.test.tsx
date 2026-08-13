@@ -3,15 +3,13 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DesignStudioToolbar } from "./DesignStudioToolbar";
 
-const promotePersonalDesign = vi.fn();
+const applyLocal = vi.fn();
 const studio = {
   activeScenario: null as { id: string; title: string } | null,
   activeScenarioId: null as string | null,
-  promotionStatus: {
-    state: "blocked" as "checking" | "ready" | "running" | "blocked" | "success" | "failure",
-    message: "Dev Mode needs a managed Stockroom source checkout.",
-  },
-  promotePersonalDesign,
+  appliedRevision: null as string | null,
+  appliedState: "ready" as "loading" | "ready" | "applying" | "error",
+  applyLocal,
 };
 
 vi.mock("../../design-studio/DesignStudioProvider", () => ({ useDesignStudio: () => studio }));
@@ -52,40 +50,42 @@ function renderToolbar() {
   );
 }
 
-describe("DesignStudioToolbar source promotion", () => {
+describe("DesignStudioToolbar local Apply", () => {
   beforeEach(() => {
-    promotePersonalDesign.mockReset();
+    applyLocal.mockReset();
     studio.activeScenario = null;
     studio.activeScenarioId = null;
-    studio.promotionStatus = {
-      state: "blocked",
-      message: "Dev Mode needs a managed Stockroom source checkout.",
-    };
+    studio.appliedRevision = null;
+    studio.appliedState = "ready";
   });
 
-  it("shows the exact packaged-build blocker instead of offering a working source action", () => {
+  it("shows Draft Only before a design is explicitly applied", () => {
     renderToolbar();
-    expect(screen.getByText("Dev Mode needs a managed Stockroom source checkout.")).toBeVisible();
-    expect(screen.getByRole("button", { name: "Make App Default" })).toBeDisabled();
+    expect(screen.getByText("Draft Only")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Apply" })).toBeEnabled();
   });
 
-  it("never invokes source promotion from a fixture-backed simulated ready state", async () => {
+  it("shows the active machine revision after Apply", () => {
+    studio.appliedRevision = "1234567890abcdef";
+    renderToolbar();
+    expect(screen.getByText("Applied To This PC · 12345678")).toBeVisible();
+  });
+
+  it("never applies a fixture-backed preview", async () => {
     studio.activeScenario = { id: "global.source-promotion.ready", title: "Source Promotion Ready" };
     studio.activeScenarioId = studio.activeScenario.id;
-    studio.promotionStatus = { state: "ready", message: "Ready to make this design the app default." };
     renderToolbar();
 
-    const button = screen.getByRole("button", { name: "Make App Default" });
+    const button = screen.getByRole("button", { name: "Apply" });
     expect(button).toBeDisabled();
     await userEvent.setup().click(button);
-    expect(promotePersonalDesign).not.toHaveBeenCalled();
+    expect(applyLocal).not.toHaveBeenCalled();
   });
 
-  it("invokes the personal-design promotion in Real Data mode", async () => {
-    studio.promotionStatus = { state: "ready", message: "Ready to make this design the app default." };
+  it("applies the personal draft only after the person presses Apply", async () => {
     renderToolbar();
 
-    await userEvent.setup().click(screen.getByRole("button", { name: "Make App Default" }));
-    expect(promotePersonalDesign).toHaveBeenCalledWith("Promote personal Stockroom design");
+    await userEvent.setup().click(screen.getByRole("button", { name: "Apply" }));
+    expect(applyLocal).toHaveBeenCalledOnce();
   });
 });

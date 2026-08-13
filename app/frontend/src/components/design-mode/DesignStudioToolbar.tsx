@@ -1,7 +1,7 @@
 import { useDesignStudio } from "../../design-studio/DesignStudioProvider";
 import { useDevMode } from "../../lib/devMode";
 import type { StudioMode } from "../../lib/devMode";
-import { useText } from "../../lib/copy";
+import { useCopyFormatter, useText } from "../../lib/copy";
 import { useTheme } from "../../lib/theme";
 import { Button } from "../primitives";
 import {
@@ -74,10 +74,16 @@ export function DesignStudioToolbar({
   const resetLabel = useText("design-studio.reset", "Reset");
   const fixtureLabel = useText("design-studio.fixture-preview", "Fixture Preview");
   const validationLabel = useText("design-studio.validation", "Preview Validation Status");
-  const makeDefaultLabel = useText("design-studio.make-default", "Make App Default");
-  const makeDefaultFixtureTitle = useText("design-studio.make-default.fixture-help", "Return To Real Data To Make App Default");
-  const makeDefaultTitle = useText("design-studio.make-default.help", "Save This Design To Source");
-  const promotionStatusLabel = useText("design-studio.promotion-status", "Source Promotion Status");
+  const applyLabel = useText("design-studio.apply-local", "Apply");
+  const applyFixtureTitle = useText("design-studio.apply-local.fixture-help", "Return To Real Data To Apply This Draft");
+  const applyTitle = useText("design-studio.apply-local.help", "Apply This Draft To This PC");
+  const appliedStatusLabel = useText("design-studio.applied-status", "Applied Design Status");
+  const appliedLabel = useCopyFormatter(
+    "design-studio.applied-this-pc",
+    "Applied To This PC · {revision}",
+  );
+  const draftOnlyLabel = useText("design-studio.draft-only", "Draft Only");
+  const applyingLabel = useText("design-studio.applying", "Applying...");
   const presentationLabel = useText("design-studio.presentation", "Presentation Mode");
   const closeLabel = useText("design-studio.close", "Close Design Studio");
 
@@ -170,28 +176,19 @@ export function DesignStudioToolbar({
       >
         {fixturePreview ? fixtureLabel : realDataLabel}
       </span>
-      <span
-        aria-label={promotionStatusLabel}
-        title={studio.promotionStatus.message}
-        className={
-          "max-w-64 truncate text-xs " +
-          (studio.promotionStatus.state === "ready" || studio.promotionStatus.state === "success"
-            ? "text-ok-text"
-            : studio.promotionStatus.state === "checking" || studio.promotionStatus.state === "running"
-              ? "text-t3"
-              : "text-warn")
-        }
-      >
-        {studio.promotionStatus.message}
+      <span aria-label={appliedStatusLabel} className="max-w-48 truncate text-xs text-t3">
+        {studio.appliedRevision
+          ? appliedLabel({ revision: studio.appliedRevision.slice(0, 8) })
+          : draftOnlyLabel}
       </span>
       <Button
         small
         variant="accent"
-        disabled={fixturePreview || studio.promotionStatus.state !== "ready"}
-        title={fixturePreview ? makeDefaultFixtureTitle : makeDefaultTitle}
-        onClick={() => void studio.promotePersonalDesign("Promote personal Stockroom design")}
+        disabled={fixturePreview || studio.appliedState === "loading" || studio.appliedState === "applying"}
+        title={fixturePreview ? applyFixtureTitle : applyTitle}
+        onClick={() => void studio.applyLocal()}
       >
-        {makeDefaultLabel}
+        {studio.appliedState === "applying" ? applyingLabel : applyLabel}
       </Button>
       <Button
         small

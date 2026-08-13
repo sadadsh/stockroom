@@ -103,6 +103,73 @@ def test_personal_design_api_never_writes_library(client, personal_config):
     assert (personal_config / "design-studio.json").is_file()
 
 
+def test_local_apply_is_separate_from_personal_draft_and_survives_draft_deletion(
+    client, personal_config
+):
+    draft = {"schemaVersion": 2, "base": {"copy": {"rail.about": "Draft"}}}
+    applied = {"schemaVersion": 2, "base": {"copy": {"rail.about": "Applied"}}}
+    saved = client.put(
+        "/api/design-studio/personal",
+        json={"document": draft, "expected_revision": None},
+    ).json()
+
+    missing = client.get("/api/design-studio/applied-local")
+    assert missing.status_code == 200
+    assert missing.json() == {"revision": None, "document": None}
+
+    response = client.post("/api/design-studio/apply-local", json={"document": applied})
+    assert response.status_code == 200
+    assert response.json()["document"] == applied
+    assert (personal_config / "design-studio-applied.json").is_file()
+
+    deleted_draft = client.request(
+        "DELETE",
+        "/api/design-studio/personal",
+        json={"expected_revision": saved["revision"]},
+    )
+    assert deleted_draft.status_code == 200
+    assert client.get("/api/design-studio/applied-local").json() == response.json()
+
+    reset = client.delete("/api/design-studio/apply-local")
+    assert reset.status_code == 200
+    assert reset.json() == {"ok": True}
+    assert client.get("/api/design-studio/applied-local").json() == {
+        "revision": None,
+        "document": None,
+    }
+
+
+def test_local_apply_is_machine_scoped_and_never_writes_library(client, personal_config):
+    before = client.app.state.ctx.repo.status_porcelain()
+
+    response = client.post(
+        "/api/design-studio/apply-local",
+        json={"document": {"schemaVersion": 2, "base": {}}},
+    )
+
+    assert response.status_code == 200
+    assert client.app.state.ctx.repo.status_porcelain() == before
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        {},
+        {"document": []},
+        {"document": {"schemaVersion": "2"}},
+        {"document": {"schemaVersion": 2}, "extra": True},
+    ],
+)
+def test_local_apply_rejects_invalid_documents(client, personal_config, body):
+    response = client.post("/api/design-studio/apply-local", json=body)
+
+    assert response.status_code == 422
+    assert client.get("/api/design-studio/applied-local").json() == {
+        "revision": None,
+        "document": None,
+    }
+
+
 def test_personal_design_api_rejects_stale_revisions_without_replacing_document(
     client, personal_config
 ):
@@ -168,6 +235,15 @@ def test_personal_design_api_requires_authentication(anon_client, personal_confi
         ).status_code
         == 401
     )
+    assert anon_client.get("/api/design-studio/applied-local").status_code == 401
+    assert (
+        anon_client.post(
+            "/api/design-studio/apply-local",
+            json={"document": {"schemaVersion": 2}},
+        ).status_code
+        == 401
+    )
+    assert anon_client.delete("/api/design-studio/apply-local").status_code == 401
     assert (
         anon_client.request(
             "DELETE",

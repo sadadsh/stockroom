@@ -445,6 +445,7 @@ export const DEV_IDS: DevIdEntry[] = [
   { id: "settings.cubemx", label: "STM32CubeMX Data section", area: "settings" },
   { id: "settings.appearance", label: "Appearance section", area: "settings" },
   { id: "settings.appearance-theme", label: "Theme toggle", area: "settings" },
+  { id: "settings.appearance-reset-applied", label: "Reset applied design", area: "settings" },
   { id: "settings.profiles", label: "Component Profiles section", area: "settings" },
   { id: "settings.profiles-row", label: "Profile row", area: "settings" },
   { id: "settings.profiles-create", label: "Create profile row", area: "settings" },

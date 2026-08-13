@@ -10,12 +10,14 @@ import {
   type ReactNode,
 } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { api } from "../api/client";
 import { DevModeProvider, useDevMode } from "../lib/devMode";
 import { committedDevModeDraft, type DevModeDraft } from "../lib/devModeDraft";
 import {
   DESIGN_DOCUMENT_SCHEMA_VERSION,
   builtInVariationDocument,
   diffDesignDraft,
+  parseDesignDocument,
   resolveDesign,
   type DesignDocument,
 } from "./document";
@@ -57,6 +59,10 @@ export interface DesignStudioContextValue {
   exitScenario: () => Promise<void>;
   promotionStatus: PromotionStatus;
   promotePersonalDesign: (message: string) => Promise<PromotionResult>;
+  appliedRevision: string | null;
+  appliedState: "loading" | "ready" | "applying" | "error";
+  applyLocal: () => Promise<boolean>;
+  resetAppliedLocal: () => Promise<boolean>;
 }
 
 const DesignStudioContext = createContext<DesignStudioContextValue | null>(null);
@@ -184,6 +190,7 @@ function DesignStudioBridge({
   const devMode = useDevMode();
   const queryClient = useQueryClient();
   const controller = useMemo(() => createPersonalDesignController(initialDocument()), []);
+  const shippedDocument = useMemo(() => initialDocument(), []);
   const snapshot = useSyncExternalStore(
     controller.subscribe,
     controller.getSnapshot,
@@ -196,6 +203,9 @@ function DesignStudioBridge({
     state: "checking",
     message: "Checking source promotion availability.",
   });
+  const [appliedDocument, setAppliedDocument] = useState<DesignDocument | null>(null);
+  const [appliedRevision, setAppliedRevision] = useState<string | null>(null);
+  const [appliedState, setAppliedState] = useState<"loading" | "ready" | "applying" | "error">("loading");
   const restoreAdapter = useRef<(() => void) | null>(null);
   const restoreEffectGuard = useRef<(() => void) | null>(null);
   const realRouteContext = useRef<RealRouteContext | null>(null);
@@ -208,6 +218,34 @@ function DesignStudioBridge({
     void controller.hydrate();
     return () => controller.dispose();
   }, [controller]);
+
+  useEffect(() => {
+    let current = true;
+    void api.designStudioAppliedGet()
+      .then((response) => {
+        if (!current) return;
+        if (response.document === null) {
+          setAppliedDocument(null);
+          setAppliedRevision(response.revision);
+          setAppliedState("ready");
+          return;
+        }
+        const parsed = parseDesignDocument(response.document);
+        if (!parsed.ok) {
+          setAppliedState("error");
+          return;
+        }
+        setAppliedDocument(parsed.document);
+        setAppliedRevision(response.revision);
+        setAppliedState("ready");
+      })
+      .catch(() => {
+        if (current) setAppliedState("error");
+      });
+    return () => {
+      current = false;
+    };
+  }, []);
 
   useEffect(() => {
     const flushForPageExit = () => {
@@ -241,9 +279,12 @@ function DesignStudioBridge({
     };
   }, []);
 
+  const activeDesignDocument = devMode.enabled
+    ? snapshot.document
+    : (appliedDocument ?? shippedDocument);
   const resolved = useMemo(
-    () => resolveDesign(snapshot.document, snapshot.document.activeVariationId, devMode.theme),
-    [snapshot.document, devMode.theme],
+    () => resolveDesign(activeDesignDocument, activeDesignDocument.activeVariationId, devMode.theme),
+    [activeDesignDocument, devMode.theme],
   );
   const resolvedDraft = useMemo(() => cloneDraft(resolved), [resolved]);
   const resolvedSignature = useMemo(() => JSON.stringify(resolvedDraft), [resolvedDraft]);
@@ -259,13 +300,14 @@ function DesignStudioBridge({
   }, [devMode.replaceDraft, draftSignature, resolvedDraft, resolvedSignature]);
 
   useEffect(() => {
+    if (!devMode.enabled) return;
     if (applyingDraft.current !== null) {
       if (applyingDraft.current === draftSignature) applyingDraft.current = null;
       return;
     }
     if (sameDraft(devMode.draft, resolvedDraft)) return;
     controller.replaceDocument(withWorkingDraft(snapshot.document, devMode.draft));
-  }, [controller, devMode.draft, draftSignature, resolvedDraft, snapshot.document]);
+  }, [controller, devMode.draft, devMode.enabled, draftSignature, resolvedDraft, snapshot.document]);
 
   const open = useCallback(() => {
     if (!devMode.enabled) devMode.toggle();
@@ -352,6 +394,43 @@ function DesignStudioBridge({
     },
     [activeScenario, devMode.theme, snapshot.document],
   );
+
+  const applyLocal = useCallback(async (): Promise<boolean> => {
+    if (activeScenario) return false;
+    setAppliedState("applying");
+    const document = withWorkingDraft(controller.getSnapshot().document, devMode.draft);
+    controller.replaceDocument(document);
+    await controller.flush();
+    try {
+      const response = await api.designStudioApplyLocal({ document });
+      const parsed = parseDesignDocument(response.document);
+      if (!parsed.ok) {
+        setAppliedState("error");
+        return false;
+      }
+      setAppliedDocument(parsed.document);
+      setAppliedRevision(response.revision);
+      setAppliedState("ready");
+      return true;
+    } catch {
+      setAppliedState("error");
+      return false;
+    }
+  }, [activeScenario, controller, devMode.draft]);
+
+  const resetAppliedLocal = useCallback(async (): Promise<boolean> => {
+    setAppliedState("applying");
+    try {
+      await api.designStudioResetLocal();
+      setAppliedDocument(null);
+      setAppliedRevision(null);
+      setAppliedState("ready");
+      return true;
+    } catch {
+      setAppliedState("error");
+      return false;
+    }
+  }, []);
 
   const beginTransition = useCallback(
     (operation: () => Promise<void>): Promise<void> => {
@@ -457,6 +536,10 @@ function DesignStudioBridge({
       exitScenario,
       promotionStatus,
       promotePersonalDesign,
+      appliedRevision,
+      appliedState,
+      applyLocal,
+      resetAppliedLocal,
     }),
     [
       open,
@@ -474,6 +557,10 @@ function DesignStudioBridge({
       exitScenario,
       promotionStatus,
       promotePersonalDesign,
+      appliedRevision,
+      appliedState,
+      applyLocal,
+      resetAppliedLocal,
     ],
   );
 

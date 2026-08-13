@@ -90,4 +90,10 @@ describe("Settings Design Studio scenarios", () => {
     expect(screen.getAllByText("Settings").length).toBeGreaterThan(0);
     expect(mounted.liveRequest).not.toHaveBeenCalled();
   });
+
+  it("keeps Reset Applied Design visible in Appearance", async () => {
+    const mounted = await mountScenario("settings.appearance.ready");
+    expect(screen.getByRole("button", { name: "Reset Applied Design" })).toBeVisible();
+    expect(mounted.liveRequest).not.toHaveBeenCalled();
+  });
 });

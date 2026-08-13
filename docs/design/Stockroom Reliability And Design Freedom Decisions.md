@@ -104,3 +104,15 @@ them, validates only the selected EDA deliverables, retains partial results, and
 requirements. A shared 3D model is requested once even when both EDA tools are selected. Design
 Studio scenarios may open a deterministic provider modal to show each state, but entering Manage
 Models in normal use never launches a provider automatically.
+
+### Draft And Applied Design Boundary
+
+The personal Design Document is an autosaved Draft and is resolved into the preview only while
+Design Studio is open. Outside Design Studio, Stockroom resolves either the explicitly activated
+machine-local document or the shipped design; autosave alone never changes the ordinary app.
+
+Apply writes a complete validated Design Document atomically to
+`design-studio-applied.json` under the machine configuration directory and records its content
+revision. This file is outside immutable release generations and survives updates. Reset Applied
+Design deletes only that activation, leaving the personal Draft untouched. Source promotion remains
+a separate developer action and is not represented by the fixed Apply control.

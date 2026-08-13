@@ -23,6 +23,7 @@ MAX_PERSONAL_DESIGN_BYTES = 2 * 1024 * 1024
 # 2 MiB contract and can load every already-valid personal design.
 MAX_PAGE_EXIT_DESIGN_BYTES = 28 * 1024
 PERSONAL_DESIGN_FILENAME = "design-studio.json"
+APPLIED_DESIGN_FILENAME = "design-studio-applied.json"
 _LOCK_TIMEOUT_SECONDS = 5.0
 _LOCK_RETRY_SECONDS = 0.01
 
@@ -43,6 +44,10 @@ class PersonalDesignRecord:
 
 def _path(root: Path | None) -> Path:
     return (Path(root) if root is not None else config_dir()) / PERSONAL_DESIGN_FILENAME
+
+
+def _applied_path(root: Path | None) -> Path:
+    return (Path(root) if root is not None else config_dir()) / APPLIED_DESIGN_FILENAME
 
 
 @contextmanager
@@ -144,6 +149,19 @@ def load_personal_design(root: Path | None = None) -> PersonalDesignRecord | Non
     return _record_from_bytes(payload)
 
 
+def load_applied_design(root: Path | None = None) -> PersonalDesignRecord | None:
+    """Load the machine-active design without consulting the editable personal draft."""
+
+    path = _applied_path(root)
+    if not path.exists():
+        return None
+    try:
+        payload = path.read_bytes()
+    except FileNotFoundError:
+        return None
+    return _record_from_bytes(payload)
+
+
 def _require_revision(current: PersonalDesignRecord | None, expected_revision: str | None) -> None:
     current_revision = current.revision if current is not None else None
     if current_revision != expected_revision:
@@ -180,6 +198,19 @@ def save_personal_design(
     with _exclusive_lock(path):
         current = load_personal_design(root)
         _require_revision(current, expected_revision)
+        _replace_payload(path, payload)
+    return _record_from_bytes(payload)
+
+
+def apply_local_design(
+    document: dict[str, object],
+    root: Path | None = None,
+) -> PersonalDesignRecord:
+    """Atomically activate an explicit Design Studio document on this machine."""
+
+    payload = _validate_document(document)
+    path = _applied_path(root)
+    with _exclusive_lock(path):
         _replace_payload(path, payload)
     return _record_from_bytes(payload)
 
@@ -225,3 +256,14 @@ def delete_personal_design(
         _require_revision(current, expected_revision)
         if current is not None:
             path.unlink()
+
+
+def delete_applied_design(root: Path | None = None) -> None:
+    """Return this machine to the shipped design without touching the personal draft."""
+
+    path = _applied_path(root)
+    with _exclusive_lock(path):
+        try:
+            path.unlink()
+        except FileNotFoundError:
+            pass

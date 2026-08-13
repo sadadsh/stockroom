@@ -3055,3 +3055,7 @@ export interface PersonalDesignDeleteBody {
 export interface PersonalDesignDeleteResponse {
   ok: true;
 }
+
+export interface AppliedDesignSaveBody {
+  document: DesignDocument;
+}
