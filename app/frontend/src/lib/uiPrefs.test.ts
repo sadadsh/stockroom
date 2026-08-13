@@ -73,6 +73,7 @@ describe("the shape of UiPrefs", () => {
       "design_studio_grid",
       "design_studio_snap",
       "design_studio_presentation",
+      "design_bypass_applied",
     ]);
   });
 

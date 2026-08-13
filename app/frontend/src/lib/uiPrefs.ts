@@ -40,6 +40,8 @@ export interface UiPrefs {
   design_studio_grid?: boolean;
   design_studio_snap?: boolean;
   design_studio_presentation?: boolean;
+  /** Ephemeral host launch chord; never persisted through writePref. */
+  design_bypass_applied?: boolean;
 }
 
 declare global {

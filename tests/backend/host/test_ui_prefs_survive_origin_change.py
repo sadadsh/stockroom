@@ -23,7 +23,7 @@ from __future__ import annotations
 import json
 import re
 
-from stockroom.host.window import inject_script
+from stockroom.host.window import design_recovery_requested, inject_script
 from stockroom.store.machine_config import MachineConfig
 
 
@@ -70,3 +70,21 @@ def test_boot_script_still_works_with_no_preferences_saved():
     match = re.search(r"window\.__STOCKROOM_UI__\s*=\s*(\{.*?\});", script, re.S)
     assert match, "the boot script must always define __STOCKROOM_UI__, even when empty"
     assert json.loads(match.group(1)) == {}
+
+
+def test_ctrl_shift_launch_recovery_is_injected_without_persisting_it():
+    keys = {0x11: 0x8000, 0x10: 0x8000}
+    assert design_recovery_requested(lambda key: keys.get(key, 0)) is True
+    assert design_recovery_requested(lambda _key: 0) is False
+
+    script = inject_script(
+        "http://127.0.0.1:1234/",
+        "tok",
+        ui={"theme": "light", "design_bypass_applied": True},
+    )
+    match = re.search(r"window\.__STOCKROOM_UI__\s*=\s*(\{.*?\});", script, re.S)
+    assert match
+    assert json.loads(match.group(1)) == {
+        "theme": "light",
+        "design_bypass_applied": True,
+    }

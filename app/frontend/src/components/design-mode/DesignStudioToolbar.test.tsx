@@ -61,14 +61,14 @@ describe("DesignStudioToolbar local Apply", () => {
 
   it("shows Draft Only before a design is explicitly applied", () => {
     renderToolbar();
-    expect(screen.getByText("Draft Only")).toBeVisible();
-    expect(screen.getByRole("button", { name: "Apply" })).toBeEnabled();
+    expect(screen.getByText("Draft")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Set" })).toBeEnabled();
   });
 
   it("shows the active machine revision after Apply", () => {
     studio.appliedRevision = "1234567890abcdef";
     renderToolbar();
-    expect(screen.getByText("Applied To This PC · 12345678")).toBeVisible();
+    expect(screen.getByText("Set On This PC · 12345678")).toBeVisible();
   });
 
   it("never applies a fixture-backed preview", async () => {
@@ -76,7 +76,7 @@ describe("DesignStudioToolbar local Apply", () => {
     studio.activeScenarioId = studio.activeScenario.id;
     renderToolbar();
 
-    const button = screen.getByRole("button", { name: "Apply" });
+    const button = screen.getByRole("button", { name: "Set" });
     expect(button).toBeDisabled();
     await userEvent.setup().click(button);
     expect(applyLocal).not.toHaveBeenCalled();
@@ -85,7 +85,7 @@ describe("DesignStudioToolbar local Apply", () => {
   it("applies the personal draft only after the person presses Apply", async () => {
     renderToolbar();
 
-    await userEvent.setup().click(screen.getByRole("button", { name: "Apply" }));
+    await userEvent.setup().click(screen.getByRole("button", { name: "Set" }));
     expect(applyLocal).toHaveBeenCalledOnce();
   });
 });

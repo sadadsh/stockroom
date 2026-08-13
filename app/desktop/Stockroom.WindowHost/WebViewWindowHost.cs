@@ -63,6 +63,7 @@ internal sealed class WebViewWindowHost : IDisposable
     private bool _hidden = true;
     private volatile bool _shuttingDown;
     private bool _closeRequested;
+    private bool _bypassAppliedDesign;
     private bool _disposed;
     private int _failureExitCode =
         (int)WindowHostFailureStage.Environment;
@@ -181,6 +182,7 @@ internal sealed class WebViewWindowHost : IDisposable
         await _webView.EnsureCoreWebView2Async(_environment)
             .ConfigureAwait(true);
         ConfigureCoreWebView(_webView.CoreWebView2);
+        _bypassAppliedDesign = DesignRecoveryChord.IsPressed(Keyboard.Modifiers);
         await AddMachineUiBootstrapAsync(_webView.CoreWebView2)
             .ConfigureAwait(true);
         _webView.CoreWebView2.NavigationCompleted +=
@@ -1484,6 +1486,7 @@ internal sealed class WebViewWindowHost : IDisposable
     {
         var themeJson = JsonSerializer.Serialize(
             _machineConfig.Theme);
+        var bypassAppliedJson = _bypassAppliedDesign ? "true" : "false";
         var script = string.Create(
             CultureInfo.InvariantCulture,
             $$"""
@@ -1496,7 +1499,8 @@ internal sealed class WebViewWindowHost : IDisposable
                     : {};
                 window.__STOCKROOM_UI__ = Object.freeze({
                   ...current,
-                  theme
+                  theme,
+                  design_bypass_applied: {{bypassAppliedJson}}
                 });
                 const webview = globalThis.chrome?.webview;
                 if (webview && typeof webview.postMessage === "function") {

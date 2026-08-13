@@ -19,6 +19,7 @@ function Probe() {
     <div>
       <div data-testid="selected">{dev.selectedDevId ?? "none"}</div>
       <div data-testid="vars">{dev.highlightedVars.join(",")}</div>
+      <output data-testid="element-overrides">{JSON.stringify(dev.draft.elements)}</output>
       <button type="button" onClick={dev.toggle}>
         toggle-dev
       </button>
@@ -28,6 +29,7 @@ function Probe() {
       <button type="button" onClick={dev.toggleShowIds}>
         toggle-showids
       </button>
+      <button type="button" onClick={dev.undo}>undo</button>
     </div>
   );
 }
@@ -37,21 +39,23 @@ function Harness({ onAppClick }: { onAppClick?: () => void }) {
     <ThemeProvider>
       <DevModeProvider>
         <Probe />
-        <button
-          type="button"
-          data-dev-id="detail.complete-part"
-          className="bg-warn text-t1"
-          onClick={onAppClick}
-        >
-          Complete Part
-        </button>
-        <div data-dev-id="detail.readiness" className="bg-raise">
-          <svg className="ico" viewBox="0 0 24 24" data-testid="ico">
-            <path d="M4 12h16" />
-          </svg>
-        </div>
-        <div data-dev-id="component-browser.symbol-canvas" {...{ [TECHNICAL_CONTENT_ATTRIBUTE]: "true" }}>
-          <svg data-dev-id="detail.technical-shape" data-testid="technical-shape"><path d="M0 0h10" /></svg>
+        <div data-design-product-root data-dev-id="components.stage" data-snap="on" data-grid="8">
+          <button
+            type="button"
+            data-dev-id="detail.complete-part"
+            className="bg-warn text-t1"
+            onClick={onAppClick}
+          >
+            Complete Part
+          </button>
+          <div data-dev-id="detail.readiness" className="bg-raise">
+            <svg className="ico" viewBox="0 0 24 24" data-testid="ico">
+              <path d="M4 12h16" />
+            </svg>
+          </div>
+          <div data-dev-id="component-browser.symbol-canvas" {...{ [TECHNICAL_CONTENT_ATTRIBUTE]: "true" }}>
+            <svg data-dev-id="detail.technical-shape" data-testid="technical-shape"><path d="M0 0h10" /></svg>
+          </div>
         </div>
         <DevInspector />
       </DevModeProvider>
@@ -142,5 +146,149 @@ describe("DevInspector", () => {
     fireEvent.click(screen.getByRole("button", { name: "Complete Part" }));
     expect(appClick).toHaveBeenCalledTimes(1); // listener removed, so the click passes through
     expect(screen.getByTestId("selected")).toHaveTextContent("none");
+  });
+
+  it("gives every selected Stockroom element one move grip and eight resize handles", () => {
+    render(<Harness />);
+    on("toggle-dev");
+    on("toggle-inspect");
+    fireEvent.click(screen.getByRole("button", { name: "Complete Part" }));
+
+    expect(screen.getByRole("button", { name: "Move Complete Part" })).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: /Resize Complete Part/ })).toHaveLength(8);
+    expect(screen.getByRole("button", { name: "Hide Complete Part" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Detach Complete Part" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Reset Complete Part" })).toBeInTheDocument();
+  });
+
+  it("hides globally and restores the selected element with one undo", () => {
+    render(<Harness />);
+    on("toggle-dev");
+    on("toggle-inspect");
+    const target = screen.getByRole("button", { name: "Complete Part" });
+    fireEvent.click(target);
+
+    fireEvent.click(screen.getByRole("button", { name: "Hide Complete Part" }));
+    expect(target).toHaveStyle({ visibility: "hidden" });
+    expect(screen.getByTestId("element-overrides")).toHaveTextContent('"visibility":"hidden"');
+
+    on("undo");
+    expect(target.style.visibility).toBe("");
+  });
+
+  it("snaps one move gesture and one resize gesture into atomic undo entries", () => {
+    render(<Harness />);
+    on("toggle-dev");
+    on("toggle-inspect");
+    const target = screen.getByRole("button", { name: "Complete Part" });
+    Object.defineProperty(target, "offsetWidth", { configurable: true, value: 100 });
+    Object.defineProperty(target, "offsetHeight", { configurable: true, value: 40 });
+    vi.spyOn(target, "getBoundingClientRect").mockReturnValue({
+      x: 20, y: 30, left: 20, top: 30, right: 120, bottom: 70, width: 100, height: 40,
+      toJSON: () => ({}),
+    });
+    fireEvent.click(target);
+
+    const move = screen.getByRole("button", { name: "Move Complete Part" });
+    fireEvent(move, new MouseEvent("pointerdown", { bubbles: true, clientX: 0, clientY: 0 }));
+    fireEvent(window, new MouseEvent("pointermove", { bubbles: true, clientX: 13, clientY: 11 }));
+    fireEvent(window, new MouseEvent("pointerup", { bubbles: true, clientX: 13, clientY: 11 }));
+    expect(target).toHaveStyle({ position: "relative", left: "16px", top: "8px" });
+    on("undo");
+    expect(target.style.left).toBe("");
+    expect(target.style.top).toBe("");
+
+    const resize = screen.getByRole("button", { name: "Resize Complete Part Southeast" });
+    fireEvent(resize, new MouseEvent("pointerdown", { bubbles: true, clientX: 0, clientY: 0 }));
+    fireEvent(window, new MouseEvent("pointermove", { bubbles: true, clientX: 13, clientY: 10 }));
+    fireEvent(window, new MouseEvent("pointerup", { bubbles: true, clientX: 13, clientY: 10 }));
+    expect(target).toHaveStyle({ width: "112px", height: "48px" });
+    on("undo");
+    expect(target.style.width).toBe("");
+    expect(target.style.height).toBe("");
+  });
+
+  it("uses Shift-click for multi-selection and hides both global targets", () => {
+    render(<Harness />);
+    on("toggle-dev");
+    on("toggle-inspect");
+    const first = screen.getByRole("button", { name: "Complete Part" });
+    const second = screen.getByTestId("ico");
+    fireEvent.click(first);
+    fireEvent.click(second, { shiftKey: true });
+
+    expect(screen.getByText("2 Selected")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Hide 2 Selected" }));
+    expect(first).toHaveStyle({ visibility: "hidden" });
+    expect(second).toHaveStyle({ visibility: "hidden" });
+  });
+
+  it("detaches into the nearest identified container and undoes both changes together", () => {
+    render(<Harness />);
+    on("toggle-dev");
+    on("toggle-inspect");
+    const target = screen.getByRole("button", { name: "Complete Part" });
+    const parent = target.parentElement as HTMLElement;
+    vi.spyOn(target, "getBoundingClientRect").mockReturnValue({
+      x: 20, y: 30, left: 20, top: 30, right: 120, bottom: 70, width: 100, height: 40,
+      toJSON: () => ({}),
+    });
+    fireEvent.click(target);
+
+    fireEvent.click(screen.getByRole("button", { name: "Detach Complete Part" }));
+    expect(target).toHaveStyle({ position: "absolute", width: "100px", height: "40px" });
+    expect(parent).toHaveStyle({ position: "relative" });
+
+    on("undo");
+    expect(target.style.position).toBe("");
+    expect(parent.style.position).toBe("");
+  });
+
+  it("moves by the active grid from the keyboard and cancels an active gesture with Escape", () => {
+    render(<Harness />);
+    on("toggle-dev");
+    on("toggle-inspect");
+    const target = screen.getByRole("button", { name: "Complete Part" });
+    Object.defineProperty(target, "offsetWidth", { configurable: true, value: 100 });
+    Object.defineProperty(target, "offsetHeight", { configurable: true, value: 40 });
+    fireEvent.click(target);
+    const move = screen.getByRole("button", { name: "Move Complete Part" });
+
+    fireEvent.keyDown(move, { key: "ArrowRight" });
+    expect(target).toHaveStyle({ position: "relative", left: "8px", top: "0px" });
+
+    fireEvent(move, new MouseEvent("pointerdown", { bubbles: true, clientX: 0, clientY: 0 }));
+    fireEvent(window, new MouseEvent("pointermove", { bubbles: true, clientX: 40, clientY: 40 }));
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(target).toHaveStyle({ left: "8px", top: "0px" });
+  });
+
+  it("cycles between a selected target and its identified parent with Tab", () => {
+    render(<Harness />);
+    on("toggle-dev");
+    on("toggle-inspect");
+    fireEvent.click(screen.getByRole("button", { name: "Complete Part" }));
+
+    fireEvent.keyDown(window, { key: "Tab", shiftKey: true });
+    expect(screen.getByTestId("selected")).toHaveTextContent("components.stage");
+    fireEvent.keyDown(window, { key: "Tab" });
+    expect(screen.getByTestId("selected")).toHaveTextContent("detail.complete-part");
+  });
+
+  it("resizes from every handle with the keyboard grid", () => {
+    render(<Harness />);
+    on("toggle-dev");
+    on("toggle-inspect");
+    const target = screen.getByRole("button", { name: "Complete Part" });
+    Object.defineProperty(target, "offsetWidth", { configurable: true, value: 100 });
+    Object.defineProperty(target, "offsetHeight", { configurable: true, value: 40 });
+    fireEvent.click(target);
+
+    const east = screen.getByRole("button", { name: "Resize Complete Part East" });
+    fireEvent.keyDown(east, { key: "ArrowRight" });
+    expect(target).toHaveStyle({ width: "108px" });
+    const north = screen.getByRole("button", { name: "Resize Complete Part North" });
+    fireEvent.keyDown(north, { key: "ArrowUp" });
+    expect(target).toHaveStyle({ height: "48px", top: "-8px" });
   });
 });

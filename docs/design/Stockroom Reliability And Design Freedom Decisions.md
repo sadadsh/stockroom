@@ -116,3 +116,25 @@ Apply writes a complete validated Design Document atomically to
 revision. This file is outside immutable release generations and survives updates. Reset Applied
 Design deletes only that activation, leaving the personal Draft untouched. Source promotion remains
 a separate developer action and is not represented by the fixed Apply control.
+
+The visible action uses Stockroom's established interface vocabulary: **Set** writes the Draft to
+this PC, while the technical endpoint remains `/api/design-studio/apply-local`. This wording does
+not collapse Draft, machine activation, and source promotion into one operation.
+
+### Universal Direct Manipulation Boundary
+
+Edit mode places one protected overlay over the exact clicked Stockroom element while every
+occurrence with the same authored or generated identity receives the resulting global override.
+The overlay owns one move grip, eight directional resize handles, visibility, flow or detached
+placement, and reset. Pointer motion is previewed imperatively, then committed as one atomic draft
+replacement on release so one gesture is one undo entry; Escape restores the pre-gesture styles.
+
+Flow movement uses relative offsets and retains layout space. Detached movement uses absolute
+placement inside the nearest identified Stockroom container, which becomes positioned only when
+needed. Snap uses the current Studio grid and Free uses one-pixel increments; both compensate for
+preview zoom. Hiding uses `visibility` so the target remains discoverable and reversible in Layers.
+
+Layers starts with meaningful targets, offers All Elements for every generated wrapper, and retains
+hidden targets as dashed ghost rows. Hide Screen Contents targets the product root, allowing a blank
+application while the editor remains usable. Both Windows hosts capture Control+Shift during launch
+as an ephemeral applied-design bypass; the bypass is never saved as a preference.

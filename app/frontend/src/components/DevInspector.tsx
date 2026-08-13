@@ -19,14 +19,23 @@
  * whom dev mode never turns on) carry no listener and no overlay. All text is rendered as React
  * children (catalog labels + cssVar names) - never innerHTML, eval, or network.
  */
-import { useEffect, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
 import { createPortal } from "react-dom";
 import { useDevMode } from "../lib/devMode";
+import type { DevModeDraft } from "../lib/devModeDraft";
 import { usedVarsForElement } from "../lib/inspectVars";
 import { DEV_ID_BY_ID } from "../lib/devIds";
 import { devIdScope, sharedRoleOf } from "../lib/componentDevIds";
 import { DESIGN_TARGET_SELECTOR, designIdOf, ensureDesignIdentities, isGeneratedDesignId } from "../lib/designIdentity";
 import { TECHNICAL_CONTENT_SELECTOR } from "../design-studio/targetDomains";
+import { useOptionalDesignStudio } from "../design-studio/DesignStudioProvider";
 
 interface Badge {
   id: string;
@@ -41,9 +50,90 @@ interface Hover {
   rect: { left: number; top: number; width: number; height: number };
 }
 
+interface SelectedTarget {
+  id: string;
+  label: string;
+  element: Element & ElementCSSInlineStyle;
+}
+
+type ResizeDirection = "north" | "northeast" | "east" | "southeast" | "south" | "southwest" | "west" | "northwest";
+type GestureKind = "move" | ResizeDirection;
+
+interface GesturePreview {
+  target: SelectedTarget;
+  original: Record<"position" | "left" | "top" | "width" | "height", string>;
+  baseLeft: number;
+  baseTop: number;
+  baseWidth: number;
+  baseHeight: number;
+}
+
+interface Gesture {
+  pointerId: number;
+  kind: GestureKind;
+  startX: number;
+  startY: number;
+  scale: number;
+  grid: number;
+  previews: GesturePreview[];
+}
+
+const RESIZE_DIRECTIONS: readonly ResizeDirection[] = [
+  "north", "northeast", "east", "southeast", "south", "southwest", "west", "northwest",
+];
+
+const HANDLE_POSITION: Record<ResizeDirection, { left: string; top: string; cursor: string }> = {
+  north: { left: "50%", top: "0%", cursor: "ns-resize" },
+  northeast: { left: "100%", top: "0%", cursor: "nesw-resize" },
+  east: { left: "100%", top: "50%", cursor: "ew-resize" },
+  southeast: { left: "100%", top: "100%", cursor: "nwse-resize" },
+  south: { left: "50%", top: "100%", cursor: "ns-resize" },
+  southwest: { left: "0%", top: "100%", cursor: "nesw-resize" },
+  west: { left: "0%", top: "50%", cursor: "ew-resize" },
+  northwest: { left: "0%", top: "0%", cursor: "nwse-resize" },
+};
+
 function rectOf(el: Element): { left: number; top: number; width: number; height: number } {
   const r = el.getBoundingClientRect();
   return { left: r.left, top: r.top, width: r.width, height: r.height };
+}
+
+function px(value: string | undefined): number {
+  const parsed = Number.parseFloat(value ?? "");
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function snap(value: number, grid: number): number {
+  return Math.round(value / grid) * grid;
+}
+
+function gridFor(element: Element): number {
+  const root = element.closest("[data-snap]");
+  return root?.getAttribute("data-snap") === "on"
+    ? Math.max(1, Number.parseInt(root.getAttribute("data-grid") ?? "8", 10) || 8)
+    : 1;
+}
+
+function displayLabel(id: string, element: Element): string {
+  const text = element.textContent?.replace(/\s+/g, " ").trim();
+  return text ? text.slice(0, 48) : labelFor(id, element) || id;
+}
+
+function withElementChanges(
+  draft: DevModeDraft,
+  changes: ReadonlyMap<string, Record<string, string> | null>,
+): DevModeDraft {
+  const elements = Object.fromEntries(
+    Object.entries(draft.elements).map(([id, props]) => [id, { ...props }]),
+  );
+  for (const [id, patch] of changes) {
+    if (patch === null) {
+      delete elements[id];
+      continue;
+    }
+    elements[id] = { ...(elements[id] ?? {}), ...patch };
+  }
+  return { ...draft, elements };
 }
 
 /** Technical drawings select their registered presentation root, never an engineering descendant. */
@@ -75,9 +165,32 @@ function labelFor(id: string, el: Element | null): string {
 
 export function DevInspector() {
   const dev = useDevMode();
+  const studio = useOptionalDesignStudio();
   const { enabled, inspect, showIds, selectDevId, selectVars } = dev;
   const [hover, setHover] = useState<Hover | null>(null);
   const [badges, setBadges] = useState<Badge[]>([]);
+  const [selection, setSelection] = useState<SelectedTarget[]>([]);
+  const [selectionRect, setSelectionRect] = useState<Hover["rect"] | null>(null);
+  const gestureRef = useRef<Gesture | null>(null);
+  const draftRef = useRef(dev.draft);
+  useEffect(() => {
+    draftRef.current = dev.draft;
+  }, [dev.draft]);
+
+  const commitChanges = useCallback((changes: ReadonlyMap<string, Record<string, string> | null>) => {
+    const next = withElementChanges(draftRef.current, changes);
+    if (studio) studio.replaceResolvedDraftAtomically(next);
+    else dev.replaceDraft(next);
+  }, [dev, studio]);
+
+  const measureSelection = useCallback(() => {
+    const primary = selection[selection.length - 1];
+    if (!primary?.element.isConnected) {
+      setSelectionRect(null);
+      return;
+    }
+    setSelectionRect(rectOf(primary.element));
+  }, [selection]);
 
   // Capture-phase document listeners live ONLY while dev mode is enabled; the whole surface is
   // inert (and leak-free) otherwise. Re-bound when inspect flips so the click handler swallows only
@@ -113,6 +226,12 @@ export function DevInspector() {
       // runs before the React root, so stopPropagation keeps the event from ever reaching it).
       e.preventDefault();
       e.stopPropagation();
+      const selected = { id, label: displayLabel(id, el), element: el as Element & ElementCSSInlineStyle };
+      setSelection((current) => {
+        if (!e.shiftKey) return [selected];
+        const withoutDuplicate = current.filter((item) => item.id !== id);
+        return [...withoutDuplicate, selected];
+      });
       selectDevId(id);
       selectVars(usedVarsForElement(el));
     }
@@ -124,6 +243,289 @@ export function DevInspector() {
       document.removeEventListener("click", onClick, true);
     };
   }, [enabled, inspect, selectDevId, selectVars]);
+
+  useEffect(() => {
+    if (!enabled || !inspect || !dev.selectedDevId) {
+      if ((!enabled || !inspect) && selection.length > 0) setSelection([]);
+      return;
+    }
+    if (selection[selection.length - 1]?.id === dev.selectedDevId) return;
+    const element = Array.from(document.querySelectorAll(DESIGN_TARGET_SELECTOR))
+      .find((candidate) => designIdOf(candidate) === dev.selectedDevId);
+    if (element && "style" in element) {
+      setSelection([{
+        id: dev.selectedDevId,
+        label: displayLabel(dev.selectedDevId, element),
+        element: element as Element & ElementCSSInlineStyle,
+      }]);
+    }
+  }, [dev.selectedDevId, enabled, inspect, selection]);
+
+  useEffect(() => {
+    measureSelection();
+    window.addEventListener("resize", measureSelection);
+    window.addEventListener("scroll", measureSelection, true);
+    return () => {
+      window.removeEventListener("resize", measureSelection);
+      window.removeEventListener("scroll", measureSelection, true);
+    };
+  }, [measureSelection, dev.draft]);
+
+  const restoreGesturePreview = useCallback((gesture: Gesture) => {
+    for (const preview of gesture.previews) {
+      for (const [property, value] of Object.entries(preview.original)) {
+        if (value) preview.target.element.style.setProperty(property, value);
+        else preview.target.element.style.removeProperty(property);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    function onPointerMove(event: PointerEvent) {
+      const gesture = gestureRef.current;
+      if (!gesture || event.pointerId !== gesture.pointerId) return;
+      const deltaX = (event.clientX - gesture.startX) / gesture.scale;
+      const deltaY = (event.clientY - gesture.startY) / gesture.scale;
+      const activeElements = draftRef.current.elements;
+      const east = gesture.kind !== "move" && gesture.kind.includes("east");
+      const west = gesture.kind !== "move" && gesture.kind.includes("west");
+      const north = gesture.kind !== "move" && gesture.kind.includes("north");
+      const south = gesture.kind !== "move" && gesture.kind.includes("south");
+      for (const preview of gesture.previews) {
+        const { element, id } = preview.target;
+        const activeOverride = activeElements[id];
+        if (gesture.kind === "move") {
+          element.style.position = activeOverride?.position === "absolute"
+            ? "absolute"
+            : "relative";
+          element.style.left = `${snap(preview.baseLeft + deltaX, gesture.grid)}px`;
+          element.style.top = `${snap(preview.baseTop + deltaY, gesture.grid)}px`;
+          continue;
+        }
+        if (east || west) {
+          element.style.width = `${Math.max(1, snap(preview.baseWidth + (east ? deltaX : -deltaX), gesture.grid))}px`;
+        }
+        if (north || south) {
+          element.style.height = `${Math.max(1, snap(preview.baseHeight + (south ? deltaY : -deltaY), gesture.grid))}px`;
+        }
+        if (west) {
+          element.style.position = activeOverride?.position ?? "relative";
+          element.style.left = `${snap(preview.baseLeft + deltaX, gesture.grid)}px`;
+        }
+        if (north) {
+          element.style.position = activeOverride?.position ?? "relative";
+          element.style.top = `${snap(preview.baseTop + deltaY, gesture.grid)}px`;
+        }
+      }
+      measureSelection();
+    }
+
+    function finishGesture(event: PointerEvent) {
+      const gesture = gestureRef.current;
+      if (!gesture || event.pointerId !== gesture.pointerId) return;
+      const changes = new Map<string, Record<string, string>>();
+      for (const preview of gesture.previews) {
+        const props: Record<string, string> = {};
+        const properties = gesture.kind === "move"
+          ? ["position", "left", "top"]
+          : ["position", "left", "top", "width", "height"];
+        for (const property of properties) {
+          const value = preview.target.element.style.getPropertyValue(property);
+          if (value) props[property] = value;
+        }
+        changes.set(preview.target.id, props);
+      }
+      restoreGesturePreview(gesture);
+      gestureRef.current = null;
+      commitChanges(changes);
+    }
+
+    function cancelGesture(event: KeyboardEvent) {
+      if (event.key !== "Escape" || !gestureRef.current) return;
+      event.preventDefault();
+      restoreGesturePreview(gestureRef.current);
+      gestureRef.current = null;
+      measureSelection();
+    }
+
+    window.addEventListener("pointermove", onPointerMove);
+    window.addEventListener("pointerup", finishGesture);
+    window.addEventListener("keydown", cancelGesture, true);
+    return () => {
+      window.removeEventListener("pointermove", onPointerMove);
+      window.removeEventListener("pointerup", finishGesture);
+      window.removeEventListener("keydown", cancelGesture, true);
+    };
+  }, [commitChanges, measureSelection, restoreGesturePreview]);
+
+  useEffect(() => {
+    function cycleTarget(event: KeyboardEvent) {
+      if (!enabled || !inspect || event.key !== "Tab") return;
+      const eventTarget = event.target;
+      if (eventTarget instanceof Element && eventTarget.matches("input, textarea, select, [contenteditable='true']")) return;
+      const current = selection[selection.length - 1];
+      if (!current) return;
+      const next = event.shiftKey
+        ? current.element.parentElement?.closest(DESIGN_TARGET_SELECTOR)
+        : current.element.querySelector(DESIGN_TARGET_SELECTOR);
+      if (!next || !("style" in next)) return;
+      const id = designIdOf(next);
+      if (!id) return;
+      event.preventDefault();
+      const target = {
+        id,
+        label: displayLabel(id, next),
+        element: next as Element & ElementCSSInlineStyle,
+      };
+      setSelection([target]);
+      selectDevId(id);
+      selectVars(usedVarsForElement(next));
+    }
+    window.addEventListener("keydown", cycleTarget);
+    return () => window.removeEventListener("keydown", cycleTarget);
+  }, [enabled, inspect, selectDevId, selectVars, selection]);
+
+  const beginGesture = useCallback((event: ReactPointerEvent<HTMLButtonElement>, kind: GestureKind) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const primary = selection[selection.length - 1];
+    if (!primary) return;
+    const grid = gridFor(primary.element);
+    const rect = primary.element.getBoundingClientRect();
+    const width = primary.element instanceof HTMLElement ? primary.element.offsetWidth : 0;
+    const scale = width > 0 && rect.width > 0 ? rect.width / width : 1;
+    gestureRef.current = {
+      pointerId: event.pointerId,
+      kind,
+      startX: event.clientX,
+      startY: event.clientY,
+      scale,
+      grid,
+      previews: selection.map((target) => {
+        const overrides = draftRef.current.elements[target.id] ?? {};
+        const targetRect = target.element.getBoundingClientRect();
+        const targetWidth = target.element instanceof HTMLElement && target.element.offsetWidth > 0
+          ? target.element.offsetWidth
+          : targetRect.width / scale;
+        const targetHeight = target.element instanceof HTMLElement && target.element.offsetHeight > 0
+          ? target.element.offsetHeight
+          : targetRect.height / scale;
+        return {
+          target,
+          original: {
+            position: target.element.style.position,
+            left: target.element.style.left,
+            top: target.element.style.top,
+            width: target.element.style.width,
+            height: target.element.style.height,
+          },
+          baseLeft: px(overrides.left),
+          baseTop: px(overrides.top),
+          baseWidth: px(overrides.width) || targetWidth,
+          baseHeight: px(overrides.height) || targetHeight,
+        };
+      }),
+    };
+  }, [selection]);
+
+  const moveByKeyboard = useCallback((event: ReactKeyboardEvent<HTMLButtonElement>) => {
+    const vector: Record<string, [number, number]> = {
+      ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1],
+    };
+    const direction = vector[event.key];
+    if (!direction || selection.length === 0) return;
+    event.preventDefault();
+    const distance = gridFor(selection[selection.length - 1].element) * (event.shiftKey ? 10 : 1);
+    const changes = new Map<string, Record<string, string>>();
+    for (const target of selection) {
+      const overrides = draftRef.current.elements[target.id] ?? {};
+      changes.set(target.id, {
+        position: overrides.position === "absolute" ? "absolute" : "relative",
+        left: `${px(overrides.left) + direction[0] * distance}px`,
+        top: `${px(overrides.top) + direction[1] * distance}px`,
+      });
+    }
+    commitChanges(changes);
+  }, [commitChanges, selection]);
+
+  const resizeByKeyboard = useCallback((event: ReactKeyboardEvent<HTMLButtonElement>, direction: ResizeDirection) => {
+    if (!event.key.startsWith("Arrow") || selection.length === 0) return;
+    const horizontal = event.key === "ArrowLeft" || event.key === "ArrowRight";
+    const vertical = event.key === "ArrowUp" || event.key === "ArrowDown";
+    const west = direction.includes("west");
+    const east = direction.includes("east");
+    const north = direction.includes("north");
+    const south = direction.includes("south");
+    if ((horizontal && !west && !east) || (vertical && !north && !south)) return;
+    event.preventDefault();
+    const distance = gridFor(selection[selection.length - 1].element) * (event.shiftKey ? 10 : 1);
+    const sign = event.key === "ArrowRight" || event.key === "ArrowDown" ? 1 : -1;
+    const changes = new Map<string, Record<string, string>>();
+    for (const target of selection) {
+      const overrides = draftRef.current.elements[target.id] ?? {};
+      const element = target.element;
+      const width = px(overrides.width) || (element instanceof HTMLElement ? element.offsetWidth : element.getBoundingClientRect().width);
+      const height = px(overrides.height) || (element instanceof HTMLElement ? element.offsetHeight : element.getBoundingClientRect().height);
+      const patch: Record<string, string> = {};
+      if (horizontal) {
+        const delta = (east ? sign : -sign) * distance;
+        patch.width = `${Math.max(1, width + delta)}px`;
+        if (west) {
+          patch.position = overrides.position ?? "relative";
+          patch.left = `${px(overrides.left) + sign * distance}px`;
+        }
+      }
+      if (vertical) {
+        const delta = (south ? sign : -sign) * distance;
+        patch.height = `${Math.max(1, height + delta)}px`;
+        if (north) {
+          patch.position = overrides.position ?? "relative";
+          patch.top = `${px(overrides.top) + sign * distance}px`;
+        }
+      }
+      changes.set(target.id, patch);
+    }
+    commitChanges(changes);
+  }, [commitChanges, selection]);
+
+  const hidden = selection.length > 0 && selection.every(
+    (target) => dev.draft.elements[target.id]?.visibility === "hidden",
+  );
+  const primary = selection[selection.length - 1];
+  const selectionName = selection.length > 1 ? `${selection.length} Selected` : primary?.label ?? "Selection";
+
+  const toggleVisibility = useCallback(() => {
+    const changes = new Map<string, Record<string, string>>();
+    for (const target of selection) changes.set(target.id, { visibility: hidden ? "visible" : "hidden" });
+    commitChanges(changes);
+  }, [commitChanges, hidden, selection]);
+
+  const resetSelection = useCallback(() => {
+    commitChanges(new Map(selection.map((target) => [target.id, null])));
+  }, [commitChanges, selection]);
+
+  const toggleDetached = useCallback(() => {
+    const detached = selection.every((target) => dev.draft.elements[target.id]?.position === "absolute");
+    const changes = new Map<string, Record<string, string>>();
+    for (const target of selection) {
+      if (detached) {
+        changes.set(target.id, { position: "relative" });
+        continue;
+      }
+      const parent = target.element.parentElement?.closest(DESIGN_TARGET_SELECTOR);
+      const parentId = parent ? designIdOf(parent) : null;
+      if (parentId) changes.set(parentId, { position: "relative" });
+      const element = target.element;
+      changes.set(target.id, {
+        position: "absolute",
+        left: `${element instanceof HTMLElement ? element.offsetLeft : 0}px`,
+        top: `${element instanceof HTMLElement ? element.offsetTop : 0}px`,
+        width: `${Math.max(1, element.getBoundingClientRect().width)}px`,
+        height: `${Math.max(1, element.getBoundingClientRect().height)}px`,
+      });
+    }
+    commitChanges(changes);
+  }, [commitChanges, dev.draft.elements, selection]);
 
   // Clear the hover highlight the moment Inspect (or dev mode) turns off, so no stale outline lingers.
   useEffect(() => {
@@ -155,7 +557,7 @@ export function DevInspector() {
   if (!enabled) return null;
 
   return createPortal(
-    <div className="pointer-events-none fixed inset-0 z-[190]" aria-hidden="true">
+    <div className="pointer-events-none fixed inset-0 z-[190]">
       {/* Hover highlight + badge, only while Inspect is on. */}
       {inspect && hover ? (
         <div
@@ -202,6 +604,38 @@ export function DevInspector() {
             </span>
           ))
         : null}
+
+      {inspect && primary && selectionRect ? (
+        <div
+          data-testid="dev-selection-overlay"
+          className="absolute rounded-[4px] outline outline-2 outline-acc"
+          style={{
+            left: selectionRect.left,
+            top: selectionRect.top,
+            width: selectionRect.width,
+            height: selectionRect.height,
+          }}
+        >
+          <div className="pointer-events-auto absolute bottom-full left-0 mb-2 flex items-center gap-1 rounded-control border border-line2 bg-popover p-1 shadow-pop">
+            <span className="max-w-40 truncate px-1 text-2xs font-semibold text-t1">{selectionName}</span>
+            <button type="button" aria-label={`Move ${selectionName}`} title={`Move ${selectionName}`} onPointerDown={(event) => beginGesture(event, "move")} onKeyDown={moveByKeyboard} className="rounded-control px-1.5 py-1 text-xs text-t1 hover:bg-control-hover">Move</button>
+            <button type="button" aria-label={`${hidden ? "Show" : "Hide"} ${selectionName}`} onClick={toggleVisibility} className="rounded-control px-1.5 py-1 text-xs text-t1 hover:bg-control-hover">{hidden ? "Show" : "Hide"}</button>
+            <button type="button" aria-label={`${dev.draft.elements[primary.id]?.position === "absolute" ? "Flow" : "Detach"} ${selectionName}`} onClick={toggleDetached} className="rounded-control px-1.5 py-1 text-xs text-t1 hover:bg-control-hover">{dev.draft.elements[primary.id]?.position === "absolute" ? "Flow" : "Detach"}</button>
+            <button type="button" aria-label={`Reset ${selectionName}`} onClick={resetSelection} className="rounded-control px-1.5 py-1 text-xs text-t1 hover:bg-control-hover">Reset</button>
+          </div>
+          {RESIZE_DIRECTIONS.map((direction) => (
+            <button
+              key={direction}
+              type="button"
+              aria-label={`Resize ${selectionName} ${direction[0].toUpperCase()}${direction.slice(1)}`}
+              onPointerDown={(event) => beginGesture(event, direction)}
+              onKeyDown={(event) => resizeByKeyboard(event, direction)}
+              className="pointer-events-auto absolute size-3 -translate-x-1/2 -translate-y-1/2 rounded-full border border-acc bg-surface shadow-card"
+              style={HANDLE_POSITION[direction]}
+            />
+          ))}
+        </div>
+      ) : null}
     </div>,
     document.body,
   );

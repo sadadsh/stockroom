@@ -256,7 +256,7 @@ export function ManageModelsWorkspace({
               <h3 className="text-sm font-semibold text-t1">{selectedProvider.row.label}</h3>
               <p className="max-w-[420px] text-xs text-t3">
                 <Text id="component-browser.manage-models-provider-modal-help">
-                  The provider opens in a movable window while Manage Models stays available.
+                  The provider opens in a movable window while Manage Models remains available.
                 </Text>
               </p>
             </div>

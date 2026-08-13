@@ -134,8 +134,8 @@ describe("target coverage", () => {
 
     expect(targetLayersFor(root, DEV_IDS)).toEqual([
       expect.objectContaining({ key: "dev:shell.root", depth: 0 }),
-      expect.objectContaining({ key: "generated:auto.fixture.0abc123", depth: 1 }),
-      expect.objectContaining({ key: "generated:auto.fixture.0def456", depth: 2 }),
+      expect.objectContaining({ key: "generated:auto.fixture.0abc123", depth: 1, ownerDevId: "auto.fixture.0abc123", meaningful: false }),
+      expect.objectContaining({ key: "generated:auto.fixture.0def456", depth: 2, ownerDevId: "auto.fixture.0def456", meaningful: true }),
     ]);
   });
 });

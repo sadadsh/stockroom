@@ -23,6 +23,8 @@ export interface TargetLayer {
   occurrences: number;
   /** The stable Dev Mode owner selected when a domain-only row is activated. */
   ownerDevId: string | null;
+  /** Default Layers stays concise; All Elements reveals every generated wrapper boundary. */
+  meaningful: boolean;
 }
 
 const STABLE_COPY_ID = /^[A-Za-z][A-Za-z0-9]*(?:[.-][A-Za-z0-9]+)*$/;
@@ -161,13 +163,14 @@ export function targetLayersFor(root: ParentNode, registry: DevIdEntry[]): Targe
           parentKey,
           depth,
           occurrences: 1,
-          ownerDevId: kind === "dev" ? id : ownerDevId,
+          ownerDevId: kind === "dev" || kind === "generated" ? id : ownerDevId,
+          meaningful: kind !== "generated" || isMeaningfulTargetElement(element),
         };
         byKey.set(key, layer);
         layers.push(layer);
       }
       parentKey = key;
-      if (kind === "dev") ownerDevId = id;
+      if (kind === "dev" || kind === "generated") ownerDevId = id;
     }
     if (parentKey) lastKeyByElement.set(element, parentKey);
     if (ownerDevId) ownerDevByElement.set(element, ownerDevId);

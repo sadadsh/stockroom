@@ -299,6 +299,35 @@ describe("DesignStudioShell", () => {
     expect(sidebar.innerHTML).not.toContain("data-target-index");
   });
 
+  it("keeps hidden targets as ghost rows and can blank then restore the product", async () => {
+    await renderStudio();
+    const sidebar = screen.getByRole("complementary", { name: "Screens And States" });
+    const rail = within(sidebar).getByRole("button", { name: "Navigation rail" });
+    await userEvent.setup().click(rail);
+    await userEvent.setup().click(within(sidebar).getByRole("button", { name: "Hide Selected" }));
+    expect(document.querySelector('[data-dev-id="rail.root"]')).toHaveStyle({ visibility: "hidden" });
+    expect(within(sidebar).getByRole("button", { name: /Navigation rail.*Hidden/ })).toBeVisible();
+
+    const productRoot = screen.getByRole("region", { name: "Stockroom Preview" })
+      .querySelector("[data-design-product-root]") as HTMLElement;
+    await userEvent.setup().click(within(sidebar).getByRole("button", { name: "Hide Screen Contents" }));
+    expect(productRoot).toHaveStyle({ visibility: "hidden" });
+
+    await userEvent.setup().click(within(sidebar).getByRole("button", { name: "Show All Hidden" }));
+    expect(productRoot.style.visibility).toBe("");
+    expect((document.querySelector('[data-dev-id="rail.root"]') as HTMLElement).style.visibility).toBe("");
+  });
+
+  it("defaults to meaningful layers and can reveal every generated wrapper", async () => {
+    await renderStudio();
+    const sidebar = screen.getByRole("complementary", { name: "Screens And States" });
+    expect(within(sidebar).getByRole("button", { name: "All Elements" })).toHaveAttribute("aria-pressed", "false");
+    const before = within(sidebar).queryAllByRole("button", { name: /Element · auto\./ }).length;
+    await userEvent.setup().click(within(sidebar).getByRole("button", { name: "All Elements" }));
+    const after = within(sidebar).getAllByRole("button", { name: /Element · auto\./ }).length;
+    expect(after).toBeGreaterThan(before);
+  });
+
   it("collapses every editor region without hiding Stockroom chrome", async () => {
     const { container } = await renderStudio();
     await userEvent.setup().click(

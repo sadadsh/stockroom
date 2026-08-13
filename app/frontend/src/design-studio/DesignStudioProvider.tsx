@@ -33,6 +33,7 @@ import type { DesignScenario } from "./scenario";
 import { installPreviewEffectGuard } from "./previewEffects";
 import { bootstrapScenarioRegistry } from "./scenarios";
 import type { ScenarioRegistry } from "./scenarioRegistry";
+import { injectedPrefs } from "../lib/uiPrefs";
 import { ScenarioUiProvider } from "./scenarioState";
 import {
   runPersonalDesignPromotion,
@@ -221,6 +222,14 @@ function DesignStudioBridge({
 
   useEffect(() => {
     let current = true;
+    if (injectedPrefs().design_bypass_applied) {
+      setAppliedDocument(null);
+      setAppliedRevision(null);
+      setAppliedState("ready");
+      return () => {
+        current = false;
+      };
+    }
     void api.designStudioAppliedGet()
       .then((response) => {
         if (!current) return;

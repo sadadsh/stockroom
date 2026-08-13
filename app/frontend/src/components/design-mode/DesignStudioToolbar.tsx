@@ -74,16 +74,16 @@ export function DesignStudioToolbar({
   const resetLabel = useText("design-studio.reset", "Reset");
   const fixtureLabel = useText("design-studio.fixture-preview", "Fixture Preview");
   const validationLabel = useText("design-studio.validation", "Preview Validation Status");
-  const applyLabel = useText("design-studio.apply-local", "Apply");
-  const applyFixtureTitle = useText("design-studio.apply-local.fixture-help", "Return To Real Data To Apply This Draft");
-  const applyTitle = useText("design-studio.apply-local.help", "Apply This Draft To This PC");
-  const appliedStatusLabel = useText("design-studio.applied-status", "Applied Design Status");
+  const applyLabel = useText("design-studio.apply-local", "Set");
+  const applyFixtureTitle = useText("design-studio.apply-local.fixture-help", "Return To Real Data To Set This Draft");
+  const applyTitle = useText("design-studio.apply-local.help", "Set This Draft On This PC");
+  const appliedStatusLabel = useText("design-studio.applied-status", "Set Design Status");
   const appliedLabel = useCopyFormatter(
     "design-studio.applied-this-pc",
-    "Applied To This PC · {revision}",
+    "Set On This PC · {revision}",
   );
-  const draftOnlyLabel = useText("design-studio.draft-only", "Draft Only");
-  const applyingLabel = useText("design-studio.applying", "Applying...");
+  const draftOnlyLabel = useText("design-studio.draft-only", "Draft");
+  const applyingLabel = useText("design-studio.applying", "Setting...");
   const presentationLabel = useText("design-studio.presentation", "Presentation Mode");
   const closeLabel = useText("design-studio.close", "Close Design Studio");
 

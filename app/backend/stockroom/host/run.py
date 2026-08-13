@@ -272,7 +272,7 @@ def _install_injected_index(
     into the HTML/JavaScript document. No-op when the built frontend is absent.
     """
     from stockroom.api.app import _FRONTEND_DIST
-    from stockroom.host.window import inject_script
+    from stockroom.host.window import design_recovery_requested, inject_script
 
     index = _FRONTEND_DIST / "index.html"
     if not index.exists():
@@ -302,6 +302,7 @@ def _install_injected_index(
             ).ui
         except Exception:  # noqa: BLE001 - an unreadable config must never block the window opening
             ui = {}
+        ui = {**ui, "design_bypass_applied": design_recovery_requested()}
         try:
             session = load_snapshot(config)
         except Exception:  # noqa: BLE001 - corrupt/dangling state is never injected

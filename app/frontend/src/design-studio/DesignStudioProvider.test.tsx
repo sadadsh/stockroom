@@ -291,6 +291,7 @@ function renderStudio(options: {
 
 describe("DesignStudioProvider", () => {
   beforeEach(() => {
+    window.__STOCKROOM_UI__ = {};
     mockApi.designStudioGet.mockReset();
     mockApi.designStudioPut.mockReset();
     mockApi.designStudioPutForPageExit.mockReset();
@@ -310,6 +311,7 @@ describe("DesignStudioProvider", () => {
   });
 
   afterEach(() => {
+    delete window.__STOCKROOM_UI__;
     vi.useRealTimers();
     vi.unstubAllGlobals();
   });
@@ -369,6 +371,20 @@ describe("DesignStudioProvider", () => {
     expect(mockApi.designStudioResetLocal).toHaveBeenCalledOnce();
     expect(screen.getByTestId("resolved-copy")).toHaveTextContent("Components");
     expect(screen.getByTestId("studio-document")).toHaveTextContent("My Components");
+  });
+
+  it("bypasses an applied design when the host captured Ctrl+Shift during launch", async () => {
+    const applied = fixtureDocument();
+    applied.base.copy["rail.components"] = "Hidden Applied Components";
+    window.__STOCKROOM_UI__ = { design_bypass_applied: true };
+    mockApi.designStudioGet.mockResolvedValue({ revision: "draft-r1", document: personalDocument() });
+    mockApi.designStudioAppliedGet.mockResolvedValue({ revision: "applied-r1", document: applied });
+
+    renderStudio({ startOpen: false });
+
+    await waitFor(() => expect(screen.getByTestId("personal-state")).toHaveTextContent("ready"));
+    expect(screen.getByTestId("resolved-copy")).toHaveTextContent("Components");
+    expect(mockApi.designStudioAppliedGet).not.toHaveBeenCalled();
   });
 
   it.each(["success", "promotion-failure"] as const)(

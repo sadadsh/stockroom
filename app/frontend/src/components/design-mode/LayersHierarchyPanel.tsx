@@ -5,6 +5,7 @@ import { targetLayersFor } from "../../design-studio/targetCoverage";
 import { useDevMode } from "../../lib/devMode";
 import { useText } from "../../lib/copy";
 import { BUILT_IN_VARIATIONS } from "../../design-studio/document";
+import { designIdOf, ensureDesignIdentities } from "../../lib/designIdentity";
 
 type TreeView = "layers" | "hierarchy";
 
@@ -13,6 +14,7 @@ export function LayersHierarchyPanel() {
   const dev = useDevMode();
   const [view, setView] = useState<TreeView>("layers");
   const [creatingVariation, setCreatingVariation] = useState(false);
+  const [allElements, setAllElements] = useState(false);
   const [variationTitle, setVariationTitle] = useState("");
   const variationsLabel = useText("design-studio.variations", "Variations");
   const baseLabel = useText("design-studio.variations.base", "Base");
@@ -27,13 +29,52 @@ export function LayersHierarchyPanel() {
   const structureLabel = useText("design-studio.structure", "Layers And Structure");
   const layersLabel = useText("design-studio.layers", "Layers");
   const hierarchyLabel = useText("design-studio.hierarchy", "Structure");
+  const allElementsLabel = useText("design-studio.layers.all-elements", "All Elements");
+  const hideSelectedLabel = useText("design-studio.layers.hide-selected", "Hide Selected");
+  const hideScreenLabel = useText("design-studio.layers.hide-screen", "Hide Screen Contents");
+  const showHiddenLabel = useText("design-studio.layers.show-hidden", "Show All Hidden");
+  const hiddenLabel = useText("design-studio.layers.hidden", "Hidden");
   const variations = Object.values(studio.document.variations);
   const parentVariations = variations.filter((variation) => variation.id !== studio.activeVariationId);
   const builtInIds = useMemo<Set<string>>(() => new Set(BUILT_IN_VARIATIONS.map((variation) => variation.id)), []);
   const targets = useMemo(
     () => targetLayersFor(document, DEV_IDS),
-    [studio.activeScenario, studio.document, dev.selectedDevId],
+    [studio.activeScenario, studio.document, dev.selectedDevId, dev.draft.elements],
   );
+  const visibleTargets = targets.filter(
+    (target) => allElements || target.meaningful || dev.draft.elements[target.ownerDevId ?? ""]?.visibility === "hidden",
+  );
+
+  const replaceElementVisibility = (ids: readonly string[], hidden: boolean) => {
+    const elements = Object.fromEntries(
+      Object.entries(dev.draft.elements).map(([id, props]) => [id, { ...props }]),
+    );
+    for (const id of ids) {
+      if (hidden) {
+        elements[id] = { ...(elements[id] ?? {}), visibility: "hidden" };
+      } else if (elements[id]) {
+        delete elements[id].visibility;
+        if (Object.keys(elements[id]).length === 0) delete elements[id];
+      }
+    }
+    studio.replaceResolvedDraftAtomically({ ...dev.draft, elements });
+  };
+
+  const hideScreenContents = () => {
+    const root = document.querySelector("[data-design-product-root]");
+    if (!root) return;
+    ensureDesignIdentities(root);
+    const id = designIdOf(root);
+    if (id) replaceElementVisibility([id], true);
+  };
+
+  const showAllHidden = () => {
+    const ids: string[] = [];
+    for (const [id, props] of Object.entries(dev.draft.elements)) {
+      if (props.visibility === "hidden") ids.push(id);
+    }
+    replaceElementVisibility(ids, false);
+  };
 
   const createVariation = (event: FormEvent) => {
     event.preventDefault();
@@ -181,7 +222,33 @@ export function LayersHierarchyPanel() {
           ))}
         </header>
         <div className="p-2">
-          {targets.map((entry) => (
+          <div className="mb-2 grid grid-cols-2 gap-1">
+            <button
+              type="button"
+              aria-pressed={allElements}
+              onClick={() => setAllElements((current) => !current)}
+              className="rounded-control px-2 py-1 text-left text-2xs text-t2 hover:bg-raise2"
+            >
+              {allElementsLabel}
+            </button>
+            <button
+              type="button"
+              disabled={!dev.selectedDevId}
+              onClick={() => dev.selectedDevId && replaceElementVisibility([dev.selectedDevId], true)}
+              className="rounded-control px-2 py-1 text-left text-2xs text-t2 hover:bg-raise2 disabled:text-t5"
+            >
+              {hideSelectedLabel}
+            </button>
+            <button type="button" onClick={hideScreenContents} className="rounded-control px-2 py-1 text-left text-2xs text-t2 hover:bg-raise2">
+              {hideScreenLabel}
+            </button>
+            <button type="button" onClick={showAllHidden} className="rounded-control px-2 py-1 text-left text-2xs text-t2 hover:bg-raise2">
+              {showHiddenLabel}
+            </button>
+          </div>
+          {visibleTargets.map((entry) => {
+            const isHidden = dev.draft.elements[entry.ownerDevId ?? ""]?.visibility === "hidden";
+            return (
             <button
               key={entry.key}
               type="button"
@@ -191,14 +258,16 @@ export function LayersHierarchyPanel() {
               className={
                 "block w-full truncate rounded-control py-1 text-left text-xs hover:bg-raise2 " +
                 (view === "hierarchy" ? "pr-2" : "px-2") +
-                (dev.selectedDevId === entry.ownerDevId ? " bg-acc-soft text-t1" : " text-t2")
+                (dev.selectedDevId === entry.ownerDevId ? " bg-acc-soft text-t1" : " text-t2") +
+                (isHidden ? " opacity-60 outline outline-1 outline-dashed outline-line2" : "")
               }
               style={view === "hierarchy" ? { paddingLeft: `${8 + entry.depth * 12}px` } : undefined}
               title={entry.id}
             >
-              {entry.label}{entry.occurrences > 1 ? ` (${entry.occurrences})` : ""}
+              {entry.label}{entry.occurrences > 1 ? ` (${entry.occurrences})` : ""}{isHidden ? ` · ${hiddenLabel}` : ""}
             </button>
-          ))}
+            );
+          })}
         </div>
       </section>
     </div>

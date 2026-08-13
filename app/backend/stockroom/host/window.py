@@ -53,6 +53,22 @@ _ICON_SMALL = 0
 _ICON_BIG = 1
 _SM_CXICON = 11
 _SM_CYICON = 12
+
+
+def design_recovery_requested(
+    get_key_state: Callable[[int], int] | None = None,
+) -> bool:
+    """Return whether Control and Shift are both held for this launch."""
+
+    if get_key_state is None:
+        if os.name != "nt":
+            return False
+        import ctypes
+
+        get_key_state = ctypes.windll.user32.GetAsyncKeyState
+    return bool(get_key_state(0x11) & 0x8000) and bool(get_key_state(0x10) & 0x8000)
+
+
 _SM_CXSMICON = 49
 _SM_CYSMICON = 50
 _DEFAULT_DPI = 96
