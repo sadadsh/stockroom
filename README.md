@@ -3,9 +3,10 @@
 Stockroom is a Windows desktop app for managing a shared KiCad V10 and Altium
 component library and the PCB projects that use it. Open a component and choose
 **CAD Models > Manage Models** to see every known provider, with complete Symbol +
-Footprint + 3D Model sets first. Stockroom opens the best complete source, captures
-and validates its download, and attaches the coherent set; **Choose Downloaded
-Files** is the manual recovery path. It also audits existing PCB projects, adding
+Footprint + 3D Model sets first. Choose KiCad, Altium, or both, then open any
+provider in Stockroom's movable mini browser. Stockroom never drives the provider
+page; it validates and attaches only files that arrive for the selected EDAs.
+**Choose Downloaded Files** is the manual recovery path. It also audits existing PCB projects, adding
 the parts it does not recognize and relinking the ones it does.
 
 The app is a Python backend (FastAPI) that serves a React single-page app inside a

@@ -34,7 +34,7 @@ import { ICON_BY_ID } from "../lib/iconRegistry";
 function canonical(el: Element): string {
   const attrs = Array.from(el.attributes)
     .map((a) => [a.name.toLowerCase(), a.value] as const)
-    .filter(([name]) => name !== "style")
+    .filter(([name]) => name !== "style" && name !== "data-design-id")
     .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
     .map(([name, value]) => `${name}=${value}`)
     .join("|");

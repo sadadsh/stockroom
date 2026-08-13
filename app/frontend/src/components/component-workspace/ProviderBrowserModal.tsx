@@ -184,15 +184,23 @@ export function ProviderBrowserModal({
     (returnFocusRef?.current ?? automaticReturnFocusRef.current)?.focus();
   }, [returnFocusRef]);
 
+  const close = useCallback(() => {
+    onClose();
+    restoreFocus();
+    try {
+      sendProviderCommand(componentId, "close");
+    } catch {
+      // The central preview guard already reports the refused native effect.
+    }
+  }, [componentId, onClose, restoreFocus]);
+
   useEffect(() => {
     if (!open) return;
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         event.preventDefault();
         event.stopImmediatePropagation();
-        sendProviderCommand(componentId, "close");
-        onClose();
-        restoreFocus();
+        close();
         return;
       }
       if (event.key !== "Tab") return;
@@ -214,7 +222,7 @@ export function ProviderBrowserModal({
     };
     window.addEventListener("keydown", onKeyDown, true);
     return () => window.removeEventListener("keydown", onKeyDown, true);
-  }, [componentId, onClose, open, restoreFocus]);
+  }, [close, open]);
 
   useEffect(() => {
     if (!open) return;
@@ -267,12 +275,6 @@ export function ProviderBrowserModal({
 
   const finishGesture = () => {
     gestureRef.current = null;
-  };
-
-  const close = () => {
-    sendProviderCommand(componentId, "close");
-    onClose();
-    restoreFocus();
   };
 
   return createPortal(

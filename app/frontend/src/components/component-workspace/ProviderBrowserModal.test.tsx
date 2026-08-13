@@ -1,6 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { createRef, useState } from "react";
+import { installPreviewEffectGuard } from "../../design-studio/previewEffects";
 import {
   ProviderBrowserModal,
   initialProviderModalGeometry,
@@ -99,6 +100,40 @@ describe("ProviderBrowserModal", () => {
     await user.click(screen.getByRole("button", { name: "Close Provider" }));
 
     expect(launcher).toHaveFocus();
+  });
+
+  it("always closes its local preview when the native provider command is refused", async () => {
+    const user = userEvent.setup();
+    const providerCommand = vi.fn();
+    Object.defineProperty(window, "__STOCKROOM_HOST__", {
+      configurable: true,
+      value: { providerCommand },
+    });
+    const restoreGuard = installPreviewEffectGuard("components.manage-models-ready");
+
+    function Harness() {
+      const [open, setOpen] = useState(true);
+      return (
+        <ProviderBrowserModal
+          open={open}
+          componentId="part-1"
+          providerLabel="Ultra Librarian"
+          url="https://ultralibrarian.example/part-1"
+          onClose={() => setOpen(false)}
+        />
+      );
+    }
+
+    try {
+      render(<Harness />);
+      await user.click(screen.getByRole("button", { name: "Close Provider" }));
+
+      expect(screen.queryByRole("dialog", { name: "Ultra Librarian Provider" })).toBeNull();
+      expect(providerCommand).not.toHaveBeenCalled();
+    } finally {
+      restoreGuard();
+      Reflect.deleteProperty(window, "__STOCKROOM_HOST__");
+    }
   });
 
   it("navigates to an entered HTTPS address like a normal browser", async () => {

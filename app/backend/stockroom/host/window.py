@@ -23,13 +23,33 @@ from collections.abc import Callable
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Protocol, TypeGuard, cast
 from urllib.parse import unquote, urlsplit
 
 _log = logging.getLogger("stockroom.host.window")
 
+
+class _ProviderWindow(Protocol):
+    def hide(self) -> object: ...
+
+    def show(self) -> object: ...
+
+    def focus(self) -> object: ...
+
+    def move(self, x: int, y: int) -> object: ...
+
+    def resize(self, width: int, height: int) -> object: ...
+
+    def load_url(self, url: str) -> object: ...
+
+    def get_current_url(self) -> object: ...
+
+    def evaluate_js(self, script: str) -> object: ...
+
+
 _ACTIVE_WINDOW = None
 _FETCH_WINDOW = None
-_PROVIDER_WINDOW = None
+_PROVIDER_WINDOW: _ProviderWindow | None = None
 #: The loopback SPA origin of the running host, known before the window opens. A new-window
 #: request from a document on this origin is Stockroom's own; anything else is a provider page.
 _APP_ORIGIN = ""
@@ -86,6 +106,10 @@ def window_chrome():
     """The bound provider-route controller, or None before the window opens."""
 
     return _WINDOW_CHROME
+
+
+def _finite_number(value: object) -> TypeGuard[int | float]:
+    return type(value) in (int, float) and math.isfinite(cast(int | float, value))
 
 
 @dataclass(slots=True)
@@ -169,7 +193,7 @@ class InAppProviderBrowserSurface:
         self,
         app_url: str,
         *,
-        provider_window: Callable[[], object] | None = None,
+        provider_window: Callable[[], _ProviderWindow] | None = None,
     ) -> None:
         global _PROVIDER_SURFACE
         if not should_inject(app_url, app_url):
@@ -178,7 +202,7 @@ class InAppProviderBrowserSurface:
         self._provider_window = provider_window or provider_window_surface
         self._lock = threading.RLock()
         self._active_show: Callable[[], None] | None = None
-        self._active_provider_window = None
+        self._active_provider_window: _ProviderWindow | None = None
         self._active_component_id: str | None = None
         self._last_provider_viewport: dict[str, object] | None = None
         _PROVIDER_SURFACE = self
@@ -202,7 +226,7 @@ class InAppProviderBrowserSurface:
             type(component_id) is not str
             or not component_id
             or type(visible) is not bool
-            or any(type(value) not in (int, float) or not math.isfinite(value) for value in values)
+            or any(not _finite_number(value) for value in values)
         ):
             return False
         provider = self._active_provider_window
@@ -212,7 +236,8 @@ class InAppProviderBrowserSurface:
             if provider is not None:
                 provider.hide()
             return True
-        x, y, width, height = (float(value) for value in values)
+        numeric_values = cast(tuple[int | float, int | float, int | float, int | float], values)
+        x, y, width, height = (float(value) for value in numeric_values)
         if x < 0 or y < 0 or width < 320 or height < 240 or provider is None or app is None:
             return False
         if self._active_component_id is None:
@@ -234,10 +259,11 @@ class InAppProviderBrowserSurface:
         app = active_window()
         if provider is None or app is None:
             return False
-        x = float(viewport["x"])
-        y = float(viewport["y"])
-        width = float(viewport["width"])
-        height = float(viewport["height"])
+        values = tuple(viewport.get(key) for key in ("x", "y", "width", "height"))
+        if any(not _finite_number(value) for value in values):
+            return False
+        numeric_values = cast(tuple[int | float, int | float, int | float, int | float], values)
+        x, y, width, height = (float(value) for value in numeric_values)
         app_x = int(getattr(app, "x", 0) or 0)
         app_y = int(getattr(app, "y", 0) or 0)
         provider.move(round(app_x + x), round(app_y + y))
@@ -259,9 +285,12 @@ class InAppProviderBrowserSurface:
         if type(request) is not dict:
             return False
         command = request.get("command")
+        if type(command) is not str:
+            return False
+        command_name = command
         expected = (
             {"componentId", "command", "url"}
-            if command == "navigate"
+            if command_name == "navigate"
             else {"componentId", "command"}
         )
         if set(request) != expected:
@@ -271,14 +300,14 @@ class InAppProviderBrowserSurface:
         if (
             type(component_id) is not str
             or component_id != self._active_component_id
-            or command not in {"back", "forward", "reload", "close", "navigate"}
+            or command_name not in {"back", "forward", "reload", "close", "navigate"}
             or provider is None
         ):
             return False
-        if command == "close":
+        if command_name == "close":
             provider.hide()
             return True
-        if command == "navigate":
+        if command_name == "navigate":
             target = request["url"]
             if type(target) is not str:
                 return False
@@ -296,7 +325,7 @@ class InAppProviderBrowserSurface:
             "back": "history.back()",
             "forward": "history.forward()",
             "reload": "location.reload()",
-        }[command]
+        }[command_name]
         provider.evaluate_js(script)
         return True
 
@@ -516,14 +545,15 @@ def fetch_window():
     return _FETCH_WINDOW
 
 
-def provider_window_surface():
+def provider_window_surface() -> _ProviderWindow:
     """Return the provider-only pywebview window; never the Stockroom window."""
 
     global _PROVIDER_WINDOW
-    if _PROVIDER_WINDOW is None:
+    provider = _PROVIDER_WINDOW
+    if provider is None:
         import webview  # pywebview, WebView2 on Windows; lazy so Linux imports
 
-        _PROVIDER_WINDOW = webview.create_window(
+        created = webview.create_window(
             "Stockroom Provider",
             url="about:blank#stockroom-provider-proof",
             width=960,
@@ -533,7 +563,11 @@ def provider_window_surface():
             frameless=True,
             easy_drag=False,
         )
-    return _PROVIDER_WINDOW
+        if created is None:
+            raise RuntimeError("pywebview did not create the provider window")
+        provider = cast(_ProviderWindow, created)
+        _PROVIDER_WINDOW = provider
+    return provider
 
 
 def should_inject(current_url: str | None, base_url: str) -> bool:
@@ -755,7 +789,9 @@ def _native_window_handle(window) -> int | None:
     return value if value > 0 else None
 
 
-def _current_process_window_handle(window, user32=None, process_id: int | None = None) -> int | None:
+def _current_process_window_handle(
+    window, user32=None, process_id: int | None = None
+) -> int | None:
     """Return ``window``'s HWND only when Windows confirms current-process ownership."""
 
     if not _is_windows():
@@ -1002,9 +1038,7 @@ def _apply_window_icon(window, *, user32=None, icon_path: Path | None = None) ->
         import ctypes
         from ctypes import wintypes
 
-        icon_path = icon_path or (
-            Path(__file__).resolve().parent / "assets" / "stockroom.ico"
-        )
+        icon_path = icon_path or (Path(__file__).resolve().parent / "assets" / "stockroom.ico")
         if not icon_path.is_file():
             return False
         api = user32 or ctypes.windll.user32
@@ -1055,17 +1089,13 @@ def _apply_window_icon(window, *, user32=None, icon_path: Path | None = None) ->
             return False
 
         prior_owned = dict(getattr(window, "_stockroom_icon_handles", {}))
-        prior_deferred = set(
-            getattr(window, "_stockroom_deferred_icon_handles", ())
-        )
+        prior_deferred = set(getattr(window, "_stockroom_deferred_icon_handles", ()))
         attached_owned = dict(prior_owned)
         previous_by_kind: dict[int, int] = {}
         replaced: list[int] = []
         try:
-            for ((_dimensions, which), icon) in zip(requested, loaded, strict=True):
-                previous_by_kind[which] = int(
-                    send_message(hwnd, _WM_SETICON, which, icon) or 0
-                )
+            for (_dimensions, which), icon in zip(requested, loaded, strict=True):
+                previous_by_kind[which] = int(send_message(hwnd, _WM_SETICON, which, icon) or 0)
                 attached_owned[which] = icon
                 replaced.append(which)
         except Exception:
@@ -1093,9 +1123,7 @@ def _apply_window_icon(window, *, user32=None, icon_path: Path | None = None) ->
 
             attempted_count = len(replaced) + 1
             owned_handles = (
-                set(prior_owned.values())
-                | prior_deferred
-                | set(loaded[:attempted_count])
+                set(prior_owned.values()) | prior_deferred | set(loaded[:attempted_count])
             )
             if rollback_uncertain:
                 # If a rollback call itself fails, Windows may have changed the
@@ -1685,14 +1713,10 @@ def run_managed_window(
             try:
                 current_url = window.get_current_url()
                 if not should_inject(current_url, base_url):
-                    raise RuntimeError(
-                        "managed window did not load the Stockroom origin"
-                    )
+                    raise RuntimeError("managed window did not load the Stockroom origin")
                 window_handle = _current_process_window_handle(window)
                 if window_handle is None:
-                    raise RuntimeError(
-                        "managed window did not expose a verified native HWND"
-                    )
+                    raise RuntimeError("managed window did not expose a verified native HWND")
                 _apply_saved_window_geometry(window_handle)
                 controller = ManagedWindowController(
                     window=window,
@@ -1832,9 +1856,7 @@ def run_window(base_url: str, token: str) -> None:
                 return
             try:
                 separator = "&" if "?" in base_url else "?"
-                window.load_url(
-                    f"{base_url}{separator}__stockroom_recover={time.time_ns()}"
-                )
+                window.load_url(f"{base_url}{separator}__stockroom_recover={time.time_ns()}")
             except Exception:  # noqa: BLE001 - the next loaded event owns the bounded retry
                 _log.debug("Stockroom startup renderer recovery failed", exc_info=True)
 

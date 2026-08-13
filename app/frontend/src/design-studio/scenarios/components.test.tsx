@@ -102,6 +102,8 @@ describe("Components Design Studio scenarios", () => {
 
   it("shows complete and partial provider choices together in Manage Models", async () => {
     const { liveRequest } = await mountScenario("components.manage-models-ready");
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(screen.getByText("EDAs")).toBeVisible();
     const providers = within(screen.getByRole("radiogroup", { name: "CAD model providers" }))
       .getAllByRole("radio");
     expect(providers.map((provider) => provider.textContent)).toEqual([

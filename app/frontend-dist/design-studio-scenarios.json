@@ -714,7 +714,8 @@
       "route": "components",
       "expectedTargets": [
         "component-browser.manage-models",
-        "component-browser.provider-viewport"
+        "component-browser.eda-selection",
+        "component-browser.provider-list"
       ]
     },
     {

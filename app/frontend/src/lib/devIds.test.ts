@@ -193,9 +193,10 @@ import { DEV_IDS, DEV_ID_AREAS, DEV_ID_BY_ID } from "./devIds";
 // blockers, repository collaboration, shared review, and build completion in the real workbenches.
 // 496 with the STM target-definition rules surface used by the real Bench scenario.
 // 497 with the background guided-capture status exposed to global scenario coverage.
-// 495 after Complete Component's modal/report/chooser targets and Compare Sources shortcut were
-// replaced by the component-scoped Manage Models tab, list, browser, navigation, and status.
-const EXPECTED_ENTRIES = 495;
+// 504 after Complete Component's modal/report/chooser targets and Compare Sources shortcut were
+// replaced by the component-scoped Manage Models tab, EDA selection, modal browser, navigation,
+// and status.
+const EXPECTED_ENTRIES = 504;
 
 describe("devIds catalogue", () => {
   // The count is asserted from a single constant so bumping it is one edit, and so the test NAME can
@@ -230,13 +231,13 @@ describe("devIds catalogue", () => {
       "toast",
       "capture",
       "components",
+      "stm",
       "projects",
       "component-browser",
       "detail",
       "search",
       "addpart",
       "ingest",
-      "stm",
       "settings",
       "altiumdb",
       "complete",

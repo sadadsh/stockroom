@@ -98,7 +98,7 @@ function search(term: string) {
 }
 
 function inspectClick(el: Element) {
-  fireEvent.click(screen.getByRole("button", { name: "Inspect" }));
+  fireEvent.click(screen.getByRole("button", { name: "Edit" }));
   fireEvent.click(el);
 }
 
@@ -172,7 +172,7 @@ describe("hover and inspect show the exact id", () => {
   it("names the hovered instance and borrows its role's label", () => {
     render(<Harness />);
     toggleDevMode();
-    fireEvent.click(screen.getByRole("button", { name: "Inspect" }));
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
     const third = document.querySelector(
       `[data-dev-id="${candidateDevId("rc0402fr-07100rl")}"]`,
     )!;

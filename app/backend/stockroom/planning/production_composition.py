@@ -150,17 +150,21 @@ def _canonical_capture_diagnostic_report(
         raise TypeError("capture report must be a JSON object")
     diagnostic = json.loads(json.dumps(report))
     rows = diagnostic.get("items")
-    row = next((value for value in rows if type(value) is dict), None) if type(rows) is list else None
+    row = (
+        next((value for value in rows if type(value) is dict), None) if type(rows) is list else None
+    )
     from stockroom.capture.projection import verify_installed_projection
 
     evidence = record_completion_evidence(
         evidence_store,
         record,
-        projection_verifier=lambda current, resolved, *, validation_reports=None: verify_installed_projection(
-            library,
-            current,
-            resolved,
-            validation_reports=validation_reports,
+        projection_verifier=lambda current, resolved, *, validation_reports=None: (
+            verify_installed_projection(
+                library,
+                current,
+                resolved,
+                validation_reports=validation_reports,
+            )
         ),
     )
     remaining = [requirement.value for requirement in completion_needs(record, evidence)]
@@ -198,6 +202,8 @@ def _canonical_capture_diagnostic_report(
     )
     diagnostic["counts"] = {status: 1}
     return diagnostic
+
+
 _SCHEMA_VERSION = 1
 _RECORD_PROVIDER = "canonical_record"
 _DATASHEET_PROVIDER = "manufacturer_datasheet"
@@ -417,8 +423,7 @@ class ManufacturerDatasheetProviderAdapter:
             return False
         return any(
             isinstance(item, Mapping)
-            and str(item.get("media_type", "")).strip().casefold()
-            in {"datasheet", "datasheets"}
+            and str(item.get("media_type", "")).strip().casefold() in {"datasheet", "datasheets"}
             and item.get("url") == record.datasheet.source_url
             for item in media
         )
@@ -681,7 +686,9 @@ def _capture_request(item_id: str, payload: object) -> _CaptureRequest:
         background=background,
         report_item_id=item_id,
         requested_requirements=(
-            tuple(requested_requirements) if requested_requirements is not None else None
+            tuple(cast(list[str], requested_requirements))
+            if requested_requirements is not None
+            else None
         ),
     )
 
@@ -1544,7 +1551,9 @@ def _cross_eda_asset_checks(
     bound_fields = set()
     if binding is not None:
         raw_fields = binding.get("fields")
-        if not isinstance(raw_fields, list) or not all(isinstance(field, str) for field in raw_fields):
+        if not isinstance(raw_fields, list) or not all(
+            isinstance(field, str) for field in raw_fields
+        ):
             raise ProductionWorkflowError("Altium identity binding fields are invalid")
         bound_fields = set(raw_fields)
     kicad_mpn = _string(kicad.get("mpn"), "KiCad native MPN")
@@ -1552,7 +1561,9 @@ def _cross_eda_asset_checks(
         assert binding is not None
         altium_mpn = _string(binding.get("mpn_canonical"), "attested Altium MPN")
         altium_mpn_check = "provider_attested_symbol_mpn"
-        altium_mpn_note = "Native legacy entry identity was bound to the exact provider detail page."
+        altium_mpn_note = (
+            "Native legacy entry identity was bound to the exact provider detail page."
+        )
     else:
         altium_mpn = _string(altium.get("mpn"), "Altium native MPN")
         altium_mpn_check = "native_symbol_mpn"

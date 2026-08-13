@@ -105,6 +105,10 @@ requirements. A shared 3D model is requested once even when both EDA tools are s
 Studio scenarios may open a deterministic provider modal to show each state, but entering Manage
 Models in normal use never launches a provider automatically.
 
+Closing the preview chrome is always a local UI operation. The modal is removed and focus restored
+before Stockroom asks a native host to hide its provider WebView. A Design Studio fixture may refuse
+that native effect, but the refusal can never trap the person inside the modal.
+
 ### Draft And Applied Design Boundary
 
 The personal Design Document is an autosaved Draft and is resolved into the preview only while

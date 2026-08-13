@@ -580,7 +580,7 @@ export const DEV_IDS: DevIdEntry[] = [
 ];
 
 // The areas in first-appearance order, for grouping the catalogue.
-export const DEV_ID_AREAS: readonly string[] = ["rail", "about", "onboarding", "toast", "capture", "components", "projects", "component-browser", "detail", "search", "addpart", "ingest", "stm", "settings", "altiumdb", "complete", "preview", "diff", "confirm", "shell", "design"];
+export const DEV_ID_AREAS: readonly string[] = ["rail", "about", "onboarding", "toast", "capture", "components", "stm", "projects", "component-browser", "detail", "search", "addpart", "ingest", "settings", "altiumdb", "complete", "preview", "diff", "confirm", "shell", "design"];
 
 // A by-id lookup so consumers resolve an entry in one call instead of re-scanning the list.
 export const DEV_ID_BY_ID: ReadonlyMap<string, DevIdEntry> = new Map(
