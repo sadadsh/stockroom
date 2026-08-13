@@ -240,20 +240,41 @@ class InAppProviderBrowserSurface:
     def provider_command(self, request: dict[str, object]) -> bool:
         """Apply one allowlisted browser command to the active provider document."""
 
-        if type(request) is not dict or set(request) != {"componentId", "command"}:
+        if type(request) is not dict:
+            return False
+        command = request.get("command")
+        expected = (
+            {"componentId", "command", "url"}
+            if command == "navigate"
+            else {"componentId", "command"}
+        )
+        if set(request) != expected:
             return False
         component_id = request["componentId"]
-        command = request["command"]
         provider = self._active_provider_window
         if (
             type(component_id) is not str
             or component_id != self._active_component_id
-            or command not in {"back", "forward", "reload", "close"}
+            or command not in {"back", "forward", "reload", "close", "navigate"}
             or provider is None
         ):
             return False
         if command == "close":
             provider.hide()
+            return True
+        if command == "navigate":
+            target = request["url"]
+            if type(target) is not str:
+                return False
+            parsed = urlsplit(target)
+            if (
+                parsed.scheme != "https"
+                or not parsed.hostname
+                or parsed.username
+                or parsed.password
+            ):
+                return False
+            provider.load_url(target)
             return True
         script = {
             "back": "history.back()",

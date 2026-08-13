@@ -39,7 +39,7 @@ export function ProviderList({
     >
       <div className="border-b border-line px-3 py-2">
         <div className="ui-section-title">
-          <Text id="component-browser.manage-models-providers">Providers</Text>
+          <Text id="component-browser.manage-models-providers">Provider Quick Links</Text>
         </div>
         <p className="mt-0.5 text-xs text-t3">
           <Text id="component-browser.manage-models-provider-help">

@@ -46,6 +46,27 @@ export const ALTIUM_REQS: Requirement[] = [
   "altium_footprint",
 ];
 
+export type CaptureEda = "kicad" | "altium";
+
+export const CAPTURE_EDAS: ReadonlyArray<{ key: CaptureEda; label: string }> = [
+  { key: "kicad", label: "KiCad" },
+  { key: "altium", label: "Altium" },
+];
+
+export function captureRequirementsForEdas(edas: readonly CaptureEda[]): Requirement[] {
+  const selected = new Set<string>(edas);
+  if (selected.size === 0) throw new Error("Select at least one EDA");
+  for (const eda of selected) {
+    if (!CAPTURE_EDAS.some((candidate) => candidate.key === eda)) {
+      throw new Error(`Unknown EDA: ${eda}`);
+    }
+  }
+  if (selected.has("kicad")) {
+    return selected.has("altium") ? [...KICAD_REQS, ...ALTIUM_REQS] : [...KICAD_REQS];
+  }
+  return [...ALTIUM_REQS, "kicad_model"];
+}
+
 export const REQ_LABELS: Record<Requirement, string> = {
   kicad_symbol: "KiCad Symbol",
   kicad_footprint: "KiCad Footprint",

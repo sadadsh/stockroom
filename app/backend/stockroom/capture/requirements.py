@@ -52,6 +52,29 @@ def split_requirement(req: "Requirement") -> tuple[str, str]:
     return tool, kind
 
 
+def requirements_for_edas(edas: list[str] | tuple[str, ...]) -> list[Requirement]:
+    """Return the exact downloadable requirements for a non-empty EDA selection.
+
+    The STEP model is shared presentation evidence. Its historical wire name is
+    ``kicad_model``, but an Altium-only acquisition still needs that one model once.
+    """
+
+    from stockroom.eda.registry import all_tools
+
+    available = {tool.key for tool in all_tools()}
+    if not edas:
+        raise ValueError("select at least one EDA")
+    if any(type(eda) is not str or eda not in available for eda in edas):
+        raise ValueError("EDAs must name registered tools")
+    if len(set(edas)) != len(edas):
+        raise ValueError("EDAs must not contain duplicates")
+    selected = set(edas)
+    result = [req for req in Requirement if split_requirement(req)[0] in selected]
+    if Requirement.KICAD_MODEL not in result:
+        result.append(Requirement.KICAD_MODEL)
+    return result
+
+
 def capture_requirements(record) -> list[Requirement]:
     """Every owned CAD requirement for a part, independent of projected references.
 

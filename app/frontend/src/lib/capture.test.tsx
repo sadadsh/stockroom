@@ -700,6 +700,36 @@ describe("CaptureProvider store", () => {
     expect(api.runCapture).toHaveBeenCalledTimes(1);
   });
 
+  it("treats a different EDA selection as a different active capture command", async () => {
+    mockSource();
+    vi.spyOn(api, "runCapture").mockImplementation(() => new Promise(() => undefined));
+    const { result } = renderHook(() => useCapture(), { wrapper: wrap(new QueryClient()) });
+
+    await act(async () => {
+      void result.current.start("p1", "Part One", ["kicad_symbol", "kicad_footprint", "kicad_model"]);
+      await Promise.resolve();
+    });
+
+    await expect(
+      result.current.start("p1", "Part One", ["altium_symbol", "altium_footprint", "kicad_model"]),
+    ).rejects.toThrow("Finish the active completion for Part One");
+    expect(api.runCapture).toHaveBeenCalledTimes(1);
+    expect(api.runCapture).toHaveBeenCalledWith(expect.objectContaining({ edas: ["kicad"] }));
+  });
+
+  it("leaves EDA selection unset for legacy model-only capture", async () => {
+    mockSource();
+    const run = vi.spyOn(api, "runCapture").mockImplementation(() => new Promise(() => undefined));
+    const { result } = renderHook(() => useCapture(), { wrapper: wrap(new QueryClient()) });
+
+    await act(async () => {
+      void result.current.start("p1", "Part One", ["kicad_model"]);
+      await Promise.resolve();
+    });
+
+    expect(run).toHaveBeenCalledWith(expect.not.objectContaining({ edas: expect.anything() }));
+  });
+
   it("keepWorking backgrounds the active capture so the pill can take over", async () => {
     mockSource();
     mockCapture();

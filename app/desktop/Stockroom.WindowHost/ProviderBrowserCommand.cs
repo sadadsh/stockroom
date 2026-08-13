@@ -6,6 +6,7 @@ internal enum ProviderBrowserCommand
     Forward,
     Reload,
     Close,
+    Navigate,
 }
 
 internal static class ProviderBrowserCommandCodec
@@ -18,8 +19,9 @@ internal static class ProviderBrowserCommandCodec
             "forward" => ProviderBrowserCommand.Forward,
             "reload" => ProviderBrowserCommand.Reload,
             "close" => ProviderBrowserCommand.Close,
+            "navigate" => ProviderBrowserCommand.Navigate,
             _ => default,
         };
-        return value is "back" or "forward" or "reload" or "close";
+        return value is "back" or "forward" or "reload" or "close" or "navigate";
     }
 }

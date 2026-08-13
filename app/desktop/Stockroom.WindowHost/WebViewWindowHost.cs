@@ -864,6 +864,11 @@ internal sealed class WebViewWindowHost : IDisposable
             typed = "https://" + typed;
         }
 
+        NavigateProviderAddress(typed);
+    }
+
+    private void NavigateProviderAddress(string typed)
+    {
         if (!ProviderNavigationPolicy.IsAllowedTopLevel(typed))
         {
             _providerNavigationError = "Provider URL Is Invalid";
@@ -1587,14 +1592,16 @@ internal sealed class WebViewWindowHost : IDisposable
                       if (
                         !request ||
                         typeof request.componentId !== "string" ||
-                        !["back", "forward", "reload", "close"].includes(request.command)
+                        !["back", "forward", "reload", "close", "navigate"].includes(request.command) ||
+                        (request.command === "navigate" && typeof request.url !== "string")
                       ) {
                         throw new Error("Invalid provider browser command.");
                       }
                       webview.postMessage({
                         schema: "stockroom.host.provider-command",
                         component_id: request.componentId,
-                        command: request.command
+                        command: request.command,
+                        ...(request.command === "navigate" ? { url: request.url } : {})
                       });
                     }
                   });
@@ -1776,12 +1783,6 @@ internal sealed class WebViewWindowHost : IDisposable
                 && commandSchema.ValueKind == JsonValueKind.String
                 && commandSchema.GetString() == "stockroom.host.provider-command")
             {
-                HandoffCodec.RequireExactObject(
-                    root,
-                    "provider browser command",
-                    "schema",
-                    "component_id",
-                    "command");
                 var componentId = HandoffCodec.GetRequiredString(root, "component_id");
                 var commandValue = HandoffCodec.GetRequiredString(root, "command");
                 if (!_providerLeases.TryGetActive(out _, out var activeContext)
@@ -1796,6 +1797,25 @@ internal sealed class WebViewWindowHost : IDisposable
                 {
                     return;
                 }
+                if (command == ProviderBrowserCommand.Navigate)
+                {
+                    HandoffCodec.RequireExactObject(
+                        root,
+                        "provider browser command",
+                        "schema",
+                        "component_id",
+                        "command",
+                        "url");
+                }
+                else
+                {
+                    HandoffCodec.RequireExactObject(
+                        root,
+                        "provider browser command",
+                        "schema",
+                        "component_id",
+                        "command");
+                }
                 switch (command)
                 {
                     case ProviderBrowserCommand.Back:
@@ -1809,6 +1829,9 @@ internal sealed class WebViewWindowHost : IDisposable
                         break;
                     case ProviderBrowserCommand.Close:
                         ShowStockroomTab();
+                        break;
+                    case ProviderBrowserCommand.Navigate:
+                        NavigateProviderAddress(HandoffCodec.GetRequiredString(root, "url"));
                         break;
                 }
                 return;

@@ -312,6 +312,7 @@ export const DEV_IDS: DevIdEntry[] = [
   { id: "component-browser.provider-row", label: "Every provider coverage row", area: "component-browser" },
   { id: "component-browser.provider-open", label: "Open one provider", area: "component-browser" },
   { id: "component-browser.provider-import", label: "Import downloaded files", area: "component-browser" },
+  { id: "component-browser.eda-selection", label: "EDA selection", area: "component-browser" },
   { id: "component-browser.provider-back", label: "Provider browser Back", area: "component-browser" },
   { id: "component-browser.provider-forward", label: "Provider browser Forward", area: "component-browser" },
   { id: "component-browser.provider-reload", label: "Provider browser Reload", area: "component-browser" },

@@ -90,3 +90,17 @@ enables both selection and direct layout manipulation. The former Browse, Inspec
 states remain accepted only as persisted preference migration inputs; they are never shown as
 separate modes. Design Studio chrome is marked as protected and excluded from generated target
 selection, while authored and generated product identities use the same selection path.
+
+### Manual Provider Acquisition Boundary
+
+Manage Models now treats every provider row as a quick link rather than an automation recipe. The
+user chooses KiCad, Altium, or both before opening a provider; that selection is frozen for the
+capture task and controls the exact backend requirements and provider formats requested. The modal
+address bar supports ordinary HTTPS navigation, while Back, Forward, Reload, and Close remain
+Stockroom controls around the dedicated provider WebView.
+
+Stockroom does not operate the provider page. It observes downloads after the browser receives
+them, validates only the selected EDA deliverables, retains partial results, and reports remaining
+requirements. A shared 3D model is requested once even when both EDA tools are selected. Design
+Studio scenarios may open a deterministic provider modal to show each state, but entering Manage
+Models in normal use never launches a provider automatically.

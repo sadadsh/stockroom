@@ -102,6 +102,11 @@ def test_durable_capture_options_cross_the_provider_worker_thread(tmp_path: Path
                         "mode": "collect-all",
                         "vendor": "ultralibrarian",
                         "background": False,
+                        "requested_requirements": [
+                            "kicad_symbol",
+                            "kicad_footprint",
+                            "kicad_model",
+                        ],
                     },
                 },
             )
@@ -115,6 +120,11 @@ def test_durable_capture_options_cross_the_provider_worker_thread(tmp_path: Path
         assert request.vendor == "ultralibrarian"
         assert request.background is False
         assert request.report_item_id == "item-capture-1"
+        assert request.requested_requirements == (
+            "kicad_symbol",
+            "kicad_footprint",
+            "kicad_model",
+        )
         assert request.should_stop() is True
 
     default = adapter._capture_options(identity)

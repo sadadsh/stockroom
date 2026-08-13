@@ -308,7 +308,12 @@ export function ProviderBrowserModal({
             ×
           </Button>
         </div>
-        <ProviderBrowserFrame componentId={componentId} providerLabel={providerLabel} url={url} />
+        <ProviderBrowserFrame
+          key={`${componentId}:${url}`}
+          componentId={componentId}
+          providerLabel={providerLabel}
+          url={url}
+        />
         {RESIZE_HANDLES.map((handle) => (
           <button
             key={handle.direction}

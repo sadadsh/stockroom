@@ -350,6 +350,7 @@ def run_guided_capture(
     should_stop=None,
     limit=None,
     capture_id: str | None = None,
+    requested_requirements=None,
 ) -> dict:
     """Collect CAD from provider surfaces a PERSON works, one selected part at a time.
 
@@ -368,6 +369,19 @@ def run_guided_capture(
 
     if part_ids is not None and isinstance(part_ids, (str, bytes)):
         raise ValueError("part_ids must be a sequence of exact part ids")
+    from stockroom.capture.requirements import Requirement
+
+    requested = None
+    if requested_requirements is not None:
+        try:
+            requested = frozenset(
+                value if isinstance(value, Requirement) else Requirement(value)
+                for value in requested_requirements
+            )
+        except (TypeError, ValueError) as exc:
+            raise ValueError("requested_requirements contains an unknown CAD requirement") from exc
+        if not requested:
+            raise ValueError("requested_requirements must not be empty")
     from threading import Event
 
     workflow_cancelled = Event()
@@ -545,6 +559,7 @@ def run_guided_capture(
             publish_active_route=person_intent.set_active_route,
             clear_active_route=person_intent.clear_active_route,
             take_selected_files=person_intent.take_selected_files,
+            requested_requirements=requested,
         )
 
     guided_sources = [make_guided_source(key) for key in provider_keys]

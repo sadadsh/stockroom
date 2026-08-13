@@ -100,4 +100,33 @@ describe("ProviderBrowserModal", () => {
 
     expect(launcher).toHaveFocus();
   });
+
+  it("navigates to an entered HTTPS address like a normal browser", async () => {
+    const user = userEvent.setup();
+    const providerCommand = vi.fn();
+    Object.defineProperty(window, "__STOCKROOM_HOST__", {
+      configurable: true,
+      value: { providerCommand },
+    });
+
+    render(
+      <ProviderBrowserModal
+        open
+        componentId="part-1"
+        providerLabel="Mouser"
+        url="https://www.mouser.com/"
+        onClose={vi.fn()}
+      />,
+    );
+
+    const address = screen.getByRole("textbox", { name: "Provider Address" });
+    await user.clear(address);
+    await user.type(address, "https://www.digikey.com/en/products/result?keywords=LM358{Enter}");
+
+    expect(providerCommand).toHaveBeenCalledWith({
+      componentId: "part-1",
+      command: "navigate",
+      url: "https://www.digikey.com/en/products/result?keywords=LM358",
+    });
+  });
 });

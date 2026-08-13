@@ -632,6 +632,7 @@ class _CaptureRequest:
     vendor: str | None = None
     background: bool = False
     report_item_id: str | None = None
+    requested_requirements: tuple[str, ...] | None = None
     should_stop: Callable[[], bool] = field(
         default=lambda: False,
         repr=False,
@@ -667,11 +668,21 @@ def _capture_request(item_id: str, payload: object) -> _CaptureRequest:
         raise ProductionWorkflowError("guided capture background flag must be a boolean")
     if mode in {"finish-first", "collect-all"} and background:
         raise ProductionWorkflowError(f"{mode} guided capture must remain visible")
+    requested_requirements = capture.get("requested_requirements")
+    if requested_requirements is not None and (
+        type(requested_requirements) is not list
+        or not requested_requirements
+        or any(type(value) is not str for value in requested_requirements)
+    ):
+        raise ProductionWorkflowError("guided capture requirements are not supported")
     return _CaptureRequest(
         mode=cast(str, mode),
         vendor=vendor,
         background=background,
         report_item_id=item_id,
+        requested_requirements=(
+            tuple(requested_requirements) if requested_requirements is not None else None
+        ),
     )
 
 
@@ -781,6 +792,7 @@ class StockroomAcquisitionProviderAdapter:
                     vendor=request.vendor,
                     should_stop=request.should_stop,
                     capture_id=request.report_item_id,
+                    requested_requirements=request.requested_requirements,
                 )
                 if request.report_item_id is not None:
                     canonical_record = self.context.ops.load_record(part_id)

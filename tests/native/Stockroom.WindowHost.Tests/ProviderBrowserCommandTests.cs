@@ -7,6 +7,7 @@ public sealed class ProviderBrowserCommandTests
     [InlineData("forward", "Forward")]
     [InlineData("reload", "Reload")]
     [InlineData("close", "Close")]
+    [InlineData("navigate", "Navigate")]
     public void AcceptsEveryModalToolbarCommand(
         string value,
         string expected)
@@ -18,7 +19,7 @@ public sealed class ProviderBrowserCommandTests
     [Theory]
     [InlineData("")]
     [InlineData("Close")]
-    [InlineData("navigate")]
+    [InlineData("Navigate")]
     public void RejectsCommandsOutsideTheClosedGrammar(string value)
     {
         Assert.False(ProviderBrowserCommandCodec.TryParse(value, out _));

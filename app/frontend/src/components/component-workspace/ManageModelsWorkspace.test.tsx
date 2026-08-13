@@ -36,7 +36,8 @@ function providerRow(id: string, complete: boolean): ProviderCoverageRow {
 }
 
 describe("ManageModelsWorkspace", () => {
-  it("shows every provider, places complete sets first, and opens the best complete provider", async () => {
+  it("shows every provider, places complete sets first, and waits for the person to open one", async () => {
+    const user = userEvent.setup();
     const dossier = makeDossier();
     const partial = providerRow("partial", false);
     const complete = providerRow("complete", true);
@@ -58,10 +59,18 @@ describe("ManageModelsWorkspace", () => {
     expect(providerButtons[0]).toHaveTextContent(complete.label);
     expect(providerButtons[0]).toHaveTextContent("Complete Set");
     expect(providerButtons[1]).toHaveTextContent(partial.label);
-    await waitFor(() => expect(onOpenProvider).toHaveBeenCalledWith(complete.id));
+    expect(onOpenProvider).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: "Open Provider" }));
+    await waitFor(() => expect(onOpenProvider).toHaveBeenCalledWith(complete.id, [
+      "kicad_symbol",
+      "kicad_footprint",
+      "kicad_model",
+      "altium_symbol",
+      "altium_footprint",
+    ]));
   });
 
-  it("keeps partial providers usable as a manual fallback", async () => {
+  it("uses every provider row as a person-chosen quick link", async () => {
     const user = userEvent.setup();
     const dossier = makeDossier();
     dossier.cadSourceCoverage.rows = [providerRow("partial-a", false), providerRow("partial-b", false)];
@@ -82,6 +91,13 @@ describe("ManageModelsWorkspace", () => {
     const lastProvider = providers[providers.length - 1]!;
     await user.click(lastProvider);
     expect(lastProvider).toHaveAttribute("aria-checked", "true");
+    expect(onOpenProvider).toHaveBeenCalledWith("partial-b", [
+      "kicad_symbol",
+      "kicad_footprint",
+      "kicad_model",
+      "altium_symbol",
+      "altium_footprint",
+    ]);
     expect(providers[0]).toHaveTextContent("Missing 3D Model");
   });
 
@@ -100,6 +116,8 @@ describe("ManageModelsWorkspace", () => {
       />,
     );
 
+    expect(screen.queryByRole("dialog", { name: "SnapEDA Provider" })).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Open Provider" }));
     expect(await screen.findByRole("dialog", { name: "SnapEDA Provider" })).toBeVisible();
     expect(screen.getByTestId("manage-models-workspace")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Close Provider" }));
@@ -107,6 +125,37 @@ describe("ManageModelsWorkspace", () => {
     expect(screen.queryByRole("dialog", { name: "SnapEDA Provider" })).toBeNull();
     expect(screen.getByTestId("manage-models-workspace")).toBeVisible();
     expect(onOpenProvider).toHaveBeenCalledTimes(1);
+  });
+
+  it("starts the provider task with only the selected EDAs", async () => {
+    const user = userEvent.setup();
+    const dossier = makeDossier();
+    dossier.cadSourceCoverage.rows = [providerRow("complete", true)];
+    const onOpenProvider = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <ManageModelsWorkspace
+        componentId="part-1"
+        dossier={dossier}
+        onView={vi.fn()}
+        onOpenProvider={onOpenProvider}
+      />,
+    );
+
+    const kicad = screen.getByRole("checkbox", { name: "KiCad" });
+    const altium = screen.getByRole("checkbox", { name: "Altium" });
+    expect(kicad).toBeChecked();
+    expect(altium).toBeChecked();
+
+    await user.click(altium);
+    await user.click(screen.getByRole("button", { name: "Open Provider" }));
+
+    expect(onOpenProvider).toHaveBeenCalledWith("complete", [
+      "kicad_symbol",
+      "kicad_footprint",
+      "kicad_model",
+    ]);
+    expect(kicad).toBeDisabled();
   });
 
   it("uses one file chooser as recovery and reports what attached", async () => {

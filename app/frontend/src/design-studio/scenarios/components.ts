@@ -184,7 +184,7 @@ export const componentScenarios: readonly DesignScenario[] = [
   scenario("components.preview-3d", { title: "3D Preview", initialUi: { components: { preview: "model" } } }),
   scenario("components.preview-symbol", { title: "Symbol Preview", initialUi: { components: { preview: "symbol" } } }),
   scenario("components.preview-footprint", { title: "Footprint Preview", initialUi: { components: { preview: "footprint" } } }),
-  scenario("components.manage-models-ready", { title: "Manage Models Ready", initialUi: { components: { cadView: "manage-models" } }, expectedTargets: ["component-browser.manage-models", "component-browser.provider-viewport"] }),
+  scenario("components.manage-models-ready", { title: "Manage Models Ready", initialUi: { components: { cadView: "manage-models" }, provider: { state: "ready" } }, expectedTargets: ["component-browser.manage-models", "component-browser.provider-viewport"] }),
   scenario("components.manage-models-partial", { title: "Manage Models Partial", dossier: partialProvider, initialUi: { components: { cadView: "manage-models" }, provider: { state: "ready" } }, expectedTargets: ["component-browser.manage-models", "component-browser.provider-list"] }),
   scenario("components.manage-models-blocked", { title: "Manage Models Blocked", dossier: blockedProvider, initialUi: { components: { cadView: "manage-models" }, provider: { state: "unavailable" } }, expectedTargets: ["component-browser.manage-models", "component-browser.provider-status"] }),
   scenario("components.bulk-import", { title: "Bulk Import", initialUi: { addParts: { state: "empty" } }, expectedTargets: ["ingest.bulk"] }),

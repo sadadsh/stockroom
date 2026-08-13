@@ -635,6 +635,7 @@ class GuidedCaptureSource:
         publish_active_route: Callable[[str, str, str], str] | None = None,
         clear_active_route: Callable[[str, str, str, str], None] | None = None,
         take_selected_files: Callable[[str, str, str, str], tuple[Path, ...]] | None = None,
+        requested_requirements: frozenset[Requirement] | None = None,
     ) -> None:
         self._make_pipeline = make_pipeline
         self._vendor_key = vendor
@@ -684,6 +685,7 @@ class GuidedCaptureSource:
         self._publish_active_route = publish_active_route
         self._clear_active_route = clear_active_route
         self._take_selected_files = take_selected_files
+        self._requested_requirements = requested_requirements
         self._session: _Session | None = None
 
     # -- lifecycle -------------------------------------------------------------------------
@@ -847,6 +849,8 @@ class GuidedCaptureSource:
         finally:
             if self._single_provider_attempt:
                 required = set(capture_needs(record))
+                if self._requested_requirements is not None:
+                    required &= self._requested_requirements
                 complete = bool(required) and required.issubset(set(outcome.satisfied))
                 if not complete and self._session is not None:
                     retain = getattr(self._session.browser, "retain_provider_surface", None)
@@ -925,6 +929,8 @@ class GuidedCaptureSource:
             )
 
         needs = list(capture_needs(record))
+        if self._requested_requirements is not None:
+            needs = [need for need in needs if need in self._requested_requirements]
         if not needs:
             if not self._collect_variants or getattr(record, "passive", False):
                 return self._decline(
@@ -939,6 +945,8 @@ class GuidedCaptureSource:
             # A selected provider is being harvested as an alternative. Ask it for its complete
             # declared set even though the active library itself has no missing requirements.
             needs = sorted(self.provides(), key=lambda requirement: requirement.value)
+            if self._requested_requirements is not None:
+                needs = [need for need in needs if need in self._requested_requirements]
         # Filter on the formats this provider declares a person can select and on Stockroom's
         # implemented attach seams.
         formats = _provider_formats(adapter, needs)

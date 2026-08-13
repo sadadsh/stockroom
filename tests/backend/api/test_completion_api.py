@@ -500,6 +500,13 @@ def test_mounted_guided_capture_is_one_reconnectable_workflow_item(
             "mode": "assisted",
             "vendor": "ultralibrarian",
             "background": False,
+            "requested_requirements": [
+                "kicad_symbol",
+                "kicad_footprint",
+                "kicad_model",
+                "altium_symbol",
+                "altium_footprint",
+            ],
             "initial_needs": [
                 "kicad_symbol",
                 "kicad_footprint",
@@ -525,6 +532,13 @@ def test_mounted_guided_capture_is_one_reconnectable_workflow_item(
         "vendor": "ultralibrarian",
         "background": False,
         "active_route": None,
+        "requested_requirements": [
+            "kicad_symbol",
+            "kicad_footprint",
+            "kicad_model",
+            "altium_symbol",
+            "altium_footprint",
+        ],
         "initial_needs": [
             "kicad_symbol",
             "kicad_footprint",
@@ -544,6 +558,39 @@ def test_mounted_guided_capture_is_one_reconnectable_workflow_item(
     )
     assert replay.status_code == 200, replay.text
     assert replay.json()["batch"]["kind"] == "guided_capture"
+
+
+def test_guided_capture_limits_download_requirements_to_selected_edas(
+    client,
+    app_ctx,
+    tmp_path,
+    monkeypatch,
+):
+    _, authority = _mount_completion_authority(app_ctx, tmp_path)
+    monkeypatch.setenv("STOCKROOM_CAPTURE_DIR", str(tmp_path / "Capture State"))
+
+    response = client.post(
+        "/api/library/capture/run",
+        json={
+            "part_ids": ["tps62130"],
+            "vendor": "ultralibrarian",
+            "edas": ["kicad"],
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    submitted, _ = authority.submissions[0]
+    capture = dict(submitted[0].payload)["capture"]
+    assert capture["requested_requirements"] == [
+        "kicad_symbol",
+        "kicad_footprint",
+        "kicad_model",
+    ]
+    assert capture["initial_needs"] == [
+        "kicad_symbol",
+        "kicad_footprint",
+        "kicad_model",
+    ]
 
 
 def test_active_capture_can_reveal_its_retained_provider_surface(

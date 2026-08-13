@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { sendProviderCommand, setProviderViewport } from "../../lib/hostProviderViewport";
 import { Text, useText } from "../../lib/copy";
 import { Button } from "../primitives";
@@ -16,6 +16,22 @@ export function ProviderBrowserFrame({
   const backLabel = useText("component-browser.manage-models-back", "Back");
   const forwardLabel = useText("component-browser.manage-models-forward", "Forward");
   const reloadLabel = useText("component-browser.manage-models-reload", "Reload");
+  const addressLabel = useText("component-browser.manage-models-address", "Provider Address");
+  const [address, setAddress] = useState(url);
+
+  function navigate() {
+    const typed = address.trim();
+    if (!typed) return;
+    let parsed: URL;
+    try {
+      parsed = new URL(typed.includes("://") ? typed : `https://${typed}`);
+    } catch {
+      return;
+    }
+    if (parsed.protocol !== "https:" || parsed.username || parsed.password) return;
+    setAddress(parsed.href);
+    sendProviderCommand(componentId, "navigate", parsed.href);
+  }
 
   useLayoutEffect(() => {
     const element = viewportRef.current;
@@ -92,10 +108,22 @@ export function ProviderBrowserFrame({
           ↻
         </Button>
         <span className="ml-1 truncate text-xs font-medium text-t1">{providerLabel}</span>
-        <span className="min-w-0 flex-1 truncate rounded-control bg-surface px-2 py-1 text-xs text-t3">
-          {url || providerLabel}
-        </span>
-        {url.startsWith("https://") ? (
+        <form
+          className="flex min-w-0 flex-1"
+          onSubmit={(event) => {
+            event.preventDefault();
+            navigate();
+          }}
+        >
+          <input
+            type="text"
+            aria-label={addressLabel}
+            value={address}
+            onChange={(event) => setAddress(event.target.value)}
+            className="min-w-0 flex-1 rounded-control border border-line bg-surface px-2 py-1 text-xs text-t2 outline-none focus:border-focus"
+          />
+        </form>
+        {address.startsWith("https://") ? (
           <span className="text-xs text-positive">
             <Text id="component-browser.manage-models-secure">Secure</Text>
           </span>

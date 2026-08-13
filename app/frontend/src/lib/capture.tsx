@@ -74,10 +74,15 @@ function submissionKey(): string {
   return `guided-capture-${globalThis.crypto.randomUUID()}`;
 }
 
-function captureCommandKey(partId: string, sourceKey: string | undefined): string {
+function captureCommandKey(
+  partId: string,
+  sourceKey: string | undefined,
+  needs: readonly Requirement[],
+): string {
   return JSON.stringify({
     part_id: partId,
     provider: sourceKey || null,
+    needs: [...needs].sort(),
   });
 }
 
@@ -694,7 +699,7 @@ export function CaptureProvider({
       needs: Requirement[],
       sourceKey?: string,
     ) => {
-      const commandKey = captureCommandKey(partId, sourceKey);
+      const commandKey = captureCommandKey(partId, sourceKey, needs);
       const idempotencyKey =
         retrySubmissionRef.current?.commandKey === commandKey
           ? retrySubmissionRef.current.idempotencyKey
@@ -717,9 +722,16 @@ export function CaptureProvider({
       }));
 
       try {
+        const selectedEdas = [
+          ...(needs.some((need) => need.startsWith("kicad_") && need !== "kicad_model")
+            ? ["kicad"]
+            : []),
+          ...(needs.some((need) => need.startsWith("altium_")) ? ["altium"] : []),
+        ];
         const reference = await api.runCapture({
           partIds: [partId],
           vendor: sourceKey || undefined,
+          ...(selectedEdas.length > 0 ? { edas: selectedEdas } : {}),
           idempotencyKey,
         });
         if (
@@ -799,7 +811,7 @@ export function CaptureProvider({
       needs: Requirement[],
       sourceKey?: string,
     ): Promise<void> => {
-      const commandKey = captureCommandKey(partId, sourceKey);
+      const commandKey = captureCommandKey(partId, sourceKey, needs);
       const pending = pendingStartRef.current;
       if (pending) {
         if (pending.commandKey === commandKey) return pending.promise;

@@ -284,6 +284,7 @@ export function ComponentWorkspace({
       bodyOverride={
         activeCadView === "manage-models" ? (
           <ManageModelsWorkspace
+            key={componentId}
             componentId={componentId}
             dossier={dossier}
             onView={setCadView}

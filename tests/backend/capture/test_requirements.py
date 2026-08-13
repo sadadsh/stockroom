@@ -3,6 +3,7 @@ from stockroom.capture.requirements import (
     capture_needs,
     capture_requirements,
     requirement,
+    requirements_for_edas,
     split_requirement,
 )
 from stockroom.model.part import AssetRef, PartRecord
@@ -45,6 +46,22 @@ def test_the_enum_covers_exactly_the_registry():
 def test_split_requirement_round_trips():
     assert split_requirement(Requirement.ALTIUM_FOOTPRINT) == ("altium", "footprint")
     assert requirement("altium", "footprint") is Requirement.ALTIUM_FOOTPRINT
+
+
+def test_selected_edas_include_one_shared_model_and_reject_empty_selection():
+    assert requirements_for_edas(["kicad"]) == list(Requirement)[:3]
+    assert requirements_for_edas(["altium"]) == [
+        Requirement.ALTIUM_SYMBOL,
+        Requirement.ALTIUM_FOOTPRINT,
+        Requirement.KICAD_MODEL,
+    ]
+
+    try:
+        requirements_for_edas([])
+    except ValueError as exc:
+        assert "at least one EDA" in str(exc)
+    else:
+        raise AssertionError("an empty EDA selection was accepted")
 
 
 def test_a_bare_record_needs_everything_capturable():

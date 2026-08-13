@@ -66,7 +66,7 @@ _PERSON_DRIVEN_CAPTURE_INSTRUCTION = (
 _COMPLETION_MAX_BATCH = 1000
 _COMPLETION_BODY_FIELDS = frozenset({"part_ids", "limit", "idempotency_key"})
 _CAPTURE_BODY_FIELDS = frozenset(
-    {"part_ids", "limit", "idempotency_key", "mode", "vendor", "background"}
+    {"part_ids", "limit", "idempotency_key", "mode", "vendor", "background", "edas"}
 )
 _CAPTURE_MODES = frozenset({"automatic", "assisted", "finish-first", "collect-all"})
 _CAPTURE_REQUIREMENTS = frozenset(
@@ -306,7 +306,7 @@ def _completion_identities(records: list[PartRecord]) -> list[IntakeIdentity]:
 def _capture_command(
     request: Request,
     body: dict | None,
-) -> tuple[list[str] | None, int, bool, str, str | None, bool, str | None]:
+) -> tuple[list[str] | None, int, bool, str, str | None, bool, tuple[str, ...], str | None]:
     """Validate the guided-capture command without permissive coercion."""
 
     payload = {} if body is None else body
@@ -361,6 +361,14 @@ def _capture_command(
     if requested_vendor is not None and vendor is None:
         raise ValueError("vendor must be a non-empty provider key")
 
+    from stockroom.capture.requirements import requirements_for_edas
+
+    raw_edas = payload.get("edas", ["kicad", "altium"])
+    if type(raw_edas) is not list:
+        raise ValueError("edas must be a non-empty list of registered EDA keys")
+    edas = tuple(raw_edas)
+    requirements_for_edas(edas)
+
     body_key = payload.get("idempotency_key")
     if body_key is not None and (type(body_key) is not str or not body_key.strip()):
         raise ValueError("idempotency_key must be a non-empty string")
@@ -376,6 +384,7 @@ def _capture_command(
         mode,
         vendor,
         background,
+        edas,
         header_key if header_key is not None else body_key,
     )
 
@@ -387,11 +396,15 @@ def _capture_identities(
     mode: str,
     vendor: str | None,
     background: bool,
+    edas: tuple[str, ...],
 ) -> list[IntakeIdentity]:
     from stockroom.capture.complete import completion_needs
+    from stockroom.capture.requirements import requirements_for_edas
     from stockroom.capture.verified_cache import record_completion_evidence
 
     evidence_store = _completion_evidence_store()
+    requested_requirements = requirements_for_edas(edas)
+    selected_requirements = set(requested_requirements)
     identities: list[IntakeIdentity] = []
     for record in records:
         if not record.mpn.strip():
@@ -416,9 +429,13 @@ def _capture_identities(
                             "mode": mode,
                             "vendor": vendor,
                             "background": background,
+                            "requested_requirements": [
+                                requirement.value for requirement in requested_requirements
+                            ],
                             "initial_needs": [
                                 requirement.value
                                 for requirement in completion_needs(record, evidence)
+                                if requirement in selected_requirements
                             ],
                         },
                     }
@@ -440,6 +457,7 @@ def _capture_item_projection(item) -> dict:
     vendor = capture.get("vendor")
     background = capture.get("background")
     initial_needs = capture.get("initial_needs")
+    requested_requirements = capture.get("requested_requirements")
     if (
         mode not in _CAPTURE_MODES
         or (vendor is not None and type(vendor) is not str)
@@ -448,6 +466,18 @@ def _capture_item_projection(item) -> dict:
         or any(
             type(requirement) is not str or requirement not in _CAPTURE_REQUIREMENTS
             for requirement in initial_needs
+        )
+        or (
+            requested_requirements is not None
+            and (
+                type(requested_requirements) is not list
+                or not requested_requirements
+                or any(
+                    type(requirement) is not str
+                    or requirement not in _CAPTURE_REQUIREMENTS
+                    for requirement in requested_requirements
+                )
+            )
         )
     ):
         raise ApiError(409, "The durable capture request is corrupt.")
@@ -458,6 +488,7 @@ def _capture_item_projection(item) -> dict:
         "vendor": vendor,
         "background": background,
         "initial_needs": initial_needs,
+        "requested_requirements": requested_requirements,
     }
 
 
@@ -1665,6 +1696,7 @@ def library_router(require_token) -> APIRouter:
         atomic publication. The process-local job exists only when source
         development deliberately runs without that authority.
         """
+        from stockroom.capture.requirements import requirements_for_edas
         from stockroom.capture.runner import run_guided_capture
         from stockroom.capture.vendors import get_adapter
 
@@ -1676,6 +1708,7 @@ def library_router(require_token) -> APIRouter:
             mode,
             vendor,
             background,
+            edas,
             idempotency_key,
         ) = _capture_command(request, body)
         if vendor is not None and get_adapter(vendor) is None:
@@ -1725,6 +1758,7 @@ def library_router(require_token) -> APIRouter:
                     mode=mode,
                     vendor=vendor,
                     background=background,
+                    edas=edas,
                 ),
                 idempotency_key=idempotency_key,
             )
@@ -1748,6 +1782,7 @@ def library_router(require_token) -> APIRouter:
                 ctx,
                 part_ids=part_ids,
                 vendor=vendor,
+                requested_requirements=requirements_for_edas(edas),
                 progress=progress,
                 should_stop=should_stop,
                 limit=None if person_driven_providers else limit,

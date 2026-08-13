@@ -14,11 +14,12 @@ type ManagedHostApi = {
   providerCommand?: (request: ProviderCommandRequest) => void;
 };
 
-export type ProviderCommand = "back" | "forward" | "reload" | "close";
+export type ProviderCommand = "back" | "forward" | "reload" | "close" | "navigate";
 
 interface ProviderCommandRequest {
   componentId: string;
   command: ProviderCommand;
+  url?: string;
 }
 
 export function setProviderViewport(viewport: ProviderViewport): void {
@@ -33,7 +34,7 @@ export function setProviderViewport(viewport: ProviderViewport): void {
   bridge(viewport);
 }
 
-export function sendProviderCommand(componentId: string, command: ProviderCommand): void {
+export function sendProviderCommand(componentId: string, command: ProviderCommand, url?: string): void {
   const bridge = (window as unknown as { __STOCKROOM_HOST__?: ManagedHostApi })
     .__STOCKROOM_HOST__?.providerCommand;
   if (!bridge) return;
@@ -42,5 +43,5 @@ export function sendProviderCommand(componentId: string, command: ProviderComman
     action: `using provider browser ${command}`,
     instruction: `use provider browser ${command}`,
   });
-  bridge({ componentId, command });
+  bridge({ componentId, command, ...(url === undefined ? {} : { url }) });
 }

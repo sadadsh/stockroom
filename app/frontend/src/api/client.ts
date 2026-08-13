@@ -1415,6 +1415,7 @@ export const api = {
       vendor?: string;
       limit?: number;
       background?: boolean;
+      edas?: string[];
       idempotencyKey?: string;
     } = {},
   ): Promise<CompletionRunRef> {
@@ -1424,6 +1425,7 @@ export const api = {
         vendor: input.vendor,
         limit: input.limit,
         background: input.background,
+        edas: input.edas,
         idempotency_key: input.idempotencyKey,
       },
     });

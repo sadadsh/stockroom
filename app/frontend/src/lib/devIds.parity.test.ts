@@ -88,6 +88,9 @@ const KNOWN_DERIVED: readonly string[] = [
   "projects.tab-bom",
   "projects.tab-build",
   "projects.tab-activity",
+  "stm.tabs",
+  "stm.tab-explorer",
+  "stm.tab-compatibility",
   // primitives.tsx SegmentedControl derives one id per option. The STM target
   // definition uses fixed lens and inspector registries at the two call sites.
   "stm.lens.compatibility",
@@ -130,6 +133,7 @@ const KNOWN_PROP_PASSED: readonly string[] = [
   // loading, failed, and filtered-empty frames are separate states of the real picker body.
   "components.list-loading",
   "components.list-failed",
+  "components.list-unreachable",
   "components.list-no-match",
   // ProductPhoto.tsx CarouselArrow: the pager buttons take devId as a prop. Spelled out in full
   // at the call site, never built as `preview.photo-${side}` - an interpolated id is invisible to

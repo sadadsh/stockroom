@@ -65,4 +65,20 @@ describe("provider viewport bridge", () => {
 
     expect(command).toHaveBeenCalledWith({ componentId: "part-1", command: "reload" });
   });
+
+  it("sends an exact address through the component-bound host bridge", () => {
+    const command = vi.fn();
+    Object.defineProperty(window, "__STOCKROOM_HOST__", {
+      configurable: true,
+      value: { providerCommand: command },
+    });
+
+    sendProviderCommand("part-1", "navigate", "https://www.mouser.com/c/?q=LM358");
+
+    expect(command).toHaveBeenCalledWith({
+      componentId: "part-1",
+      command: "navigate",
+      url: "https://www.mouser.com/c/?q=LM358",
+    });
+  });
 });

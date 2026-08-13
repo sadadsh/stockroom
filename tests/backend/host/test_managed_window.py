@@ -152,6 +152,21 @@ def test_in_app_provider_surface_applies_modal_viewport_and_commands(monkeypatch
         assert provider_window.move_calls[-1] == (428, 294)
         surface.provider_command({"componentId": "part-1", "command": "back"})
         assert provider_window.evaluations[-1] == "history.back()"
+        surface.provider_command(
+            {
+                "componentId": "part-1",
+                "command": "navigate",
+                "url": "https://www.mouser.com/c/?q=LM358",
+            }
+        )
+        assert provider_window.loaded_urls[-1] == "https://www.mouser.com/c/?q=LM358"
+        assert not surface.provider_command(
+            {
+                "componentId": "part-1",
+                "command": "navigate",
+                "url": "file:///C:/Windows/System32/calc.exe",
+            }
+        )
         surface.provider_command({"componentId": "part-1", "command": "close"})
         assert provider_window.hidden_calls == 1
 

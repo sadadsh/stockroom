@@ -1,7 +1,11 @@
 import { useEffect } from "react";
 import { ensureDesignIdentities } from "../lib/designIdentity";
 
-const PRODUCT_ROOTS = '[data-dev-id="shell.root"], [data-dev-id="onboarding.gate"], [data-design-product-root]';
+const PRODUCT_ROOT_IDS = ["shell.root", "onboarding.gate"] as const;
+const PRODUCT_ROOTS = [
+  ...PRODUCT_ROOT_IDS.map((id) => `[data-dev-id="${id}"]`),
+  "[data-design-product-root]",
+].join(", ");
 
 /** Keeps dynamic, cloned, and imperative Stockroom DOM addressable after the JSX build transform. */
 export function DesignIdentityRuntime() {

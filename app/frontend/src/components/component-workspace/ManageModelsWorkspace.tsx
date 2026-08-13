@@ -1,7 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import type { ComponentDossier } from "../../api/dossierTypes";
 import { useOptionalCapture } from "../../lib/capture";
-import { ALTIUM_REQS, captureInFlight, KICAD_REQS } from "../../lib/captureRequirements";
+import {
+  CAPTURE_EDAS,
+  captureInFlight,
+  captureRequirementsForEdas,
+  type CaptureEda,
+} from "../../lib/captureRequirements";
 import {
   recoverCaptureFiles,
   type CaptureRecoveryResult,
@@ -67,7 +72,7 @@ export function ManageModelsWorkspace({
   componentId: string;
   dossier: ComponentDossier;
   onView: (view: CadWorkspaceView) => void;
-  onOpenProvider?: (providerId: string) => void | Promise<void>;
+  onOpenProvider?: (providerId: string, needs: ReturnType<typeof captureRequirementsForEdas>) => void | Promise<void>;
   onRecoverFiles?: () => Promise<CaptureRecoveryResult>;
   onAttached?: () => void;
 }) {
@@ -84,44 +89,35 @@ export function ManageModelsWorkspace({
   const [dismissedCaptureKey, setDismissedCaptureKey] = useState<string | null>(null);
   const [activityMessage, setActivityMessage] = useState<string | null>(null);
   const [recovering, setRecovering] = useState(false);
-  const lastAutomaticOpen = useRef<string | null>(null);
+  const [selectedEdas, setSelectedEdas] = useState<CaptureEda[]>(() => CAPTURE_EDAS.map((eda) => eda.key));
+  const [selectionLocked, setSelectionLocked] = useState(false);
   const ownsCapture = capture?.active.partId === componentId;
 
   const openProvider = useCallback(
     async (providerId: string) => {
       setActivityMessage(null);
+      const needs = captureRequirementsForEdas(selectedEdas);
+      setSelectionLocked(true);
       try {
         if (onOpenProvider) {
-          await onOpenProvider(providerId);
+          await onOpenProvider(providerId, needs);
         } else {
           if (!capture) return;
           await capture.start(
             componentId,
             dossier.identity.displayName,
-            [...KICAD_REQS, ...ALTIUM_REQS],
+            needs,
             providerId,
           );
         }
         setOpenProviderKey(`${componentId}:${providerId}`);
       } catch (error) {
+        setSelectionLocked(false);
         setActivityMessage(error instanceof Error ? error.message : "Could not open provider");
       }
     },
-    [capture, componentId, dossier.identity.displayName, onOpenProvider],
+    [capture, componentId, dossier.identity.displayName, onOpenProvider, selectedEdas],
   );
-
-  useEffect(() => {
-    setSelectedProviderId(initialProviderId);
-    lastAutomaticOpen.current = null;
-  }, [componentId, initialProviderId]);
-
-  useEffect(() => {
-    if (!bestProvider || ownsCapture || (!onOpenProvider && !capture)) return;
-    const automaticOpenKey = `${componentId}:${bestProvider.row.id}`;
-    if (lastAutomaticOpen.current === automaticOpenKey) return;
-    lastAutomaticOpen.current = automaticOpenKey;
-    void openProvider(bestProvider.row.id);
-  }, [bestProvider, capture, componentId, onOpenProvider, openProvider, ownsCapture]);
 
   const selectedProvider =
     providers.find((provider) => provider.row.id === selectedProviderId) ?? providers[0] ?? null;
@@ -131,7 +127,7 @@ export function ManageModelsWorkspace({
   const captureProviderKey = ownsCapture && selectedProviderKey ? selectedProviderKey : null;
   const browserOpen = Boolean(
     selectedProviderKey
-      && (openProviderKey === selectedProviderKey || (
+      && (scenarioProviderState || openProviderKey === selectedProviderKey || (
         captureProviderKey === selectedProviderKey
         && dismissedCaptureKey !== captureProviderKey
       )),
@@ -220,6 +216,41 @@ export function ManageModelsWorkspace({
           }}
         />
         <div className="flex min-w-0 flex-1 flex-col">
+          <fieldset
+            data-dev-id="component-browser.eda-selection"
+            className="flex flex-none items-center gap-4 border-b border-line bg-band px-4 py-2"
+          >
+            <legend className="sr-only">
+              <Text id="component-browser.manage-models-selected-edas">Selected EDAs</Text>
+            </legend>
+            <span className="text-xs font-semibold text-t2">
+              <Text id="component-browser.manage-models-edas">EDAs</Text>
+            </span>
+            {CAPTURE_EDAS.map((eda) => {
+              const checked = selectedEdas.includes(eda.key);
+              const onlySelection = checked && selectedEdas.length === 1;
+              return (
+                <label key={eda.key} className="flex items-center gap-1.5 text-xs text-t2">
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    disabled={selectionLocked || captureBusy || onlySelection}
+                    onChange={() => setSelectedEdas((current) =>
+                      current.includes(eda.key)
+                        ? current.filter((candidate) => candidate !== eda.key)
+                        : [...current, eda.key]
+                    )}
+                  />
+                  {eda.label}
+                </label>
+              );
+            })}
+            <span className="text-xs text-t3">
+              <Text id="component-browser.manage-models-eda-help">
+                Collect files for selected EDAs.
+              </Text>
+            </span>
+          </fieldset>
           {selectedProvider ? (
             <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 px-6 text-center">
               <h3 className="text-sm font-semibold text-t1">{selectedProvider.row.label}</h3>
