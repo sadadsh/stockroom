@@ -2,8 +2,8 @@
  * The persisted, personal Design Studio document.
  *
  * This module is deliberately pure: it knows how to parse and resolve versioned override data,
- * but never reads storage, the DOM, or an API. A v1 scope records where an edit was authored after
- * that edit has already been expanded to stable target ids; it is not a second selector system.
+ * but never reads storage, the DOM, or an API. V1 scope records are migrated to global target
+ * identities because their edits were already expanded to stable ids before persistence.
  */
 import {
   REGION_LAYOUT_MODES,
@@ -25,9 +25,60 @@ import type { BehaviorOverride } from "../lib/behavior.overrides";
 import type { IconOverride } from "../lib/icon.overrides";
 import type { Theme } from "../lib/theme";
 
-export const DESIGN_DOCUMENT_SCHEMA_VERSION = 1;
+export const DESIGN_DOCUMENT_SCHEMA_VERSION = 2;
 
 export type DesignScope = "instance" | "role" | "screen" | "global";
+
+export interface SymbolPresentationOverride {
+  body?: boolean;
+  pins?: boolean;
+  names?: boolean;
+  numbers?: boolean;
+  fields?: boolean;
+  hiddenPins?: boolean;
+  stroke?: string;
+  fill?: string;
+}
+
+export interface FootprintPresentationOverride {
+  pads?: boolean;
+  fabrication?: boolean;
+  courtyard?: boolean;
+  silkscreen?: boolean;
+  reference?: boolean;
+  value?: boolean;
+  models3d?: boolean;
+  layerColors?: Record<string, string>;
+}
+
+export interface Model3dPresentationOverride {
+  models?: boolean;
+  board?: boolean;
+  axes?: boolean;
+  grid?: boolean;
+  background?: string;
+  tint?: string;
+  opacity?: number;
+  material?: string;
+}
+
+export interface CadPresentationOverride {
+  symbol?: SymbolPresentationOverride;
+  footprint?: FootprintPresentationOverride;
+  model3d?: Model3dPresentationOverride;
+}
+
+export interface GlobalTargetIdentity {
+  id: string;
+  identity: "authored" | "generated";
+  label?: string;
+}
+
+export interface OrphanedDesignEdit {
+  targetId: string;
+  lastKnownLabel?: string;
+  remapTo?: string;
+}
 
 /** A sparse layer: omitted values inherit and `null` removes the inherited keyed override. */
 export interface DesignPatch {
@@ -39,6 +90,7 @@ export interface DesignPatch {
   icons?: Record<string, IconOverride | null>;
   elements?: Record<string, Record<string, string | null> | null>;
   behaviors?: Record<string, BehaviorOverride | null>;
+  cadPresentation?: Record<string, CadPresentationOverride | null>;
   /** `null` explicitly returns the resolved layout to the shipped/default arrangement. */
   layout?: LayoutDocument | null;
 }
@@ -52,15 +104,19 @@ export interface DesignVariation {
 }
 
 export interface DesignDocument {
-  schemaVersion: 1;
+  schemaVersion: 2;
   base: DevModeDraft;
   variations: Record<string, DesignVariation>;
   activeVariationId: string;
-  targetScopes: Record<string, DesignScope>;
+  globalTargets: Record<string, GlobalTargetIdentity>;
+  orphanedEdits: Record<string, OrphanedDesignEdit>;
+  cadPresentation: Record<string, CadPresentationOverride>;
 }
 
 /** A name for the draft produced by the resolver at the public Design Studio boundary. */
-export type ResolvedDesign = DevModeDraft;
+export type ResolvedDesign = DevModeDraft & {
+  cadPresentation: Record<string, CadPresentationOverride>;
+};
 
 export interface DesignDocumentParseError {
   code:
@@ -75,7 +131,10 @@ export interface DesignDocumentParseError {
     | "missing-variation-parent"
     | "variation-inheritance-cycle"
     | "unknown-active-variation"
-    | "invalid-target-scope";
+    | "invalid-target-scope"
+    | "invalid-global-target"
+    | "invalid-orphaned-edit"
+    | "invalid-cad-presentation";
   message: string;
 }
 
@@ -119,6 +178,11 @@ function dictionary<T>(): Record<string, T> {
 
 function hasOwn(record: object, key: string): boolean {
   return Object.prototype.hasOwnProperty.call(record, key);
+}
+
+function hasOnlyKeys(record: UnknownRecord, allowed: readonly string[]): boolean {
+  const keys = new Set(allowed);
+  return Object.keys(record).every((key) => keys.has(key));
 }
 
 function error(code: DesignDocumentParseError["code"], message: string): DesignDocumentParseResult {
@@ -232,6 +296,106 @@ function copyBehaviors(value: unknown, nullable: boolean): Record<string, Behavi
     const behavior = copyBehavior(entry);
     if (!behavior) return null;
     out[key] = behavior;
+  }
+  return out;
+}
+
+function copyBooleanAndStringFields<T extends object>(
+  value: unknown,
+  booleanKeys: readonly string[],
+  stringKeys: readonly string[],
+): T | null {
+  if (!isRecord(value) || !hasOnlyKeys(value, [...booleanKeys, ...stringKeys])) return null;
+  const out: Record<string, boolean | string> = {};
+  for (const key of booleanKeys) {
+    const entry = value[key];
+    if (entry !== undefined && typeof entry !== "boolean") return null;
+    if (entry !== undefined) out[key] = entry;
+  }
+  for (const key of stringKeys) {
+    const entry = value[key];
+    if (entry !== undefined && typeof entry !== "string") return null;
+    if (entry !== undefined) out[key] = entry;
+  }
+  return out as T;
+}
+
+function copyCadPresentation(value: unknown): CadPresentationOverride | null {
+  if (!isRecord(value) || !hasOnlyKeys(value, ["symbol", "footprint", "model3d"])) return null;
+  const out: CadPresentationOverride = {};
+  if (value.symbol !== undefined) {
+    const symbol = copyBooleanAndStringFields<SymbolPresentationOverride>(
+      value.symbol,
+      ["body", "pins", "names", "numbers", "fields", "hiddenPins"],
+      ["stroke", "fill"],
+    );
+    if (!symbol) return null;
+    out.symbol = symbol;
+  }
+  if (value.footprint !== undefined) {
+    if (!isRecord(value.footprint) || !hasOnlyKeys(value.footprint, [
+      "pads",
+      "fabrication",
+      "courtyard",
+      "silkscreen",
+      "reference",
+      "value",
+      "models3d",
+      "layerColors",
+    ])) return null;
+    const footprint = copyBooleanAndStringFields<FootprintPresentationOverride>(
+      Object.fromEntries(Object.entries(value.footprint).filter(([key]) => key !== "layerColors")),
+      ["pads", "fabrication", "courtyard", "silkscreen", "reference", "value", "models3d"],
+      [],
+    );
+    if (!footprint) return null;
+    if (value.footprint.layerColors !== undefined) {
+      const layerColors = copyStringMap(value.footprint.layerColors, false);
+      if (!layerColors || Object.values(layerColors).some((entry) => entry === null)) return null;
+      footprint.layerColors = layerColors as Record<string, string>;
+    }
+    out.footprint = footprint;
+  }
+  if (value.model3d !== undefined) {
+    if (!isRecord(value.model3d) || !hasOnlyKeys(value.model3d, [
+      "models",
+      "board",
+      "axes",
+      "grid",
+      "background",
+      "tint",
+      "opacity",
+      "material",
+    ])) return null;
+    const model3d = copyBooleanAndStringFields<Model3dPresentationOverride>(
+      Object.fromEntries(Object.entries(value.model3d).filter(([key]) => key !== "opacity")),
+      ["models", "board", "axes", "grid"],
+      ["background", "tint", "material"],
+    );
+    if (!model3d) return null;
+    if (value.model3d.opacity !== undefined) {
+      if (!isFiniteNumber(value.model3d.opacity) || value.model3d.opacity < 0 || value.model3d.opacity > 1) return null;
+      model3d.opacity = value.model3d.opacity;
+    }
+    out.model3d = model3d;
+  }
+  return out;
+}
+
+function copyCadPresentationMap(
+  value: unknown,
+  nullable: boolean,
+): Record<string, CadPresentationOverride | null> | null {
+  if (!isRecord(value)) return null;
+  const out = dictionary<CadPresentationOverride | null>();
+  for (const [targetId, entry] of Object.entries(value)) {
+    if (entry === null && nullable) {
+      out[targetId] = null;
+      continue;
+    }
+    const parsed = copyCadPresentation(entry);
+    if (!parsed) return null;
+    out[targetId] = parsed;
   }
   return out;
 }
@@ -536,6 +700,11 @@ function parsePatch(value: unknown): DesignPatch | null {
     if (!behaviors) return null;
     patch.behaviors = behaviors;
   }
+  if (value.cadPresentation !== undefined) {
+    const cadPresentation = copyCadPresentationMap(value.cadPresentation, true);
+    if (!cadPresentation) return null;
+    patch.cadPresentation = cadPresentation;
+  }
   if (value.layout !== undefined) {
     const layout = copyLayout(value.layout);
     if (layout === undefined) return null;
@@ -593,6 +762,90 @@ function validateVariationGraph(variations: Record<string, DesignVariation>): De
   return null;
 }
 
+function parseGlobalTargets(value: unknown): Record<string, GlobalTargetIdentity> | null {
+  if (value === undefined) return dictionary<GlobalTargetIdentity>();
+  if (!isRecord(value)) return null;
+  const out = dictionary<GlobalTargetIdentity>();
+  for (const [targetId, raw] of Object.entries(value)) {
+    if (
+      !isRecord(raw)
+      || !hasOnlyKeys(raw, ["id", "identity", "label"])
+      || raw.id !== targetId
+      || (raw.identity !== "authored" && raw.identity !== "generated")
+      || (raw.label !== undefined && typeof raw.label !== "string")
+    ) return null;
+    out[targetId] = {
+      id: targetId,
+      identity: raw.identity,
+      ...(raw.label === undefined ? {} : { label: raw.label }),
+    };
+  }
+  return out;
+}
+
+function parseOrphanedEdits(value: unknown): Record<string, OrphanedDesignEdit> | null {
+  if (value === undefined) return dictionary<OrphanedDesignEdit>();
+  if (!isRecord(value)) return null;
+  const out = dictionary<OrphanedDesignEdit>();
+  for (const [targetId, raw] of Object.entries(value)) {
+    if (
+      !isRecord(raw)
+      || !hasOnlyKeys(raw, ["targetId", "lastKnownLabel", "remapTo"])
+      || raw.targetId !== targetId
+      || (raw.lastKnownLabel !== undefined && typeof raw.lastKnownLabel !== "string")
+      || (raw.remapTo !== undefined && typeof raw.remapTo !== "string")
+    ) return null;
+    out[targetId] = {
+      targetId,
+      ...(raw.lastKnownLabel === undefined ? {} : { lastKnownLabel: raw.lastKnownLabel }),
+      ...(raw.remapTo === undefined ? {} : { remapTo: raw.remapTo }),
+    };
+  }
+  return out;
+}
+
+function patchTargetIds(patch: DesignPatch): string[] {
+  return [
+    ...Object.keys(patch.elements ?? {}),
+    ...Object.keys(patch.behaviors ?? {}),
+    ...Object.keys(patch.cadPresentation ?? {}),
+  ];
+}
+
+function globalTargetId(id: string): string {
+  return id.endsWith("::text") || id.endsWith("::icon")
+    ? id.slice(0, id.lastIndexOf("::"))
+    : id;
+}
+
+function migratedGlobalTargets(
+  base: DevModeDraft,
+  variations: Record<string, DesignVariation>,
+  cadPresentation: Record<string, CadPresentationOverride>,
+  targetScopes: Record<string, DesignScope>,
+): Record<string, GlobalTargetIdentity> {
+  const ids = new Set([
+    ...Object.keys(base.elements),
+    ...Object.keys(base.behaviors),
+    ...Object.keys(cadPresentation),
+    ...Object.keys(targetScopes),
+  ]);
+  for (const variation of Object.values(variations)) {
+    for (const id of patchTargetIds(variation.patch)) ids.add(id);
+    for (const themePatch of Object.values(variation.themes ?? {})) {
+      if (!themePatch) continue;
+      for (const id of patchTargetIds(themePatch)) ids.add(id);
+    }
+  }
+  return Object.fromEntries(Array.from(ids, globalTargetId).sort().map((id) => [
+    id,
+    {
+      id,
+      identity: id.startsWith("auto.") ? "generated" : "authored",
+    } satisfies GlobalTargetIdentity,
+  ]));
+}
+
 /** Parse untrusted persisted data, keeping malformed input and version errors as structured data. */
 export function parseDesignDocument(value: unknown): DesignDocumentParseResult {
   if (!isRecord(value)) return error("invalid-document", "Design document must be an object.");
@@ -600,9 +853,10 @@ export function parseDesignDocument(value: unknown): DesignDocumentParseResult {
   if (value.schemaVersion > DESIGN_DOCUMENT_SCHEMA_VERSION) {
     return error("unsupported-schema-version", `Design document schemaVersion ${value.schemaVersion} is newer than supported.`);
   }
-  if (value.schemaVersion !== DESIGN_DOCUMENT_SCHEMA_VERSION) {
-    return error("invalid-schema-version", `Design document schemaVersion must be ${DESIGN_DOCUMENT_SCHEMA_VERSION}.`);
+  if (value.schemaVersion !== 1 && value.schemaVersion !== DESIGN_DOCUMENT_SCHEMA_VERSION) {
+    return error("invalid-schema-version", "Design document schemaVersion must be 1 or 2.");
   }
+  const sourceVersion = value.schemaVersion;
   if (isRecord(value.base) && hasMalformedLayout(value.base.layout)) {
     return error("invalid-layout", "Design document base layout is malformed.");
   }
@@ -645,6 +899,9 @@ export function parseDesignDocument(value: unknown): DesignDocumentParseResult {
 
   const targetScopes = dictionary<DesignScope>();
   if (value.targetScopes !== undefined) {
+    if (sourceVersion !== 1) {
+      return error("invalid-target-scope", "Design document v2 does not accept targetScopes.");
+    }
     if (!isRecord(value.targetScopes)) return error("invalid-target-scope", "targetScopes must be an object.");
     for (const [targetId, scope] of Object.entries(value.targetScopes)) {
       if (scope !== "instance" && scope !== "role" && scope !== "screen" && scope !== "global") {
@@ -652,6 +909,32 @@ export function parseDesignDocument(value: unknown): DesignDocumentParseResult {
       }
       targetScopes[targetId] = scope;
     }
+  }
+  const parsedCadPresentation = value.cadPresentation === undefined
+    ? dictionary<CadPresentationOverride | null>()
+    : copyCadPresentationMap(value.cadPresentation, false);
+  if (!parsedCadPresentation || Object.values(parsedCadPresentation).some((entry) => entry === null)) {
+    return error("invalid-cad-presentation", "cadPresentation must contain valid typed CAD presentation overrides.");
+  }
+  const cadPresentation = parsedCadPresentation as Record<string, CadPresentationOverride>;
+  const inferredTargets = migratedGlobalTargets(base, variations, cadPresentation, targetScopes);
+  const parsedTargets = sourceVersion === 1
+    ? dictionary<GlobalTargetIdentity>()
+    : parseGlobalTargets(value.globalTargets);
+  if (!parsedTargets) {
+    return error("invalid-global-target", "globalTargets must contain valid global target identities.");
+  }
+  for (const target of Object.values(parsedTargets)) {
+    const expected = target.id.startsWith("auto.") ? "generated" : "authored";
+    if (target.identity !== expected) {
+      return error("invalid-global-target", `Global target '${target.id}' has the wrong identity kind.`);
+    }
+  }
+  const orphanedEdits = sourceVersion === 1
+    ? dictionary<OrphanedDesignEdit>()
+    : parseOrphanedEdits(value.orphanedEdits);
+  if (!orphanedEdits) {
+    return error("invalid-orphaned-edit", "orphanedEdits must contain valid remapping metadata.");
   }
 
   return {
@@ -661,7 +944,9 @@ export function parseDesignDocument(value: unknown): DesignDocumentParseResult {
       base,
       variations,
       activeVariationId,
-      targetScopes,
+      globalTargets: { ...inferredTargets, ...parsedTargets },
+      orphanedEdits,
+      cadPresentation,
     },
   };
 }
@@ -681,6 +966,12 @@ function cloneDraft(draft: DevModeDraft): DevModeDraft {
   };
 }
 
+function cloneCadPresentation(
+  overrides: Record<string, CadPresentationOverride>,
+): Record<string, CadPresentationOverride> {
+  return structuredClone(overrides);
+}
+
 function applyNullableMap<T>(target: Record<string, T>, patch: Record<string, T | null>): Record<string, T> {
   const next = { ...target };
   for (const [key, value] of Object.entries(patch)) {
@@ -691,8 +982,11 @@ function applyNullableMap<T>(target: Record<string, T>, patch: Record<string, T 
 }
 
 /** Apply one sparse layer without mutating either the existing draft or the persisted patch. */
-function applyPatch(draft: DevModeDraft, patch: DesignPatch): DevModeDraft {
-  const next = cloneDraft(draft);
+function applyPatch(draft: ResolvedDesign, patch: DesignPatch): ResolvedDesign {
+  const next: ResolvedDesign = {
+    ...cloneDraft(draft),
+    cadPresentation: cloneCadPresentation(draft.cadPresentation),
+  };
   if (patch.tokens) {
     const tokens: TokenOverrides = { ...next.tokens };
     if (patch.tokens.root) tokens.root = applyNullableMap(tokens.root, patch.tokens.root);
@@ -728,6 +1022,14 @@ function applyPatch(draft: DevModeDraft, patch: DesignPatch): DevModeDraft {
       else behaviors[id] = { ...override };
     }
     next.behaviors = behaviors;
+  }
+  if (patch.cadPresentation) {
+    const cadPresentation = { ...next.cadPresentation };
+    for (const [id, override] of Object.entries(patch.cadPresentation)) {
+      if (override === null) delete cadPresentation[id];
+      else cadPresentation[id] = structuredClone(override);
+    }
+    next.cadPresentation = cadPresentation;
   }
   if (patch.layout !== undefined) next.layout = patch.layout ? structuredClone(patch.layout) : null;
   return next;
@@ -802,7 +1104,11 @@ export function resolveDesign(
   variationId: string,
   theme: Theme,
 ): ResolvedDesign {
-  let resolved = applyPatch(committedDevModeDraft(), patchFromDraft(document.base));
+  let resolved: ResolvedDesign = {
+    ...cloneDraft(committedDevModeDraft()),
+    cadPresentation: cloneCadPresentation(document.cadPresentation),
+  };
+  resolved = applyPatch(resolved, patchFromDraft(document.base));
   const lineage = variationLineage(document.variations, variationId);
   for (const variation of lineage) resolved = applyPatch(resolved, variation.patch);
   const selected = hasOwn(document.variations, variationId)

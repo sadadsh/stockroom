@@ -67,7 +67,9 @@ function initialDocument(): DesignDocument {
     base: committedDevModeDraft(),
     variations: builtInVariationDocument(),
     activeVariationId: "full-data",
-    targetScopes: {},
+    globalTargets: {},
+    orphanedEdits: {},
+    cadPresentation: {},
   };
 }
 
@@ -118,7 +120,7 @@ function mountScenarioRoute(route: DesignScenario["route"]): void {
   replaceBrowserLocation(next.href, window.history.state);
 }
 
-/** Build a complete v1 document from the one working Dev Mode draft. */
+/** Build a complete v2 document from the one working Dev Mode draft. */
 function withWorkingDraft(document: DesignDocument, draft: DevModeDraft): DesignDocument {
   if (!document.activeVariationId || !document.variations[document.activeVariationId]) {
     return { ...document, base: cloneDraft(draft) };
@@ -128,7 +130,13 @@ function withWorkingDraft(document: DesignDocument, draft: DevModeDraft): Design
     ...document,
     variations: {
       ...document.variations,
-      [active.id]: { ...active, patch: cloneDraft(draft) },
+      [active.id]: {
+        ...active,
+        patch: {
+          ...cloneDraft(draft),
+          cadPresentation: active.patch.cadPresentation,
+        },
+      },
     },
   };
 }
@@ -156,7 +164,10 @@ function withExactWorkingDraft(document: DesignDocument, draft: DevModeDraft, th
         ...active,
         themes: {
           ...themes,
-          [theme]: diffDesignDraft(baseline, draft),
+          [theme]: {
+            ...diffDesignDraft(baseline, draft),
+            cadPresentation: active.themes?.[theme]?.cadPresentation,
+          },
         },
       },
     },
@@ -234,7 +245,8 @@ function DesignStudioBridge({
     () => resolveDesign(snapshot.document, snapshot.document.activeVariationId, devMode.theme),
     [snapshot.document, devMode.theme],
   );
-  const resolvedSignature = useMemo(() => JSON.stringify(resolved), [resolved]);
+  const resolvedDraft = useMemo(() => cloneDraft(resolved), [resolved]);
+  const resolvedSignature = useMemo(() => JSON.stringify(resolvedDraft), [resolvedDraft]);
   const draftSignature = useMemo(() => JSON.stringify(devMode.draft), [devMode.draft]);
   const previousResolvedSignature = useRef(resolvedSignature);
 
@@ -243,17 +255,17 @@ function DesignStudioBridge({
     previousResolvedSignature.current = resolvedSignature;
     if (!documentResolutionChanged || draftSignature === resolvedSignature) return;
     applyingDraft.current = resolvedSignature;
-    devMode.replaceDraft(resolved);
-  }, [devMode.replaceDraft, draftSignature, resolved, resolvedSignature]);
+    devMode.replaceDraft(resolvedDraft);
+  }, [devMode.replaceDraft, draftSignature, resolvedDraft, resolvedSignature]);
 
   useEffect(() => {
     if (applyingDraft.current !== null) {
       if (applyingDraft.current === draftSignature) applyingDraft.current = null;
       return;
     }
-    if (sameDraft(devMode.draft, resolved)) return;
+    if (sameDraft(devMode.draft, resolvedDraft)) return;
     controller.replaceDocument(withWorkingDraft(snapshot.document, devMode.draft));
-  }, [controller, devMode.draft, draftSignature, resolved, snapshot.document]);
+  }, [controller, devMode.draft, draftSignature, resolvedDraft, snapshot.document]);
 
   const open = useCallback(() => {
     if (!devMode.enabled) devMode.toggle();
@@ -268,7 +280,7 @@ function DesignStudioBridge({
     (document: DesignDocument) => {
       const nextDraft = resolveDesign(document, document.activeVariationId, devMode.theme);
       devMode.replaceDraftAtomically(
-        nextDraft,
+        cloneDraft(nextDraft),
         "design-document",
         JSON.stringify(document),
       );

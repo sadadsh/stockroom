@@ -54,16 +54,85 @@ function fixtureDocument(): DesignDocument {
       },
     },
     activeVariationId: "purchasing",
-    targetScopes: {
-      "component-browser.offers": "instance",
-      "component-browser.offer-card": "role",
-      "components": "screen",
-      rail: "global",
+    globalTargets: {
+      "component-browser.offers": { id: "component-browser.offers", identity: "authored" },
+      "component-browser.offer-card": { id: "component-browser.offer-card", identity: "authored" },
+      components: { id: "components", identity: "authored" },
+      rail: { id: "rail", identity: "authored" },
     },
+    orphanedEdits: {},
+    cadPresentation: {},
   };
 }
 
 describe("Design Studio document", () => {
+  it("migrates v1 scopes and unresolved edits into the global v2 document", () => {
+    const parsed = parseDesignDocument({
+      schemaVersion: 1,
+      base: {
+        ...emptyDraft(),
+        elements: {
+          "component-browser.offers": { display: "none" },
+          "auto.legacy.0abc123": { width: "320px" },
+        },
+      },
+      targetScopes: {
+        "component-browser.offers": "screen",
+        "auto.legacy.0abc123": "instance",
+      },
+    });
+
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) return;
+    expect(parsed.document.schemaVersion).toBe(2);
+    expect(parsed.document).not.toHaveProperty("targetScopes");
+    expect(parsed.document.globalTargets).toEqual({
+      "component-browser.offers": {
+        id: "component-browser.offers",
+        identity: "authored",
+      },
+      "auto.legacy.0abc123": {
+        id: "auto.legacy.0abc123",
+        identity: "generated",
+      },
+    });
+    expect(parsed.document.orphanedEdits).toEqual({});
+  });
+
+  it("preserves typed CAD presentation and orphan remapping metadata in v2", () => {
+    const parsed = parseDesignDocument({
+      schemaVersion: 2,
+      base: emptyDraft(),
+      cadPresentation: {
+        "component-browser.cad-symbol": {
+          symbol: { pins: false, names: true, stroke: "#c1c4c8" },
+        },
+      },
+      globalTargets: {
+        "component-browser.cad-symbol": {
+          id: "component-browser.cad-symbol",
+          identity: "authored",
+          label: "Symbol Preview",
+        },
+      },
+      orphanedEdits: {
+        "auto.old.0abc123": {
+          targetId: "auto.old.0abc123",
+          lastKnownLabel: "Old Wrapper",
+          remapTo: "component-browser.cad-symbol",
+        },
+      },
+    });
+
+    expect(parsed.ok && parsed.document.cadPresentation).toEqual({
+      "component-browser.cad-symbol": {
+        symbol: { pins: false, names: true, stroke: "#c1c4c8" },
+      },
+    });
+    expect(parsed.ok && parsed.document.orphanedEdits["auto.old.0abc123"]?.remapTo)
+      .toBe("component-browser.cad-symbol");
+  });
+
   it("publishes the built-in presentation variations", () => {
     expect(BUILT_IN_VARIATIONS).toEqual([
       { id: "full-data", title: "Full Data" },
@@ -90,18 +159,19 @@ describe("Design Studio document", () => {
     }).ok).toBe(true);
   });
 
-  it("resolves shipped base, personal base, variation, theme, role, and instance in order", () => {
+  it("resolves the personal base, variation, and theme in order", () => {
     const parsed = parseDesignDocument(fixtureDocument());
     if (!parsed.ok) throw new Error(parsed.error.message);
 
     expect(resolveDesign(parsed.document, "purchasing", "dark").elements["component-browser.offers"])
       .toEqual({ display: "grid", opacity: "0.9" });
-    expect(parsed.document.targetScopes).toEqual({
-      "component-browser.offers": "instance",
-      "component-browser.offer-card": "role",
-      components: "screen",
-      rail: "global",
-    });
+    expect(Object.keys(parsed.document.globalTargets)).toEqual([
+      "component-browser.offers",
+      "detail.category-control",
+      "component-browser.offer-card",
+      "components",
+      "rail",
+    ]);
   });
 
   it("migrates missing v1 slices to empty values without losing known overrides", () => {
@@ -330,6 +400,7 @@ describe("Design Studio document", () => {
       icons: {},
       elements: { "component-browser.offers": { opacity: "0.5" } },
       behaviors: {},
+      cadPresentation: {},
       layout: null,
     });
     expect(parsed.document.base.tokens.root["--c-accent"]).toBe("base");
@@ -337,7 +408,7 @@ describe("Design Studio document", () => {
   });
 
   it.each([
-    [{ schemaVersion: 2, base: emptyDraft() }, "unsupported-schema-version"],
+    [{ schemaVersion: 3, base: emptyDraft() }, "unsupported-schema-version"],
     [{ schemaVersion: 1, base: [], variations: {} }, "invalid-base"],
     [{ schemaVersion: 1, base: emptyDraft(), activeVariationId: "missing" }, "unknown-active-variation"],
     [

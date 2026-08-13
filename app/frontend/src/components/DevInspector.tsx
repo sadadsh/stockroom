@@ -25,6 +25,7 @@ import { useDevMode } from "../lib/devMode";
 import { usedVarsForElement } from "../lib/inspectVars";
 import { DEV_ID_BY_ID } from "../lib/devIds";
 import { devIdScope, sharedRoleOf } from "../lib/componentDevIds";
+import { DESIGN_TARGET_SELECTOR, designIdOf, ensureDesignIdentities, isGeneratedDesignId } from "../lib/designIdentity";
 import { TECHNICAL_CONTENT_SELECTOR } from "../design-studio/targetDomains";
 
 interface Badge {
@@ -47,8 +48,13 @@ function rectOf(el: Element): { left: number; top: number; width: number; height
 
 /** Technical drawings select their registered presentation root, never an engineering descendant. */
 function selectableTarget(target: Element): Element | null {
+  const productRoot = document.querySelector("[data-design-product-root]");
+  if (productRoot && !productRoot.contains(target)) return null;
+  const localRoot = target.closest(DESIGN_TARGET_SELECTOR);
+  if (!productRoot && !localRoot) return null;
+  ensureDesignIdentities(productRoot ?? localRoot!);
   const technicalRoot = target.closest(TECHNICAL_CONTENT_SELECTOR);
-  return (technicalRoot?.closest("[data-dev-id]") ?? target.closest("[data-dev-id]"));
+  return (technicalRoot?.closest(DESIGN_TARGET_SELECTOR) ?? target.closest(DESIGN_TARGET_SELECTOR));
 }
 
 /**
@@ -57,6 +63,7 @@ function selectableTarget(target: Element): Element | null {
  * The ID ITSELF is always shown verbatim beside this - the label is context, never a substitute.
  */
 function labelFor(id: string, el: Element | null): string {
+  if (isGeneratedDesignId(id)) return "Generated Stockroom element";
   const entry = DEV_ID_BY_ID.get(id);
   if (entry) return entry.label;
   if (devIdScope(id) !== "instance") return "";
@@ -86,7 +93,7 @@ export function DevInspector() {
         setHover(null);
         return;
       }
-      const id = el.getAttribute("data-dev-id");
+      const id = designIdOf(el);
       if (!id) {
         setHover(null);
         return;
@@ -99,7 +106,7 @@ export function DevInspector() {
       const target = e.target as Element | null;
       const el = target && "closest" in target ? selectableTarget(target) : null;
       if (!el) return;
-      const id = el.getAttribute("data-dev-id");
+      const id = designIdOf(el);
       if (!id) return;
       // Swallow the click so no app action / copy layer handler fires (the document-capture phase
       // runs before the React root, so stopPropagation keeps the event from ever reaching it).
@@ -130,10 +137,10 @@ export function DevInspector() {
       return;
     }
     function enumerate() {
-      const nodes = Array.from(document.querySelectorAll("[data-dev-id]"));
+      const nodes = Array.from(document.querySelectorAll(DESIGN_TARGET_SELECTOR));
       setBadges(
         nodes.map((el) => {
-          const id = el.getAttribute("data-dev-id") ?? "";
+          const id = designIdOf(el) ?? "";
           return { id, label: labelFor(id, el) || id, rect: rectOf(el) };
         }),
       );

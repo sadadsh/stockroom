@@ -9,6 +9,7 @@ import { isApprovedDynamicDevId } from "../lib/componentDevIds";
 import { copyPlaceholderDeclarations } from "../lib/copyPlaceholders";
 import { DEV_IDS, DEV_ID_BY_ID } from "../lib/devIds";
 import { isApplicableElementOverride } from "../lib/elementLayout";
+import { isGeneratedDesignId } from "../lib/designIdentity";
 import { ICON_BY_ID } from "../lib/iconRegistry";
 import { ownerAuthoredCopyIds } from "../lib/devModeSave";
 import type { Theme } from "../lib/theme";
@@ -61,7 +62,7 @@ function baseTargetId(id: string): string {
 
 function isKnownDevTarget(id: string): boolean {
   const base = baseTargetId(id);
-  return DEV_ID_BY_ID.has(base) || isApprovedDynamicDevId(base);
+  return DEV_ID_BY_ID.has(base) || isApprovedDynamicDevId(base) || isGeneratedDesignId(base);
 }
 
 function targetIssues(document: DesignDocument, theme: Theme): DesignPromotionIssue[] {
@@ -91,8 +92,8 @@ function targetIssues(document: DesignDocument, theme: Theme): DesignPromotionIs
   for (const id of Object.keys(resolved.copy)) {
     if (!COPY_ID.test(id)) add("missing-target", id);
   }
-  for (const id of Object.keys(document.targetScopes)) {
-    if (!isKnownDevTarget(id)) add("missing-target", id);
+  for (const orphan of Object.values(document.orphanedEdits)) {
+    if (!orphan.remapTo || !isKnownDevTarget(orphan.remapTo)) add("missing-target", orphan.targetId);
   }
   return issues;
 }

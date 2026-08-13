@@ -1,10 +1,8 @@
 import { useMemo, useState } from "react";
-import type { DesignScope } from "../../design-studio/document";
 import {
   inspectTarget,
   previewTargetScope,
   type EditableTargetDomain,
-  type ScopePreview,
   type TargetInspection,
 } from "../../design-studio/targetDomains";
 import { useOptionalDesignStudio } from "../../design-studio/DesignStudioProvider";
@@ -58,11 +56,8 @@ export function InspectorPanel({ root, integrated = false }: { root?: Element; i
   const studio = useOptionalDesignStudio();
   const defaultFacet: InspectorFacet = integrated ? "advanced" : "box";
   const [facetState, setFacetState] = useState<{ targetId: string | null; value: InspectorFacet }>(() => ({ targetId: dev.selectedDevId, value: defaultFacet }));
-  const [scopeState, setScopeState] = useState<{ targetId: string | null; value: DesignScope }>(() => ({ targetId: dev.selectedDevId, value: "instance" }));
   const facet = facetState.targetId === dev.selectedDevId ? facetState.value : defaultFacet;
-  const scope = scopeState.targetId === dev.selectedDevId ? scopeState.value : "instance";
   const setFacet = (value: InspectorFacet) => setFacetState({ targetId: dev.selectedDevId, value });
-  const setScope = (value: DesignScope) => setScopeState({ targetId: dev.selectedDevId, value });
   const resolvedRoot = rootElement(root);
   const inspection = useMemo(
     () => inspectionFor(resolvedRoot, dev.selectedDevId),
@@ -70,7 +65,6 @@ export function InspectorPanel({ root, integrated = false }: { root?: Element; i
   );
   const contextualInspectorLabel = useText("design-studio.inspector.context", "Contextual Inspector");
   const targetDomainsLabel = useText("design-studio.inspector.target-domains", "Target Domains");
-  const editingScopeLabel = useText("design-studio.inspector.editing-scope", "Editing Scope");
   const inspectorDomainsLabel = useText("design-studio.inspector.domains", "Inspector Domains");
   const boxLabel = useText("design-studio.inspector.domain.box", "Box");
   const textLabel = useText("design-studio.inspector.domain.text", "Text");
@@ -79,19 +73,12 @@ export function InspectorPanel({ root, integrated = false }: { root?: Element; i
   const behaviorLabel = useText("design-studio.inspector.domain.behavior", "Behavior");
   const statesLabel = useText("design-studio.inspector.domain.states", "States");
   const advancedLabel = useText("design-studio.inspector.domain.advanced", "Advanced");
-  const instanceLabel = useText("design-studio.inspector.scope.instance", "Instance");
-  const roleLabel = useText("design-studio.inspector.scope.role", "Role");
   const screenLabel = useText("design-studio.inspector.scope.screen", "Screen");
-  const globalLabel = useText("design-studio.inspector.scope.global", "Global");
   const resetLabel = useText("design-studio.inspector.reset", "Reset");
   const targetLabel = useText("design-studio.inspector.reset.target", "Target");
   const variationLabel = useText("design-studio.inspector.reset.variation", "Variation");
   const themeLabel = useText("design-studio.inspector.reset.theme", "Theme");
   const fullDesignLabel = useText("design-studio.inspector.reset.full-design", "Full Personal Design");
-  const scopeAria = useCopyFormatter("design-studio.inspector.scope.aria", "{scope} Scope");
-  const scopeSummary = useCopyFormatter("design-studio.inspector.scope.summary", "{scope} · {count} {targets}");
-  const singularTarget = useText("design-studio.inspector.scope.singular-target", "Target");
-  const pluralTargets = useText("design-studio.inspector.scope.plural-targets", "Targets");
   const integratedDomain = useCopyFormatter("design-studio.inspector.domain.integrated", "{domain} Domain");
   const textDomainPreviewLabel = useText("design-studio.inspector.domain.text-preview", "Text Domain Preview");
   const iconDomainPreviewLabel = useText("design-studio.inspector.domain.icon-preview", "Icon Domain Preview");
@@ -101,18 +88,11 @@ export function InspectorPanel({ root, integrated = false }: { root?: Element; i
     { id: "behavior", label: behaviorLabel }, { id: "states", label: statesLabel },
     { id: "advanced", label: advancedLabel },
   ];
-  const scopes: readonly { id: DesignScope; label: string }[] = [
-    { id: "instance", label: instanceLabel }, { id: "role", label: roleLabel },
-    { id: "screen", label: screenLabel }, { id: "global", label: globalLabel },
-  ];
-
-  const scopePreview = useMemo<ScopePreview>(
-    () => inspection
-      ? previewTargetScope(resolvedRoot, inspection.id, scope)
-      : { scope, affectedTargetIds: [] },
-    [inspection, resolvedRoot, scope],
-  );
-  const affectedTargetIds = scopePreview.affectedTargetIds;
+  const affectedTargetIds = inspection
+    ? inspection.role
+      ? previewTargetScope(resolvedRoot, inspection.id, "role").affectedTargetIds
+      : [inspection.id]
+    : [];
   const affectedInspections = useMemo(
     () => inspectionsFor(resolvedRoot, affectedTargetIds),
     [affectedTargetIds, resolvedRoot],
@@ -120,15 +100,6 @@ export function InspectorPanel({ root, integrated = false }: { root?: Element; i
 
   if (!dev.enabled || !inspection) return null;
 
-  const chooseScope = (next: DesignScope) => {
-    const preview = previewTargetScope(resolvedRoot, inspection.id, next);
-    setScope(next);
-    if (studio) {
-      const targetScopes = { ...studio.document.targetScopes };
-      for (const id of preview.affectedTargetIds) targetScopes[id] = next;
-      studio.replaceDocument({ ...studio.document, targetScopes });
-    }
-  };
   const domainOverrideIds = (domain: EditableTargetDomain) => {
     const ids = new Set<string>();
     for (const item of affectedInspections) {
@@ -187,11 +158,13 @@ export function InspectorPanel({ root, integrated = false }: { root?: Element; i
       return;
     }
     studio.replaceDocumentAtomically({
-      schemaVersion: 1,
+      schemaVersion: 2,
       base: empty,
       variations: {},
       activeVariationId: "",
-      targetScopes: {},
+      globalTargets: {},
+      orphanedEdits: {},
+      cadPresentation: {},
     });
   };
 
@@ -219,34 +192,6 @@ export function InspectorPanel({ root, integrated = false }: { root?: Element; i
           <span className="rounded-control bg-raise2 px-1.5 py-0.5 text-2xs text-t2">
             {inspection.summary.behaviors} {behaviorLabel} · {inspection.summary.states} {statesLabel}
           </span>
-        </div>
-      </div>
-
-      <div className="border-b border-line px-3.5 py-2">
-        <div className="flex flex-wrap gap-1" aria-label={editingScopeLabel}>
-          {scopes.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              aria-label={scopeAria({ scope: item.label })}
-              aria-pressed={scope === item.id}
-              disabled={item.id === "role" && inspection.role === null}
-              onClick={() => chooseScope(item.id)}
-              className={`rounded-control border px-2 py-1 text-2xs font-semibold ${scope === item.id ? "border-transparent bg-acc text-acc-on" : "border-line text-t2 hover:text-t1"} disabled:opacity-35`}
-            >
-              {item.label}
-            </button>
-          ))}
-        </div>
-        <div className="mt-2 rounded-control border border-line bg-field p-2" aria-live="polite">
-          <div className="text-2xs font-semibold text-t2">
-            {scopeSummary({ scope: scopes.find((item) => item.id === scope)?.label ?? scope, count: affectedTargetIds.length, targets: affectedTargetIds.length === 1 ? singularTarget : pluralTargets })}
-          </div>
-          {scope !== "instance" ? (
-            <ul className="mt-1 max-h-20 overflow-y-auto font-mono text-2xs text-t3">
-              {affectedTargetIds.map((id) => <li key={id}>{id}</li>)}
-            </ul>
-          ) : null}
         </div>
       </div>
 

@@ -83,14 +83,9 @@ describe("InspectorPanel", () => {
     await waitFor(() => expect(document.documentElement.style.getPropertyValue("--icon-stroke")).toBe("2.4"));
   });
 
-  it("previews every affected role id before a broad edit and removal is undoable", async () => {
+  it("edits every global occurrence and removal is undoable", async () => {
     render(<Harness />);
     fireEvent.click(screen.getByRole("button", { name: "Select First" }));
-    fireEvent.click(screen.getByRole("button", { name: "Role Scope" }));
-
-    expect(screen.getByText("Role · 2 Targets")).toBeInTheDocument();
-    expect(screen.getByText("detail.action[first]")).toBeInTheDocument();
-    expect(screen.getByText("detail.action[second]")).toBeInTheDocument();
     const first = document.querySelector<HTMLElement>('[data-dev-id="detail.action[first]"]')!;
     const second = document.querySelector<HTMLElement>('[data-dev-id="detail.action[second]"]')!;
     expect(first.style.display).toBe("");
@@ -110,20 +105,17 @@ describe("InspectorPanel", () => {
     });
   });
 
-  it.each([
-    ["Role", ["detail.action.copy", "detail.action.second.copy"], ["action.add", "action.edit"]],
-    ["Screen", ["detail.action.copy", "detail.action.second.copy"], ["action.add", "action.edit"]],
-    ["Global", ["detail.action.copy", "detail.action.second.copy", "rail.action.copy"], ["action.add", "action.edit", "action.search"]],
-  ] as const)(
-    "applies scoped Text and Icon operations to every %s domain target shown in the preview",
-    async (scope, copyIds, iconIds) => {
+  it(
+    "applies Text and Icon operations to every global semantic occurrence",
+    async () => {
+      const copyIds = ["detail.action.copy", "detail.action.second.copy"];
+      const iconIds = ["action.add", "action.edit"];
       render(<Harness />);
       fireEvent.click(screen.getByRole("button", { name: "Select First" }));
-      fireEvent.click(screen.getByRole("button", { name: `${scope} Scope` }));
 
       fireEvent.click(screen.getByRole("tab", { name: "Text" }));
       expect(screen.getByLabelText("Text Domain Preview")).toHaveTextContent(copyIds.join(" "));
-      fireEvent.change(screen.getByLabelText("Text Content"), { target: { value: `${scope} Text` } });
+      fireEvent.change(screen.getByLabelText("Text Content"), { target: { value: "Global Text" } });
       fireEvent.change(screen.getByLabelText("Text font-size Value"), { target: { value: "18px" } });
       fireEvent.blur(screen.getByLabelText("Text font-size Value"));
 
@@ -146,13 +138,11 @@ describe("InspectorPanel", () => {
         };
         expect(Object.keys(draft.copy).sort()).toEqual([...copyIds].sort());
         expect(Object.keys(draft.icons).sort()).toEqual([...iconIds].sort());
-        for (const id of copyIds) expect(draft.copy[id]).toBe(`${scope} Text`);
+        for (const id of copyIds) expect(draft.copy[id]).toBe("Global Text");
         for (const id of iconIds) expect(draft.icons[id]?.swapToId ?? draft.icons[id]?.body).toBeTruthy();
       });
 
-      const expectedRoots = scope === "Global"
-        ? ["detail.action[first]", "detail.action[second]", "rail.action"]
-        : ["detail.action[first]", "detail.action[second]"];
+      const expectedRoots = ["detail.action[first]", "detail.action[second]"];
       for (const id of expectedRoots) {
         const root = document.querySelector<HTMLElement>(`[data-dev-id="${id}"]`)!;
         const text = root.querySelector<HTMLElement>("[data-copy-id]")!;
@@ -227,7 +217,6 @@ describe("InspectorPanel", () => {
     fireEvent.click(screen.getByRole("button", { name: "Reset Width" }));
     await waitFor(() => expect(first.style.width).toBe(""));
 
-    fireEvent.click(screen.getByRole("button", { name: "Role Scope" }));
     fireEvent.click(screen.getByRole("tab", { name: "Arrangement" }));
     fireEvent.click(screen.getByRole("button", { name: "Remove From Arrangement" }));
     await waitFor(() => expect(second.style.display).toBe("none"));

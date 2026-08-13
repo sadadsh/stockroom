@@ -22,7 +22,7 @@ const mockApi = vi.mocked(api);
 
 function fixtureDocument(copy: Record<string, string> = {}): DesignDocument {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     base: {
       tokens: { root: {}, light: {} },
       copy,
@@ -33,7 +33,9 @@ function fixtureDocument(copy: Record<string, string> = {}): DesignDocument {
     },
     variations: builtInVariationDocument(),
     activeVariationId: "",
-    targetScopes: {},
+    globalTargets: {},
+    orphanedEdits: {},
+    cadPresentation: {},
   };
 }
 

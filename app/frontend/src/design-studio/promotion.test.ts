@@ -11,7 +11,7 @@ import {
 
 function fixtureDocument(): DesignDocument {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     base: {
       tokens: { root: {}, light: {} },
       copy: {},
@@ -22,7 +22,9 @@ function fixtureDocument(): DesignDocument {
     },
     variations: {},
     activeVariationId: "",
-    targetScopes: {},
+    globalTargets: {},
+    orphanedEdits: {},
+    cadPresentation: {},
   };
 }
 
@@ -41,7 +43,9 @@ function personalDocument(): DesignDocument {
 
 function documentWithIssue(code: "missing-target"): DesignDocument {
   const document = fixtureDocument();
-  document.targetScopes[`unregistered.${code}`] = "instance";
+  document.orphanedEdits[`unregistered.${code}`] = {
+    targetId: `unregistered.${code}`,
+  };
   return document;
 }
 

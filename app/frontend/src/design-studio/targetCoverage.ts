@@ -2,6 +2,7 @@ import { isApprovedDynamicDevId } from "../lib/componentDevIds";
 import type { DevIdEntry } from "../lib/devIds";
 import { ICON_BY_ID } from "../lib/iconRegistry";
 import { WORKSPACE_PIECE_REGISTRY } from "../layout/workspacePieces";
+import { ensureDesignIdentities, isGeneratedDesignId } from "../lib/designIdentity";
 
 export type TargetCoverageIssueCode = "missing-target" | "unregistered-target";
 
@@ -9,13 +10,13 @@ export interface TargetCoverageIssue {
   code: TargetCoverageIssueCode;
   element: Element;
   targetId?: string;
-  targetKind?: "dev" | "copy" | "icon" | "layout-piece";
+  targetKind?: "dev" | "generated" | "copy" | "icon" | "layout-piece";
 }
 
 export interface TargetLayer {
   key: string;
   id: string;
-  kind: "dev" | "copy" | "icon" | "layout-piece";
+  kind: "dev" | "generated" | "copy" | "icon" | "layout-piece";
   label: string;
   parentKey: string | null;
   depth: number;
@@ -42,30 +43,10 @@ const INTERACTIVE_BOUNDARY_SELECTOR = [
 ].join(", ");
 const SEMANTIC_LAYOUT_TAGS = new Set(["ARTICLE", "ASIDE", "FOOTER", "HEADER", "MAIN", "NAV", "SECTION"]);
 
-const TARGET_IDENTITY_SELECTOR = "[data-dev-id], [data-copy-id], [data-icon-id], [data-layout-piece]";
+const TARGET_IDENTITY_SELECTOR = "[data-dev-id], [data-design-id], [data-copy-id], [data-icon-id], [data-layout-piece]";
 function identityOwner(element: Element): Element | null {
   if (element.matches(TARGET_IDENTITY_SELECTOR)) return element;
-  const owner = element.closest(TARGET_IDENTITY_SELECTOR);
-  if (!owner) return null;
-  const ownerHasDomainIdentity = owner.hasAttribute("data-copy-id") || owner.hasAttribute("data-icon-id") || owner.hasAttribute("data-layout-piece");
-  const ownerIsControl = owner.matches(INTERACTIVE_BOUNDARY_SELECTOR);
-  // A broad page/section identity cannot make a nested control addressable. Interactive and
-  // semantic layout boundaries need their own identity; text/icons may inherit only through a
-  // non-interactive wrapper that belongs to the same visual control.
-  if (element.matches(INTERACTIVE_BOUNDARY_SELECTOR) || SEMANTIC_LAYOUT_TAGS.has(element.tagName)) {
-    return null;
-  }
-  if (!ownerHasDomainIdentity && !ownerIsControl && (element.localName === "svg" || element.localName === "img" || hasDirectVisibleText(element))) {
-    return null;
-  }
-  let ancestor = element.parentElement;
-  while (ancestor && ancestor !== owner) {
-    if (ancestor.matches(INTERACTIVE_BOUNDARY_SELECTOR) || SEMANTIC_LAYOUT_TAGS.has(ancestor.tagName)) {
-      return null;
-    }
-    ancestor = ancestor.parentElement;
-  }
-  return owner;
+  return null;
 }
 
 function hasDirectVisibleText(element: Element): boolean {
@@ -74,7 +55,7 @@ function hasDirectVisibleText(element: Element): boolean {
   );
 }
 
-function isMeaningfulBoundary(element: Element): boolean {
+export function isMeaningfulTargetElement(element: Element): boolean {
   return (
     element.matches(INTERACTIVE_BOUNDARY_SELECTOR) ||
     element.localName === "svg" ||
@@ -84,12 +65,14 @@ function isMeaningfulBoundary(element: Element): boolean {
   );
 }
 
-/** Report explicitly meaningful boundaries that cannot be addressed by a production registry. */
+/** Report every Stockroom-owned rendered element that cannot be globally addressed. */
 export function coverageIssuesFor(root: ParentNode, registry: DevIdEntry[]): TargetCoverageIssue[] {
+  ensureDesignIdentities(root);
   const registeredDevIds = new Set(registry.map((entry) => entry.id));
   const issues: TargetCoverageIssue[] = [];
-  for (const element of Array.from(root.querySelectorAll("*")).filter(isMeaningfulBoundary)) {
+  for (const element of Array.from(root.querySelectorAll("*"))) {
     if (element.closest('[data-design-technical-content="true"]')) continue;
+    if (element.localName !== "svg" && element.closest("svg")) continue;
     const owner = identityOwner(element);
     if (!owner) {
       issues.push({ code: "missing-target", element });
@@ -97,6 +80,7 @@ export function coverageIssuesFor(root: ParentNode, registry: DevIdEntry[]): Tar
     }
     const identities = [
       ["dev", owner.getAttribute("data-dev-id")],
+      ["generated", owner.getAttribute("data-design-id")],
       ["copy", owner.getAttribute("data-copy-id")],
       ["icon", owner.getAttribute("data-icon-id")],
       ["layout-piece", owner.getAttribute("data-layout-piece")],
@@ -109,6 +93,8 @@ export function coverageIssuesFor(root: ParentNode, registry: DevIdEntry[]): Tar
     for (const [kind, id] of present) {
       const valid = kind === "dev"
         ? registeredDevIds.has(id) || isApprovedDynamicDevId(id)
+        : kind === "generated"
+          ? isGeneratedDesignId(id)
         : kind === "copy"
           ? STABLE_COPY_ID.test(id)
           : kind === "icon"
@@ -128,13 +114,14 @@ export function targetLayersFor(root: ParentNode, registry: DevIdEntry[]): Targe
   const lastKeyByElement = new Map<Element, string>();
   const ownerDevByElement = new Map<Element, string>();
   const elements = root.querySelectorAll(
-    "[data-dev-id], [data-copy-id], [data-icon-id], [data-layout-piece]",
+    "[data-dev-id], [data-design-id], [data-copy-id], [data-icon-id], [data-layout-piece]",
   );
 
   for (const element of elements) {
     const devId = element.getAttribute("data-dev-id");
     const identities = [
       ["dev", devId],
+      ["generated", element.getAttribute("data-design-id")],
       ["copy", element.getAttribute("data-copy-id")],
       ["icon", element.getAttribute("data-icon-id")],
       ["layout-piece", element.getAttribute("data-layout-piece")],
@@ -151,6 +138,8 @@ export function targetLayersFor(root: ParentNode, registry: DevIdEntry[]): Targe
       if (!id) continue;
       const valid = kind === "dev"
         ? devById.has(id) || isApprovedDynamicDevId(id)
+        : kind === "generated"
+          ? isGeneratedDesignId(id)
         : kind === "copy"
           ? STABLE_COPY_ID.test(id)
           : kind === "icon"
@@ -163,7 +152,7 @@ export function targetLayersFor(root: ParentNode, registry: DevIdEntry[]): Targe
         existing.occurrences += 1;
       } else {
         const depth = parentKey ? (byKey.get(parentKey)?.depth ?? -1) + 1 : 0;
-        const label = kind === "dev" ? (devById.get(id)?.label ?? id) : `${kind === "layout-piece" ? "Layout Piece" : kind[0].toUpperCase() + kind.slice(1)} · ${id}`;
+        const label = kind === "dev" ? (devById.get(id)?.label ?? id) : `${kind === "layout-piece" ? "Layout Piece" : kind === "generated" ? "Element" : kind[0].toUpperCase() + kind.slice(1)} · ${id}`;
         const layer: TargetLayer = {
           key,
           id,

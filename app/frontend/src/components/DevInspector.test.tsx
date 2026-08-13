@@ -94,14 +94,14 @@ describe("DevInspector", () => {
     expect(screen.getByTestId("vars")).toHaveTextContent("--c-warn,--c-t1");
   });
 
-  it("adds --icon-stroke when the inspected element contains an svg.ico", () => {
+  it("selects an automatically exposed icon as its own editable element", () => {
     render(<Harness />);
     on("toggle-dev");
     on("toggle-inspect");
 
     fireEvent.click(screen.getByTestId("ico"));
-    expect(screen.getByTestId("selected")).toHaveTextContent("detail.readiness");
-    expect(screen.getByTestId("vars")).toHaveTextContent("--c-raise,--icon-stroke");
+    expect(screen.getByTestId("selected").textContent).toMatch(/^auto\.dom-svg\./);
+    expect(screen.getByTestId("vars")).toHaveTextContent("--icon-stroke");
   });
 
   it("selects a technical drawing's presentation root instead of an engineering descendant", () => {
@@ -123,13 +123,12 @@ describe("DevInspector", () => {
     expect(screen.getByTestId("selected")).toHaveTextContent("none");
   });
 
-  it("Show IDs renders exactly one badge per [data-dev-id] node", () => {
+  it("Show IDs renders exactly one badge per authored or generated target", () => {
     render(<Harness />);
     on("toggle-dev");
     on("toggle-showids");
 
-    const nodeCount = document.querySelectorAll("[data-dev-id]").length;
-    expect(nodeCount).toBe(4);
+    const nodeCount = document.querySelectorAll("[data-dev-id],[data-design-id]").length;
     expect(screen.getAllByTestId("dev-id-badge")).toHaveLength(nodeCount);
   });
 

@@ -1,5 +1,11 @@
 import type { DesignScope } from "./document";
 import { nodesForDevId } from "../lib/componentDevIds";
+import {
+  DESIGN_TARGET_SELECTOR,
+  designIdOf,
+  designIdSelector,
+  isGeneratedDesignId,
+} from "../lib/designIdentity";
 
 /** Stable opt-out boundary for engineering drawings and model canvases inside editable UI. */
 export const TECHNICAL_CONTENT_ATTRIBUTE = "data-design-technical-content";
@@ -111,9 +117,13 @@ function isTechnical(element: Element): boolean {
 }
 
 function targetIn(root: Element, id: string): Element | null {
-  return inclusiveElements(root, "[data-dev-id]").find(
-    (element) => element.getAttribute("data-dev-id") === id,
-  ) ?? null;
+  if (designIdOf(root) === id) return root;
+  return root.querySelector(designIdSelector(id));
+}
+
+function belongsToTarget(element: Element, target: Element): boolean {
+  const authoredBoundary = element.closest("[data-dev-id]");
+  return authoredBoundary === target || authoredBoundary === null || !target.contains(authoredBoundary);
 }
 
 function textDomains(target: Element): TargetTextDomain[] {
@@ -145,7 +155,7 @@ function iconDomains(target: Element): TargetIconDomain[] {
   const claimed = new Set<Element>();
   for (const element of inclusiveElements(target, "[data-icon-id], svg.ico, svg")) {
     if (isTechnical(element)) continue;
-    if (element.closest("[data-dev-id]") !== target) continue;
+    if (!belongsToTarget(element, target)) continue;
     const iconOwner = element.closest("[data-icon-id]");
     const owner = iconOwner && target.contains(iconOwner) ? iconOwner : element;
     if (claimed.has(owner)) continue;
@@ -157,7 +167,7 @@ function iconDomains(target: Element): TargetIconDomain[] {
 
 function behaviorDomains(target: Element): Element[] {
   return inclusiveElements(target, "[data-dev-control]").filter(
-    (element) => !isTechnical(element) && element.closest("[data-dev-id]") === target,
+    (element) => !isTechnical(element) && belongsToTarget(element, target),
   );
 }
 
@@ -165,7 +175,7 @@ function stateDomains(target: Element): TargetStateDomain[] {
   const states: TargetStateDomain[] = [];
   for (const element of inclusiveElements(target, "*")) {
     if (isTechnical(element)) continue;
-    if (element.closest("[data-dev-id]") !== target) continue;
+    if (!belongsToTarget(element, target)) continue;
     for (const name of STATE_ATTRIBUTES) {
       const value = element.getAttribute(name);
       if (value !== null) states.push({ element, name, value });
@@ -266,7 +276,10 @@ export function elementsForTargetDomainOverride(
 ): Element[] {
   const address = parseTargetDomainOverrideId(overrideId);
   const elements: Element[] = [];
-  for (const target of nodesForDevId(address.targetId, root)) {
+  const targets = isGeneratedDesignId(address.targetId)
+    ? Array.from(root.querySelectorAll(designIdSelector(address.targetId)))
+    : nodesForDevId(address.targetId, root);
+  for (const target of targets) {
     if (address.domain === "box") elements.push(target);
     else if (address.domain === "text") {
       elements.push(...domainElementsExceptTarget(textDomains(target), target));
@@ -278,7 +291,7 @@ export function elementsForTargetDomainOverride(
 }
 
 function allTargetElements(root: Element): Element[] {
-  return inclusiveElements(root, "[data-dev-id]");
+  return inclusiveElements(root, DESIGN_TARGET_SELECTOR);
 }
 
 /** Resolve a scope to its concrete stable ids before an inspector command writes anything. */
@@ -293,7 +306,7 @@ export function previewTargetScope(
   const screen = id.split(".", 1)[0] || id;
   const ids = new Set<string>();
   for (const element of allTargetElements(root)) {
-    const candidate = element.getAttribute("data-dev-id");
+    const candidate = designIdOf(element);
     if (!candidate) continue;
     const include =
       scope === "global" ||

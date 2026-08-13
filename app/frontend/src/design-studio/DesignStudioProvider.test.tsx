@@ -43,7 +43,7 @@ const mockApi = vi.mocked(api);
 
 function fixtureDocument(): DesignDocument {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     base: {
       tokens: { root: {}, light: {} },
       copy: {},
@@ -54,7 +54,9 @@ function fixtureDocument(): DesignDocument {
     },
     variations: {},
     activeVariationId: "",
-    targetScopes: {},
+    globalTargets: {},
+    orphanedEdits: {},
+    cadPresentation: {},
   };
 }
 
@@ -133,7 +135,10 @@ function historyDocument(): DesignDocument {
     },
   };
   document.activeVariationId = "custom";
-  document.targetScopes = { target: "role", target2: "screen" };
+  document.globalTargets = {
+    target: { id: "target", identity: "authored" },
+    target2: { id: "target2", identity: "authored" },
+  };
   return document;
 }
 
@@ -346,7 +351,7 @@ describe("DesignStudioProvider", () => {
 
     expect(mockApi.designStudioPut).toHaveBeenCalledWith({
       document: expect.objectContaining({
-        schemaVersion: 1,
+        schemaVersion: 2,
         base: expect.objectContaining({ copy: { "rail.about": "Information" } }),
       }),
       expected_revision: "r1",
@@ -509,11 +514,13 @@ describe("DesignStudioProvider", () => {
         });
       } else {
         studio.replaceDocumentAtomically({
-          schemaVersion: 1,
+          schemaVersion: 2,
           base: emptyDevModeDraft(),
           variations: {},
           activeVariationId: "",
-          targetScopes: {},
+          globalTargets: {},
+          orphanedEdits: {},
+          cadPresentation: {},
         });
       }
 
@@ -523,7 +530,10 @@ describe("DesignStudioProvider", () => {
         expect(readDocument()).toEqual(beforeDocument);
         expect(readDraft()).toEqual(beforeDraft);
       });
-      expect(readDocument().targetScopes).toEqual({ target: "role", target2: "screen" });
+      expect(readDocument().globalTargets).toEqual({
+        target: { id: "target", identity: "authored" },
+        target2: { id: "target2", identity: "authored" },
+      });
       expect(readDocument().activeVariationId).toBe("custom");
       expect(readDocument().variations.custom?.extends).toBe("parent");
     },
@@ -532,7 +542,7 @@ describe("DesignStudioProvider", () => {
   it("falls back to the shipped draft when persisted input is invalid", async () => {
     mockApi.designStudioGet.mockResolvedValue({
       revision: "bad",
-      document: { schemaVersion: 2, base: { copy: { "rail.components": "Broken" } } },
+      document: { schemaVersion: 2, base: [] },
     });
 
     renderStudio();

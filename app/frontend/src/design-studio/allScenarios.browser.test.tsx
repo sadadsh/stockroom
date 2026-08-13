@@ -1,6 +1,8 @@
 import { afterAll, describe, expect, it } from "vitest";
 import { bootstrapScenarioRegistry } from "./scenarios";
 import { mountScenario } from "./scenarios/testHarness";
+import { coverageIssuesFor } from "./targetCoverage";
+import { DEV_IDS } from "../lib/devIds";
 
 /**
  * Browser-floor coverage over the one production scenario registry. The external Playwright
@@ -30,6 +32,14 @@ describe("all production Design Studio scenarios", () => {
       }
       const productRoot = document.querySelector("[data-design-product-root]");
       expect(productRoot).toBeInTheDocument();
+      expect(
+        coverageIssuesFor(productRoot!, DEV_IDS).map((issue) => ({
+          code: issue.code,
+          tag: issue.element.tagName,
+          targetId: issue.targetId,
+          outerHTML: issue.element.outerHTML.slice(0, 240),
+        })),
+      ).toEqual([]);
       const targetState = scenario.expectedTargets.flatMap((target) =>
         Array.from(document.querySelectorAll(`[data-dev-id="${target}"], [data-dev-role="${target}"]`))
           .map((element) => element.outerHTML),

@@ -6,6 +6,7 @@ import { defineConfig, normalizePath } from "vite";
 import react from "@vitejs/plugin-react";
 import { viteStaticCopy } from "vite-plugin-static-copy";
 import pkg from "./package.json";
+import { stockroomDesignIdentityPlugin } from "./scripts/design-identity-transform.mjs";
 
 // pdf.js ships the 14 standard PDF fonts as separate files and loads them at RUNTIME from a
 // directory it is told about. Without them a datasheet whose text relies on a standard font
@@ -41,6 +42,7 @@ const appVersion = buildVersion();
 // bundle works whether the host loads it from the API mount or from file://.
 export default defineConfig({
   plugins: [
+    stockroomDesignIdentityPlugin(),
     react(),
     // `stripBase: true` matters: without it the plugin reproduces each file's path from the
     // project root, so the fonts land under `node_modules/pdfjs-dist/standard_fonts/...` in the

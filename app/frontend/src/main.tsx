@@ -9,6 +9,7 @@ import { ToastProvider } from "./lib/toast";
 import { ThemeProvider } from "./lib/theme";
 import { DesignStudioProvider } from "./design-studio/DesignStudioProvider";
 import { DevInspector } from "./components/DevInspector";
+import { DesignIdentityRuntime } from "./components/DesignIdentityRuntime";
 import { DesignStudioShell } from "./components/design-mode/DesignStudioShell";
 import { CaptureProvider } from "./lib/capture";
 // The interface face is the PLATFORM's: Segoe UI Variable, named in the token sheet, loaded from
@@ -66,6 +67,7 @@ createRoot(rootEl).render(
                 </RouterProvider>
               </ToastProvider>
               <DevInspector />
+              <DesignIdentityRuntime />
             </DesignStudioProvider>
           </ThemeProvider>
         </LazyMotion>

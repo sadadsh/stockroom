@@ -10,39 +10,36 @@ function fixture(markup: string): HTMLElement {
 }
 
 describe("target coverage", () => {
-  it("fails when a meaningful interactive or visual boundary has no stable target", () => {
+  it("automatically identities a meaningful interactive or visual boundary", () => {
     const root = fixture("<section><button>Save</button></section>");
-    expect(coverageIssuesFor(root, DEV_IDS)).toEqual(
-      expect.arrayContaining([expect.objectContaining({ code: "missing-target" })]),
-    );
-    expect(coverageIssuesFor(root, DEV_IDS).some((issue) => issue.element.tagName === "BUTTON")).toBe(true);
+    expect(coverageIssuesFor(root, DEV_IDS)).toEqual([]);
+    expect(root.querySelector("button")?.getAttribute("data-design-id")).toMatch(/^auto\./);
   });
 
-  it("lets one stable component target own its internal text and icon domains", () => {
+  it("requires generated identities on a control's internal text and icon nodes", () => {
     const root = fixture(`
-      <button data-dev-id="rail.about"><span>About</span><svg viewBox="0 0 24 24"></svg></button>
+      <button data-dev-id="rail.about"><span data-design-id="auto.fixture.0abc123">About</span><svg data-design-id="auto.fixture.0def456" viewBox="0 0 24 24"></svg></button>
     `);
     expect(coverageIssuesFor(root, DEV_IDS)).toEqual([]);
   });
 
-  it("does not let a shell root hide an unaddressed nested control", () => {
+  it("gives a nested control its own identity beneath the shell", () => {
     const root = fixture('<main data-dev-id="shell.root"><button>Save</button></main>');
-    expect(coverageIssuesFor(root, DEV_IDS)).toEqual([
-      expect.objectContaining({ code: "missing-target", element: root.querySelector("button") }),
-    ]);
+    expect(coverageIssuesFor(root, DEV_IDS)).toEqual([]);
+    expect(root.querySelector("button")).toHaveAttribute("data-design-id");
   });
 
-  it("does not let any broad page identity hide an unaddressed nested control", () => {
+  it("gives a nested control its own identity beneath a page", () => {
     const root = fixture('<main data-dev-id="components.root"><div><button>Save</button></div></main>');
-    expect(coverageIssuesFor(root, DEV_IDS)).toEqual([
-      expect.objectContaining({ code: "missing-target", element: root.querySelector("button") }),
-    ]);
+    expect(coverageIssuesFor(root, DEV_IDS)).toEqual([]);
+    expect(root.querySelector("button")).toHaveAttribute("data-design-id");
   });
 
-  it("does not let a broad page identity absorb nested text or icon boundaries", () => {
+  it("identities nested text and icon boundaries independently", () => {
     const root = fixture('<main data-dev-id="components.root"><h2>Summary</h2><svg viewBox="0 0 24 24"></svg></main>');
-    const missing = coverageIssuesFor(root, DEV_IDS).filter((issue) => issue.code === "missing-target");
-    expect(missing.map((issue) => issue.element.tagName)).toEqual(expect.arrayContaining(["H2", "svg"]));
+    expect(coverageIssuesFor(root, DEV_IDS)).toEqual([]);
+    expect(root.querySelector("h2")).toHaveAttribute("data-design-id");
+    expect(root.querySelector("svg")).toHaveAttribute("data-design-id");
   });
 
   it("derives text, icon, layout, and interactive boundaries without opt-in markers", () => {
@@ -57,7 +54,7 @@ describe("target coverage", () => {
     expect(root.querySelector("[data-design-meaningful]")).toBeNull();
   });
 
-  it("reports unaddressed text, icon, and semantic layout boundaries without annotations", () => {
+  it("automatically covers text, icon, and semantic layout boundaries without annotations", () => {
     const root = fixture(`
       <main>
         <section aria-label="Summary">
@@ -67,10 +64,22 @@ describe("target coverage", () => {
       </main>
     `);
 
-    const missingTags = coverageIssuesFor(root, DEV_IDS)
-      .filter((issue) => issue.code === "missing-target")
-      .map((issue) => issue.element.tagName.toLowerCase());
-    expect(missingTags).toEqual(expect.arrayContaining(["main", "section", "h2", "svg"]));
+    expect(coverageIssuesFor(root, DEV_IDS)).toEqual([]);
+    for (const tag of ["main", "section", "h2", "svg"]) {
+      expect(root.querySelector(tag)).toHaveAttribute("data-design-id");
+    }
+  });
+
+  it("supplies an identity to every Stockroom-owned rendered element", () => {
+    const root = fixture(`
+      <main data-dev-id="shell.root">
+        <div></div>
+        <span data-design-id="auto.fixture.0abc123">Ready</span>
+      </main>
+    `);
+
+    expect(coverageIssuesFor(root, DEV_IDS)).toEqual([]);
+    expect(root.querySelector("div")).toHaveAttribute("data-design-id");
   });
 
   it("accepts registered dev, copy, icon, layout-piece, and approved dynamic identities", () => {
@@ -114,5 +123,19 @@ describe("target coverage", () => {
       expect.objectContaining({ key: "copy:about.title", parentKey: "dev:rail.about", depth: 3 }),
     ]);
     expect(targetLayersFor(root, DEV_IDS).map((target) => target.key).join(" ")).not.toMatch(/index|:0|:1/);
+  });
+
+  it("includes generated identities in the complete layer tree", () => {
+    const root = fixture(`
+      <main data-dev-id="shell.root">
+        <div data-design-id="auto.fixture.0abc123"><span data-design-id="auto.fixture.0def456">Ready</span></div>
+      </main>
+    `);
+
+    expect(targetLayersFor(root, DEV_IDS)).toEqual([
+      expect.objectContaining({ key: "dev:shell.root", depth: 0 }),
+      expect.objectContaining({ key: "generated:auto.fixture.0abc123", depth: 1 }),
+      expect.objectContaining({ key: "generated:auto.fixture.0def456", depth: 2 }),
+    ]);
   });
 });

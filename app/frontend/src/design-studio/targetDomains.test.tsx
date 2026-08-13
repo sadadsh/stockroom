@@ -74,6 +74,22 @@ afterEach(() => {
 });
 
 describe("inspectTarget", () => {
+  it("inspects and edits a generated Stockroom target without an authored id", () => {
+    const target = document.createElement("section");
+    target.dataset.designId = "auto.generated-section.0abc123";
+    target.innerHTML = '<span data-copy-id="generated.copy">Generated copy</span>';
+    document.body.append(target);
+
+    const inspection = inspectTarget(target, "auto.generated-section.0abc123");
+    expect(inspection.id).toBe("auto.generated-section.0abc123");
+    expect(inspection.summary.texts).toBe(1);
+
+    applyElementOverrides({
+      "auto.generated-section.0abc123": { width: "320px" },
+    });
+    expect(target.style.width).toBe("320px");
+  });
+
   it.each<FixtureName>(["currentColor SVG", "fill SVG", "nested text", "mixed CAD header"])(
     "reports independent Box, Text, and Icon domains for %s",
     (fixture) => {

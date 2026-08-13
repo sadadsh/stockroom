@@ -50,3 +50,22 @@ provider creates a React modal with a fixed Close control and a measured native 
 The managed WPF host keeps its provider WebView inside that rectangle. The source pywebview host
 uses a second provider-only window over the same rectangle; it never navigates the Stockroom
 window. Closing only hides the native surface, so an active download and its lease continue.
+
+### Generated Global Identity Boundary
+
+The JSX build transform will preserve authored `data-dev-id` values and add deterministic
+`data-design-id` values to otherwise unidentified Stockroom-owned host elements. The key is derived
+from the owning source component and host-element source location, so repeated renders share one
+global target while unrelated elements cannot collide. Portals remain Stockroom-owned; provider
+document internals and raw CAD geometry remain outside this boundary. Runtime-created Stockroom DOM
+must use the same identity helper. Production coverage derives candidates from the rendered tree and
+fails when any owned element lacks either identity.
+
+Dynamic JSX tags, cloned elements, portals, and imperative DOM use a deterministic runtime fallback.
+The coverage gate instruments only the bounded Stockroom product tree before proving that every
+non-technical element is addressable; Design Studio chrome remains outside selection.
+
+Design Document v2 removes legacy scope selection, stores global target overrides, and retains
+unresolved identities as orphaned edits. Loading v1 is a migration, not a destructive rewrite:
+legacy overrides are mapped where deterministic authority exists and otherwise remain visible for
+manual remapping.
