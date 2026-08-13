@@ -190,6 +190,26 @@ def test_draft_sanitizes_urls_and_rejects_secret_shaped_dynamic_fields() -> None
         "https://www.digikey.com/en/products/detail/x"
     )
 
+    exact_miss = _draft_body("DG714BRUZ-REEL")
+    exact_miss["review"]["enrichment_result"] = {
+        "category": "",
+        "mpn": None,
+        "manufacturer": None,
+        "description": None,
+        "datasheet_url": None,
+        "stock": None,
+        "package": None,
+        "price_breaks": [],
+        "specs": {},
+        "source_states": {"digikey": "unavailable"},
+        "identity_suggestions": {"digikey": ["ADG714BRUZ-REEL"]},
+        "schema_version": 1,
+    }
+    recovered = create_draft(exact_miss)
+    assert recovered["review"]["enrichment_result"]["identity_suggestions"] == {
+        "digikey": ["ADG714BRUZ-REEL"]
+    }
+
     hostile = _draft_body()
     hostile["review"]["enrichment_result"] = {
         "category": "ICs",

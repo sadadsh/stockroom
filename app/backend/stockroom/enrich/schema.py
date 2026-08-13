@@ -213,6 +213,10 @@ class EnrichmentResult:
     # indistinguishable from a part the distributor simply does not carry. Values are fixed
     # vocabulary only; no exception text or credential material ever lands here.
     source_states: dict[str, str] = field(default_factory=dict)
+    # Official keyword-search candidates returned when no exact manufacturer part number exists.
+    # They are display-only recovery choices and never contribute identity or part fields until the
+    # person explicitly chooses one and Stockroom performs a new exact lookup.
+    identity_suggestions: dict[str, list[str]] = field(default_factory=dict)
     schema_version: int = SCHEMA_VERSION
 
     def filled_fields(self) -> set[str]:
@@ -284,3 +288,8 @@ class EnrichmentResult:
             self.catalog.setdefault(key, dict(val))
         for key, val in other.source_states.items():
             self.source_states.setdefault(key, val)
+        for key, values in other.identity_suggestions.items():
+            existing = self.identity_suggestions.setdefault(key, [])
+            for value in values:
+                if value not in existing:
+                    existing.append(value)

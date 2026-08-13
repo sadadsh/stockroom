@@ -652,7 +652,23 @@ def parse_digikey_payload(body: dict | None, mpn: str) -> EnrichmentResult:
     detailed = _details_product(body, mpn)
     chosen = detailed or exact
     if not isinstance(chosen, dict):
-        return EnrichmentResult()
+        suggestions: list[str] = []
+        seen: set[str] = set()
+        for product in products:
+            if not isinstance(product, dict):
+                continue
+            candidate = _obj_str(product.get("ManufacturerProductNumber")).strip()
+            key = normalize_mpn(candidate)
+            if not candidate or not key or key in seen:
+                continue
+            seen.add(key)
+            suggestions.append(candidate)
+            if len(suggestions) == 5:
+                break
+        result = EnrichmentResult()
+        if suggestions:
+            result.identity_suggestions["digikey"] = suggestions
+        return result
     result = _parse_digikey_part(chosen)
     catalog = digikey_catalog_from_payload(body, mpn)
     if catalog:

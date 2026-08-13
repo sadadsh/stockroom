@@ -79,6 +79,7 @@ interface Gesture {
   centerX: number;
   centerY: number;
   startAngle: number;
+  changed: boolean;
   previews: GesturePreview[];
 }
 
@@ -216,6 +217,25 @@ export function DevInspector() {
   useEffect(() => {
     if (!enabled) return;
 
+    function selectFromEvent(e: MouseEvent | PointerEvent): boolean {
+      const target = e.target as Element | null;
+      const el = target && "closest" in target ? selectableTarget(target) : null;
+      if (!el) return false;
+      const id = designIdOf(el);
+      if (!id) return false;
+      e.preventDefault();
+      e.stopPropagation();
+      const selected = { id, label: displayLabel(id, el), element: el as Element & ElementCSSInlineStyle };
+      setSelection((current) => {
+        if (!e.shiftKey) return [selected];
+        const withoutDuplicate = current.filter((item) => item.id !== id);
+        return [...withoutDuplicate, selected];
+      });
+      selectDevId(id);
+      selectVars(usedVarsForElement(el));
+      return true;
+    }
+
     function onPointerMove(e: PointerEvent) {
       if (!inspect) return;
       const target = e.target as Element | null;
@@ -234,29 +254,22 @@ export function DevInspector() {
 
     function onClick(e: MouseEvent) {
       if (!inspect) return; // inspect OFF: zero behaviour change, the click passes through untouched
-      const target = e.target as Element | null;
-      const el = target && "closest" in target ? selectableTarget(target) : null;
-      if (!el) return;
-      const id = designIdOf(el);
-      if (!id) return;
-      // Swallow the click so no app action / copy layer handler fires (the document-capture phase
-      // runs before the React root, so stopPropagation keeps the event from ever reaching it).
-      e.preventDefault();
-      e.stopPropagation();
-      const selected = { id, label: displayLabel(id, el), element: el as Element & ElementCSSInlineStyle };
-      setSelection((current) => {
-        if (!e.shiftKey) return [selected];
-        const withoutDuplicate = current.filter((item) => item.id !== id);
-        return [...withoutDuplicate, selected];
-      });
-      selectDevId(id);
-      selectVars(usedVarsForElement(el));
+      // Browser pointer clicks were already selected on pointerdown. Detail zero is the keyboard
+      // and synthetic-click path, which has no pointerdown and therefore selects here.
+      if (e.detail === 0) selectFromEvent(e);
+    }
+
+    function onPointerDown(e: PointerEvent) {
+      if (!inspect || e.button !== 0) return;
+      selectFromEvent(e);
     }
 
     document.addEventListener("pointermove", onPointerMove, true);
+    document.addEventListener("pointerdown", onPointerDown, true);
     document.addEventListener("click", onClick, true);
     return () => {
       document.removeEventListener("pointermove", onPointerMove, true);
+      document.removeEventListener("pointerdown", onPointerDown, true);
       document.removeEventListener("click", onClick, true);
     };
   }, [enabled, inspect, selectDevId, selectVars]);
@@ -311,6 +324,11 @@ export function DevInspector() {
       const south = resizing && gesture.kind.includes("south");
       const currentAngle = Math.atan2(event.clientY - gesture.centerY, event.clientX - gesture.centerX) * 180 / Math.PI;
       const angleDelta = currentAngle - gesture.startAngle;
+      const changed = gesture.kind === "rotate"
+        ? Math.abs(angleDelta) > 0.01
+        : Math.abs(deltaX) > 0.01 || Math.abs(deltaY) > 0.01;
+      if (!changed) return;
+      gesture.changed = true;
       for (const preview of gesture.previews) {
         const { element, id } = preview.target;
         const activeOverride = activeElements[id];
@@ -349,6 +367,11 @@ export function DevInspector() {
     function finishGesture(event: PointerEvent) {
       const gesture = gestureRef.current;
       if (!gesture || event.pointerId !== gesture.pointerId) return;
+      if (!gesture.changed) {
+        gestureRef.current = null;
+        measureSelection();
+        return;
+      }
       const changes = new Map<string, Record<string, string>>();
       for (const preview of gesture.previews) {
         const props: Record<string, string> = {};
@@ -432,6 +455,7 @@ export function DevInspector() {
       centerX: rect.left + rect.width / 2,
       centerY: rect.top + rect.height / 2,
       startAngle: Math.atan2(event.clientY - (rect.top + rect.height / 2), event.clientX - (rect.left + rect.width / 2)) * 180 / Math.PI,
+      changed: false,
       previews: selection.map((target) => {
         const overrides = draftRef.current.elements[target.id] ?? {};
         const targetRect = target.element.getBoundingClientRect();
@@ -603,7 +627,7 @@ export function DevInspector() {
   if (!enabled) return null;
 
   return createPortal(
-    <div className="pointer-events-none fixed inset-0 z-[190]">
+    <div data-design-studio-chrome="true" className="pointer-events-none fixed inset-0 z-[190]">
       {/* Hover highlight + badge, only while Inspect is on. */}
       {inspect && hover ? (
         <div

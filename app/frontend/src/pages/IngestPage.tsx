@@ -207,9 +207,10 @@ export function IngestPage() {
     setPendingIntakeDraft(draft);
   }, [input, lookedUpInput, result, staged]);
 
-  const lookUp = useCallback(() => {
-    const v = input.trim();
+  const runLookup = useCallback((raw: string) => {
+    const v = raw.trim();
     if (!v || looking) return;
+    setInput(v);
     setResult(null);
     setStaged(null);
     setLookedUpInput(v);
@@ -217,7 +218,8 @@ export function IngestPage() {
     // the sourced fields in once the stream ends (a submit/stream failure lands as enrich.error).
     if (isUrl(v)) enrich.runUrl(v);
     else enrich.runPart(v);
-  }, [input, looking, enrich]);
+  }, [looking, enrich]);
+  const lookUp = useCallback(() => runLookup(input), [input, runLookup]);
 
   // Fold the finished lookup into the page: the sourced result feeds the passive section and
   // metadata-only staging; a total miss or an error is surfaced honestly.
@@ -351,7 +353,13 @@ export function IngestPage() {
       ) : null}
 
       {blockedFetch ? (
-        <BlockedFetchCard vendor={blockedKeyVendor} lookedUpInput={lookedUpInput} />
+        <BlockedFetchCard
+          vendor={blockedKeyVendor}
+          lookedUpInput={lookedUpInput}
+          sourceStates={result.source_states ?? {}}
+          suggestions={result.identity_suggestions ?? {}}
+          onCorrect={runLookup}
+        />
       ) : null}
 
       {staged && staged.length > 0 ? (
@@ -480,10 +488,18 @@ function LookupHero({
 function BlockedFetchCard({
   vendor,
   lookedUpInput,
+  sourceStates,
+  suggestions,
+  onCorrect,
 }: {
   vendor: string | null;
   lookedUpInput: string;
+  sourceStates: Record<string, string>;
+  suggestions: Record<string, string[]>;
+  onCorrect: (mpn: string) => void;
 }) {
+  const candidates = [...new Set(Object.values(suggestions).flat())];
+  const correctionLabel = useCopyFormatter("ingest.blocked-use-correction", "Use {mpn}");
   return (
     <Card data-dev-id="ingest.blocked" className="px-4 py-4">
       <div className="flex flex-col gap-3">
@@ -514,6 +530,29 @@ function BlockedFetchCard({
             </>
           )}
         </span>
+        {sourceStates.digikey === "unavailable" ? (
+          <p className="text-xs text-t2">
+            <Text id="ingest.blocked-digikey-checked">DigiKey was checked and returned no exact match.</Text>
+          </p>
+        ) : null}
+        {candidates.length > 0 ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs text-t3">
+              <Text id="ingest.blocked-corrections">Did you mean:</Text>
+            </span>
+            {candidates.map((candidate) => (
+              <Button
+                key={candidate}
+                type="button"
+                small
+                aria-label={correctionLabel({ mpn: candidate })}
+                onClick={() => onCorrect(candidate)}
+              >
+                {candidate}
+              </Button>
+            ))}
+          </div>
+        ) : null}
       </div>
     </Card>
   );

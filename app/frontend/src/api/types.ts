@@ -508,6 +508,9 @@ export interface EnrichmentResult {
   // vendor key ("mouser"/"digikey"). Fixed vocabulary; optional so cached results
   // written before the field existed still type-check.
   source_states?: Record<string, EnrichSourceState>;
+  // Official distributor keyword results shown only after an exact miss. Choosing one starts a
+  // new exact lookup; candidates never populate a part automatically.
+  identity_suggestions?: Record<string, string[]>;
   schema_version: number;
 }
 

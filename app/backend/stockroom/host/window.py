@@ -244,7 +244,8 @@ class InAppProviderBrowserSurface:
             self._active_component_id = component_id
         if component_id != self._active_component_id:
             self._last_provider_viewport = None
-            provider.hide()
+            if provider is not None:
+                provider.hide()
             return False
         self._last_provider_viewport = dict(viewport)
         # React often measures and publishes the modal before the durable capture worker has

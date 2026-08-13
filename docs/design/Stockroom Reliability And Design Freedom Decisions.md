@@ -230,3 +230,23 @@ writes through the same validated Design Document grammar and remains undoable.
 Text entry remains only where text is the actual content: labels, copy, search, accessibility text,
 draft names, and the explicitly named Advanced validated-value escape hatch. Advanced preserves exact
 CSS authoring without making ordinary property editing depend on memorizing CSS syntax.
+
+### Exact Intake Recovery And Direct Gesture Safety
+
+Distributor enrichment remains exact-identity only. When an entered manufacturer part number has no
+exact match but an official distributor returns close candidates, Stockroom must not create or enrich
+a near-match record automatically. It presents the candidate manufacturer part numbers as explicit
+corrections; choosing one replaces the draft identity and starts a new exhaustive lookup against all
+enabled sources. The source status must distinguish an API query that returned no exact match from a
+source that was never queried.
+
+Direct Edit selection begins on the capture-phase pointer press, not the later click. This makes the
+element under the visible highlight the inspector authority before nested controls or copy handlers can
+consume the click. A press on Move, Rotate, or Resize without actual pointer motion is selection-only
+and creates no draft/history entry. Design Studio overlay chrome is permanently outside the target
+grammar, and Escape cancellation restores the complete inline-style preview before leaving the gesture.
+
+The provider placeholder is not success evidence. It remains visible only behind the dedicated native
+provider WebView; browser readiness requires a current host runtime to accept and apply the measured
+modal viewport after the capture lease exists. Source fixes are not represented as delivered until CI
+passes and a usable Windows runtime containing them is published or installed.

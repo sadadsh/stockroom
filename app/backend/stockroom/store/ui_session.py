@@ -796,6 +796,8 @@ def _enrichment_result(value: object) -> dict | None:
         "field_conflicts",
         "add_plan",
         "catalog",
+        "source_states",
+        "identity_suggestions",
     }
     obj = _expect_exact(
         value,

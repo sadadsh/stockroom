@@ -1046,6 +1046,9 @@ def _result_to_cache(r: EnrichmentResult) -> dict:
         # the per-source verdicts (a cache hit must keep showing the same degraded state the
         # stored answer was produced under, never silently upgrade to "fine")
         "source_states": dict(r.source_states),
+        "identity_suggestions": {
+            key: list(values) for key, values in r.identity_suggestions.items()
+        },
     }
 
 
@@ -1084,5 +1087,10 @@ def _result_from_cache(d: dict, category: str) -> EnrichmentResult:
     }
     r.source_states = {
         str(key): str(value) for key, value in (d.get("source_states") or {}).items()
+    }
+    r.identity_suggestions = {
+        str(key): [str(value) for value in values if isinstance(value, str)]
+        for key, values in (d.get("identity_suggestions") or {}).items()
+        if isinstance(values, list)
     }
     return r

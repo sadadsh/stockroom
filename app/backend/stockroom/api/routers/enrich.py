@@ -117,6 +117,9 @@ def _result_dto(r: EnrichmentResult) -> dict:
         # success / unavailable / failed / not_configured. Fixed vocabulary only - never an
         # exception body, a key, or a URL.
         "source_states": dict(r.source_states),
+        "identity_suggestions": {
+            key: list(values) for key, values in r.identity_suggestions.items()
+        },
         "schema_version": r.schema_version,
     }
 

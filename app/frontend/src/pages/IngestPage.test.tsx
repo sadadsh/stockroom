@@ -322,6 +322,33 @@ describe("IngestPage network-only Add A Part", () => {
     expect(screen.queryByRole("button", { name: "Add to Components" })).not.toBeInTheDocument();
   });
 
+  it("shows an official near MPN as an explicit correction and re-runs exact lookup", async () => {
+    mockApi.enrichPart
+      .mockResolvedValueOnce({ job_id: "typo-1" })
+      .mockResolvedValueOnce({ job_id: "corrected-1" });
+    mockApi.openJobStream
+      .mockResolvedValueOnce(streamOf({
+        ...EMPTY_RESULT,
+        source_states: { digikey: "unavailable" },
+        identity_suggestions: { digikey: ["ADG714BRUZ-REEL", "ADG714BRUZ-REEL7"] },
+      } as EnrichmentResult))
+      .mockResolvedValueOnce(streamOf({
+        ...EMPTY_RESULT,
+        mpn: sourced("ADG714BRUZ-REEL", "digikey"),
+        manufacturer: sourced("Analog Devices", "digikey"),
+      }));
+    wrapper(<IngestPage />);
+    const user = userEvent.setup();
+
+    await user.type(screen.getByLabelText("Product link or part number"), "DG714BRUZ-REEL");
+    await user.click(screen.getByRole("button", { name: "Look Up" }));
+    await user.click(await screen.findByRole("button", { name: "Use ADG714BRUZ-REEL" }));
+
+    expect(mockApi.enrichPart).toHaveBeenNthCalledWith(2, "ADG714BRUZ-REEL", undefined, undefined);
+    expect(await screen.findByText("Review and Add")).toBeInTheDocument();
+    expect(screen.getByLabelText("Part Number")).toHaveValue("ADG714BRUZ-REEL");
+  });
+
   it("shows every pulled spec disagreement while keeping local CAD absent", async () => {
     mockApi.enrichFromUrl.mockResolvedValue({ job_id: "spec-1" });
     mockApi.openJobStream.mockResolvedValue(

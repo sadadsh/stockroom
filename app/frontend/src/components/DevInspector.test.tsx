@@ -107,6 +107,21 @@ describe("DevInspector", () => {
     expect(screen.getByTestId("vars")).toHaveTextContent("--c-warn,--c-t1");
   });
 
+  it("makes the highlighted element the editing selection on pointer press", () => {
+    render(<Harness />);
+    on("toggle-dev");
+    on("toggle-inspect");
+    fireEvent.click(screen.getByRole("button", { name: "Complete Part" }));
+    expect(screen.getByTestId("selected")).toHaveTextContent("detail.complete-part");
+
+    const next = screen.getByTestId("ico");
+    fireEvent.pointerMove(next);
+    expect(screen.getByTestId("dev-hover")).toBeInTheDocument();
+    fireEvent(next, new MouseEvent("pointerdown", { bubbles: true, button: 0 }));
+
+    expect(screen.getByTestId("selected").textContent).toMatch(/^auto\.dom-svg\./);
+  });
+
   it("selects an automatically exposed icon as its own editable element", () => {
     render(<Harness />);
     on("toggle-dev");
@@ -275,6 +290,23 @@ describe("DevInspector", () => {
     on("undo");
     expect(target.style.width).toBe("");
     expect(target.style.height).toBe("");
+  });
+
+  it("does not write or move anything when the Move grip is only clicked", () => {
+    render(<Harness />);
+    on("toggle-dev");
+    on("toggle-inspect");
+    const target = screen.getByRole("button", { name: "Complete Part" });
+    fireEvent.click(target);
+
+    const move = screen.getByRole("button", { name: "Move Complete Part" });
+    fireEvent.pointerDown(move, { pointerId: 7, clientX: 40, clientY: 20 });
+    fireEvent.pointerUp(window, { pointerId: 7, clientX: 40, clientY: 20 });
+
+    expect(target.style.position).toBe("");
+    expect(target.style.left).toBe("");
+    expect(target.style.top).toBe("");
+    expect(screen.getByTestId("element-overrides")).toHaveTextContent("{}");
   });
 
   it("uses Shift-click for multi-selection and hides both global targets", () => {
