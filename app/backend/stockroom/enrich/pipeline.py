@@ -552,7 +552,10 @@ class EnrichmentPipeline:
             # An instant cache hit does no network work; the job returns straight to a
             # `done`, so no fetching/rendering stage is claimed for it.
             hit = _result_from_cache(cached, category)
-            if hit.mpn is None or mpn_identity_key(hit.mpn.value) == mpn_identity_key(mpn):
+            if (
+                (hit.mpn is None or mpn_identity_key(hit.mpn.value) == mpn_identity_key(mpn))
+                and self._cache_covers_current_sources(hit)
+            ):
                 # Classify the cache hit too. An install carries entries written BEFORE the MPN
                 # path classified at all, whose stored category is "Other" beside a perfectly
                 # good Product Category, and a cached answer must not serve that stale verdict
@@ -576,6 +579,23 @@ class EnrichmentPipeline:
         self._record_unconfigured_officials(result)
         self.cache.put(mpn, _result_to_cache(result))
         return result
+
+    def _cache_covers_current_sources(self, result: EnrichmentResult) -> bool:
+        """Whether every distributor available now was consulted for this cached answer.
+
+        Distributor credentials can be added after an MPN was cached. A previous
+        ``not_configured`` verdict is then stale configuration, not a useful product result;
+        refresh immediately so Add Parts queries the newly available source on its first try.
+        """
+        current = {
+            str(getattr(source, "vendor_key", "") or "").strip().lower()
+            for source in self.registry.sources
+        }
+        current.discard("")
+        return all(
+            result.source_states.get(vendor) not in {None, "not_configured"}
+            for vendor in current
+        )
 
     def _record_unconfigured_officials(self, result: EnrichmentResult) -> None:
         """Both official distributor APIs always appear in the per-source states.

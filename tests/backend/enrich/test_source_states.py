@@ -157,6 +157,25 @@ def test_source_states_survive_the_cache_round_trip():
     assert restored.source_states == {"mouser": "success", "digikey": "failed"}
 
 
+def test_configuring_a_new_distributor_refreshes_a_stale_cached_part(tmp_path):
+    """A cache written before DigiKey setup must not hide DigiKey until its TTL expires."""
+
+    from stockroom.enrich.pipeline import _result_to_cache
+
+    mouser = _FakeAdapter(_answer("S1M", "mouser"))
+    digikey = _FakeAdapter(_answer("S1M", "digikey"))
+    pipeline = EnrichmentPipeline(tmp_path, mouser=mouser, digikey=digikey)
+    pipeline.registry = SourceRegistry([_MouserSource(mouser), _DigiKeySource(digikey)])
+    stale = _answer("S1M", "mouser")
+    stale.source_states = {"mouser": "success", "digikey": "not_configured"}
+    pipeline.cache.put("S1M", _result_to_cache(stale))
+
+    result = pipeline.enrich("S1M", "Other")
+
+    assert mouser.calls == 1 and digikey.calls == 1
+    assert result.source_states == {"mouser": "success", "digikey": "success"}
+
+
 def test_source_states_reach_the_result_dto():
     result = EnrichmentResult()
     result.source_states = {"mouser": "unavailable", "digikey": "success"}
