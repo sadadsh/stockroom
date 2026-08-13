@@ -85,7 +85,7 @@ export function SourcingSubSection({
  */
 export function PropertyRow({ label, children }: { label: ReactNode; children: ReactNode }) {
   return (
-    <div className="flex min-h-[24px] items-baseline gap-2 border-b border-line/60 px-2 py-1 last:border-b-0">
+    <div className="flex min-h-[24px] items-baseline gap-2 px-2 py-1.5 hover:bg-[var(--c-hover)]">
       <span className="ui-property-label w-[7.5rem] flex-none">{label}</span>
       <span className="min-w-0 flex-1">{children}</span>
     </div>

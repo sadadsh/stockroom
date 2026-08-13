@@ -165,12 +165,9 @@ function OfferRow({ offer }: { offer: DistributorOffer }) {
     <tr
       data-dev-id="component-browser.offer-row"
       data-offer-provider={offer.provider}
-      // A REAL GRID. The row carries an alternating tint and every cell a 1px right rule, because
-      // eight numeric columns read across without either: a data grid that hides its cells asks the
-      // eye to hold a column boundary it cannot see. Both steps are deliberately at the edge of
-      // perception - `--c-row-alt` is 1.06:1 off the workspace - so it reads as structure and not
-      // as stripes.
-      className="border-b border-line/60 last:border-b-0 even:bg-row-alt [&>td]:border-r [&>td]:border-line/50 [&>td:last-child]:border-r-0"
+      // Fixed colgroup widths and numeric alignment carry the comparison. A restrained horizontal
+      // rhythm replaces the full cell grid so the values stay compact without looking boxed in.
+      className="border-b border-line/40 last:border-b-0 even:bg-row-alt/50 hover:bg-[var(--c-hover)]"
     >
       <td className="px-2 py-1 align-baseline">
         <span className="ui-row-secondary block truncate" title={offer.providerLabel}>
@@ -267,7 +264,7 @@ function Heading({
     <th
       scope="col"
       className={
-        "ui-table-header whitespace-nowrap border-r border-line/50 px-2 py-1 last:border-r-0 " +
+        "ui-table-header whitespace-nowrap px-2 py-1 " +
         (numeric ? "text-right" : "text-left")
       }
     >

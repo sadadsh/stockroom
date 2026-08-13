@@ -114,13 +114,12 @@ export function SpecificationRow({
       data-spec-key={record.key}
       data-spec-state={state}
       data-spec-importance={record.importance}
-      // A REAL GRID ROW: an alternating tint so a label and its value stay on one line across a
-      // fixed 9.5rem label column, and a 1px rule between the label column and the value it
-      // introduces. `--c-row-alt` is a 1.06:1 step off the workspace - structure, not stripes.
-      className="border-b border-line/60 last:border-b-0 even:bg-row-alt"
+      // Compact rows align on a fixed label column. A quiet alternating wash and hover state keep
+      // each value on its line without boxing every label and value into separate cells.
+      className="even:bg-row-alt/50 hover:bg-[var(--c-hover)]"
     >
       <div className="flex min-h-[24px] items-baseline gap-2 px-2 py-1">
-        <span className="ui-property-label w-[9.5rem] flex-none break-words border-r border-line/50 pr-2">
+        <span className="ui-property-label w-[9.5rem] flex-none break-words pr-3">
           {record.label}
         </span>
         <span

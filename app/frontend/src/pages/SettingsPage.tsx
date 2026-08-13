@@ -84,7 +84,7 @@ function StatusRow({
   value: ReactNode;
 }) {
   return (
-    <div className="flex items-center justify-between gap-4 border-b border-line py-2 last:border-b-0">
+    <div className="flex items-center justify-between gap-4 py-2">
       <span className="flex-none text-xs text-t3">
         {labelId ? <Text id={labelId}>{label}</Text> : label}
       </span>
