@@ -4,10 +4,10 @@ import { isSafeElementValue } from "../../../lib/elementLayout";
 import type { DomainInspectorProps } from "./types";
 
 const GROUPS = [
-  ["Display And Size", ["display", "width", "height", "min-width", "min-height", "max-width", "max-height"]],
-  ["Spacing", ["margin", "margin-top", "margin-right", "margin-bottom", "margin-left", "padding", "padding-top", "padding-right", "padding-bottom", "padding-left", "gap", "row-gap", "column-gap"]],
-  ["Appearance", ["visibility", "opacity", "background-color", "border-color", "border-radius"]],
-  ["Alignment", ["flex-direction", "flex-wrap", "justify-content", "align-items", "align-content"]],
+  ["layout", "Show And Size", ["display", "visibility", "position", "inset", "top", "right", "bottom", "left", "width", "height", "min-width", "min-height", "max-width", "max-height"]],
+  ["layout", "Spacing", ["margin", "margin-top", "margin-right", "margin-bottom", "margin-left", "padding", "padding-top", "padding-right", "padding-bottom", "padding-left", "gap", "row-gap", "column-gap"]],
+  ["layout", "Alignment", ["flex-direction", "flex-wrap", "justify-content", "align-items", "align-content", "grid-template-columns", "grid-template-rows", "grid-auto-flow"]],
+  ["appearance", "Surface", ["opacity", "background-color", "background-image", "border-color", "border-radius", "border-style", "border-width", "box-shadow", "transform", "filter", "z-index"]],
 ] as const;
 
 function labelOf(property: string): string {
@@ -43,11 +43,12 @@ function PropertyRow({ property, ...props }: { property: string } & DomainInspec
   );
 }
 
-export function BoxInspector(props: DomainInspectorProps) {
+export function BoxInspector(props: DomainInspectorProps & { section?: "layout" | "appearance" }) {
+  const section = props.section;
   const note = useText("design-studio.inspector.box.advanced-note", "Position, inset, overflow, gradients, borders, shadows, flex, and grid values remain visible in Advanced when accepted in the validated application grammar.");
   return (
     <div className="px-3.5 py-2">
-      {GROUPS.map(([title, properties]) => (
+      {GROUPS.filter(([group]) => !section || group === section).map(([, title, properties]) => (
         <section key={title} className="border-b border-line py-2 last:border-b-0">
           <h4 className="ui-property-label mb-1">{title}</h4>
           {properties.map((property) => <PropertyRow key={property} property={property} {...props} />)}

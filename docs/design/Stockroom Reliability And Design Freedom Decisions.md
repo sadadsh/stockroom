@@ -138,3 +138,18 @@ Layers starts with meaningful targets, offers All Elements for every generated w
 hidden targets as dashed ghost rows. Hide Screen Contents targets the product root, allowing a blank
 application while the editor remains usable. Both Windows hosts capture Control+Shift during launch
 as an ephemeral applied-design bypass; the bypass is never saved as a preference.
+
+### Compact Inspector And CAD Presentation Boundary
+
+The visible inspector has four stable sections only: Layout, Appearance, Content, and Advanced.
+Existing safe box, typography, icon, behavior, state, and validated-property capabilities are grouped
+inside those sections instead of exposed as seven competing modes. Selection context remains visible,
+but internal implementation domains are no longer navigation concepts the person must understand.
+
+CAD presentation is stored as typed Design Document data keyed to the Stockroom-owned Symbol,
+Footprint, or 3D preview container. The presentation layer may hide or restyle rendered bodies, pins,
+labels, footprint layers, models, boards, grids, and scene appearance; it never changes parsed CAD
+geometry, source files, placements, nets, pad coordinates, or engineering primitives. Raw SVG/canvas
+geometry remains protected while its Stockroom container and typed presentation controls are editable.
+All color-bearing element, interaction-state, and CAD presentation values are written into the active
+Light or Dark theme patch; geometry, visibility, content, and arrangement remain shared global edits.

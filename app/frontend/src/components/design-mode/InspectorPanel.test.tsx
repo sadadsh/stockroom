@@ -70,17 +70,24 @@ afterEach(() => {
 });
 
 describe("InspectorPanel", () => {
-  it("shows independent domains and every focused inspector", async () => {
+  it("groups every editing capability into four plain-language sections", async () => {
     render(<Harness />);
     fireEvent.click(screen.getByRole("button", { name: "Select First" }));
 
     expect(screen.getByText("Box 1 · Text 1 · Icon 1")).toBeInTheDocument();
-    for (const facet of ["Box", "Text", "Icon", "Arrangement", "Behavior", "States", "Advanced"]) {
+    for (const facet of ["Arrangement", "Appearance", "Content", "Advanced"]) {
       expect(screen.getByRole("tab", { name: facet })).toBeEnabled();
     }
-    fireEvent.click(screen.getByRole("tab", { name: "Icon" }));
+    expect(screen.getAllByRole("tab")).toHaveLength(4);
+    fireEvent.click(screen.getByRole("tab", { name: "Content" }));
     fireEvent.change(screen.getByLabelText("Icon Stroke"), { target: { value: "2.4" } });
-    await waitFor(() => expect(document.documentElement.style.getPropertyValue("--icon-stroke")).toBe("2.4"));
+    await waitFor(() => {
+      const draft = JSON.parse(screen.getByTestId("inspector-draft").textContent ?? "{}") as {
+        icons: Record<string, { strokeWidth?: number }>;
+      };
+      expect(draft.icons["action.add"]?.strokeWidth).toBe(2.4);
+      expect(draft.icons["action.edit"]?.strokeWidth).toBe(2.4);
+    });
   });
 
   it("edits every global occurrence and removal is undoable", async () => {
@@ -113,18 +120,20 @@ describe("InspectorPanel", () => {
       render(<Harness />);
       fireEvent.click(screen.getByRole("button", { name: "Select First" }));
 
-      fireEvent.click(screen.getByRole("tab", { name: "Text" }));
+      fireEvent.click(screen.getByRole("tab", { name: "Content" }));
       expect(screen.getByLabelText("Text Domain Preview")).toHaveTextContent(copyIds.join(" "));
       fireEvent.change(screen.getByLabelText("Text Content"), { target: { value: "Global Text" } });
       fireEvent.change(screen.getByLabelText("Text font-size Value"), { target: { value: "18px" } });
       fireEvent.blur(screen.getByLabelText("Text font-size Value"));
 
-      fireEvent.click(screen.getByRole("tab", { name: "Icon" }));
       expect(screen.getByLabelText("Icon Domain Preview")).toHaveTextContent(iconIds.join(" "));
       fireEvent.change(screen.getByLabelText("Icon Color"), { target: { value: "#123456" } });
       fireEvent.blur(screen.getByLabelText("Icon Color"));
       fireEvent.change(screen.getByLabelText("Icon Size"), { target: { value: "28px" } });
       fireEvent.blur(screen.getByLabelText("Icon Size"));
+      fireEvent.change(screen.getByLabelText("Treatment"), { target: { value: "solid" } });
+      fireEvent.change(screen.getByLabelText("Alignment"), { target: { value: "text-top" } });
+      fireEvent.change(screen.getByLabelText("Accessible Label"), { target: { value: "Add item" } });
       const nextIcon = screen.getAllByRole("button", { name: /^Swap to / })[0]!;
       fireEvent.click(nextIcon);
       const body = screen.queryByLabelText("Edit Icon SVG Markup");
@@ -133,13 +142,16 @@ describe("InspectorPanel", () => {
       await waitFor(() => {
         const draft = JSON.parse(screen.getByTestId("inspector-draft").textContent ?? "{}") as {
           copy: Record<string, string>;
-          icons: Record<string, { swapToId?: string; body?: string }>;
+          icons: Record<string, { swapToId?: string; body?: string; treatment?: string; alignment?: string; a11yLabel?: string }>;
           elements: Record<string, Record<string, string>>;
         };
         expect(Object.keys(draft.copy).sort()).toEqual([...copyIds].sort());
         expect(Object.keys(draft.icons).sort()).toEqual([...iconIds].sort());
         for (const id of copyIds) expect(draft.copy[id]).toBe("Global Text");
-        for (const id of iconIds) expect(draft.icons[id]?.swapToId ?? draft.icons[id]?.body).toBeTruthy();
+        for (const id of iconIds) {
+          expect(draft.icons[id]?.swapToId ?? draft.icons[id]?.body).toBeTruthy();
+          expect(draft.icons[id]).toMatchObject({ treatment: "solid", alignment: "text-top", a11yLabel: "Add item" });
+        }
       });
 
       const expectedRoots = ["detail.action[first]", "detail.action[second]"];
@@ -181,7 +193,7 @@ describe("InspectorPanel", () => {
     render(<Harness />);
     fireEvent.click(screen.getByRole("button", { name: "Select First" }));
     const target = document.querySelector<HTMLButtonElement>('[data-dev-id="detail.action[first]"]')!;
-    fireEvent.click(screen.getByRole("tab", { name: "States" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Appearance" }));
 
     fireEvent.click(screen.getByRole("button", { name: "Disabled" }));
     expect(target).toBeDisabled();
@@ -191,7 +203,17 @@ describe("InspectorPanel", () => {
     fireEvent.click(target);
     expect(screen.getByTestId("activation-count")).toHaveTextContent("0");
 
-    for (const state of ["Hover", "Focus", "Active"] as const) {
+    fireEvent.change(screen.getByLabelText("State Color"), { target: { value: "#123456" } });
+    fireEvent.blur(screen.getByLabelText("State Color"));
+    await waitFor(() => {
+      const draft = JSON.parse(screen.getByTestId("inspector-draft").textContent ?? "{}") as {
+        elements: Record<string, Record<string, string>>;
+      };
+      expect(draft.elements["detail.action[first]::state:disabled"]?.color).toBe("#123456");
+      expect(draft.elements["detail.action[second]::state:disabled"]?.color).toBe("#123456");
+    });
+
+    for (const state of ["Hover", "Focus", "Active", "Selected"] as const) {
       fireEvent.click(screen.getByRole("button", { name: state }));
       expect(target).not.toBeDisabled();
       expect(target).not.toHaveAttribute("aria-disabled");

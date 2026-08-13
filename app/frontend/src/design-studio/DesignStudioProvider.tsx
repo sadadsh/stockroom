@@ -30,6 +30,14 @@ import {
   previewAdapter,
 } from "./requestAdapter";
 import type { DesignScenario } from "./scenario";
+import {
+  resetCadPresentationDocument,
+  updateCadPresentationDocument,
+  updateCadPresentationThemeDocument,
+  type CadPresentationKind,
+  type CadPresentationPatchByKind,
+} from "./cadPresentation";
+import type { CadPresentationOverride } from "./document";
 import { installPreviewEffectGuard } from "./previewEffects";
 import { bootstrapScenarioRegistry } from "./scenarios";
 import type { ScenarioRegistry } from "./scenarioRegistry";
@@ -64,6 +72,14 @@ export interface DesignStudioContextValue {
   appliedState: "loading" | "ready" | "applying" | "error";
   applyLocal: () => Promise<boolean>;
   resetAppliedLocal: () => Promise<boolean>;
+  resolvedCadPresentation: Record<string, CadPresentationOverride>;
+  setCadPresentation: <K extends CadPresentationKind>(
+    targetId: string,
+    kind: K,
+    patch: CadPresentationPatchByKind[K],
+    themeSpecific?: boolean,
+  ) => void;
+  resetCadPresentation: (targetId: string) => void;
 }
 
 const DesignStudioContext = createContext<DesignStudioContextValue | null>(null);
@@ -349,6 +365,27 @@ function DesignStudioBridge({
     },
     [devMode.replaceDraftAtomically, devMode.theme, snapshot.document],
   );
+  const setCadPresentation = useCallback(
+    <K extends CadPresentationKind>(
+      targetId: string,
+      kind: K,
+      patch: CadPresentationPatchByKind[K],
+      themeSpecific = false,
+    ) => {
+      replaceDocumentAtomically(
+        themeSpecific
+          ? updateCadPresentationThemeDocument(snapshot.document, targetId, kind, patch, devMode.theme)
+          : updateCadPresentationDocument(snapshot.document, targetId, kind, patch),
+      );
+    },
+    [devMode.theme, replaceDocumentAtomically, snapshot.document],
+  );
+  const resetCadPresentation = useCallback(
+    (targetId: string) => {
+      replaceDocumentAtomically(resetCadPresentationDocument(snapshot.document, targetId));
+    },
+    [replaceDocumentAtomically, snapshot.document],
+  );
   const setVariation = useCallback(
     (variationId: string) => {
       controller.replaceDocument({ ...snapshot.document, activeVariationId: variationId });
@@ -549,6 +586,9 @@ function DesignStudioBridge({
       appliedState,
       applyLocal,
       resetAppliedLocal,
+      resolvedCadPresentation: resolved.cadPresentation,
+      setCadPresentation,
+      resetCadPresentation,
     }),
     [
       open,
@@ -570,6 +610,9 @@ function DesignStudioBridge({
       appliedState,
       applyLocal,
       resetAppliedLocal,
+      resolved.cadPresentation,
+      setCadPresentation,
+      resetCadPresentation,
     ],
   );
 

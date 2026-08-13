@@ -129,6 +129,9 @@ export const EDITABLE_ELEMENT_PROPS = [
   "border-width",
   "box-shadow",
   "background-image",
+  "transform",
+  "filter",
+  "z-index",
   "font-size",
   "font-weight",
   "line-height",
@@ -156,6 +159,18 @@ export function isEditableElementProp(prop: string): boolean {
   return EDITABLE_PROPS.has(prop.trim().toLowerCase());
 }
 
+const THEME_SPECIFIC_PROPS = new Set([
+  "color",
+  "background-color",
+  "background-image",
+  "border-color",
+  "box-shadow",
+]);
+
+export function isThemeSpecificElementProp(prop: string): boolean {
+  return THEME_SPECIFIC_PROPS.has(prop.trim().toLowerCase());
+}
+
 const MAX_VALUE_LEN = 64;
 const FORBIDDEN = [";", "<", ">", "{", "}", "url(", "expression(", "/*", "*/", "\\", "@"];
 const LENGTH_KEYWORDS = new Set(["auto", "none", "0", "min-content", "max-content", "fit-content"]);
@@ -176,6 +191,9 @@ const GRID_TRACK_RE = new RegExp(
   "(?:minmax\\(0,\\s*1fr\\)|1fr|auto|(?:\\d+|\\d*\\.\\d+)(?:px|rem|em|%))" +
   "(?:\\s+(?:minmax\\(0,\\s*1fr\\)|1fr|auto|(?:\\d+|\\d*\\.\\d+)(?:px|rem|em|%))){0,11})$",
 );
+const Z_INDEX_RE = /^(?:auto|-?\d{1,4})$/;
+const TRANSFORM_RE = /^(?:none|translate\(-?(?:\d+|\d*\.\d+)(?:px|rem|em|%),\s*-?(?:\d+|\d*\.\d+)(?:px|rem|em|%)\)|translate[XY]\(-?(?:\d+|\d*\.\d+)(?:px|rem|em|%)\)|scale\((?:\d+|\d*\.\d+)(?:,\s*(?:\d+|\d*\.\d+))?\)|rotate\(-?(?:\d+|\d*\.\d+)deg\))$/;
+const FILTER_RE = /^(?:none|blur\((?:\d+|\d*\.\d+)(?:px|rem|em)\)|(?:brightness|contrast|grayscale|saturate)\((?:\d+|\d*\.\d+)(?:%)?\))$/;
 const ENUMS: Record<string, ReadonlySet<string>> = {
   display: new Set(["block", "inline", "inline-block", "flex", "inline-flex", "grid", "none"]),
   visibility: new Set(["visible", "hidden"]),
@@ -243,6 +261,9 @@ export function isSafeElementValue(prop: string, value: string): boolean {
   if (name === "box-shadow") return SHADOW_RE.test(v);
   if (name === "background-image") return low === "none" || GRADIENT_RE.test(v);
   if (name === "grid-template-columns" || name === "grid-template-rows") return GRID_TRACK_RE.test(v);
+  if (name === "z-index") return Z_INDEX_RE.test(v) && (low === "auto" || Math.abs(Number(v)) <= 9999);
+  if (name === "transform") return TRANSFORM_RE.test(v);
+  if (name === "filter") return FILTER_RE.test(v);
   if (name === "border-width") return v === "0" || LENGTH_RE.test(v) || LENGTH_LIST_RE.test(v);
   if (name === "border-radius") return v === "0" || LENGTH_RE.test(v) || LENGTH_LIST_RE.test(v);
   if (name === "line-height") return low === "normal" || LENGTH_RE.test(v) || LINE_HEIGHT_RE.test(v);

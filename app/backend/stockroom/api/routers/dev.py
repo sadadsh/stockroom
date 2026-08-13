@@ -98,14 +98,25 @@ _MAX_DEV_ID_LEN = 512
 
 
 def _valid_element_id(value: object) -> bool:
-    """True for a stable box id or its explicit ``::text`` / ``::icon`` internal domain."""
+    """True for a stable box id or one closed internal text, icon, or state domain."""
     if not isinstance(value, str) or not value or len(value) > _MAX_DEV_ID_LEN:
         return False
     if "::" in value:
         base, separator, domain = value.rpartition("::")
-        if not separator or domain not in {"text", "icon"} or "::" in base:
+        if not separator or "::" in base:
             return False
-        value = base
+        if domain in {"text", "icon"}:
+            value = base
+        elif domain.startswith("state:") and domain.removeprefix("state:") in {
+            "hover",
+            "focus",
+            "active",
+            "selected",
+            "disabled",
+        }:
+            value = base
+        else:
+            return False
     if "[" in value or "]" in value:
         return any(pattern.match(value) for pattern in _DYNAMIC_DEV_ID_RES)
     return bool(_DEV_ID_RE.match(value))
@@ -574,7 +585,11 @@ def _clean_icons(block: object) -> dict:
                 raise ApiError(400, f"Icon swap target '{swap}' is not a valid icon id.")
             result["swapToId"] = swap
         if stroke_width is not None:
-            if not isinstance(stroke_width, (int, float)) or isinstance(stroke_width, bool) or not 0.5 <= float(stroke_width) <= 4:
+            if (
+                not isinstance(stroke_width, (int, float))
+                or isinstance(stroke_width, bool)
+                or not 0.5 <= float(stroke_width) <= 4
+            ):
                 raise ApiError(400, "Icon stroke width must be between 0.5 and 4.")
             result["strokeWidth"] = float(stroke_width)
         if treatment is not None:
@@ -582,7 +597,12 @@ def _clean_icons(block: object) -> dict:
                 raise ApiError(400, "Icon treatment must be line, solid, or muted.")
             result["treatment"] = treatment
         if a11y_label is not None:
-            if not isinstance(a11y_label, str) or not a11y_label.strip() or len(a11y_label.strip()) > 120 or any(ch in a11y_label for ch in "<>\r\n"):
+            if (
+                not isinstance(a11y_label, str)
+                or not a11y_label.strip()
+                or len(a11y_label.strip()) > 120
+                or any(ch in a11y_label for ch in "<>\r\n")
+            ):
                 raise ApiError(400, "Icon accessibility label is invalid.")
             result["a11yLabel"] = a11y_label.strip()
         if alignment is not None:
@@ -645,6 +665,9 @@ _ELEM_ALLOWED_PROPS = {
     "border-width",
     "box-shadow",
     "background-image",
+    "transform",
+    "filter",
+    "z-index",
     "font-size",
     "font-weight",
     "line-height",
@@ -681,13 +704,29 @@ _COLOR_RE = re.compile(r"^(?:#[0-9a-fA-F]{3,8}|var\(--[a-z0-9-]+\)|transparent|c
 _NUMBER_RE = re.compile(r"^(?:0|1|0?\.\d{1,3})$")
 _LINE_HEIGHT_RE = re.compile(r"^(?:0|[1-9](?:\.\d{1,3})?|0?\.\d{1,3})$")
 _FONT_WEIGHT_RE = re.compile(r"^(?:[1-9]00|normal|bold)$")
-_FONT_FAMILY_RE = re.compile(r"^(?:system-ui|sans-serif|serif|monospace|ui-sans-serif|ui-serif|ui-monospace)$")
-_SHADOW_RE = re.compile(r"^(?:none|(?:-?(?:\d+|\d*\.\d+)(?:px|rem|em)\s+){2,3}(?:-?(?:\d+|\d*\.\d+)(?:px|rem|em)\s+)?(?:#[0-9a-fA-F]{3,8}|var\(--[a-z0-9-]+\)|transparent))$")
-_GRADIENT_RE = re.compile(r"^linear-gradient\((?:to (?:top|right|bottom|left),\s*)?(?:#[0-9a-fA-F]{3,8}|var\(--[a-z0-9-]+\)|transparent),\s*(?:#[0-9a-fA-F]{3,8}|var\(--[a-z0-9-]+\)|transparent)\)$")
+_FONT_FAMILY_RE = re.compile(
+    r"^(?:system-ui|sans-serif|serif|monospace|ui-sans-serif|ui-serif|ui-monospace)$"
+)
+_SHADOW_RE = re.compile(
+    r"^(?:none|(?:-?(?:\d+|\d*\.\d+)(?:px|rem|em)\s+){2,3}(?:-?(?:\d+|\d*\.\d+)(?:px|rem|em)\s+)?(?:#[0-9a-fA-F]{3,8}|var\(--[a-z0-9-]+\)|transparent))$"
+)
+_GRADIENT_RE = re.compile(
+    r"^linear-gradient\((?:to (?:top|right|bottom|left),\s*)?(?:#[0-9a-fA-F]{3,8}|var\(--[a-z0-9-]+\)|transparent),\s*(?:#[0-9a-fA-F]{3,8}|var\(--[a-z0-9-]+\)|transparent)\)$"
+)
 _GRID_TRACK_RE = re.compile(
     r"^(?:none|repeat\([1-9]\d?,\s*(?:minmax\(0,\s*1fr\)|1fr)\)|"
     r"(?:minmax\(0,\s*1fr\)|1fr|auto|(?:\d+|\d*\.\d+)(?:px|rem|em|%))"
     r"(?:\s+(?:minmax\(0,\s*1fr\)|1fr|auto|(?:\d+|\d*\.\d+)(?:px|rem|em|%))){0,11})$"
+)
+_Z_INDEX_RE = re.compile(r"^(?:auto|-?\d{1,4})$")
+_TRANSFORM_RE = re.compile(
+    r"^(?:none|translate\(-?(?:\d+|\d*\.\d+)(?:px|rem|em|%),\s*-?(?:\d+|\d*\.\d+)(?:px|rem|em|%)\)|"
+    r"translate[XY]\(-?(?:\d+|\d*\.\d+)(?:px|rem|em|%)\)|scale\((?:\d+|\d*\.\d+)(?:,\s*(?:\d+|\d*\.\d+))?\)|"
+    r"rotate\(-?(?:\d+|\d*\.\d+)deg\))$"
+)
+_FILTER_RE = re.compile(
+    r"^(?:none|blur\((?:\d+|\d*\.\d+)(?:px|rem|em)\)|"
+    r"(?:brightness|contrast|grayscale|saturate)\((?:\d+|\d*\.\d+)(?:%)?\))$"
 )
 _APPEARANCE_ENUMS = {
     "display": {"block", "inline", "inline-block", "flex", "inline-flex", "grid", "none"},
@@ -758,6 +797,12 @@ def _valid_css_value(prop: str, value: str) -> bool:
         return low == "none" or bool(_GRADIENT_RE.match(v))
     if prop in ("grid-template-columns", "grid-template-rows"):
         return bool(_GRID_TRACK_RE.match(v))
+    if prop == "z-index":
+        return bool(_Z_INDEX_RE.match(v)) and (low == "auto" or abs(int(v)) <= 9999)
+    if prop == "transform":
+        return bool(_TRANSFORM_RE.match(v))
+    if prop == "filter":
+        return bool(_FILTER_RE.match(v))
     if prop == "border-width":
         return v == "0" or bool(_LENGTH_RE.match(v)) or bool(_LENGTH_LIST_RE.match(v))
     if prop == "border-radius":
@@ -1336,22 +1381,27 @@ def _clean_save_payload(body: object) -> tuple[dict[str, str], dict, dict]:
 
 
 def _clean_promotion_translations(value: object) -> dict:
-    if not isinstance(value, dict) or not isinstance(value.get("base"), dict) or not isinstance(value.get("variations"), dict):
+    if (
+        not isinstance(value, dict)
+        or not isinstance(value.get("base"), dict)
+        or not isinstance(value.get("variations"), dict)
+    ):
         raise ApiError(400, "Design promotion translations must contain base and variations.")
 
     def clean_pair(raw: object, label: str) -> dict:
         if not isinstance(raw, dict) or set(raw) != {"dark", "light"}:
             raise ApiError(400, f"{label} must preserve exactly dark and light themes.")
-        return {
-            theme: _clean_save_payload(raw.get(theme))[1]
-            for theme in ("dark", "light")
-        }
+        return {theme: _clean_save_payload(raw.get(theme))[1] for theme in ("dark", "light")}
 
     variations: dict[str, dict] = {}
     raw_variations = value.get("variations")
     assert isinstance(raw_variations, dict)
     for variation_id, raw in raw_variations.items():
-        if not isinstance(variation_id, str) or not _DEV_ID_RE.fullmatch(variation_id) or not isinstance(raw, dict):
+        if (
+            not isinstance(variation_id, str)
+            or not _DEV_ID_RE.fullmatch(variation_id)
+            or not isinstance(raw, dict)
+        ):
             raise ApiError(400, "Design promotion contains a malformed variation.")
         title = raw.get("title")
         parent = raw.get("extends")
@@ -1617,11 +1667,18 @@ def _promote(request: Request, body: object) -> dict:
     if not isinstance(body, dict):
         raise ApiError(400, "Design promotion body must be an object.")
     raw_message = body.get("message")
-    if not isinstance(raw_message, str) or not raw_message.strip() or len(raw_message.strip()) > 120 or "\n" in raw_message:
+    if (
+        not isinstance(raw_message, str)
+        or not raw_message.strip()
+        or len(raw_message.strip()) > 120
+        or "\n" in raw_message
+    ):
         raise ApiError(400, "Commit message must be one non-empty line of at most 120 characters.")
     foreign = _foreign_dev_paths(repo)
     if foreign:
-        raise ApiError(409, "Promotion refused because unrelated files are changed: " + ", ".join(foreign[:8]))
+        raise ApiError(
+            409, "Promotion refused because unrelated files are changed: " + ", ".join(foreign[:8])
+        )
 
     modules, _active, report = _clean_save_payload(body.get("source"))
     translations = _clean_promotion_translations(body.get("translations"))
@@ -1635,7 +1692,9 @@ def _promote(request: Request, body: object) -> dict:
     except GitError as exc:
         raise ApiError(409, f"Could not resolve origin/main: {exc}") from exc
     if remote != repo.head():
-        raise ApiError(409, "Main changed on GitHub. Update Stockroom before promoting this design.")
+        raise ApiError(
+            409, "Main changed on GitHub. Update Stockroom before promoting this design."
+        )
 
     paths = [repo.root / rel for rel in _DEV_SOURCE_PATHS]
     paths.append(repo.root / "app" / "frontend-dist")
@@ -1651,7 +1710,10 @@ def _promote(request: Request, body: object) -> dict:
             _run_frontend(repo, "build")
             foreign = _foreign_dev_paths(repo)
             if foreign:
-                raise ApiError(409, "Build changed files outside the promotion boundary: " + ", ".join(foreign[:8]))
+                raise ApiError(
+                    409,
+                    "Build changed files outside the promotion boundary: " + ", ".join(foreign[:8]),
+                )
             revision = repo.commit(raw_message.strip(), paths)
         except Exception:
             if hasattr(repo, "restore_paths"):

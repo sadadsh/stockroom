@@ -196,11 +196,11 @@ describe("what counts as an addressable id", () => {
 });
 
 describe("a stale committed override is ignored, not applied", () => {
-  it("drops a property that is not editable and a value outside the safe grammar", () => {
+  it("keeps approved transforms and drops values outside the safe grammar", () => {
     const kept = applicableOverrides({
       "components.row": {
         width: "240px",
-        // No longer editable: never in the whitelist, so it cannot be applied or re-saved.
+        // Approved single transform, retained and re-saved.
         transform: "translateX(10px)",
         // Editable property, value outside the grammar (a second declaration attempt).
         padding: "8px; color: red",
@@ -208,7 +208,7 @@ describe("a stale committed override is ignored, not applied", () => {
         gap: "calc(100% - 3px)",
       },
     });
-    expect(kept).toEqual({ "components.row": { width: "240px" } });
+    expect(kept).toEqual({ "components.row": { width: "240px", transform: "translateX(10px)" } });
   });
 
   it("applies only the surviving properties and does not throw on the rest", () => {
@@ -220,12 +220,14 @@ describe("a stale committed override is ignored, not applied", () => {
     ).not.toThrow();
     const row = nodesForDevId("components.row")[0];
     expect(row.style.getPropertyValue("width")).toBe("240px");
-    expect(row.style.getPropertyValue("transform")).toBe("");
+    expect(row.style.getPropertyValue("transform")).toBe("translateX(10px)");
     expect(row.style.getPropertyValue("padding")).toBe("");
   });
 
-  it("drops an id whose every property is invalid rather than keeping an empty entry", () => {
-    expect(applicableOverrides({ "components.row": { transform: "translateX(10px)" } })).toEqual({});
+  it("keeps an id whose transform is in the closed grammar", () => {
+    expect(applicableOverrides({ "components.row": { transform: "translateX(10px)" } })).toEqual({
+      "components.row": { transform: "translateX(10px)" },
+    });
   });
 });
 
@@ -265,12 +267,12 @@ describe("saved dynamic overrides survive a restart", () => {
     }
   });
 
-  it("ignores a committed override that is no longer valid, without failing the boot", () => {
+  it("applies a committed transform that remains valid without failing the boot", () => {
     MOCK_ELEMENT_OVERRIDES[candidateDevId("b")] = { transform: "translateX(10px)", width: "240px" };
 
     expect(() => renderHook(() => useDevMode(), { wrapper })).not.toThrow();
     const node = nodeFor(candidateDevId("b"));
     expect(node.style.getPropertyValue("width")).toBe("240px");
-    expect(node.style.getPropertyValue("transform")).toBe("");
+    expect(node.style.getPropertyValue("transform")).toBe("translateX(10px)");
   });
 });

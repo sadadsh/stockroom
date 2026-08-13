@@ -59,7 +59,7 @@ export interface Model3dPresentationOverride {
   background?: string;
   tint?: string;
   opacity?: number;
-  material?: string;
+  material?: "realistic" | "studio" | "xray";
 }
 
 export interface CadPresentationOverride {
@@ -330,6 +330,7 @@ function copyCadPresentation(value: unknown): CadPresentationOverride | null {
       ["stroke", "fill"],
     );
     if (!symbol) return null;
+    if ((symbol.stroke !== undefined && !isDesignColor(symbol.stroke)) || (symbol.fill !== undefined && !isDesignColor(symbol.fill))) return null;
     out.symbol = symbol;
   }
   if (value.footprint !== undefined) {
@@ -352,6 +353,7 @@ function copyCadPresentation(value: unknown): CadPresentationOverride | null {
     if (value.footprint.layerColors !== undefined) {
       const layerColors = copyStringMap(value.footprint.layerColors, false);
       if (!layerColors || Object.values(layerColors).some((entry) => entry === null)) return null;
+      if (Object.values(layerColors).some((entry) => !isDesignColor(entry as string))) return null;
       footprint.layerColors = layerColors as Record<string, string>;
     }
     out.footprint = footprint;
@@ -373,6 +375,8 @@ function copyCadPresentation(value: unknown): CadPresentationOverride | null {
       ["background", "tint", "material"],
     );
     if (!model3d) return null;
+    if ((model3d.background !== undefined && !isDesignColor(model3d.background)) || (model3d.tint !== undefined && !isDesignColor(model3d.tint))) return null;
+    if (model3d.material !== undefined && model3d.material !== "realistic" && model3d.material !== "studio" && model3d.material !== "xray") return null;
     if (value.model3d.opacity !== undefined) {
       if (!isFiniteNumber(value.model3d.opacity) || value.model3d.opacity < 0 || value.model3d.opacity > 1) return null;
       model3d.opacity = value.model3d.opacity;
@@ -380,6 +384,12 @@ function copyCadPresentation(value: unknown): CadPresentationOverride | null {
     out.model3d = model3d;
   }
   return out;
+}
+
+const DESIGN_COLOR_RE = /^(?:#[0-9a-fA-F]{3,8}|var\(--[a-z0-9-]+\)|transparent|currentColor)$/;
+
+function isDesignColor(value: string): boolean {
+  return DESIGN_COLOR_RE.test(value);
 }
 
 function copyCadPresentationMap(
@@ -813,9 +823,8 @@ function patchTargetIds(patch: DesignPatch): string[] {
 }
 
 function globalTargetId(id: string): string {
-  return id.endsWith("::text") || id.endsWith("::icon")
-    ? id.slice(0, id.lastIndexOf("::"))
-    : id;
+  const separator = id.indexOf("::");
+  return separator === -1 ? id : id.slice(0, separator);
 }
 
 function migratedGlobalTargets(
@@ -981,6 +990,36 @@ function applyNullableMap<T>(target: Record<string, T>, patch: Record<string, T 
   return next;
 }
 
+function mergeCadPresentationOverride(
+  current: CadPresentationOverride | undefined,
+  patch: CadPresentationOverride,
+): CadPresentationOverride {
+  return {
+    ...(current?.symbol || patch.symbol
+      ? { symbol: { ...current?.symbol, ...patch.symbol } }
+      : {}),
+    ...(current?.footprint || patch.footprint
+      ? {
+          footprint: {
+            ...current?.footprint,
+            ...patch.footprint,
+            ...(current?.footprint?.layerColors || patch.footprint?.layerColors
+              ? {
+                  layerColors: {
+                    ...current?.footprint?.layerColors,
+                    ...patch.footprint?.layerColors,
+                  },
+                }
+              : {}),
+          },
+        }
+      : {}),
+    ...(current?.model3d || patch.model3d
+      ? { model3d: { ...current?.model3d, ...patch.model3d } }
+      : {}),
+  };
+}
+
 /** Apply one sparse layer without mutating either the existing draft or the persisted patch. */
 function applyPatch(draft: ResolvedDesign, patch: DesignPatch): ResolvedDesign {
   const next: ResolvedDesign = {
@@ -1027,7 +1066,7 @@ function applyPatch(draft: ResolvedDesign, patch: DesignPatch): ResolvedDesign {
     const cadPresentation = { ...next.cadPresentation };
     for (const [id, override] of Object.entries(patch.cadPresentation)) {
       if (override === null) delete cadPresentation[id];
-      else cadPresentation[id] = structuredClone(override);
+      else cadPresentation[id] = mergeCadPresentationOverride(cadPresentation[id], override);
     }
     next.cadPresentation = cadPresentation;
   }

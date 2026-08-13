@@ -220,7 +220,9 @@ def test_dev_save_writes_closed_icon_presentation_properties(client, tmp_path, m
     assert '"alignment": "middle"' in icon_ts
 
 
-def test_dev_save_rejects_open_ended_icon_presentation_before_any_write(client, tmp_path, monkeypatch):
+def test_dev_save_rejects_open_ended_icon_presentation_before_any_write(
+    client, tmp_path, monkeypatch
+):
     src = _src_with_lib(tmp_path, monkeypatch)
     for patch in (
         {"strokeWidth": 10},
@@ -280,21 +282,51 @@ def test_dev_save_writes_validated_element_overrides(client, tmp_path, monkeypat
 def test_dev_save_writes_complete_closed_box_and_text_grammar(client, tmp_path, monkeypatch):
     src = _src_with_lib(tmp_path, monkeypatch)
     properties = {
-        "position": "absolute", "inset": "8px", "overflow": "hidden",
+        "position": "absolute",
+        "inset": "8px",
+        "overflow": "hidden",
         "background-image": "linear-gradient(to right, #112233, var(--c-acc))",
-        "border-style": "solid", "border-width": "1px", "box-shadow": "0px 2px 8px #11223344",
-        "grid-template-columns": "repeat(3, minmax(0, 1fr))", "grid-auto-flow": "row dense",
-        "font-family": "system-ui", "text-transform": "uppercase", "white-space": "nowrap",
-        "text-overflow": "ellipsis", "overflow-wrap": "anywhere",
+        "border-style": "solid",
+        "border-width": "1px",
+        "box-shadow": "0px 2px 8px #11223344",
+        "grid-template-columns": "repeat(3, minmax(0, 1fr))",
+        "grid-auto-flow": "row dense",
+        "font-family": "system-ui",
+        "text-transform": "uppercase",
+        "white-space": "nowrap",
+        "text-overflow": "ellipsis",
+        "overflow-wrap": "anywhere",
+        "transform": "translate(12px, -4px)",
+        "filter": "blur(2px)",
+        "z-index": "120",
     }
     res = client.post(
         "/api/dev/save",
-        json={"tokens": {"root": {}, "light": {}}, "copy": {}, "elements": {"detail.title::text": properties}},
+        json={
+            "tokens": {"root": {}, "light": {}},
+            "copy": {},
+            "elements": {"detail.title::text": properties},
+        },
     )
     assert res.status_code == 200, res.text
     element_ts = (src / "lib" / "element.overrides.ts").read_text(encoding="utf-8")
     for property, value in properties.items():
         assert f'"{property}": "{value}"' in element_ts
+
+
+def test_dev_save_accepts_closed_state_override_ids(client, tmp_path, monkeypatch):
+    src = _src_with_lib(tmp_path, monkeypatch)
+    res = client.post(
+        "/api/dev/save",
+        json={
+            "tokens": {"root": {}, "light": {}},
+            "copy": {},
+            "elements": {"detail.title::state:hover": {"color": "#123456"}},
+        },
+    )
+    assert res.status_code == 200, res.text
+    element_ts = (src / "lib" / "element.overrides.ts").read_text(encoding="utf-8")
+    assert '"detail.title::state:hover"' in element_ts
 
 
 def test_dev_save_empty_elements_reproduces_the_committed_file(client, tmp_path, monkeypatch):
@@ -597,7 +629,9 @@ def test_design_promotion_directly_rejects_malformed_variation_and_theme_layout(
     assert "root must be a region" in caught.value.detail
 
 
-def test_design_promotion_is_one_backend_transaction_and_preserves_themes_and_variations(tmp_path, monkeypatch):
+def test_design_promotion_is_one_backend_transaction_and_preserves_themes_and_variations(
+    tmp_path, monkeypatch
+):
     root = tmp_path / "repo"
     src = root / "app" / "frontend" / "src"
     (src / "lib").mkdir(parents=True)
@@ -618,7 +652,9 @@ def test_design_promotion_is_one_backend_transaction_and_preserves_themes_and_va
     assert '"full-data"' in generated and '"custom"' in generated
 
 
-def test_design_promotion_restores_pre_source_and_dist_snapshot_when_build_fails(tmp_path, monkeypatch):
+def test_design_promotion_restores_pre_source_and_dist_snapshot_when_build_fails(
+    tmp_path, monkeypatch
+):
     root = tmp_path / "repo"
     src = root / "app" / "frontend" / "src"
     lib = src / "lib"

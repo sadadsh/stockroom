@@ -32,13 +32,23 @@ export function IconInspector(props: DomainInspectorProps) {
   const sizePlaceholder = useText("design-studio.inspector.icon.size-placeholder", "1em");
   const strokeLabel = useText("design-studio.inspector.icon.stroke", "Stroke");
   const strokeAria = useText("design-studio.inspector.icon.stroke-aria", "Icon Stroke");
-  const treatmentNote = useText("design-studio.inspector.icon.treatment-note", "Stroke and fill treatment resolve from the selected icon's registered outline and current color.");
+  const treatmentLabel = useText("design-studio.inspector.icon.treatment", "Treatment");
+  const accessibleLabel = useText("design-studio.inspector.icon.accessible-label", "Accessible Label");
+  const alignmentLabel = useText("design-studio.inspector.icon.alignment", "Alignment");
+  const lineLabel = useText("design-studio.inspector.icon.treatment.line", "Line");
+  const solidLabel = useText("design-studio.inspector.icon.treatment.solid", "Solid");
+  const mutedLabel = useText("design-studio.inspector.icon.treatment.muted", "Muted");
+  const baselineLabel = useText("design-studio.inspector.icon.alignment.baseline", "Baseline");
+  const middleLabel = useText("design-studio.inspector.icon.alignment.middle", "Middle");
+  const textTopLabel = useText("design-studio.inspector.icon.alignment.text-top", "Text Top");
+  const textBottomLabel = useText("design-studio.inspector.icon.alignment.text-bottom", "Text Bottom");
   if (!iconId) return <p className="px-3.5 py-3 text-2xs text-t3">{emptyLabel}</p>;
   const resolved = resolveIcon(iconId, dev.resolveIconOverride);
   const entry = resolved?.entry;
   if (!entry) return <p className="px-3.5 py-3 text-2xs text-t3">{unregisteredLabel}</p>;
   const alternatives = ICON_IDS_BY_CATEGORY[entry.category] ?? [];
   const body = dev.iconOverrideFor(iconId)?.body ?? entry.body ?? "";
+  const presentation = dev.iconOverrideFor(iconId);
   return (
     <div className="px-3.5 py-3">
       <div className="flex items-center gap-2">
@@ -101,18 +111,49 @@ export function IconInspector(props: DomainInspectorProps) {
             min={0.5}
             max={3}
             step={0.1}
-            value={dev.tokenValue("--icon-stroke")}
+            value={presentation?.strokeWidth ?? entry.strokeWidth ?? 1.5}
             onChange={(event) => {
               const value = event.currentTarget.valueAsNumber;
               if (Number.isFinite(value) && value >= 0.5 && value <= 3) {
-                dev.setToken("--icon-stroke", String(value));
+                iconIds.forEach((id) => dev.setIconPresentation(id, { strokeWidth: value }));
               }
             }}
             className="mt-1 w-full rounded-control border border-line bg-field px-2 py-1 text-2xs text-t1"
           />
         </label>
       </div>
-      <p className="mt-2 text-2xs text-t3">{treatmentNote}</p>
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <label className="text-xs text-t2">{treatmentLabel}
+          <select
+            value={presentation?.treatment ?? "line"}
+            onChange={(event) => iconIds.forEach((id) => dev.setIconPresentation(id, { treatment: event.target.value as "line" | "solid" | "muted" }))}
+            className="mt-1 w-full rounded-control border border-line bg-field px-2 py-1 text-2xs text-t1"
+          >
+            <option value="line">{lineLabel}</option>
+            <option value="solid">{solidLabel}</option>
+            <option value="muted">{mutedLabel}</option>
+          </select>
+        </label>
+        <label className="text-xs text-t2">{alignmentLabel}
+          <select
+            value={presentation?.alignment ?? "middle"}
+            onChange={(event) => iconIds.forEach((id) => dev.setIconPresentation(id, { alignment: event.target.value as "baseline" | "middle" | "text-top" | "text-bottom" }))}
+            className="mt-1 w-full rounded-control border border-line bg-field px-2 py-1 text-2xs text-t1"
+          >
+            <option value="baseline">{baselineLabel}</option>
+            <option value="middle">{middleLabel}</option>
+            <option value="text-top">{textTopLabel}</option>
+            <option value="text-bottom">{textBottomLabel}</option>
+          </select>
+        </label>
+      </div>
+      <label className="mt-3 block text-xs text-t2">{accessibleLabel}
+        <input
+          value={presentation?.a11yLabel ?? ""}
+          onChange={(event) => iconIds.forEach((id) => dev.setIconPresentation(id, { a11yLabel: event.target.value }))}
+          className="mt-1 w-full rounded-control border border-line bg-field px-2 py-1 text-2xs text-t1"
+        />
+      </label>
     </div>
   );
 }

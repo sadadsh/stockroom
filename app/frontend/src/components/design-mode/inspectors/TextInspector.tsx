@@ -4,7 +4,19 @@ import { useDevMode } from "../../../lib/devMode";
 import { isSafeElementValue } from "../../../lib/elementLayout";
 import type { DomainInspectorProps } from "./types";
 
-const TYPE_PROPS = ["color", "font-size", "font-weight", "line-height", "letter-spacing", "text-align"] as const;
+const TYPE_PROPS = [
+  "color",
+  "font-family",
+  "font-size",
+  "font-weight",
+  "line-height",
+  "letter-spacing",
+  "text-align",
+  "text-transform",
+  "white-space",
+  "text-overflow",
+  "overflow-wrap",
+] as const;
 
 export function TextInspector(props: DomainInspectorProps) {
   const dev = useDevMode();
@@ -14,13 +26,6 @@ export function TextInspector(props: DomainInspectorProps) {
   const readOnlyLabel = useText("design-studio.inspector.text.read-only", "Text cannot be edited until it has a stable text ID.");
   const typographyLabel = useText("design-studio.inspector.text.typography", "Font");
   const propertyAria = useCopyFormatter("design-studio.inspector.text.property-aria", "Text {property} Value");
-  const familyLabel = useText("design-studio.inspector.text.family", "Series");
-  const transformLabel = useText("design-studio.inspector.text.transform", "Transform");
-  const wrappingLabel = useText("design-studio.inspector.text.wrapping", "Wrapping");
-  const truncationLabel = useText("design-studio.inspector.text.truncation", "Truncation");
-  const noneLabel = useText("design-studio.inspector.text.none", "none");
-  const normalLabel = useText("design-studio.inspector.text.normal", "normal");
-  const clipLabel = useText("design-studio.inspector.text.clip", "clip");
   const texts = useMemo(
     () => props.inspections.flatMap((inspection) => inspection.texts),
     [props.inspections],
@@ -64,12 +69,6 @@ export function TextInspector(props: DomainInspectorProps) {
           </label>
         ))}
       </div>
-      <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-2 gap-y-1 text-2xs">
-        <dt className="text-t3">{familyLabel}</dt><dd className="truncate text-t2">{computed.fontFamily}</dd>
-        <dt className="text-t3">{transformLabel}</dt><dd className="text-t2">{computed.textTransform || noneLabel}</dd>
-        <dt className="text-t3">{wrappingLabel}</dt><dd className="text-t2">{computed.whiteSpace || normalLabel}</dd>
-        <dt className="text-t3">{truncationLabel}</dt><dd className="text-t2">{computed.textOverflow || clipLabel}</dd>
-      </dl>
     </div>
   );
 }

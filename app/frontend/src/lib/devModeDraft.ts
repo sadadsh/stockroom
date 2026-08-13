@@ -143,6 +143,9 @@ export function resetDraftTargets(draft: DevModeDraft, reset: DraftTargetReset):
     delete next.elements[id];
     delete next.elements[`${id}::text`];
     delete next.elements[`${id}::icon`];
+    for (const key of Object.keys(next.elements)) {
+      if (key.startsWith(`${id}::state:`)) delete next.elements[key];
+    }
     delete next.behaviors[id];
   }
   for (const id of reset.copyIds ?? []) delete next.copy[id];
@@ -162,6 +165,18 @@ export function resetDraftElementProperty(
     delete next.elements[id][property];
     if (Object.keys(next.elements[id]).length === 0) delete next.elements[id];
   }
+  return next;
+}
+
+/** Set one property on every concrete target in one immutable draft. */
+export function setDraftElementProperty(
+  draft: DevModeDraft,
+  targetIds: readonly string[],
+  property: string,
+  value: string,
+): DevModeDraft {
+  const next = resetDraftTargets(draft, { targetIds: [] });
+  for (const id of targetIds) next.elements[id] = { ...next.elements[id], [property]: value };
   return next;
 }
 

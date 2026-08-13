@@ -141,7 +141,7 @@ export function CadAssetModule({
     <section
       ref={focusRef}
       data-dev-id={componentRepresentationDevId(componentId, kind)}
-      data-dev-role="component-browser.cad-asset"
+      data-dev-role="component-browser.cad-asset" data-design-cad-kind={kind === "model" ? "model3d" : kind} data-design-cad-target={`cad.${kind === "model" ? "model3d" : kind}`}
       data-asset-kind={kind}
       data-expanded={expanded ? "true" : "false"}
       data-status={status}

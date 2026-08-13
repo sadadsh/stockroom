@@ -28,6 +28,7 @@
 import { useMemo, useState } from "react";
 import type { LandPad, LandPattern } from "../../api/client";
 import { TECHNICAL_CONTENT_ATTRIBUTE } from "../../design-studio/targetDomains";
+import { useOptionalDesignStudio } from "../../design-studio/DesignStudioProvider";
 import { Text, useText } from "../../lib/copy";
 import { usePanZoom } from "../../lib/usePanZoom";
 import { copperBounds, onLayer } from "./cadEvidence";
@@ -133,6 +134,15 @@ export function FootprintPreview({
   onMeasure?: (point: [number, number]) => void;
   interactive?: boolean;
 }) {
+  const presentation = useOptionalDesignStudio()?.resolvedCadPresentation["cad.footprint"]?.footprint;
+  const visibleLayers: FootprintLayerState = {
+    ...layers,
+    copper: layers.copper && presentation?.pads !== false,
+    fabrication: layers.fabrication && presentation?.fabrication !== false,
+    courtyard: layers.courtyard && presentation?.courtyard !== false,
+    silkscreen: layers.silkscreen && presentation?.silkscreen !== false,
+    numbers: layers.numbers && presentation?.reference !== false && presentation?.value !== false,
+  };
   const { view, frameRef, handlers, reset } = usePanZoom();
   const canvasLabel = useText(
     "component-browser.footprint-canvas",
@@ -235,29 +245,29 @@ export function FootprintPreview({
           transformOrigin: "center",
         }}
       >
-        {layers.fabrication ? <Lines land={land} suffix=".Fab" layer="fabrication" /> : null}
-        {layers.courtyard ? <Lines land={land} suffix=".CrtYd" layer="courtyard" /> : null}
-        {layers.mask
+        {visibleLayers.fabrication ? <Lines land={land} suffix=".Fab" layer="fabrication" color={presentation?.layerColors?.fabrication} /> : null}
+        {visibleLayers.courtyard ? <Lines land={land} suffix=".CrtYd" layer="courtyard" color={presentation?.layerColors?.courtyard} /> : null}
+        {visibleLayers.mask
           ? land.pads
               .filter((pad) => declares(pad, ".Mask"))
-              .map((pad) => <Pad key={`mask-${padKey(pad)}`} pad={pad} layer="mask" hollow />)
+              .map((pad) => <Pad key={`mask-${padKey(pad)}`} pad={pad} layer="mask" color={presentation?.layerColors?.mask} hollow />)
           : null}
-        {layers.copper
-          ? land.pads.map((pad) => <Pad key={`cu-${padKey(pad)}`} pad={pad} layer="copper" />)
+        {visibleLayers.copper
+          ? land.pads.map((pad) => <Pad key={`cu-${padKey(pad)}`} pad={pad} layer="copper" color={presentation?.layerColors?.copper} />)
           : null}
-        {layers.paste
+        {visibleLayers.paste
           ? land.pads
               .filter((pad) => declares(pad, ".Paste"))
-              .map((pad) => <Pad key={`paste-${padKey(pad)}`} pad={pad} layer="paste" hollow />)
+              .map((pad) => <Pad key={`paste-${padKey(pad)}`} pad={pad} layer="paste" color={presentation?.layerColors?.paste} hollow />)
           : null}
-        {layers.silkscreen ? <Lines land={land} suffix=".SilkS" layer="silkscreen" /> : null}
+        {visibleLayers.silkscreen ? <Lines land={land} suffix=".SilkS" layer="silkscreen" color={presentation?.layerColors?.silkscreen} /> : null}
 
         {/* Pin 1, always drawn when the copper is: every orientation check starts from it, and
             hiding it behind a toggle would make the most important pad the easiest to lose. */}
-        {layers.copper ? <PinOneMarker pads={land.pads} scale={scale} /> : null}
-        {layers.origin ? <Origin scale={scale} /> : null}
-        {layers.dimensions && copper ? <Dimensions box={copper} scale={scale} /> : null}
-        {layers.numbers ? (
+        {visibleLayers.copper ? <PinOneMarker pads={land.pads} scale={scale} /> : null}
+        {visibleLayers.origin ? <Origin scale={scale} /> : null}
+        {visibleLayers.dimensions && copper ? <Dimensions box={copper} scale={scale} /> : null}
+        {visibleLayers.numbers ? (
           <g fontSize={scale * 0.045} className="fill-technical-ink" textAnchor="middle">
             {land.pads.map((pad) => (
               <text
@@ -277,7 +287,7 @@ export function FootprintPreview({
   );
 }
 
-function Pad({ pad, layer, hollow = false }: { pad: LandPad; layer: string; hollow?: boolean }) {
+function Pad({ pad, layer, hollow = false, color }: { pad: LandPad; layer: string; hollow?: boolean; color?: string }) {
   const ink = LAYER_INK[layer];
   const paint = hollow ? `fill-none ${ink.stroke}` : `${ink.fill} stroke-none`;
   const [w, h] = pad.size;
@@ -297,6 +307,7 @@ function Pad({ pad, layer, hollow = false }: { pad: LandPad; layer: string; holl
         rx={radius}
         ry={radius}
         className={paint}
+        style={color ? (hollow ? { stroke: color } : { fill: color }) : undefined}
         strokeWidth={hollow ? Math.min(w, h) * 0.08 : 0}
         fillOpacity={hollow ? 0 : 0.85}
         data-layer={layer}
@@ -318,9 +329,9 @@ function Pad({ pad, layer, hollow = false }: { pad: LandPad; layer: string; holl
   );
 }
 
-function Lines({ land, suffix, layer }: { land: LandPattern; suffix: string; layer: string }) {
+function Lines({ land, suffix, layer, color }: { land: LandPattern; suffix: string; layer: string; color?: string }) {
   return (
-    <g className={LAYER_INK[layer].stroke} strokeLinecap="round" data-layer={layer}>
+    <g className={LAYER_INK[layer].stroke} style={color ? { stroke: color } : undefined} strokeLinecap="round" data-layer={layer}>
       {land.graphics
         .filter((graphic) => onLayer(graphic, suffix))
         .map((graphic, index) => (

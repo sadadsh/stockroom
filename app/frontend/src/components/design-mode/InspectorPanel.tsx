@@ -7,13 +7,15 @@ import {
 } from "../../design-studio/targetDomains";
 import { useOptionalDesignStudio } from "../../design-studio/DesignStudioProvider";
 import { useDevMode } from "../../lib/devMode";
-import { useCopyFormatter, useText } from "../../lib/copy";
+import { useText } from "../../lib/copy";
 import {
   emptyDevModeDraft,
   resetDraftElementProperty,
   resetDraftTargets,
   resetDraftTheme,
+  setDraftElementProperty,
 } from "../../lib/devModeDraft";
+import { isThemeSpecificElementProp } from "../../lib/elementLayout";
 import { AdvancedInspector } from "./inspectors/AdvancedInspector";
 import { BehaviorInspector } from "./inspectors/BehaviorInspector";
 import { BoxInspector } from "./inspectors/BoxInspector";
@@ -21,8 +23,9 @@ import { IconInspector } from "./inspectors/IconInspector";
 import { LayoutInspector } from "./inspectors/LayoutInspector";
 import { StatesInspector } from "./inspectors/StatesInspector";
 import { TextInspector } from "./inspectors/TextInspector";
+import { CadPresentationInspector } from "./inspectors/CadPresentationInspector";
 
-type InspectorFacet = "box" | "text" | "icon" | "layout" | "behavior" | "states" | "advanced";
+type InspectorFacet = "layout" | "appearance" | "content" | "advanced";
 
 function rootElement(root?: Element): Element {
   return root ?? document.documentElement;
@@ -51,10 +54,10 @@ function inspectionsFor(root: Element, ids: readonly string[]): TargetInspection
     .filter((item): item is TargetInspection => item !== null);
 }
 
-export function InspectorPanel({ root, integrated = false }: { root?: Element; integrated?: boolean } = {}) {
+export function InspectorPanel({ root }: { root?: Element; integrated?: boolean } = {}) {
   const dev = useDevMode();
   const studio = useOptionalDesignStudio();
-  const defaultFacet: InspectorFacet = integrated ? "advanced" : "box";
+  const defaultFacet: InspectorFacet = "layout";
   const [facetState, setFacetState] = useState<{ targetId: string | null; value: InspectorFacet }>(() => ({ targetId: dev.selectedDevId, value: defaultFacet }));
   const facet = facetState.targetId === dev.selectedDevId ? facetState.value : defaultFacet;
   const setFacet = (value: InspectorFacet) => setFacetState({ targetId: dev.selectedDevId, value });
@@ -70,6 +73,8 @@ export function InspectorPanel({ root, integrated = false }: { root?: Element; i
   const textLabel = useText("design-studio.inspector.domain.text", "Text");
   const iconLabel = useText("design-studio.inspector.domain.icon", "Icon");
   const layoutLabel = useText("design-studio.inspector.domain.layout", "Arrangement");
+  const appearanceLabel = useText("design-studio.inspector.domain.appearance", "Appearance");
+  const contentLabel = useText("design-studio.inspector.domain.content", "Content");
   const behaviorLabel = useText("design-studio.inspector.domain.behavior", "Behavior");
   const statesLabel = useText("design-studio.inspector.domain.states", "States");
   const advancedLabel = useText("design-studio.inspector.domain.advanced", "Advanced");
@@ -79,20 +84,22 @@ export function InspectorPanel({ root, integrated = false }: { root?: Element; i
   const variationLabel = useText("design-studio.inspector.reset.variation", "Variation");
   const themeLabel = useText("design-studio.inspector.reset.theme", "Theme");
   const fullDesignLabel = useText("design-studio.inspector.reset.full-design", "Full Personal Design");
-  const integratedDomain = useCopyFormatter("design-studio.inspector.domain.integrated", "{domain} Domain");
   const textDomainPreviewLabel = useText("design-studio.inspector.domain.text-preview", "Text Domain Preview");
   const iconDomainPreviewLabel = useText("design-studio.inspector.domain.icon-preview", "Icon Domain Preview");
   const facets: readonly { id: InspectorFacet; label: string }[] = [
-    { id: "box", label: boxLabel }, { id: "text", label: textLabel },
-    { id: "icon", label: iconLabel }, { id: "layout", label: layoutLabel },
-    { id: "behavior", label: behaviorLabel }, { id: "states", label: statesLabel },
+    { id: "layout", label: layoutLabel },
+    { id: "appearance", label: appearanceLabel },
+    { id: "content", label: contentLabel },
     { id: "advanced", label: advancedLabel },
   ];
-  const affectedTargetIds = inspection
-    ? inspection.role
-      ? previewTargetScope(resolvedRoot, inspection.id, "role").affectedTargetIds
-      : [inspection.id]
-    : [];
+  const affectedTargetIds = useMemo(
+    () => inspection
+      ? inspection.role
+        ? previewTargetScope(resolvedRoot, inspection.id, "role").affectedTargetIds
+        : [inspection.id]
+      : [],
+    [inspection, resolvedRoot],
+  );
   const affectedInspections = useMemo(
     () => inspectionsFor(resolvedRoot, affectedTargetIds),
     [affectedTargetIds, resolvedRoot],
@@ -109,7 +116,14 @@ export function InspectorPanel({ root, integrated = false }: { root?: Element; i
     return [...ids];
   };
   const setDomainProperty = (domain: EditableTargetDomain, property: string, value: string) => {
-    domainOverrideIds(domain).forEach((id) => dev.setElementProp(id, property, value));
+    const ids = domainOverrideIds(domain);
+    if (studio && isThemeSpecificElementProp(property)) {
+      studio.replaceResolvedDraftAtomically(
+        setDraftElementProperty(dev.draft, ids, property, value),
+      );
+      return;
+    }
+    ids.forEach((id) => dev.setElementProp(id, property, value));
   };
   const resetDomainProperty = (domain: EditableTargetDomain, property: string) => {
     const next = resetDraftElementProperty(dev.draft, domainOverrideIds(domain), property);
@@ -175,10 +189,8 @@ export function InspectorPanel({ root, integrated = false }: { root?: Element; i
     setDomainProperty,
     resetDomainProperty,
   };
-  const previewDomain: EditableTargetDomain | null = facet === "text" || facet === "icon" ? facet : null;
-  const previewContentIds = previewDomain
-    ? [...new Set(affectedInspections.flatMap((item) => item.editTargets[previewDomain].contentIds))]
-    : [];
+  const textContentIds = [...new Set(affectedInspections.flatMap((item) => item.editTargets.text.contentIds))];
+  const iconContentIds = [...new Set(affectedInspections.flatMap((item) => item.editTargets.icon.contentIds))];
   return (
     <section aria-label={contextualInspectorLabel} className="border-b border-line">
       <div className="border-b border-line px-3.5 py-2.5">
@@ -198,29 +210,22 @@ export function InspectorPanel({ root, integrated = false }: { root?: Element; i
       <div role="tablist" aria-label={inspectorDomainsLabel} className="flex flex-wrap gap-1 border-b border-line px-3.5 py-1.5">
         {facets.map((item) => (
           <button key={item.id} type="button" role="tab" aria-selected={facet === item.id} onClick={() => setFacet(item.id)} className={`rounded-control px-2 py-1 text-2xs font-semibold ${facet === item.id ? "bg-raise2 text-t1" : "text-t3 hover:text-t2"}`}>
-            {integrated && (item.id === "box" || item.id === "icon" || item.id === "behavior")
-              ? integratedDomain({ domain: item.label })
-              : item.label}
+            {item.label}
           </button>
         ))}
       </div>
 
-      {previewDomain ? (
-        <div
-          aria-label={previewDomain === "text" ? textDomainPreviewLabel : iconDomainPreviewLabel}
-          className="border-b border-line px-3.5 py-2 font-mono text-2xs text-t3"
-        >
-          {previewContentIds.join(" ")}
+      {facet === "content" ? (
+        <div className="border-b border-line px-3.5 py-2 font-mono text-2xs text-t3">
+          <div aria-label={textDomainPreviewLabel}>{textContentIds.join(" ")}</div>
+          <div aria-label={iconDomainPreviewLabel}>{iconContentIds.join(" ")}</div>
         </div>
       ) : null}
 
-      {facet === "box" ? <BoxInspector {...inspectorProps} /> : null}
-      {facet === "text" ? <TextInspector {...inspectorProps} /> : null}
-      {facet === "icon" ? <IconInspector {...inspectorProps} /> : null}
-      {facet === "layout" ? <LayoutInspector {...inspectorProps} /> : null}
-      {facet === "behavior" ? <BehaviorInspector {...inspectorProps} /> : null}
-      {facet === "states" ? <StatesInspector {...inspectorProps} /> : null}
-      {facet === "advanced" ? <AdvancedInspector {...inspectorProps} /> : null}
+      {facet === "layout" ? <><LayoutInspector {...inspectorProps} /><BoxInspector {...inspectorProps} section="layout" /></> : null}
+      {facet === "appearance" ? <><BoxInspector {...inspectorProps} section="appearance" /><StatesInspector {...inspectorProps} /></> : null}
+      {facet === "content" ? <><TextInspector {...inspectorProps} /><IconInspector {...inspectorProps} /><CadPresentationInspector {...inspectorProps} /></> : null}
+      {facet === "advanced" ? <><BehaviorInspector {...inspectorProps} /><AdvancedInspector {...inspectorProps} /></> : null}
 
       <div className="border-t border-line px-3.5 py-2">
         <div className="ui-property-label mb-1.5">{resetLabel}</div>

@@ -59,4 +59,18 @@ describe("applyElementOverrides", () => {
 
     disconnect();
   });
+
+  it("writes safe global state rules and removes them with the draft", () => {
+    nodeWithId("x.y");
+    const state = { "x.y::state:hover": { color: "#123456" } };
+    applyElementOverrides(state);
+    const sheet = document.querySelector<HTMLStyleElement>("#stockroom-design-state-overrides");
+    expect(sheet?.textContent).toContain("data-dev-id");
+    expect(sheet?.textContent).toContain(":hover");
+    expect(sheet?.textContent).toContain('[data-design-preview-state="hover"]');
+    expect(sheet?.textContent).toContain("color:#123456");
+
+    applyElementOverrides({}, state);
+    expect(document.querySelector("#stockroom-design-state-overrides")).toBeNull();
+  });
 });

@@ -133,6 +133,19 @@ describe("Design Studio document", () => {
       .toBe("component-browser.cad-symbol");
   });
 
+  it("rejects remote or open-ended CAD presentation values", () => {
+    for (const cadPresentation of [
+      { "cad.symbol": { symbol: { stroke: "url(https://evil.invalid/a.svg)" } } },
+      { "cad.footprint": { footprint: { layerColors: { copper: "red; display:none" } } } },
+      { "cad.model3d": { model3d: { background: "url(https://evil.invalid/a.png)" } } },
+      { "cad.model3d": { model3d: { material: "custom-script" } } },
+    ]) {
+      const parsed = parseDesignDocument({ schemaVersion: 2, base: emptyDraft(), cadPresentation });
+      expect(parsed.ok).toBe(false);
+      if (!parsed.ok) expect(parsed.error.code).toBe("invalid-cad-presentation");
+    }
+  });
+
   it("publishes the built-in presentation variations", () => {
     expect(BUILT_IN_VARIATIONS).toEqual([
       { id: "full-data", title: "Full Data" },
@@ -142,6 +155,42 @@ describe("Design Studio document", () => {
       { id: "minimal", title: "Minimal" },
       { id: "custom", title: "Custom" },
     ]);
+  });
+
+  it("adds missing built-in variations when an existing v2 draft is upgraded", () => {
+    const parsed = parseDesignDocument({
+      schemaVersion: 2,
+      base: emptyDraft(),
+      variations: {
+        "owner-view": { id: "owner-view", title: "Owner View", patch: {} },
+      },
+      activeVariationId: "owner-view",
+    });
+
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) return;
+    expect(Object.keys(parsed.document.variations)).toEqual(expect.arrayContaining([
+      "full-data", "compact", "purchasing", "cad-review", "minimal", "custom", "owner-view",
+    ]));
+    expect(parsed.document.activeVariationId).toBe("owner-view");
+  });
+
+  it("records state and internal-domain overrides under their owning global target", () => {
+    const parsed = parseDesignDocument({
+      schemaVersion: 2,
+      base: {
+        ...emptyDraft(),
+        elements: {
+          "detail.action::text": { color: "#111111" },
+          "detail.action::state:hover": { color: "#222222" },
+        },
+      },
+    });
+
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) return;
+    expect(Object.keys(parsed.document.globalTargets)).toContain("detail.action");
+    expect(Object.keys(parsed.document.globalTargets)).not.toContain("detail.action::state:hover");
   });
 
   it("seeds all six named variations with closed inheritance", () => {

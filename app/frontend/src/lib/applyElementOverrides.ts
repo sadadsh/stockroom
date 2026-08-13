@@ -31,6 +31,51 @@ import { isApplicableElementOverride } from "./elementLayout";
 // devId -> (cssProp -> value). Mirrors ELEMENT_OVERRIDES exactly.
 export type ElementOverrides = Record<string, Record<string, string>>;
 
+const STATE_STYLE_ID = "stockroom-design-state-overrides";
+const STATE_OVERRIDE_RE = /^(.*)::state:(hover|focus|active|selected|disabled)$/;
+
+function attributeSelector(attribute: string, value: string): string {
+  if (typeof CSS !== "undefined" && typeof CSS.escape === "function") {
+    return `[${attribute}=${CSS.escape(value)}]`;
+  }
+  return `[${attribute}="${value.replace(/["\\]/g, "\\$&")}"]`;
+}
+
+function stateSelectors(targetId: string, state: string): string[] {
+  const bases = [
+    attributeSelector("data-dev-id", targetId),
+    attributeSelector("data-dev-role", targetId),
+    attributeSelector("data-design-id", targetId),
+  ];
+  const preview = bases.map((base) => `${base}[data-design-preview-state="${state}"]`);
+  if (state === "selected") return [...bases.map((base) => `${base}[aria-selected="true"]`), ...preview];
+  if (state === "disabled") {
+    return [
+      ...bases.map((base) => `${base}:disabled`),
+      ...bases.map((base) => `${base}[aria-disabled="true"]`),
+      ...preview,
+    ];
+  }
+  if (state === "focus") return [...bases.map((base) => `${base}:focus`), ...bases.map((base) => `${base}:focus-visible`), ...preview];
+  return [...bases.map((base) => `${base}:${state}`), ...preview];
+}
+
+function writeStateOverrides(overrides: ElementOverrides): void {
+  const rules: string[] = [];
+  for (const [id, props] of Object.entries(overrides)) {
+    const match = STATE_OVERRIDE_RE.exec(id);
+    if (!match) continue;
+    const declarations = Object.entries(props).map(([property, value]) => `${property}:${value}`).join(";");
+    if (declarations) rules.push(`${stateSelectors(match[1], match[2]).join(",")} {${declarations}}`);
+  }
+  document.getElementById(STATE_STYLE_ID)?.remove();
+  if (rules.length === 0) return;
+  const style = document.createElement("style");
+  style.id = STATE_STYLE_ID;
+  style.textContent = rules.join("\n");
+  document.head.appendChild(style);
+}
+
 function styled(element: Element): (Element & ElementCSSInlineStyle) | null {
   return "style" in element ? element as Element & ElementCSSInlineStyle : null;
 }
@@ -94,9 +139,11 @@ export function applicableOverrides(source: ElementOverrides): ElementOverrides 
  */
 export function applyElementOverrides(current: ElementOverrides, previous?: ElementOverrides): void {
   const live = applicableOverrides(current);
+  writeStateOverrides(live);
 
   // Set every current prop on every element the id addresses.
   for (const [id, props] of Object.entries(live)) {
+    if (STATE_OVERRIDE_RE.test(id)) continue;
     for (const [prop, value] of Object.entries(props)) writeOverrideProperty(id, prop, value);
   }
 
@@ -104,6 +151,7 @@ export function applyElementOverrides(current: ElementOverrides, previous?: Elem
   // removed prop within a still-present id).
   if (previous) {
     for (const [id, prevProps] of Object.entries(previous)) {
+      if (STATE_OVERRIDE_RE.test(id)) continue;
       const nextProps = live[id];
       const removed = Object.keys(prevProps).filter((prop) => !nextProps || !(prop in nextProps));
       if (removed.length === 0) continue;

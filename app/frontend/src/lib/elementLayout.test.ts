@@ -177,6 +177,7 @@ describe("closed Box and Text value grammar", () => {
       "grid-template-columns": "repeat(3, minmax(0, 1fr))", "grid-auto-flow": "row dense",
       "font-family": "system-ui", "text-transform": "uppercase", "white-space": "nowrap",
       "text-overflow": "ellipsis", "overflow-wrap": "anywhere",
+      transform: "translate(12px, -4px)", filter: "blur(2px)", "z-index": "120",
     } as const;
     for (const [property, value] of Object.entries(approved)) {
       expect(isSafeElementValue(property, value), `${property}: ${value}`).toBe(true);
@@ -190,6 +191,9 @@ describe("closed Box and Text value grammar", () => {
       ["font-family", "'Custom Font'"],
       ["grid-template-columns", "subgrid<script>"],
       ["position", "expression(alert(1))"],
+      ["transform", "translateX(10px) rotate(20deg)"],
+      ["filter", "url(#remote-filter)"],
+      ["z-index", "999999"],
     ]) expect(isSafeElementValue(property, value)).toBe(false);
   });
 });

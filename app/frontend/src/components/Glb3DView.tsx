@@ -15,6 +15,7 @@ import { useEffect, useRef, useState } from "react";
 import type { LandPattern } from "../api/client";
 import { ApiError } from "../api/client";
 import { TECHNICAL_CONTENT_ATTRIBUTE } from "../design-studio/targetDomains";
+import { useOptionalDesignStudio } from "../design-studio/DesignStudioProvider";
 import { Text, useText } from "../lib/copy";
 import { useModelScene, type ModelVisibility } from "../lib/useModelScene";
 import { ModelViewerControlSurface, type ModelControlsMode } from "./Glb3DViewControls";
@@ -97,6 +98,7 @@ export function Glb3DView({
    */
   onVisibilityChange?: (state: ModelVisibility) => void;
 }) {
+  const presentation = useOptionalDesignStudio()?.resolvedCadPresentation["cad.model3d"]?.model3d;
   const scene = useModelScene({ data, land, isLoading, isError, onVisibilityChange });
   const [compactControlsOpen, setCompactControlsOpen] = useState(false);
   const settingsRef = useRef<HTMLDivElement>(null);
@@ -138,6 +140,22 @@ export function Glb3DView({
     };
   }, [compactControlsOpen]);
 
+  useEffect(() => {
+    if (presentation?.models !== undefined && presentation.models !== scene.controls.showModel) {
+      scene.controls.toggleModel();
+    }
+    if (presentation?.board !== undefined && presentation.board !== scene.controls.showBoard) {
+      scene.controls.toggleBoard();
+    }
+    const material = presentation?.material;
+    if (
+      (material === "realistic" || material === "studio" || material === "xray") &&
+      material !== scene.controls.renderMode
+    ) {
+      scene.controls.setRenderMode(material);
+    }
+  }, [presentation?.board, presentation?.material, presentation?.models, scene.controls]);
+
   if (isLoading) {
     return (
       <Centered>
@@ -176,8 +194,30 @@ export function Glb3DView({
             scene.controls.fit();
           }
         }}
+        style={{
+          ...(presentation?.background ? { background: presentation.background } : {}),
+          ...(presentation?.opacity === undefined ? {} : { opacity: presentation.opacity }),
+        }}
         className="relative min-h-0 w-full flex-1 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-acc"
-      />
+      >
+        {presentation?.grid === true ? (
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0"
+            style={{
+              backgroundImage: "linear-gradient(var(--c-line) 1px, transparent 1px), linear-gradient(90deg, var(--c-line) 1px, transparent 1px)",
+              backgroundSize: "16px 16px",
+              opacity: 0.35,
+            }}
+          />
+        ) : null}
+        {presentation?.axes === true ? (
+          <div aria-hidden="true" className="pointer-events-none absolute bottom-3 left-3 h-12 w-12 border-b-2 border-l-2 border-acc" />
+        ) : null}
+        {presentation?.tint ? (
+          <div aria-hidden="true" className="pointer-events-none absolute inset-0" style={{ background: presentation.tint, mixBlendMode: "color", opacity: 0.35 }} />
+        ) : null}
+      </div>
       {!compact && showViews ? <div aria-hidden="true" className="h-[82px] flex-none" /> : null}
       <ModelViewerControlSurface
         controls={scene.controls}

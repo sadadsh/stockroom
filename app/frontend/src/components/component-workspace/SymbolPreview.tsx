@@ -19,6 +19,7 @@
 import { useMemo, useState } from "react";
 import type { SymbolGeometry, SymbolPin } from "../../api/client";
 import { TECHNICAL_CONTENT_ATTRIBUTE } from "../../design-studio/targetDomains";
+import { useOptionalDesignStudio } from "../../design-studio/DesignStudioProvider";
 import { Text, useText } from "../../lib/copy";
 import { usePanZoom } from "../../lib/usePanZoom";
 
@@ -73,6 +74,7 @@ export function SymbolPreview({
   /** A collapsed module shows the same drawing without taking the pointer or the tab stop. */
   interactive?: boolean;
 }) {
+  const presentation = useOptionalDesignStudio()?.resolvedCadPresentation["cad.symbol"]?.symbol;
   const { view, frameRef, handlers, reset } = usePanZoom();
   const canvasLabel = useText(
     "component-browser.symbol-canvas",
@@ -147,17 +149,22 @@ export function SymbolPreview({
             outshouted the MPN, and a near-black symbol on a dark sheet would be worse still. The
             filled-body case is why the wash is its own token instead of an opacity - see
             `SymbolShape`. */}
-        <g transform={flip} className="fill-none stroke-technical-ink" strokeLinecap="round">
+        <g
+          transform={flip}
+          className="fill-none stroke-technical-ink"
+          strokeLinecap="round"
+          style={presentation?.stroke ? { stroke: presentation.stroke } : undefined}
+        >
           {/* The line work is keyed by position in the file because a KiCad graphic carries no
               identity of its own and two identical shapes are genuinely indistinguishable. The
               list is the file's, whole and in its order: never filtered, never reordered, and
               nothing in it holds state. Keying it by its own drawn geometry would invent a
               distinction the file does not make, and collide the moment a symbol repeats a shape. */}
-          {geometry.graphics.map((shape, index) => (
-            <SymbolShape key={index} shape={shape} />
+          {presentation?.body === false ? null : geometry.graphics.map((shape, index) => (
+            <SymbolShape key={index} shape={shape} overrideFill={presentation?.fill} />
           ))}
-          {geometry.pins.map((pin) => (
-            <PinLine key={pinKey(pin)} pin={pin} />
+          {presentation?.pins === false ? null : geometry.pins.map((pin) => (
+            <PinLine key={pinKey(pin)} pin={pin} showHidden={presentation?.hiddenPins === true} />
           ))}
         </g>
         {/* Text is drawn OUTSIDE the flip, with its own per-pin placement, because a mirrored
@@ -167,7 +174,12 @@ export function SymbolPreview({
             <PinLabels
               key={pinKey(pin)}
               pin={pin}
-              layers={layers}
+              layers={{
+                pinName: layers.pinName && presentation?.names !== false,
+                pinNumber: layers.pinNumber && presentation?.numbers !== false,
+                electrical: layers.electrical && presentation?.fields !== false,
+              }}
+              showHidden={presentation?.hiddenPins === true}
               flipY={2 * box.y + box.height}
             />
           ))}
@@ -191,7 +203,7 @@ const SHAPE_FILL: Record<string, string> = {
   outline: "fill-technical-ink",
 };
 
-function SymbolShape({ shape }: { shape: SymbolGeometry["graphics"][number] }) {
+function SymbolShape({ shape, overrideFill }: { shape: SymbolGeometry["graphics"][number]; overrideFill?: string }) {
   const fill = SHAPE_FILL[shape.fill] ?? "fill-none";
   const width = shape.width > 0 ? shape.width : 0.15;
   if (shape.kind === "rectangle") {
@@ -204,6 +216,7 @@ function SymbolShape({ shape }: { shape: SymbolGeometry["graphics"][number] }) {
         width={Math.abs(b[0] - a[0])}
         height={Math.abs(b[1] - a[1])}
         className={fill}
+        style={overrideFill ? { fill: overrideFill } : undefined}
         strokeWidth={width}
       />
     );
@@ -215,12 +228,13 @@ function SymbolShape({ shape }: { shape: SymbolGeometry["graphics"][number] }) {
         cy={shape.center[1]}
         r={shape.radius}
         className={fill}
+        style={overrideFill ? { fill: overrideFill } : undefined}
         strokeWidth={width}
       />
     );
   }
   const points = shape.points.map(([x, y]) => `${x},${y}`).join(" ");
-  return <polyline points={points} className={fill} strokeWidth={width} />;
+  return <polyline points={points} className={fill} style={overrideFill ? { fill: overrideFill } : undefined} strokeWidth={width} />;
 }
 
 function pinEnd(pin: SymbolPin): [number, number] {
@@ -228,8 +242,8 @@ function pinEnd(pin: SymbolPin): [number, number] {
   return [pin.at[0] + pin.length * Math.cos(radians), pin.at[1] + pin.length * Math.sin(radians)];
 }
 
-function PinLine({ pin }: { pin: SymbolPin }) {
-  if (pin.hidden) return null;
+function PinLine({ pin, showHidden = false }: { pin: SymbolPin; showHidden?: boolean }) {
+  if (pin.hidden && !showHidden) return null;
   const [x2, y2] = pinEnd(pin);
   return (
     <line
@@ -254,12 +268,14 @@ function PinLabels({
   pin,
   layers,
   flipY,
+  showHidden = false,
 }: {
   pin: SymbolPin;
   layers: SymbolLayerState;
   flipY: number;
+  showHidden?: boolean;
 }) {
-  if (pin.hidden) return null;
+  if (pin.hidden && !showHidden) return null;
   const [bodyX, bodyY] = pinEnd(pin);
   const horizontal = Math.abs(Math.cos((pin.angle * Math.PI) / 180)) > 0.5;
   const towardsBody = Math.cos((pin.angle * Math.PI) / 180) >= 0 ? 1 : -1;

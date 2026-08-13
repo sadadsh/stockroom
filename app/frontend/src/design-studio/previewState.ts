@@ -1,4 +1,4 @@
-export type DesignPreviewState = "default" | "hover" | "focus" | "active" | "disabled";
+export type DesignPreviewState = "default" | "hover" | "focus" | "active" | "selected" | "disabled";
 
 type DisableableElement = HTMLElement & { disabled: boolean };
 
@@ -17,6 +17,7 @@ export function applyDesignPreviewState(
 ): () => void {
   const previousState = target.getAttribute("data-design-preview-state");
   const previousAriaDisabled = target.getAttribute("aria-disabled");
+  const previousAriaSelected = target.getAttribute("aria-selected");
   const hadDisabledClass = target.classList.contains("design-preview-disabled");
   const previousDisabled = isDisableable(target) ? target.disabled : null;
   const suppressActivation = (event: Event) => {
@@ -34,6 +35,7 @@ export function applyDesignPreviewState(
     target.addEventListener("click", suppressActivation, true);
     target.addEventListener("keydown", suppressActivation, true);
   }
+  if (state === "selected") target.setAttribute("aria-selected", "true");
   if (state === "focus" && target instanceof HTMLElement) target.focus();
 
   return () => {
@@ -43,6 +45,8 @@ export function applyDesignPreviewState(
     else target.setAttribute("data-design-preview-state", previousState);
     if (previousAriaDisabled === null) target.removeAttribute("aria-disabled");
     else target.setAttribute("aria-disabled", previousAriaDisabled);
+    if (previousAriaSelected === null) target.removeAttribute("aria-selected");
+    else target.setAttribute("aria-selected", previousAriaSelected);
     target.classList.toggle("design-preview-disabled", hadDisabledClass);
     if (previousDisabled !== null && isDisableable(target)) target.disabled = previousDisabled;
   };
