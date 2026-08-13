@@ -111,6 +111,14 @@ function writeOverrideProperty(id: string, property: string, value: string | nul
   }
 }
 
+function safelyWriteOverrideProperty(id: string, property: string, value: string | null): void {
+  try {
+    writeOverrideProperty(id, property, value);
+  } catch (error) {
+    console.error(`Design override '${id}.${property}' was skipped after a DOM write failure.`, error);
+  }
+}
+
 /**
  * The subset of an override map this runtime will apply: the entries whose property is editable and
  * whose value is in the safe grammar. Exported so Save can send only what the writer would accept
@@ -139,12 +147,16 @@ export function applicableOverrides(source: ElementOverrides): ElementOverrides 
  */
 export function applyElementOverrides(current: ElementOverrides, previous?: ElementOverrides): void {
   const live = applicableOverrides(current);
-  writeStateOverrides(live);
+  try {
+    writeStateOverrides(live);
+  } catch (error) {
+    console.error("Design state overrides were skipped after a DOM write failure.", error);
+  }
 
   // Set every current prop on every element the id addresses.
   for (const [id, props] of Object.entries(live)) {
     if (STATE_OVERRIDE_RE.test(id)) continue;
-    for (const [prop, value] of Object.entries(props)) writeOverrideProperty(id, prop, value);
+    for (const [prop, value] of Object.entries(props)) safelyWriteOverrideProperty(id, prop, value);
   }
 
   // Clear anything present in `previous` that no longer appears in `current` (a removed id, or a
@@ -155,7 +167,7 @@ export function applyElementOverrides(current: ElementOverrides, previous?: Elem
       const nextProps = live[id];
       const removed = Object.keys(prevProps).filter((prop) => !nextProps || !(prop in nextProps));
       if (removed.length === 0) continue;
-      for (const prop of removed) writeOverrideProperty(id, prop, null);
+      for (const prop of removed) safelyWriteOverrideProperty(id, prop, null);
     }
   }
 }

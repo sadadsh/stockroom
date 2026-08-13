@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { applyElementOverrides, startElementOverrideObserver } from "./applyElementOverrides";
 
 // Each test seeds real nodes under document.body; clear them so state never leaks between tests.
@@ -72,5 +72,20 @@ describe("applyElementOverrides", () => {
 
     applyElementOverrides({}, state);
     expect(document.querySelector("#stockroom-design-state-overrides")).toBeNull();
+  });
+
+  it("contains one failing DOM write instead of blanking the remaining preview", () => {
+    const broken = nodeWithId("broken.node");
+    const healthy = nodeWithId("healthy.node");
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    vi.spyOn(broken.style, "setProperty").mockImplementation(() => {
+      throw new Error("simulated DOM write failure");
+    });
+
+    expect(() => applyElementOverrides({
+      "broken.node": { width: "100px" },
+      "healthy.node": { width: "200px" },
+    })).not.toThrow();
+    expect(healthy.style.width).toBe("200px");
   });
 });

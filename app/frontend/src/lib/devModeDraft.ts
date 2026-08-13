@@ -151,6 +151,9 @@ export function resetDraftTargets(draft: DevModeDraft, reset: DraftTargetReset):
   }
   for (const id of reset.copyIds ?? []) delete next.copy[id];
   for (const id of reset.iconIds ?? []) delete next.icons[id];
+  for (const [id, icon] of Object.entries(next.icons)) {
+    if (icon.insertInto && reset.targetIds.includes(icon.insertInto)) delete next.icons[id];
+  }
   return next;
 }
 

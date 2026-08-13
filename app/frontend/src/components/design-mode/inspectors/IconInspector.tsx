@@ -8,6 +8,7 @@ import type { DomainInspectorProps } from "./types";
 import { designIdOf } from "../../../lib/designIdentity";
 import { VisualCssControl } from "./VisualCssControl";
 import { ValueSlider } from "../ValueSlider";
+import { insertedIconOverrideId } from "../../../lib/applyIconOverrides";
 
 const IconBrowser = lazy(() => import("../IconBrowser").then((module) => ({ default: module.IconBrowser })));
 
@@ -19,7 +20,9 @@ export function IconInspector(props: DomainInspectorProps) {
     return id ? [id] : [];
   }))];
   const selectedIcon = props.inspection.icons[0];
-  const iconId = selectedIcon?.iconId ?? (selectedIcon ? designIdOf(selectedIcon.element) : null) ?? iconIds[0];
+  const insertionId = insertedIconOverrideId(props.inspection.id);
+  const inserted = dev.iconOverrideFor(insertionId);
+  const iconId = selectedIcon?.iconId ?? (selectedIcon ? designIdOf(selectedIcon.element) : null) ?? iconIds[0] ?? (inserted ? insertionId : null);
   const emptyLabel = useText("design-studio.inspector.icon.empty", "This target has no editable interface icon.");
   const unregisteredLabel = useText("design-studio.inspector.icon.unregistered", "The icon is not registered.");
   const resetLabel = useText("design-studio.inspector.icon.reset", "Reset Icon");
@@ -43,19 +46,44 @@ export function IconInspector(props: DomainInspectorProps) {
   const middleLabel = useText("design-studio.inspector.icon.alignment.middle", "Middle");
   const textTopLabel = useText("design-studio.inspector.icon.alignment.text-top", "Text Top");
   const textBottomLabel = useText("design-studio.inspector.icon.alignment.text-bottom", "Text Bottom");
-  if (!iconId) return <p className="px-3.5 py-3 text-2xs text-t3">{emptyLabel}</p>;
+  const addLabel = useText("design-studio.inspector.icon.add", "Add Icon");
+  const addHelp = useText("design-studio.inspector.icon.add-help", "Choose an offline icon to attach to this element.");
+  const placementLabel = useText("design-studio.inspector.icon.placement", "Placement");
+  const beforeLabel = useText("design-studio.inspector.icon.placement.before", "Before Content");
+  const afterLabel = useText("design-studio.inspector.icon.placement.after", "After Content");
+  if (!iconId) return (
+    <div className="px-3.5 py-3">
+      <h4 className="text-xs font-semibold text-t1">{addLabel}</h4>
+      <p className="mt-1 text-2xs text-t3">{emptyLabel} {addHelp}</p>
+      <Suspense fallback={<p className="mt-3 text-2xs text-t3">{loadingCatalogLabel}</p>}>
+        <IconBrowser
+          targetViewBox="0 0 24 24"
+          onSelect={(selected) => dev.setIconPresentation(insertionId, {
+            body: sanitizeIconBody(selected.body),
+            insertInto: props.inspection.id,
+            placement: "before",
+          })}
+        />
+      </Suspense>
+    </div>
+  );
   const resolved = resolveIcon(iconId, dev.resolveIconOverride);
   const rawSvg = selectedIcon?.element instanceof SVGElement ? selectedIcon.element : null;
+  const presentation = dev.iconOverrideFor(iconId);
   const entry = resolved?.entry ?? (rawSvg ? {
     id: iconId,
     category: "bespoke" as const,
     viewBox: rawSvg.getAttribute("viewBox") ?? "0 0 24 24",
     body: sanitizeIconBody(rawSvg.innerHTML),
+  } : presentation?.body ? {
+    id: iconId,
+    category: "bespoke" as const,
+    viewBox: "0 0 24 24",
+    body: sanitizeIconBody(presentation.body),
   } : null);
   if (!entry) return <p className="px-3.5 py-3 text-2xs text-t3">{unregisteredLabel}</p>;
   const alternatives = resolved ? ICON_IDS_BY_CATEGORY[entry.category] ?? [] : [];
   const body = dev.iconOverrideFor(iconId)?.body ?? resolved?.body ?? entry.body ?? "";
-  const presentation = dev.iconOverrideFor(iconId);
   const iconStyle = getComputedStyle(selectedIcon?.element ?? props.inspection.target);
   return (
     <div className="px-3.5 py-3">
@@ -151,6 +179,18 @@ export function IconInspector(props: DomainInspectorProps) {
           </select>
         </label>
       </div>
+      {presentation?.insertInto ? (
+        <label className="mt-3 block text-xs text-t2">{placementLabel}
+          <select
+            value={presentation.placement ?? "before"}
+            onChange={(event) => dev.setIconPresentation(iconId, { placement: event.target.value as "before" | "after" })}
+            className="mt-1 w-full rounded-control border border-line bg-field px-2 py-1 text-2xs text-t1"
+          >
+            <option value="before">{beforeLabel}</option>
+            <option value="after">{afterLabel}</option>
+          </select>
+        </label>
+      ) : null}
       <label className="mt-3 block text-xs text-t2">{accessibleLabel}
         <input
           value={presentation?.a11yLabel ?? ""}

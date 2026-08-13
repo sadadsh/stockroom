@@ -17,6 +17,9 @@ export interface IconOverride {
   treatment?: "line" | "solid" | "muted";
   a11yLabel?: string;
   alignment?: "baseline" | "middle" | "text-top" | "text-bottom";
+  /** Optional safe attachment for an icon added by Design Studio. */
+  insertInto?: string;
+  placement?: "before" | "after";
 }
 
 export const ICON_OVERRIDES: Record<string, IconOverride> = {};

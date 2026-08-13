@@ -19,6 +19,7 @@ function Probe() {
   return (
     <div>
       <div data-testid="selected">{dev.selectedDevId ?? "none"}</div>
+      <div data-testid="selected-copy">{dev.selectedCopyId ?? "none"}</div>
       <div data-testid="vars">{dev.highlightedVars.join(",")}</div>
       <output data-testid="element-overrides">{JSON.stringify(dev.draft.elements)}</output>
       <button type="button" onClick={dev.toggle}>
@@ -50,7 +51,7 @@ function Harness({ onAppClick }: { onAppClick?: () => void }) {
             Complete Part
           </button>
           <span data-testid="stockroom-copy" data-copy-id="brand.stockroom" data-design-id="auto.text.1234567">Stockroom</span>
-          <span data-testid="mpn-copy" data-copy-id="component-browser.copy-mpn-object" data-design-id="auto.text.1234567">MPN</span>
+          <span data-testid="mpn-copy" data-copy-id="component-browser.copy-mpn-object" data-design-id="auto.text.1234567"><strong data-testid="mpn-copy-child">MPN</strong></span>
           <div data-dev-id="detail.readiness" className="bg-raise">
             <svg className="ico" viewBox="0 0 24 24" data-testid="ico">
               <path d="M4 12h16" />
@@ -164,6 +165,28 @@ describe("DevInspector", () => {
     expect(mpnId).not.toBe(stockroomId);
   });
 
+  it("synchronizes copy and element selection on the pointer press", () => {
+    render(<Harness />);
+    on("toggle-dev");
+    on("toggle-inspect");
+
+    fireEvent(screen.getByTestId("mpn-copy"), new MouseEvent("pointerdown", { bubbles: true, button: 0 }));
+
+    expect(screen.getByTestId("selected").textContent).toMatch(/^auto\.copy\./);
+    expect(screen.getByTestId("selected-copy")).toHaveTextContent("component-browser.copy-mpn-object");
+  });
+
+  it("keeps the owning copy selected when an exact nested text child is pressed", () => {
+    render(<Harness />);
+    on("toggle-dev");
+    on("toggle-inspect");
+
+    fireEvent(screen.getByTestId("mpn-copy-child"), new MouseEvent("pointerdown", { bubbles: true, button: 0 }));
+
+    expect(screen.getByTestId("selected").textContent).toMatch(/^auto\.dom-strong\./);
+    expect(screen.getByTestId("selected-copy")).toHaveTextContent("component-browser.copy-mpn-object");
+  });
+
   it("inspect-off is zero behaviour change: the app click fires and nothing is selected", () => {
     const appClick = vi.fn();
     render(<Harness onAppClick={appClick} />);
@@ -207,7 +230,25 @@ describe("DevInspector", () => {
     expect(screen.getAllByRole("button", { name: /Resize Complete Part/ })).toHaveLength(8);
     expect(screen.getByRole("button", { name: "Hide Complete Part" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Detach Complete Part" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Bring Complete Part Forward" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Send Complete Part Backward" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Reset Complete Part" })).toBeInTheDocument();
+  });
+
+  it("moves the selected element forward and backward as undoable layer edits", () => {
+    render(<Harness />);
+    on("toggle-dev");
+    on("toggle-inspect");
+    const target = screen.getByRole("button", { name: "Complete Part" });
+    fireEvent.click(target);
+
+    fireEvent.click(screen.getByRole("button", { name: "Bring Complete Part Forward" }));
+    expect(target).toHaveStyle({ zIndex: "1" });
+    fireEvent.click(screen.getByRole("button", { name: "Send Complete Part Backward" }));
+    expect(target).toHaveStyle({ zIndex: "0" });
+
+    on("undo");
+    expect(target).toHaveStyle({ zIndex: "1" });
   });
 
   it("rotates from the keyboard as one undoable edit", () => {
@@ -307,6 +348,22 @@ describe("DevInspector", () => {
     expect(target.style.left).toBe("");
     expect(target.style.top).toBe("");
     expect(screen.getByTestId("element-overrides")).toHaveTextContent("{}");
+  });
+
+  it("keeps the preview frame out of accidental move, rotate, detach, and resize gestures", () => {
+    render(<Harness />);
+    on("toggle-dev");
+    on("toggle-inspect");
+    const frame = document.querySelector<HTMLElement>("[data-design-product-root]")!;
+
+    fireEvent.click(frame);
+
+    expect(screen.getByTestId("selected")).toHaveTextContent("components.stage");
+    expect(screen.queryByRole("button", { name: /^Move / })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Rotate / })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Detach / })).toBeNull();
+    expect(screen.queryAllByRole("button", { name: /^Resize / })).toHaveLength(0);
+    expect(screen.getByRole("button", { name: /^Hide / })).toBeInTheDocument();
   });
 
   it("uses Shift-click for multi-selection and hides both global targets", () => {

@@ -84,7 +84,10 @@ function targetIssues(document: DesignDocument, theme: Theme): DesignPromotionIs
     if (!isKnownDevTarget(id)) add("missing-target", id);
   }
   for (const [id, override] of Object.entries(resolved.icons)) {
-    if (!ICON_BY_ID.has(id)) add("missing-target", id);
+    if (override.insertInto) {
+      if (!isGeneratedDesignId(id)) add("missing-target", id);
+      if (!isKnownDevTarget(override.insertInto)) add("missing-target", override.insertInto);
+    } else if (!ICON_BY_ID.has(id)) add("missing-target", id);
     if (override.swapToId && !ICON_BY_ID.has(override.swapToId)) {
       add("missing-target", override.swapToId);
     }

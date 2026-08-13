@@ -133,6 +133,10 @@ function rotationStepFor(element: Element): number {
   return element.closest("[data-snap]")?.getAttribute("data-snap") === "on" ? 15 : 1;
 }
 
+function isPreviewFrameTarget(element: Element): boolean {
+  return element.hasAttribute("data-design-product-root") || element.getAttribute("data-dev-id") === "shell.root";
+}
+
 function displayLabel(id: string, element: Element): string {
   const text = element.textContent?.replace(/\s+/g, " ").trim();
   return text ? text.slice(0, 48) : labelFor(id, element) || id;
@@ -184,7 +188,15 @@ function labelFor(id: string, el: Element | null): string {
 export function DevInspector() {
   const dev = useDevMode();
   const studio = useOptionalDesignStudio();
-  const { enabled, inspect, showIds, selectDevId, selectVars } = dev;
+  const {
+    enabled,
+    inspect,
+    showIds,
+    selectDevId,
+    selectVars,
+    selectCopy,
+    clearSelectedCopy,
+  } = dev;
   const [hover, setHover] = useState<Hover | null>(null);
   const [badges, setBadges] = useState<Badge[]>([]);
   const [selection, setSelection] = useState<SelectedTarget[]>([]);
@@ -233,6 +245,15 @@ export function DevInspector() {
       });
       selectDevId(id);
       selectVars(usedVarsForElement(el));
+      const copy = target?.closest("[data-copy-id]") ?? null;
+      if (copy && (copy === el || copy.contains(el) || el.contains(copy))) {
+        selectCopy(
+          copy.getAttribute("data-copy-id") ?? "",
+          copy.getAttribute("data-copy-default") ?? copy.textContent ?? "",
+        );
+      } else {
+        clearSelectedCopy();
+      }
       return true;
     }
 
@@ -272,7 +293,7 @@ export function DevInspector() {
       document.removeEventListener("pointerdown", onPointerDown, true);
       document.removeEventListener("click", onClick, true);
     };
-  }, [enabled, inspect, selectDevId, selectVars]);
+  }, [clearSelectedCopy, enabled, inspect, selectCopy, selectDevId, selectVars]);
 
   useEffect(() => {
     if (!enabled || !inspect || !dev.selectedDevId) {
@@ -563,6 +584,9 @@ export function DevInspector() {
   );
   const primary = selection[selection.length - 1];
   const selectionName = selection.length > 1 ? `${selection.length} Selected` : primary?.label ?? "Selection";
+  const geometryEditable = selection.length > 0 && selection.every(
+    (target) => !isPreviewFrameTarget(target.element),
+  );
 
   const toggleVisibility = useCallback(() => {
     const changes = new Map<string, Record<string, string>>();
@@ -596,6 +620,17 @@ export function DevInspector() {
     }
     commitChanges(changes);
   }, [commitChanges, dev.draft.elements, selection]);
+
+  const adjustLayer = useCallback((delta: -1 | 1) => {
+    const changes = new Map<string, Record<string, string>>();
+    for (const target of selection) {
+      const override = draftRef.current.elements[target.id]?.["z-index"];
+      const computed = getComputedStyle(target.element).zIndex;
+      const current = Number.parseInt(override ?? computed, 10);
+      changes.set(target.id, { "z-index": String((Number.isFinite(current) ? current : 0) + delta) });
+    }
+    commitChanges(changes);
+  }, [commitChanges, selection]);
 
   // Clear the hover highlight the moment Inspect (or dev mode) turns off, so no stale outline lingers.
   useEffect(() => {
@@ -688,13 +723,17 @@ export function DevInspector() {
         >
           <div className="pointer-events-auto absolute bottom-full left-0 mb-2 flex items-center gap-1 rounded-control border border-line2 bg-popover p-1 shadow-pop">
             <span className="max-w-40 truncate px-1 text-2xs font-semibold text-t1">{selectionName}</span>
-            <button type="button" aria-label={`Move ${selectionName}`} title={`Move ${selectionName}`} onPointerDown={(event) => beginGesture(event, "move")} onKeyDown={moveByKeyboard} className="rounded-control px-1.5 py-1 text-xs text-t1 hover:bg-control-hover">Move</button>
-            <button type="button" aria-label={`Rotate ${selectionName}`} title={`Rotate ${selectionName}`} onPointerDown={(event) => beginGesture(event, "rotate")} onKeyDown={rotateByKeyboard} className="rounded-control px-1.5 py-1 text-xs text-t1 hover:bg-control-hover">Rotate</button>
+            {geometryEditable ? <>
+              <button type="button" aria-label={`Move ${selectionName}`} title={`Move ${selectionName}`} onPointerDown={(event) => beginGesture(event, "move")} onKeyDown={moveByKeyboard} className="rounded-control px-1.5 py-1 text-xs text-t1 hover:bg-control-hover">Move</button>
+              <button type="button" aria-label={`Rotate ${selectionName}`} title={`Rotate ${selectionName}`} onPointerDown={(event) => beginGesture(event, "rotate")} onKeyDown={rotateByKeyboard} className="rounded-control px-1.5 py-1 text-xs text-t1 hover:bg-control-hover">Rotate</button>
+            </> : null}
             <button type="button" aria-label={`${hidden ? "Show" : "Hide"} ${selectionName}`} onClick={toggleVisibility} className="rounded-control px-1.5 py-1 text-xs text-t1 hover:bg-control-hover">{hidden ? "Show" : "Hide"}</button>
-            <button type="button" aria-label={`${dev.draft.elements[primary.id]?.position === "absolute" ? "Flow" : "Detach"} ${selectionName}`} onClick={toggleDetached} className="rounded-control px-1.5 py-1 text-xs text-t1 hover:bg-control-hover">{dev.draft.elements[primary.id]?.position === "absolute" ? "Flow" : "Detach"}</button>
+            {geometryEditable ? <button type="button" aria-label={`${dev.draft.elements[primary.id]?.position === "absolute" ? "Flow" : "Detach"} ${selectionName}`} onClick={toggleDetached} className="rounded-control px-1.5 py-1 text-xs text-t1 hover:bg-control-hover">{dev.draft.elements[primary.id]?.position === "absolute" ? "Flow" : "Detach"}</button> : null}
+            <button type="button" aria-label={`Bring ${selectionName} Forward`} onClick={() => adjustLayer(1)} className="rounded-control px-1.5 py-1 text-xs text-t1 hover:bg-control-hover">Forward</button>
+            <button type="button" aria-label={`Send ${selectionName} Backward`} onClick={() => adjustLayer(-1)} className="rounded-control px-1.5 py-1 text-xs text-t1 hover:bg-control-hover">Back</button>
             <button type="button" aria-label={`Reset ${selectionName}`} onClick={resetSelection} className="rounded-control px-1.5 py-1 text-xs text-t1 hover:bg-control-hover">Reset</button>
           </div>
-          {RESIZE_DIRECTIONS.map((direction) => (
+          {geometryEditable ? RESIZE_DIRECTIONS.map((direction) => (
             <button
               key={direction}
               type="button"
@@ -704,7 +743,7 @@ export function DevInspector() {
               className="pointer-events-auto absolute size-3 -translate-x-1/2 -translate-y-1/2 rounded-full border border-acc bg-surface shadow-card"
               style={HANDLE_POSITION[direction]}
             />
-          ))}
+          )) : null}
         </div>
       ) : null}
     </div>,

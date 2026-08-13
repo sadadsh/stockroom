@@ -118,6 +118,17 @@ describe("personal design source promotion", () => {
     expect(collectDesignIssues(fixtureDocument(), "dark", shell)).toEqual([]);
   });
 
+  it("accepts a safe generated icon attached to a known global target", () => {
+    const document = fixtureDocument();
+    document.base.icons["auto.inserted-icon.001c8t8"] = {
+      body: '<path d="M4 12h16" />',
+      insertInto: "auto.copy.0fedcba",
+      placement: "before",
+    };
+
+    expect(collectDesignIssues(document, "dark", null)).toEqual([]);
+  });
+
   it("never invokes source APIs while a fixture scenario is active", async () => {
     const client = {
       devStatus: vi.fn(),

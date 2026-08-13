@@ -212,12 +212,14 @@ function copyStringMap(value: unknown, nullable: boolean): Record<string, string
 
 function copyIcon(value: unknown): IconOverride | null {
   if (!isRecord(value)) return null;
-  const { body, swapToId, strokeWidth, treatment, a11yLabel, alignment } = value;
+  const { body, swapToId, strokeWidth, treatment, a11yLabel, alignment, insertInto, placement } = value;
   if (body !== undefined && typeof body !== "string") return null;
   if (swapToId !== undefined && typeof swapToId !== "string") return null;
   if (strokeWidth !== undefined && (typeof strokeWidth !== "number" || !Number.isFinite(strokeWidth))) return null;
   if (treatment !== undefined && treatment !== "line" && treatment !== "solid" && treatment !== "muted") return null;
   if (a11yLabel !== undefined && typeof a11yLabel !== "string") return null;
+  if (insertInto !== undefined && typeof insertInto !== "string") return null;
+  if (placement !== undefined && placement !== "before" && placement !== "after") return null;
   if (
     alignment !== undefined &&
     alignment !== "baseline" &&
@@ -232,6 +234,8 @@ function copyIcon(value: unknown): IconOverride | null {
     ...(treatment === undefined ? {} : { treatment }),
     ...(a11yLabel === undefined ? {} : { a11yLabel }),
     ...(alignment === undefined ? {} : { alignment }),
+    ...(insertInto === undefined ? {} : { insertInto }),
+    ...(placement === undefined ? {} : { placement }),
   };
 }
 

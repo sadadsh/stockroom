@@ -16,6 +16,7 @@ import { ScenarioCatalog } from "./ScenarioCatalog";
 import { PREVIEW_EFFECT_BLOCKED_EVENT, type PreviewEffectError } from "../../design-studio/previewEffects";
 import { useToast } from "../../lib/toast";
 import { DEFAULT_DESIGN_GRID_SIZE, finiteDesignGridSize } from "../../design-studio/gridSize";
+import { DesignPreviewBoundary } from "./DesignPreviewBoundary";
 
 const LEFT_COLLAPSED_KEY = "stockroom.design-studio.left-collapsed";
 const RIGHT_COLLAPSED_KEY = "stockroom.design-studio.right-collapsed";
@@ -416,7 +417,9 @@ export function DesignStudioShell({ children }: { children: ReactNode }) {
             className={studio.enabled ? "mx-auto min-h-full overflow-hidden border border-line bg-surface shadow-pop" : "contents"}
             style={studio.enabled ? previewStyle : undefined}
           >
-            <ArrangePreferencesProvider snap={snap} gridSize={gridSize}>{children}</ArrangePreferencesProvider>
+            <DesignPreviewBoundary resetKey={JSON.stringify(dev.draft)} onRecover={dev.undo}>
+              <ArrangePreferencesProvider snap={snap} gridSize={gridSize}>{children}</ArrangePreferencesProvider>
+            </DesignPreviewBoundary>
           </div>
           {studio.enabled ? (
             <div className="sticky bottom-2 left-2 z-10 w-fit rounded-control border border-line bg-popover/90 px-2 py-1 text-2xs text-t2" data-dev-id="design.pan-cue">

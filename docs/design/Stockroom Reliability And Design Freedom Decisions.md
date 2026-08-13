@@ -293,3 +293,24 @@ The Add Part commit boundary must carry every selected specification, its source
 procurement fields that live as specifications, provider catalogue data, both distributor offers, and
 all disagreements. A successful lookup is not complete evidence until the newly created component
 dossier renders that same data after persistence.
+
+### Exact Target Editing, Safe Additions, And Recovery
+
+A generated text or icon identity is an independent target even when it lives inside an authored
+container. Its own visible node participates in the Text or Icon domain; the inspector must never
+replace it with the first text or icon found in an ancestor. Copy selection and element selection are
+synchronized from the same pointer target so a label cannot display one identity while the inspector
+edits another.
+
+Adding an icon is a declarative Design Document edit. The document stores a sanitized SVG body, the
+stable target it is attached to, and a closed before/after placement. The runtime may materialize that
+SVG, but it accepts no HTML, script, event handler, or network URL. Removing or undoing the edit removes
+the materialized node without changing the component's React source.
+
+Bring Forward and Send Backward are target-local z-index edits in the same undo history as all other
+visual changes. The app preview root cannot be moved, resized, or rotated through a casual direct
+gesture; whole-screen hiding remains an explicit reversible command in Layers.
+
+The product preview is protected by a Design Studio recovery boundary. A render exception leaves the
+fixed editor chrome and an Undo recovery action visible instead of replacing Stockroom with an empty
+canvas. Draft application remains atomic and the last accepted document remains recoverable.

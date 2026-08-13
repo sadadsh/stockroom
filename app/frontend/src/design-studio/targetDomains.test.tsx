@@ -90,6 +90,27 @@ describe("inspectTarget", () => {
     expect(target.style.width).toBe("320px");
   });
 
+  it("styles the exact generated copy node instead of dropping its text domain", () => {
+    document.body.innerHTML = `
+      <section data-dev-id="component-browser.key-specs">
+        <span data-copy-id="component-browser.key-specs-title" data-design-id="auto.copy.0abc123">Main Specifications</span>
+        <span data-copy-id="brand.stockroom" data-design-id="auto.copy.0def456">Stockroom</span>
+      </section>
+    `;
+    const heading = document.querySelector<HTMLElement>('[data-copy-id="component-browser.key-specs-title"]')!;
+    const unrelated = document.querySelector<HTMLElement>('[data-copy-id="brand.stockroom"]')!;
+
+    const inspection = inspectTarget(document.body, "auto.copy.0abc123");
+    expect(inspection.editTargets.text.elements).toEqual([heading]);
+
+    applyElementOverrides({
+      "auto.copy.0abc123::text": { "font-size": "22px", color: "#123456" },
+    });
+    expect(heading).toHaveStyle({ fontSize: "22px", color: "rgb(18, 52, 86)" });
+    expect(unrelated.style.fontSize).toBe("");
+    expect(unrelated.style.color).toBe("");
+  });
+
   it.each<FixtureName>(["currentColor SVG", "fill SVG", "nested text", "mixed CAD header"])(
     "reports independent Box, Text, and Icon domains for %s",
     (fixture) => {

@@ -208,6 +208,8 @@ def test_dev_save_writes_closed_icon_presentation_properties(client, tmp_path, m
                     "treatment": "muted",
                     "a11yLabel": "Parts navigation",
                     "alignment": "middle",
+                    "insertInto": "auto.copy.0abc123",
+                    "placement": "before",
                 }
             },
         },
@@ -218,6 +220,8 @@ def test_dev_save_writes_closed_icon_presentation_properties(client, tmp_path, m
     assert '"treatment": "muted"' in icon_ts
     assert '"a11yLabel": "Parts navigation"' in icon_ts
     assert '"alignment": "middle"' in icon_ts
+    assert '"insertInto": "auto.copy.0abc123"' in icon_ts
+    assert '"placement": "before"' in icon_ts
 
 
 def test_dev_save_rejects_open_ended_icon_presentation_before_any_write(
@@ -229,6 +233,8 @@ def test_dev_save_rejects_open_ended_icon_presentation_before_any_write(
         {"treatment": "filter:blur(3px)"},
         {"a11yLabel": "<script>bad()</script>"},
         {"alignment": "position:absolute"},
+        {"insertInto": "not a valid target"},
+        {"placement": "around"},
     ):
         res = client.post(
             "/api/dev/save",

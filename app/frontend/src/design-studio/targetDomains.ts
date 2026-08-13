@@ -199,6 +199,21 @@ function domainElementsExceptTarget<T extends { element: Element }>(
   return uniqueElements(elements);
 }
 
+function textEditElements(
+  domains: readonly TargetTextDomain[],
+  target: Element,
+): Element[] {
+  const elements = domainElementsExceptTarget(domains, target);
+  const ownsVisibleText = domains.some((domain) => domain.element === target);
+  if (
+    ownsVisibleText &&
+    (target.hasAttribute("data-copy-id") || target.hasAttribute("data-design-id"))
+  ) {
+    elements.unshift(target);
+  }
+  return uniqueElements(elements);
+}
+
 function editTargets(
   id: string,
   target: Element,
@@ -221,7 +236,7 @@ function editTargets(
     box: make("box", [target], []),
     text: make(
       "text",
-      domainElementsExceptTarget(texts, target),
+      textEditElements(texts, target),
       texts.flatMap((text) => text.copyId ? [text.copyId] : []),
     ),
     icon: make(
@@ -285,7 +300,7 @@ export function elementsForTargetDomainOverride(
   for (const target of targets) {
     if (address.domain === "box") elements.push(target);
     else if (address.domain === "text") {
-      elements.push(...domainElementsExceptTarget(textDomains(target), target));
+      elements.push(...textEditElements(textDomains(target), target));
     } else {
       elements.push(...iconDomains(target).map((icon) => icon.element));
     }

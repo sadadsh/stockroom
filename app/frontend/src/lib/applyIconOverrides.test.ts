@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { applyGeneratedIconOverrides } from "./applyIconOverrides";
+import { applyGeneratedIconOverrides, insertedIconOverrideId } from "./applyIconOverrides";
 
 afterEach(() => document.body.replaceChildren());
 
@@ -18,5 +18,43 @@ describe("applyGeneratedIconOverrides", () => {
 
     applyGeneratedIconOverrides({}, current);
     expect(document.querySelector('[data-testid="original"]')).not.toBeNull();
+  });
+
+  it("materializes and removes a safe icon attached to any design target", () => {
+    document.body.innerHTML = '<span data-design-id="auto.copy.0abc123">Main Specifications</span>';
+    const id = insertedIconOverrideId("auto.copy.0abc123");
+    const current = {
+      [id]: {
+        body: '<path data-testid="added" d="M4 12h16" />',
+        insertInto: "auto.copy.0abc123",
+        placement: "before" as const,
+      },
+    };
+
+    applyGeneratedIconOverrides(current, {});
+    const added = document.querySelector<SVGElement>(`[data-design-inserted-icon="${id}"]`);
+    expect(added).not.toBeNull();
+    expect(added?.querySelector('[data-testid="added"]')).not.toBeNull();
+    expect(added?.nextSibling?.textContent).toBe("Main Specifications");
+
+    applyGeneratedIconOverrides({}, current);
+    expect(document.querySelector(`[data-design-inserted-icon="${id}"]`)).toBeNull();
+  });
+
+  it("places an added icon beside a text input without throwing or replacing the input", () => {
+    document.body.innerHTML = '<label><input data-design-id="auto.input.0abc123" value="MPN" /></label>';
+    const id = insertedIconOverrideId("auto.input.0abc123");
+    const current = {
+      [id]: {
+        body: '<path d="M4 12h16" />',
+        insertInto: "auto.input.0abc123",
+        placement: "before" as const,
+      },
+    };
+
+    expect(() => applyGeneratedIconOverrides(current, {})).not.toThrow();
+    const input = document.querySelector("input");
+    expect(input?.previousElementSibling).toHaveAttribute("data-design-inserted-icon", id);
+    expect(input).toHaveValue("MPN");
   });
 });

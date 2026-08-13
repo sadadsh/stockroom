@@ -114,6 +114,7 @@ export function Text({
         selectCopy(id, children);
       }}
       onClickCapture={(e) => {
+        if (e.target instanceof Element && e.target.closest("[data-design-inserted-icon]")) return;
         // Capture + stop so a label inside a button edits instead of triggering the button.
         e.stopPropagation();
         e.preventDefault();

@@ -29,6 +29,15 @@ function Controls() {
       >
         Select Raw Icon
       </button>
+      <button
+        type="button"
+        onClick={() => {
+          if (!dev.enabled) dev.toggle();
+          dev.selectDevId("auto.copy.0fedcba");
+        }}
+      >
+        Select Text Only
+      </button>
       <output data-testid="inspector-draft">{JSON.stringify(dev.draft)}</output>
     </>
   );
@@ -67,6 +76,7 @@ function Harness() {
           </button>
         </section>
         <svg data-design-id="auto.raw-svg.0abc123" viewBox="0 0 24 24"><path d="M3 12h18" /></svg>
+        <span data-copy-id="component-browser.key-specs-title" data-design-id="auto.copy.0fedcba">Main Specifications</span>
         <output data-testid="activation-count">{activations}</output>
         <InspectorPanel />
       </DevModeProvider>
@@ -116,6 +126,41 @@ describe("InspectorPanel", () => {
 
     expect(await screen.findByRole("searchbox", { name: "Search Icon Catalog" })).toBeVisible();
     expect(screen.queryByText("The icon is not registered.")).toBeNull();
+  });
+
+  it("adds an offline icon to a text-only element", async () => {
+    render(<Harness />);
+    fireEvent.click(screen.getByRole("button", { name: "Select Text Only" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Content" }));
+
+    const search = await screen.findByRole("searchbox", { name: "Search Icon Catalog" });
+    fireEvent.change(search, { target: { value: "github" } });
+    fireEvent.click(await screen.findByRole("button", { name: "Select github" }));
+
+    await waitFor(() => {
+      const draft = JSON.parse(screen.getByTestId("inspector-draft").textContent ?? "{}") as {
+        icons: Record<string, { insertInto?: string }>;
+      };
+      expect(Object.values(draft.icons)).toContainEqual(expect.objectContaining({
+        insertInto: "auto.copy.0fedcba",
+      }));
+      expect(document.querySelector('[data-design-inserted-icon]')).not.toBeNull();
+    });
+
+  });
+
+  it("applies Main Specifications text settings only to that selected text target", async () => {
+    render(<Harness />);
+    fireEvent.click(screen.getByRole("button", { name: "Select Text Only" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Content" }));
+    fireEvent.change(screen.getByLabelText("Text font-size Value"), { target: { value: "22" } });
+
+    await waitFor(() => {
+      const heading = document.querySelector<HTMLElement>('[data-copy-id="component-browser.key-specs-title"]')!;
+      const unrelated = document.querySelector<HTMLElement>('[data-copy-id="detail.action.copy"]')!;
+      expect(heading.style.fontSize).toBe("22px");
+      expect(unrelated.style.fontSize).toBe("");
+    });
   });
 
   it("edits every global occurrence and removal is undoable", async () => {

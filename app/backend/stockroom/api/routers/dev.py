@@ -173,6 +173,8 @@ export interface IconOverride {
   treatment?: "line" | "solid" | "muted";
   a11yLabel?: string;
   alignment?: "baseline" | "middle" | "text-top" | "text-bottom";
+  insertInto?: string;
+  placement?: "before" | "after";
 }
 
 export const ICON_OVERRIDES: Record<string, IconOverride> = """
@@ -578,6 +580,8 @@ def _clean_icons(block: object) -> dict:
         treatment = entry.get("treatment")
         a11y_label = entry.get("a11yLabel")
         alignment = entry.get("alignment")
+        insert_into = entry.get("insertInto")
+        placement = entry.get("placement")
         if body is not None:
             result["body"] = _sanitize_svg_body(body)
         if swap is not None:
@@ -609,6 +613,14 @@ def _clean_icons(block: object) -> dict:
             if alignment not in {"baseline", "middle", "text-top", "text-bottom"}:
                 raise ApiError(400, "Icon alignment is invalid.")
             result["alignment"] = alignment
+        if insert_into is not None:
+            if not _valid_element_id(insert_into):
+                raise ApiError(400, "Inserted icon target is invalid.")
+            result["insertInto"] = insert_into
+        if placement is not None:
+            if placement not in {"before", "after"}:
+                raise ApiError(400, "Inserted icon placement is invalid.")
+            result["placement"] = placement
         if result:
             out[key] = result
     return out

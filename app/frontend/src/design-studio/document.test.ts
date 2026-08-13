@@ -247,6 +247,8 @@ describe("Design Studio document", () => {
             treatment: "muted",
             a11yLabel: "Add component",
             alignment: "text-top",
+            insertInto: "auto.copy.0abc123",
+            placement: "before",
           },
         },
       },
@@ -259,6 +261,8 @@ describe("Design Studio document", () => {
       treatment: "muted",
       a11yLabel: "Add component",
       alignment: "text-top",
+      insertInto: "auto.copy.0abc123",
+      placement: "before",
     });
   });
 
