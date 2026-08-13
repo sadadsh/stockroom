@@ -5,7 +5,7 @@ import os
 import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from threading import Lock
+from threading import Condition, Lock
 
 import pytest
 
@@ -91,23 +91,23 @@ def _digest(label: str) -> str:
     return f"sha256:{hashlib.sha256(label.encode()).hexdigest()}"
 
 
-def _handlers(*, delay_identity: float = 0.0):
+def _handlers(*, synchronize_identity: bool = False):
     active = 0
     peak = 0
     lock = Lock()
+    identity_gate = Condition(lock)
 
     def handle(context: StageContext):
         nonlocal active, peak
         if context.stage.name is StageName.IDENTITY_DEDUPE:
-            with lock:
+            with identity_gate:
                 active += 1
                 peak = max(peak, active)
-            try:
-                if delay_identity:
-                    time.sleep(delay_identity)
-            finally:
-                with lock:
-                    active -= 1
+                identity_gate.notify_all()
+                if synchronize_identity:
+                    identity_gate.wait_for(lambda: peak >= 2, timeout=2.0)
+            with lock:
+                active -= 1
             return ExactIdentityOutcome(
                 authoritative_manufacturer_key=context.item.manufacturer,
                 mpn_canonical=context.item.mpn,
@@ -146,7 +146,7 @@ def test_background_polling_is_bounded_fair_clean_and_payload_free(
     store.submit_batch(
         [IntakeIdentity("ACME", f"P-{index}", {"private": secret}) for index in range(12)]
     )
-    handlers, observed_peak = _handlers(delay_identity=0.03)
+    handlers, observed_peak = _handlers(synchronize_identity=True)
     runtime = WorkflowRuntime(store, handlers)
     coordinator = WorkflowCoordinator(
         control,
@@ -369,7 +369,9 @@ def test_a_slow_stage_does_not_fault_the_coordinator(tmp_path: Path) -> None:
         if context.stage.name is StageName.IDENTITY_DEDUPE:
             with lock:
                 identity_calls += 1
-            time.sleep(1.0)
+            # Cross the lease boundary with enough heartbeat intervals that
+            # loaded Windows runners test renewal instead of scheduler luck.
+            time.sleep(2.5)
             return ExactIdentityOutcome(
                 authoritative_manufacturer_key=context.item.manufacturer,
                 mpn_canonical=context.item.mpn,
@@ -392,10 +394,10 @@ def test_a_slow_stage_does_not_fault_the_coordinator(tmp_path: Path) -> None:
         WorkflowRuntime(
             store,
             {name: handle for name in StageName},
-            heartbeat_seconds=0.1,
+            heartbeat_seconds=0.05,
         ),
         worker_count=4,
-        lease_seconds=0.3,
+        lease_seconds=2.0,
         minimum_idle_backoff_seconds=0.005,
         maximum_idle_backoff_seconds=0.02,
     )

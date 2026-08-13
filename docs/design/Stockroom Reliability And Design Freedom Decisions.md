@@ -174,8 +174,9 @@ from a Git checkout.
 
 ### Repository Byte Fidelity On Windows
 
-Every Git repository created or cloned by Stockroom sets repository-local `core.autocrlf=false`,
-and clone checkout receives the same setting before files are materialized. Generated CAD,
+Every Git repository created or cloned by Stockroom sets repository-local `core.autocrlf=false`
+and `core.longpaths=true`; clone checkout receives both settings before files are materialized. Generated CAD,
 transaction snapshots, rollback files, and publish comparisons are byte contracts; they must not
-change because a machine-wide Windows Git preference converts line endings. This local boundary
-does not alter the person's global Git configuration or normalize unrelated repositories.
+change because a machine-wide Windows Git preference converts line endings, and provider library
+paths must remain writable beyond the legacy 260-character boundary. These local settings do not
+alter the person's global Git configuration or normalize unrelated repositories.

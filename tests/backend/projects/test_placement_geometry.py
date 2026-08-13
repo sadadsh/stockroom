@@ -1,10 +1,10 @@
 from __future__ import annotations
 
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 
-from stockroom.kicad.cli import KiCadCli
 from stockroom.model.project import ProjectRecord
 from stockroom.projects.placement_geometry import (
     altium_board_geometry,
@@ -79,9 +79,37 @@ def test_kicad_geometry_uses_native_metric_csv_and_preserves_the_board(tmp_path)
     )
     before = board.read_bytes()
 
+    class Cli:
+        available = True
+
+        @staticmethod
+        def version():
+            return "10.0-test"
+
+        @staticmethod
+        def _run(*args):
+            assert args[:8] == (
+                "pcb",
+                "export",
+                "pos",
+                "--format",
+                "csv",
+                "--units",
+                "mm",
+                "--side",
+            )
+            assert args[8] == "both"
+            output = Path(args[args.index("--output") + 1])
+            output.write_text(
+                '"Ref","Val","Package","PosX","PosY","Rot","Side"\n'
+                '"R1","10k","R_0402","10.25","20.5","90","top"\n',
+                encoding="utf-8",
+            )
+            return SimpleNamespace(returncode=0, stdout="", stderr="")
+
     result = kicad_board_geometry(
         _project(tmp_path, eda="kicad", board=board.name),
-        KiCadCli(),
+        Cli(),
     )
 
     assert result["status"] == "ready"

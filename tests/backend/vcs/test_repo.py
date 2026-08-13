@@ -33,6 +33,7 @@ def test_init_disables_inherited_autocrlf_and_restores_exact_bytes(tmp_path, mon
     repo.restore_paths([tracked])
 
     assert repo._run("config", "--local", "--get", "core.autocrlf").stdout.strip() == "false"
+    assert repo._run("config", "--local", "--get", "core.longpaths").stdout.strip() == "true"
     assert tracked.read_bytes() == b"first\nsecond\n"
 
 
@@ -52,6 +53,7 @@ def test_clone_disables_inherited_autocrlf_before_checkout(tmp_path, monkeypatch
     clone.clone_from(origin_root)
 
     assert clone._run("config", "--local", "--get", "core.autocrlf").stdout.strip() == "false"
+    assert clone._run("config", "--local", "--get", "core.longpaths").stdout.strip() == "true"
     assert (clone_root / "exact.txt").read_bytes() == b"first\nsecond\n"
 
 

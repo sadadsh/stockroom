@@ -2800,10 +2800,11 @@ def test_fab_status_unknown_id_is_404(client):
 
 
 @pytest.mark.serial_only
-def test_fab_export_streams_the_zip(client, tmp_path, monkeypatch):
+def test_fab_export_streams_the_zip(client, app_ctx, tmp_path, monkeypatch):
     from stockroom.projects import fab_export as fx
 
     rec = _register(client, _make_board_project(tmp_path / "brd"))
+    monkeypatch.setattr(app_ctx.project_ops.cli, "binary", "test-kicad-cli")
 
     def fake_bundle(pcb, cli, **kw):
         return {
@@ -2831,11 +2832,28 @@ def test_fab_export_unknown_id_is_404(client):
 
 
 @pytest.mark.serial_only
-def test_fab_export_missing_cli_is_502(client, tmp_path, monkeypatch):
+def test_fab_export_unavailable_cli_is_502(client, app_ctx, tmp_path, monkeypatch):
+    from stockroom.projects import fab_export as fx
+
+    rec = _register(client, _make_board_project(tmp_path / "brd"))
+    monkeypatch.setattr(app_ctx.project_ops.cli, "binary", None)
+
+    def unexpected_bundle(*_args, **_kwargs):
+        raise AssertionError("an unavailable CLI must fail before bundle creation")
+
+    monkeypatch.setattr(fx, "build_fab_bundle", unexpected_bundle)
+    r = client.get(f"/api/projects/{rec['id']}/fab/export")
+    assert r.status_code == 502
+    assert "not found" in r.json()["detail"]
+
+
+@pytest.mark.serial_only
+def test_fab_export_missing_cli_is_502(client, app_ctx, tmp_path, monkeypatch):
     from stockroom.kicad.errors import KiCadCliError
     from stockroom.projects import fab_export as fx
 
     rec = _register(client, _make_board_project(tmp_path / "brd"))
+    monkeypatch.setattr(app_ctx.project_ops.cli, "binary", "test-kicad-cli")
 
     def no_cli(pcb, cli, **kw):
         raise KiCadCliError("kicad-cli was not found")
@@ -2847,10 +2865,11 @@ def test_fab_export_missing_cli_is_502(client, tmp_path, monkeypatch):
 
 
 @pytest.mark.serial_only
-def test_fab_export_passes_options_through(client, tmp_path, monkeypatch):
+def test_fab_export_passes_options_through(client, app_ctx, tmp_path, monkeypatch):
     from stockroom.projects import fab_export as fx
 
     rec = _register(client, _make_board_project(tmp_path / "brd"))
+    monkeypatch.setattr(app_ctx.project_ops.cli, "binary", "test-kicad-cli")
     seen = {}
 
     def capture(pcb, cli, **kw):

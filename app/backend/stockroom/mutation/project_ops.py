@@ -18,6 +18,7 @@ from pathlib import Path
 from stockroom.eda.registry import get_tool
 from stockroom.kicad import conform, project_settings, stackup
 from stockroom.kicad.board import Board
+from stockroom.kicad.errors import KiCadCliError
 from stockroom.model.project import ProjectRecord
 from stockroom.mutation.hygiene import apply_hygiene, hygiene_preview
 from stockroom.mutation.transaction import Transaction
@@ -168,7 +169,7 @@ class ProjectOps:
             chosen = rec.board_paths[0]
         cli = getattr(self.cli, "binary", self.cli)
         if not isinstance(cli, str) or not cli:
-            raise ValueError("kicad-cli is unavailable")
+            raise KiCadCliError("kicad-cli was not found")
         return fab_export_mod.build_fab_bundle(
             Path(rec.root) / chosen, cli,
             drill_format=drill_format, drill_map=drill_map,
