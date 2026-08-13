@@ -173,14 +173,13 @@ async function assertVisibleTargets(page, scenario) {
 async function representativeClickThrough(page, studio) {
   await studio.open("components.full-data");
   const modes = page.getByLabel("Studio Mode");
-  await modes.getByRole("button", { name: "Inspect", exact: true }).click();
+  await modes.getByRole("button", { name: "Edit", exact: true }).click();
   await page.locator('[data-dev-id="shell.root"]').click({ position: { x: 10, y: 10 } });
   for (const domain of ["Box", "Text", "Icon", "Arrangement", "Behavior", "States", "Advanced"]) {
     const button = page.getByRole("button", { name: domain, exact: true });
     if (await button.count()) await button.first().click();
   }
-  await modes.getByRole("button", { name: "Arrange", exact: true }).click();
-  await modes.getByRole("button", { name: "Browse", exact: true }).click();
+  await modes.getByRole("button", { name: "Preview", exact: true }).click();
   await page.getByRole("button", { name: "Hide Screens And States", exact: true }).click();
   await page.getByRole("button", { name: "Show Screens And States", exact: true }).click();
   await page.getByRole("button", { name: "Hide Inspector", exact: true }).click();
