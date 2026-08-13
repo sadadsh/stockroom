@@ -449,7 +449,9 @@ def test_job_generation_blocks_new_work_and_retains_fence_until_executor_join(
         control_database=database,
         lifecycle=lifecycle,
         start_as_coordinator=True,
-        transition_timeout_seconds=0.05,
+        # The blocked job must force the first demotion to fail, while the
+        # released retry gets enough time to join real Windows worker threads.
+        transition_timeout_seconds=2.0,
         shadow_factory=shadow_factory,
         coordinator_factory=coordinator_factory,
     )
