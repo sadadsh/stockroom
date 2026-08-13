@@ -7,6 +7,7 @@ import type {
   SymbolPresentationOverride,
 } from "../../../design-studio/document";
 import type { DomainInspectorProps } from "./types";
+import { ValueSlider } from "../ValueSlider";
 
 const BOOLEAN_FIELDS = {
   symbol: ["body", "pins", "names", "numbers", "fields", "hiddenPins"],
@@ -108,20 +109,17 @@ export function CadPresentationInspector({ inspection }: DomainInspectorProps) {
               <option value="xray">{seeThroughLabel}</option>
             </select>
           </label>
-          <label className="text-xs text-t2">{alphaLabel}
-            <input
-              type="range"
+          <div className="text-xs text-t2">{alphaLabel}
+            <ValueSlider
+              ariaLabel={alphaLabel}
               min={0}
               max={1}
               step={0.05}
               value={(presentation as Model3dPresentationOverride).opacity ?? 1}
-              onChange={(event) => {
-                const value = event.currentTarget.valueAsNumber;
-                if (Number.isFinite(value) && value >= 0 && value <= 1) set({ opacity: value });
-              }}
-              className="mt-1 w-full rounded-control border border-line bg-field px-2 py-1 text-2xs text-t1"
+              onChange={(value) => set({ opacity: value })}
+              className="mt-1"
             />
-          </label>
+          </div>
         </div>
       ) : null}
     </section>

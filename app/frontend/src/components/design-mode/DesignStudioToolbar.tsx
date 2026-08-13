@@ -5,11 +5,10 @@ import { useCopyFormatter, useText } from "../../lib/copy";
 import { useTheme } from "../../lib/theme";
 import { Button } from "../primitives";
 import {
-  finiteViewportWidth,
   RESPONSIVE_VIEWPORT_PRESETS,
   type StudioViewport,
 } from "../../design-studio/responsiveViewports";
-import { finiteDesignGridSize } from "../../design-studio/gridSize";
+import { ValueSlider } from "./ValueSlider";
 
 interface DesignStudioToolbarProps {
   mode: StudioMode;
@@ -138,19 +137,15 @@ export function DesignStudioToolbar({
         </select>
       </label>
       {viewport === "custom" ? (
-        <input
-          type="range"
-          aria-label={customViewportLabel}
+        <ValueSlider
+          ariaLabel={customViewportLabel}
           min={320}
           max={3840}
           step={1}
           value={customViewportWidth}
-          onChange={(event) =>
-            onCustomViewportWidthChange(
-              finiteViewportWidth(event.target.value, customViewportWidth),
-            )
-          }
-          className="h-[22px] w-20 accent-[var(--c-acc)]"
+          unit="px"
+          onChange={onCustomViewportWidthChange}
+          className="w-40"
         />
       ) : null}
 
@@ -169,16 +164,15 @@ export function DesignStudioToolbar({
       </label>
 
       <Button small aria-pressed={grid} onClick={() => onGridChange(!grid)}>{gridLabel}</Button>
-      <input
-        type="range"
-        aria-label={gridSizeLabel}
-        title={gridSizeLabel}
+      <ValueSlider
+        ariaLabel={gridSizeLabel}
         min={1}
         max={64}
         step={1}
         value={gridSize}
-        onChange={(event) => onGridSizeChange(finiteDesignGridSize(event.currentTarget.value, gridSize))}
-        className="h-[22px] w-16 accent-[var(--c-acc)]"
+        unit="px"
+        onChange={onGridSizeChange}
+        className="w-36"
       />
       <Button small aria-pressed={snap} onClick={() => onSnapChange(!snap)}>{snapLabel}</Button>
 

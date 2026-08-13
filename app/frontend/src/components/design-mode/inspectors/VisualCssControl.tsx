@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { ValueSlider } from "../ValueSlider";
 
 interface VisualCssControlProps {
   property: string;
@@ -130,25 +131,18 @@ export function VisualCssControl({ property, ariaLabel, value, onCommit }: Visua
     );
   }
   if (!range) return null;
-  const formatted = `${rangeValue}${range.unit}`;
   return (
-    <div className="grid grid-cols-[minmax(0,1fr)_42px] items-center gap-1">
-      <input
-        type="range"
-        aria-label={ariaLabel}
-        min={range.min}
-        max={range.max}
-        step={range.step}
-        value={rangeValue}
-        onChange={(event) => {
-          const next = event.currentTarget.valueAsNumber;
-          if (!Number.isFinite(next)) return;
-          setRangeValue(next);
-          onCommit(`${next}${range.unit}`);
-        }}
-        className="min-w-0 accent-[var(--c-acc)]"
-      />
-      <output className="truncate text-right font-mono text-2xs text-t2">{formatted}</output>
-    </div>
+    <ValueSlider
+      ariaLabel={ariaLabel}
+      value={rangeValue}
+      min={range.min}
+      max={range.max}
+      step={range.step}
+      unit={range.unit}
+      onChange={(next) => {
+        setRangeValue(next);
+        onCommit(`${next}${range.unit}`);
+      }}
+    />
   );
 }

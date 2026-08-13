@@ -7,6 +7,7 @@ import { Icon } from "../../Icon";
 import type { DomainInspectorProps } from "./types";
 import { designIdOf } from "../../../lib/designIdentity";
 import { VisualCssControl } from "./VisualCssControl";
+import { ValueSlider } from "../ValueSlider";
 
 const IconBrowser = lazy(() => import("../IconBrowser").then((module) => ({ default: module.IconBrowser })));
 
@@ -95,39 +96,35 @@ export function IconInspector(props: DomainInspectorProps) {
         <label className="text-xs text-t2">{colorLabel}
           <div className="mt-1"><VisualCssControl property="color" ariaLabel={colorAria} value={iconStyle.color} onCommit={(value) => props.setDomainProperty("icon", "color", value)} /></div>
         </label>
-        <label className="text-xs text-t2">{sizeLabel}
-          <input
-            type="range"
-            aria-label={sizeAria}
+        <div className="text-xs text-t2">{sizeLabel}
+          <ValueSlider
+            ariaLabel={sizeAria}
             min={8}
             max={128}
             step={1}
-            defaultValue={Number.parseFloat(iconStyle.width) || 24}
-            onChange={(event) => {
-              const size = `${event.currentTarget.valueAsNumber}px`;
+            value={Number.parseFloat(iconStyle.width) || 24}
+            unit="px"
+            onChange={(value) => {
+              const size = `${value}px`;
               props.setDomainProperty("icon", "width", size);
               props.setDomainProperty("icon", "height", size);
             }}
-            className="mt-2 w-full accent-[var(--c-acc)]"
+            className="mt-1"
           />
-        </label>
-        <label className="text-xs text-t2">{strokeLabel}
-          <input
-            type="range"
-            aria-label={strokeAria}
+        </div>
+        <div className="text-xs text-t2">{strokeLabel}
+          <ValueSlider
+            ariaLabel={strokeAria}
             min={0.5}
             max={3}
             step={0.1}
             value={presentation?.strokeWidth ?? entry.strokeWidth ?? 1.5}
-            onChange={(event) => {
-              const value = event.currentTarget.valueAsNumber;
-              if (Number.isFinite(value) && value >= 0.5 && value <= 3) {
-                iconIds.forEach((id) => dev.setIconPresentation(id, { strokeWidth: value }));
-              }
+            onChange={(value) => {
+              iconIds.forEach((id) => dev.setIconPresentation(id, { strokeWidth: value }));
             }}
-            className="mt-1 w-full rounded-control border border-line bg-field px-2 py-1 text-2xs text-t1"
+            className="mt-1"
           />
-        </label>
+        </div>
       </div>
       <div className="mt-3 grid grid-cols-2 gap-2">
         <label className="text-xs text-t2">{treatmentLabel}

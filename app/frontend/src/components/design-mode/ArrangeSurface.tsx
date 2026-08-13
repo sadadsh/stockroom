@@ -111,6 +111,7 @@ import {
   type DropSide,
   type StepDirection,
 } from "./arrangeMoves";
+import { ValueSlider } from "./ValueSlider";
 
 /* -------------------------------------------------------------------------- */
 /*  the surface                                                                */
@@ -838,43 +839,43 @@ function PieceMenu({ state }: { state: ArrangeMenuState }) {
       </select>
       {freePosition ? (
         <div className="flex gap-1" data-dev-id="design.piece-position">
-          <input
-            type="range"
+          <ValueSlider
             min={-2048}
             max={2048}
             step={surface.snapGrid}
-            aria-label={xLabel}
+            ariaLabel={xLabel}
             value={placement.position?.x ?? 0}
-            onChange={(event) =>
+            unit="px"
+            onChange={(x) =>
               surface.edit(
                 positionPlacement(
                   surface.layout,
                   state.placementId,
-                  { x: finiteInputValue(event.target.value, placement.position?.x ?? 0) },
+                  { x },
                   { grid: surface.snapGrid },
                 ),
               )
             }
-            className="min-w-0 flex-1 accent-[var(--c-acc)]"
+            className="min-w-0 flex-1"
           />
-          <input
-            type="range"
+          <ValueSlider
             min={-2048}
             max={2048}
             step={surface.snapGrid}
-            aria-label={yLabel}
+            ariaLabel={yLabel}
             value={placement.position?.y ?? 0}
-            onChange={(event) =>
+            unit="px"
+            onChange={(y) =>
               surface.edit(
                 positionPlacement(
                   surface.layout,
                   state.placementId,
-                  { y: finiteInputValue(event.target.value, placement.position?.y ?? 0) },
+                  { y },
                   { grid: surface.snapGrid },
                 ),
               )
             }
-            className="min-w-0 flex-1 accent-[var(--c-acc)]"
+            className="min-w-0 flex-1"
           />
         </div>
       ) : (

@@ -53,6 +53,7 @@ import { useText } from "../lib/copy";
 import { ArrangeSection } from "./design-mode/ArrangePanel";
 import { IssuesSection } from "./design-mode/IssuesPanel";
 import { InspectorPanel } from "./design-mode/InspectorPanel";
+import { ValueSlider } from "./design-mode/ValueSlider";
 import { Button } from "./primitives";
 // The Interface Studio is part of the product, so its own chrome comes from the shared design
 // system rather than from a private set of class strings that drift away from it.
@@ -141,30 +142,21 @@ function ScaleRow({ token }: { token: DevToken }) {
   const overridden = dev.isTokenOverridden(token.cssVar);
   const { min, max, step } = token.range ?? DEFAULT_RANGE;
   const unit = token.kind === "length" ? "px" : "";
-  const set = (raw: string) => dev.setToken(token.cssVar, `${raw}${unit}`);
+  const set = (next: number) => dev.setToken(token.cssVar, `${next}${unit}`);
   return (
     <div className="flex items-center gap-2 py-1">
       <span className="min-w-0 flex-1 truncate text-xs text-t2">{token.label}</span>
       {overridden ? <ResetDot onClick={() => dev.resetToken(token.cssVar)} /> : null}
-      <input
-        type="range"
-        aria-label={`${token.label} slider`}
+      <ValueSlider
+        ariaLabel={`${token.label} slider`}
+        exactAriaLabel={`${token.label} value`}
         min={min}
         max={max}
         step={step}
         value={n}
-        onChange={(e) => set(e.target.value)}
-        className="w-[104px] flex-none accent-acc"
-      />
-      <input
-        type="number"
-        aria-label={`${token.label} value`}
-        min={min}
-        max={max}
-        step={step}
-        value={n}
-        onChange={(e) => set(e.target.value)}
-        className="nospin tnum w-[52px] flex-none rounded-control border border-line bg-field px-2 py-1 text-2xs font-mono text-t1 outline-none focus:border-acc"
+        unit={unit}
+        onChange={set}
+        className="w-[168px] flex-none"
       />
     </div>
   );
