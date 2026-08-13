@@ -250,3 +250,18 @@ The provider placeholder is not success evidence. It remains visible only behind
 provider WebView; browser readiness requires a current host runtime to accept and apply the measured
 modal viewport after the capture lease exists. Source fixes are not represented as delivered until CI
 passes and a usable Windows runtime containing them is published or installed.
+
+### Quiet Hierarchy And Exact Visual Controls
+
+Stockroom groups routine content with spacing and restrained surface shifts, not a box around every
+row, action, and nested section. Borders remain for major application regions, active inputs,
+selection, tables whose columns need tracking, and floating surfaces. Specifications stay compact,
+but ordinary rows use a subtle horizontal rhythm rather than a full cell grid.
+
+Each region exposes one visually primary action. Secondary actions are quiet controls, while rare or
+administrative actions remain in the existing overflow or Manage menu. Simplification must never
+remove data, provenance, conflicts, accessibility, or a unique workflow.
+
+Every Design Studio range uses one visible-value contract. Its current value and unit remain visible
+during pointer and keyboard use, and exact entry is available where a precise number matters. Slider
+position is never the only representation of the saved value.
