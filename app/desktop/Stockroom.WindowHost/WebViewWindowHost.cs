@@ -1587,7 +1587,7 @@ internal sealed class WebViewWindowHost : IDisposable
                       if (
                         !request ||
                         typeof request.componentId !== "string" ||
-                        !["back", "forward", "reload"].includes(request.command)
+                        !["back", "forward", "reload", "close"].includes(request.command)
                       ) {
                         throw new Error("Invalid provider browser command.");
                       }
@@ -1783,7 +1783,7 @@ internal sealed class WebViewWindowHost : IDisposable
                     "component_id",
                     "command");
                 var componentId = HandoffCodec.GetRequiredString(root, "component_id");
-                var command = HandoffCodec.GetRequiredString(root, "command");
+                var commandValue = HandoffCodec.GetRequiredString(root, "command");
                 if (!_providerLeases.TryGetActive(out _, out var activeContext)
                     || !string.Equals(
                         componentId,
@@ -1792,19 +1792,24 @@ internal sealed class WebViewWindowHost : IDisposable
                 {
                     return;
                 }
+                if (!ProviderBrowserCommandCodec.TryParse(commandValue, out var command))
+                {
+                    return;
+                }
                 switch (command)
                 {
-                    case "back":
+                    case ProviderBrowserCommand.Back:
                         NavigateProviderHistory(back: true);
                         break;
-                    case "forward":
+                    case ProviderBrowserCommand.Forward:
                         NavigateProviderHistory(back: false);
                         break;
-                    case "reload":
+                    case ProviderBrowserCommand.Reload:
                         RefreshActiveProvider();
                         break;
-                    default:
-                        return;
+                    case ProviderBrowserCommand.Close:
+                        ShowStockroomTab();
+                        break;
                 }
                 return;
             }

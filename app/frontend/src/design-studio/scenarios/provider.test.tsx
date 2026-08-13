@@ -44,12 +44,13 @@ describe("provider-download Design Studio scenarios", () => {
   it("clicks through the real Manage Models browser without live product I/O", async () => {
     const { user, liveRequest } = await mountScenario("provider.download-armed");
     const workspace = await screen.findByTestId("manage-models-workspace");
+    const dialog = await screen.findByRole("dialog", { name: "Ultra Librarian Provider" });
     expect(within(workspace).getByRole("status")).toHaveTextContent("Download capture ready");
-    expect(within(workspace).getByRole("button", { name: "Back" })).toBeEnabled();
-    expect(within(workspace).getByRole("button", { name: "Forward" })).toBeEnabled();
-    expect(within(workspace).getByRole("button", { name: "Reload" })).toBeEnabled();
+    expect(within(dialog).getByRole("button", { name: "Back" })).toBeEnabled();
+    expect(within(dialog).getByRole("button", { name: "Forward" })).toBeEnabled();
+    expect(within(dialog).getByRole("button", { name: "Reload" })).toBeEnabled();
     expect(within(workspace).getByRole("button", { name: "Choose Downloaded Files" })).toBeEnabled();
-    await user.click(within(workspace).getByRole("button", { name: "Reload" }));
+    await user.click(within(dialog).getByRole("button", { name: "Reload" }));
     expect(document.querySelector('[data-dev-id="shell.root"]')).toBeInTheDocument();
     expect(liveRequest).not.toHaveBeenCalled();
   });

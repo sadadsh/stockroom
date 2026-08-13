@@ -85,6 +85,30 @@ describe("ManageModelsWorkspace", () => {
     expect(providers[0]).toHaveTextContent("Missing 3D Model");
   });
 
+  it("opens the selected provider in a closable modal while Manage Models stays mounted", async () => {
+    const user = userEvent.setup();
+    const dossier = makeDossier();
+    dossier.cadSourceCoverage.rows = [providerRow("complete", true)];
+    const onOpenProvider = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <ManageModelsWorkspace
+        componentId="part-1"
+        dossier={dossier}
+        onView={vi.fn()}
+        onOpenProvider={onOpenProvider}
+      />,
+    );
+
+    expect(await screen.findByRole("dialog", { name: "SnapEDA Provider" })).toBeVisible();
+    expect(screen.getByTestId("manage-models-workspace")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Close Provider" }));
+
+    expect(screen.queryByRole("dialog", { name: "SnapEDA Provider" })).toBeNull();
+    expect(screen.getByTestId("manage-models-workspace")).toBeVisible();
+    expect(onOpenProvider).toHaveBeenCalledTimes(1);
+  });
+
   it("uses one file chooser as recovery and reports what attached", async () => {
     const user = userEvent.setup();
     const dossier = makeDossier();

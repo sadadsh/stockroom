@@ -14,7 +14,7 @@ type ManagedHostApi = {
   providerCommand?: (request: ProviderCommandRequest) => void;
 };
 
-export type ProviderCommand = "back" | "forward" | "reload";
+export type ProviderCommand = "back" | "forward" | "reload" | "close";
 
 interface ProviderCommandRequest {
   componentId: string;

@@ -18,6 +18,8 @@ def test_inject_script_hands_the_spa_the_base_and_token():
     assert f"window.__API_BASE__ = {json.dumps('http://127.0.0.1:5123')}" in js
     assert f"window.__STOCKROOM_TOKEN__ = {json.dumps('tok-abc123')}" in js
     assert "serviceWorker" in js and "unregister" in js
+    assert "window.pywebview.api.set_provider_viewport" in js
+    assert "window.pywebview.api.provider_command" in js
 
 
 def test_inject_script_escapes_special_characters():
@@ -47,13 +49,19 @@ def test_should_inject_only_on_the_loopback_spa_origin():
     assert should_inject("", base) is False
 
 
-def test_host_api_exposes_only_the_purpose_scoped_folder_picker():
+def test_host_api_exposes_only_pickers_and_provider_surface_controls():
     methods = {
         name
         for name, value in vars(_HostApi).items()
         if callable(value) and not name.startswith("__")
     }
-    assert methods == {"pick_files", "pick_folder", "pick_project_folder"}
+    assert methods == {
+        "pick_files",
+        "pick_folder",
+        "pick_project_folder",
+        "provider_command",
+        "set_provider_viewport",
+    }
 
 
 def test_webview_start_kwargs_persist_the_shell_profile_when_supported(tmp_path):

@@ -37,6 +37,8 @@ class _Window:
         self.destroyed = threading.Event()
         self.evaluations: list[str] = []
         self.loaded_urls: list[str] = []
+        self.move_calls: list[tuple[int, int]] = []
+        self.resize_calls: list[tuple[int, int]] = []
         self.session = {"route": "components", "event_sequence": 17}
 
     def get_current_url(self) -> str:
@@ -62,23 +64,33 @@ class _Window:
         self.evaluations.append(script)
         return self.session
 
+    def move(self, x: int, y: int) -> None:
+        self.move_calls.append((x, y))
+
+    def resize(self, width: int, height: int) -> None:
+        self.resize_calls.append((width, height))
+
     def destroy(self) -> None:
         self.destroy_calls += 1
         self.destroyed.set()
 
 
-def test_in_app_provider_surface_reuses_and_restores_the_original_window(monkeypatch) -> None:
-    window = _Window("http://127.0.0.1:8123/components")
-    monkeypatch.setattr(W, "_ACTIVE_WINDOW", window)
-    surface = W.InAppProviderBrowserSurface("http://127.0.0.1:8123")
+def test_in_app_provider_surface_never_navigates_the_stockroom_window(monkeypatch) -> None:
+    app_window = _Window("http://127.0.0.1:8123/components")
+    provider_window = _Window("about:blank#stockroom-provider-proof")
+    monkeypatch.setattr(W, "_ACTIVE_WINDOW", app_window)
+    surface = W.InAppProviderBrowserSurface(
+        "http://127.0.0.1:8123",
+        provider_window=lambda: provider_window,
+    )
 
     with surface.lease() as lease:
         # The in-app surface exposes no debugging endpoint either; the lease is commands only.
         assert not hasattr(lease, "endpoint")
         lease.show()
-        assert window.show_calls == 1
-        assert window.focus_calls == 1
-        assert window.loaded_urls == []
+        assert provider_window.show_calls == 0
+        assert provider_window.focus_calls == 0
+        assert app_window.loaded_urls == []
         lease.navigate("https://www.snapeda.com/parts/ABC/Maker/view-part/")
         state = lease.document_state(
             ready_selectors=('a[name="download-modal"]',),
@@ -91,24 +103,72 @@ def test_in_app_provider_surface_reuses_and_restores_the_original_window(monkeyp
             "provider_error": False,
             "provider_ready": False,
         }
-        assert "getBoundingClientRect" in window.evaluations[-1]
-        assert 'a[name=\\"download-modal\\"]' in window.evaluations[-1]
-        assert '"verify your phone number"' in window.evaluations[-1]
-        assert '"phone verification is required"' in window.evaluations[-1]
-        assert '"oh snap! we' in window.evaluations[-1]
+        assert "getBoundingClientRect" in provider_window.evaluations[-1]
+        assert 'a[name=\\"download-modal\\"]' in provider_window.evaluations[-1]
+        assert '"verify your phone number"' in provider_window.evaluations[-1]
+        assert '"phone verification is required"' in provider_window.evaluations[-1]
+        assert '"oh snap! we' in provider_window.evaluations[-1]
         lease.hide()
-        assert window.loaded_urls[-1] == "http://127.0.0.1:8123"
+        assert provider_window.hidden_calls == 1
+        assert app_window.loaded_urls == []
         surface.show_active_provider_browser()
-        assert window.loaded_urls[-1] == (
-            "https://www.snapeda.com/parts/ABC/Maker/view-part/"
-        )
+        assert provider_window.show_calls == 0
 
-    assert window.loaded_urls == [
-        "https://www.snapeda.com/parts/ABC/Maker/view-part/",
+    assert provider_window.loaded_urls == ["https://www.snapeda.com/parts/ABC/Maker/view-part/"]
+    assert provider_window.hidden_calls == 2
+    assert app_window.loaded_urls == []
+
+
+def test_in_app_provider_surface_applies_modal_viewport_and_commands(monkeypatch) -> None:
+    app_window = _Window("http://127.0.0.1:8123/components")
+    app_window.x = 100
+    app_window.y = 60
+    provider_window = _Window("https://www.snapeda.com/parts/ABC/Maker/view-part/")
+    monkeypatch.setattr(W, "_ACTIVE_WINDOW", app_window)
+    surface = W.InAppProviderBrowserSurface(
         "http://127.0.0.1:8123",
-        "https://www.snapeda.com/parts/ABC/Maker/view-part/",
-        "http://127.0.0.1:8123",
-    ]
+        provider_window=lambda: provider_window,
+    )
+
+    with surface.lease():
+        assert (
+            surface.set_provider_viewport(
+                {
+                    "componentId": "part-1",
+                    "visible": True,
+                    "x": 128,
+                    "y": 114,
+                    "width": 1024,
+                    "height": 570,
+                }
+            )
+            is True
+        )
+        assert provider_window.move_calls == [(228, 174)]
+        assert provider_window.resize_calls == [(1024, 570)]
+        app_window.x = 300
+        app_window.y = 180
+        assert surface.reapply_provider_viewport() is True
+        assert provider_window.move_calls[-1] == (428, 294)
+        surface.provider_command({"componentId": "part-1", "command": "back"})
+        assert provider_window.evaluations[-1] == "history.back()"
+        surface.provider_command({"componentId": "part-1", "command": "close"})
+        assert provider_window.hidden_calls == 1
+
+        assert (
+            surface.set_provider_viewport(
+                {
+                    "componentId": "part-2",
+                    "visible": True,
+                    "x": 128,
+                    "y": 114,
+                    "width": 1024,
+                    "height": 570,
+                }
+            )
+            is False
+        )
+        assert provider_window.hidden_calls == 2
 
 
 class _Webview:
@@ -156,8 +216,7 @@ def test_managed_controller_exports_only_non_secret_health_and_session(
     assert "do-not-render-this" not in repr(controller.health())
     assert controller.export_session() == window.session
     assert window.evaluations == [
-        "window.__STOCKROOM_EXPORT_UI_SESSION__"
-        " ? window.__STOCKROOM_EXPORT_UI_SESSION__() : null"
+        "window.__STOCKROOM_EXPORT_UI_SESSION__ ? window.__STOCKROOM_EXPORT_UI_SESSION__() : null"
     ]
 
     controller.shutdown()
@@ -202,10 +261,7 @@ def test_saved_window_geometry_is_applied_hidden_before_candidate_commands(
     monkeypatch.setattr(
         window_geometry,
         "apply_window_geometry",
-        lambda hwnd, geometry, *, show: calls.append(
-            ("apply", hwnd, geometry, show)
-        )
-        or resolution,
+        lambda hwnd, geometry, *, show: calls.append(("apply", hwnd, geometry, show)) or resolution,
     )
 
     assert W._apply_saved_window_geometry(9123, config) is resolution

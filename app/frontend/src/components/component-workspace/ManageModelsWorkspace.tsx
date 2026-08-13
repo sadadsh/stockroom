@@ -12,7 +12,7 @@ import { Button } from "../primitives";
 import { useScenarioUiState } from "../../design-studio/scenarioState";
 import { bestCompleteProvider, orderedManageModelsProviders } from "./manageModelsModel";
 import { ProviderList } from "./ProviderList";
-import { ProviderBrowserFrame } from "./ProviderBrowserFrame";
+import { ProviderBrowserModal } from "./ProviderBrowserModal";
 
 export function CadWorkspaceTabs({
   view,
@@ -80,6 +80,8 @@ export function ManageModelsWorkspace({
   const bestProvider = bestCompleteProvider(providers);
   const initialProviderId = bestProvider?.row.id ?? providers[0]?.row.id ?? null;
   const [selectedProviderId, setSelectedProviderId] = useState<string | null>(initialProviderId);
+  const [openProviderKey, setOpenProviderKey] = useState<string | null>(null);
+  const [dismissedCaptureKey, setDismissedCaptureKey] = useState<string | null>(null);
   const [activityMessage, setActivityMessage] = useState<string | null>(null);
   const [recovering, setRecovering] = useState(false);
   const lastAutomaticOpen = useRef<string | null>(null);
@@ -91,15 +93,16 @@ export function ManageModelsWorkspace({
       try {
         if (onOpenProvider) {
           await onOpenProvider(providerId);
-          return;
+        } else {
+          if (!capture) return;
+          await capture.start(
+            componentId,
+            dossier.identity.displayName,
+            [...KICAD_REQS, ...ALTIUM_REQS],
+            providerId,
+          );
         }
-        if (!capture) return;
-        await capture.start(
-          componentId,
-          dossier.identity.displayName,
-          [...KICAD_REQS, ...ALTIUM_REQS],
-          providerId,
-        );
+        setOpenProviderKey(`${componentId}:${providerId}`);
       } catch (error) {
         setActivityMessage(error instanceof Error ? error.message : "Could not open provider");
       }
@@ -122,6 +125,17 @@ export function ManageModelsWorkspace({
 
   const selectedProvider =
     providers.find((provider) => provider.row.id === selectedProviderId) ?? providers[0] ?? null;
+  const selectedProviderKey = selectedProvider
+    ? `${componentId}:${selectedProvider.row.id}`
+    : null;
+  const captureProviderKey = ownsCapture && selectedProviderKey ? selectedProviderKey : null;
+  const browserOpen = Boolean(
+    selectedProviderKey
+      && (openProviderKey === selectedProviderKey || (
+        captureProviderKey === selectedProviderKey
+        && dismissedCaptureKey !== captureProviderKey
+      )),
+  );
   const captureBusy = Boolean(ownsCapture && capture && captureInFlight(capture.active));
   const previewStatus = scenarioProviderState
     ? {
@@ -207,11 +221,14 @@ export function ManageModelsWorkspace({
         />
         <div className="flex min-w-0 flex-1 flex-col">
           {selectedProvider ? (
-            <ProviderBrowserFrame
-              componentId={componentId}
-              providerLabel={selectedProvider.row.label}
-              url={ownsCapture ? (capture?.active.url ?? selectedProvider.row.url) : selectedProvider.row.url}
-            />
+            <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 px-6 text-center">
+              <h3 className="text-sm font-semibold text-t1">{selectedProvider.row.label}</h3>
+              <p className="max-w-[420px] text-xs text-t3">
+                <Text id="component-browser.manage-models-provider-modal-help">
+                  The provider opens in a movable window while Manage Models stays available.
+                </Text>
+              </p>
+            </div>
           ) : (
             <div className="flex min-h-0 flex-1 items-center justify-center text-sm text-t3">
               <Text id="component-browser.manage-models-no-providers">No providers found</Text>
@@ -249,6 +266,22 @@ export function ManageModelsWorkspace({
           </div>
         </div>
       </div>
+      {selectedProvider ? (
+        <ProviderBrowserModal
+          open={browserOpen}
+          componentId={componentId}
+          providerLabel={selectedProvider.row.label}
+          url={
+            ownsCapture
+              ? (capture?.active.url ?? selectedProvider.row.url)
+              : selectedProvider.row.url
+          }
+          onClose={() => {
+            setOpenProviderKey(null);
+            if (captureProviderKey) setDismissedCaptureKey(captureProviderKey);
+          }}
+        />
+      ) : null}
     </section>
   );
 }

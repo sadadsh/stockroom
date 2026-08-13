@@ -41,3 +41,12 @@ The frozen launcher activates verified immutable release generations. It never u
 by mutating the active checkout. Trusted metadata recovery is anchored in the packaged root and
 verified root history. Each successful main release uses `0.7.0.<build number>`.
 
+## Implementation Waves
+
+### Provider Modal Boundary
+
+Manage Models owns the provider list, capture status, downloads, and import recovery. Opening a
+provider creates a React modal with a fixed Close control and a measured native content rectangle.
+The managed WPF host keeps its provider WebView inside that rectangle. The source pywebview host
+uses a second provider-only window over the same rectangle; it never navigates the Stockroom
+window. Closing only hides the native surface, so an active download and its lease continue.

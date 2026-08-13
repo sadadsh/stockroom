@@ -297,7 +297,7 @@ export const DEV_IDS: DevIdEntry[] = [
   { id: "component-browser.change-diff", label: "Open the visual diff for one commit", area: "component-browser" },
   { id: "component-browser.diagnostics-toggle", label: "Show or hide diagnostics", area: "component-browser" },
   { id: "component-browser.diagnostics-raw", label: "Show or hide the canonical record", area: "component-browser" },
-  // Manage Models: one component-scoped provider list, embedded browser, and status strip.
+  // Manage Models: one component-scoped provider list, modal browser, and status strip.
   { id: "component-browser.manage-models", label: "Manage Models workspace", area: "component-browser" },
   { id: "component-browser.cad-tab-models", label: "Models tab", area: "component-browser" },
   { id: "component-browser.cad-tab-manage-models", label: "Manage Models tab", area: "component-browser" },
@@ -311,6 +311,9 @@ export const DEV_IDS: DevIdEntry[] = [
   { id: "component-browser.provider-back", label: "Provider browser Back", area: "component-browser" },
   { id: "component-browser.provider-forward", label: "Provider browser Forward", area: "component-browser" },
   { id: "component-browser.provider-reload", label: "Provider browser Reload", area: "component-browser" },
+  { id: "component-browser.provider-dialog", label: "Provider browser modal", area: "component-browser" },
+  { id: "component-browser.provider-dialog-titlebar", label: "Provider browser modal title bar", area: "component-browser" },
+  { id: "component-browser.provider-close", label: "Close provider browser", area: "component-browser" },
   { id: "component-browser.provider-viewport", label: "Embedded provider page", area: "component-browser" },
   { id: "component-browser.provider-status", label: "Model download status", area: "component-browser" },
   { id: "component-browser.identity-sheet", label: "Identity editing sheet", area: "component-browser" },

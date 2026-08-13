@@ -2,10 +2,9 @@
 
 The shell hosts Stockroom's FastAPI-served frontend, injects the loopback API
 base and per-launch token, owns native window lifecycle, exposes the project
-folder picker, and provides one separate hidden window to the rendered-DOM
-fetcher. Provider acquisition is not a host responsibility: the capture package
-owns its isolated Playwright/CloakBrowser sessions, task-bound downloads, and
-provider HUD.
+folder picker, and provides separate WebViews for rendered-DOM fetching and the
+in-app provider modal. Provider acquisition owns task-bound downloads and status;
+the host only supplies the human-operated provider surface.
 
 pywebview is imported lazily inside the Windows-only entry points so this module
 and its pure helpers remain importable on every supported platform.
@@ -15,6 +14,7 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 import os
 import socket
 import threading
@@ -29,11 +29,13 @@ _log = logging.getLogger("stockroom.host.window")
 
 _ACTIVE_WINDOW = None
 _FETCH_WINDOW = None
+_PROVIDER_WINDOW = None
 #: The loopback SPA origin of the running host, known before the window opens. A new-window
 #: request from a document on this origin is Stockroom's own; anything else is a provider page.
 _APP_ORIGIN = ""
 #: The source host's provider-route controller, once bound to the window thread.
 _WINDOW_CHROME = None
+_PROVIDER_SURFACE = None
 _NATIVE_DOWNLOAD_GUARD = threading.RLock()
 _NATIVE_DOWNLOAD_LEASE: str | None = None
 _NATIVE_DOWNLOAD_SEQUENCE = 0
@@ -83,11 +85,11 @@ class InAppProviderDownloadEvent:
 
 @dataclass(slots=True)
 class InAppProviderBrowserLease:
-    """One task-bound lease of the visible Stockroom WebView.
+    """One task-bound lease of Stockroom's dedicated provider WebView.
 
-    Nothing is attached to it. The existing top-level Stockroom window IS the browser: provider
-    pages and their downloads do not escape into Chrome, Vivaldi, or a second automation window,
-    and capture observes them only through the download events below.
+    Nothing is attached to it. Provider pages and their downloads do not escape into Chrome,
+    Vivaldi, or the primary Stockroom WebView, and capture observes them only through the download
+    events below.
     """
 
     _show: Callable[[], None]
@@ -143,15 +145,123 @@ class InAppProviderBrowserLease:
     ) -> tuple[InAppProviderDownloadEvent, ...]:
         return self._download_events(after_sequence)
 
-class InAppProviderBrowserSurface:
-    """Temporarily lend the original Stockroom WebView to provider capture."""
 
-    def __init__(self, app_url: str) -> None:
+class InAppProviderBrowserSurface:
+    """Own the dedicated native provider WebView without navigating Stockroom."""
+
+    def __init__(
+        self,
+        app_url: str,
+        *,
+        provider_window: Callable[[], object] | None = None,
+    ) -> None:
+        global _PROVIDER_SURFACE
         if not should_inject(app_url, app_url):
             raise ValueError("app_url must have a complete origin")
         self._app_url = app_url
+        self._provider_window = provider_window or provider_window_surface
         self._lock = threading.RLock()
         self._active_show: Callable[[], None] | None = None
+        self._active_provider_window = None
+        self._active_component_id: str | None = None
+        self._last_provider_viewport: dict[str, object] | None = None
+        _PROVIDER_SURFACE = self
+
+    def set_provider_viewport(self, viewport: dict[str, object]) -> bool:
+        """Place the provider-only window over the React modal's content rectangle."""
+
+        if type(viewport) is not dict or set(viewport) != {
+            "componentId",
+            "visible",
+            "x",
+            "y",
+            "width",
+            "height",
+        }:
+            return False
+        component_id = viewport["componentId"]
+        visible = viewport["visible"]
+        values = tuple(viewport[key] for key in ("x", "y", "width", "height"))
+        if (
+            type(component_id) is not str
+            or not component_id
+            or type(visible) is not bool
+            or any(type(value) not in (int, float) or not math.isfinite(value) for value in values)
+        ):
+            return False
+        provider = self._active_provider_window
+        app = active_window()
+        if not visible:
+            self._last_provider_viewport = None
+            if provider is not None:
+                provider.hide()
+            return True
+        x, y, width, height = (float(value) for value in values)
+        if x < 0 or y < 0 or width < 320 or height < 240 or provider is None or app is None:
+            return False
+        if self._active_component_id is None:
+            self._active_component_id = component_id
+        if component_id != self._active_component_id:
+            self._last_provider_viewport = None
+            provider.hide()
+            return False
+        self._last_provider_viewport = dict(viewport)
+        return self._apply_provider_viewport(viewport, focus=True)
+
+    def _apply_provider_viewport(
+        self,
+        viewport: dict[str, object],
+        *,
+        focus: bool,
+    ) -> bool:
+        provider = self._active_provider_window
+        app = active_window()
+        if provider is None or app is None:
+            return False
+        x = float(viewport["x"])
+        y = float(viewport["y"])
+        width = float(viewport["width"])
+        height = float(viewport["height"])
+        app_x = int(getattr(app, "x", 0) or 0)
+        app_y = int(getattr(app, "y", 0) or 0)
+        provider.move(round(app_x + x), round(app_y + y))
+        provider.resize(round(width), round(height))
+        provider.show()
+        if focus:
+            provider.focus()
+        return True
+
+    def reapply_provider_viewport(self) -> bool:
+        """Follow a moved or resized Stockroom window without stealing focus."""
+
+        viewport = self._last_provider_viewport
+        return bool(viewport and self._apply_provider_viewport(viewport, focus=False))
+
+    def provider_command(self, request: dict[str, object]) -> bool:
+        """Apply one allowlisted browser command to the active provider document."""
+
+        if type(request) is not dict or set(request) != {"componentId", "command"}:
+            return False
+        component_id = request["componentId"]
+        command = request["command"]
+        provider = self._active_provider_window
+        if (
+            type(component_id) is not str
+            or component_id != self._active_component_id
+            or command not in {"back", "forward", "reload", "close"}
+            or provider is None
+        ):
+            return False
+        if command == "close":
+            provider.hide()
+            return True
+        script = {
+            "back": "history.back()",
+            "forward": "history.forward()",
+            "reload": "location.reload()",
+        }[command]
+        provider.evaluate_js(script)
+        return True
 
     def __call__(self):
         """Open one provider lease; keeps the surface itself available to the API."""
@@ -168,41 +278,34 @@ class InAppProviderBrowserSurface:
 
     @contextmanager
     def lease(self):
-        """Yield one observed provider lease and always restore the SPA afterward."""
+        """Yield one observed provider lease and always hide its native surface afterward."""
 
         with self._lock:
-            window = active_window()
+            if active_window() is None:
+                raise RuntimeError("the Stockroom provider browser is not ready")
+            window = self._provider_window()
             if window is None:
                 raise RuntimeError("the Stockroom provider browser is not ready")
             lease_token = _begin_native_webview_download_lease()
-            resume_url = ""
+            self._active_provider_window = window
+            self._active_component_id = None
+            self._last_provider_viewport = None
 
             chrome = window_chrome()
 
             def show() -> None:
-                if resume_url:
-                    # pywebview navigation is asynchronous. Reload the remembered provider URL
-                    # even when get_current_url still reports the old document, so a queued SPA
-                    # navigation cannot win a fast Return/Show race.
-                    window.load_url(resume_url)
-                try:
-                    window.show()
-                except Exception:  # noqa: BLE001 - an already-visible window is usable
-                    pass
+                # Visibility belongs to the React modal's measured viewport. Showing here would
+                # flash a free-standing provider window before the modal can publish its bounds.
                 if chrome is not None:
                     chrome.provider_shown()
 
             def hide() -> None:
-                nonlocal resume_url
                 if chrome is not None:
                     chrome.provider_hidden()
                 try:
-                    current = current_url()
-                    if current and not should_inject(current, self._app_url):
-                        resume_url = current
-                    window.load_url(self._app_url)
+                    window.hide()
                 except Exception:  # noqa: BLE001 - a navigating WebView retries from its tab
-                    _log.exception("could not return to Stockroom during provider capture")
+                    _log.exception("could not hide the provider browser")
 
             def navigate(url: str) -> None:
                 if type(url) is not str or not url or url != url.strip():
@@ -314,11 +417,6 @@ class InAppProviderBrowserSurface:
                     )
 
             try:
-                window.focus()
-            except Exception:  # noqa: BLE001 - focus is helpful, not an ownership proof
-                pass
-
-            try:
                 self._active_show = show
                 if chrome is not None:
                     # A route is open before its first page loads, so the tab exists from here
@@ -341,13 +439,16 @@ class InAppProviderBrowserSurface:
                 )
             finally:
                 self._active_show = None
+                self._active_provider_window = None
+                self._active_component_id = None
+                self._last_provider_viewport = None
                 _end_native_webview_download_lease(lease_token)
                 if chrome is not None:
                     chrome.close_provider_route()
                 try:
-                    window.load_url(self._app_url)
+                    window.hide()
                 except Exception:  # noqa: BLE001 - teardown must not mask capture evidence
-                    _log.exception("could not restore Stockroom after provider capture")
+                    _log.exception("could not hide the provider browser after capture")
 
 
 #: The word a provider tab wears before its first page has named it.
@@ -378,6 +479,26 @@ def fetch_window():
     return _FETCH_WINDOW
 
 
+def provider_window_surface():
+    """Return the provider-only pywebview window; never the Stockroom window."""
+
+    global _PROVIDER_WINDOW
+    if _PROVIDER_WINDOW is None:
+        import webview  # pywebview, WebView2 on Windows; lazy so Linux imports
+
+        _PROVIDER_WINDOW = webview.create_window(
+            "Stockroom Provider",
+            url="about:blank#stockroom-provider-proof",
+            width=960,
+            height=640,
+            min_size=(320, 240),
+            hidden=True,
+            frameless=True,
+            easy_drag=False,
+        )
+    return _PROVIDER_WINDOW
+
+
 def should_inject(current_url: str | None, base_url: str) -> bool:
     """Return whether ``current_url`` is the exact loopback SPA origin.
 
@@ -405,21 +526,25 @@ def inject_script(
     base = json.dumps(base_url)
     # ``</script>`` inside a JSON string would otherwise close the injected element.
     prefs = json.dumps(ui or {}).replace("</", "<\\/")
-    token_line = (
-        ""
-        if token is None
-        else f"window.__STOCKROOM_TOKEN__ = {json.dumps(token)};\n"
-    )
+    token_line = "" if token is None else f"window.__STOCKROOM_TOKEN__ = {json.dumps(token)};\n"
     return (
         f"window.__API_BASE__ = {base};\n"
         + token_line
         + (
-        f"window.__STOCKROOM_UI__ = {prefs};\n"
-        "if ('serviceWorker' in navigator) {\n"
-        "  navigator.serviceWorker.getRegistrations().then(function (rs) {\n"
-        "    rs.forEach(function (r) { r.unregister(); });\n"
-        "  });\n"
-        "}\n"
+            f"window.__STOCKROOM_UI__ = {prefs};\n"
+            "window.__STOCKROOM_HOST__ = Object.assign(window.__STOCKROOM_HOST__ || {}, {\n"
+            "  setProviderViewport: function (viewport) {\n"
+            "    return window.pywebview.api.set_provider_viewport(viewport);\n"
+            "  },\n"
+            "  providerCommand: function (request) {\n"
+            "    return window.pywebview.api.provider_command(request);\n"
+            "  }\n"
+            "});\n"
+            "if ('serviceWorker' in navigator) {\n"
+            "  navigator.serviceWorker.getRegistrations().then(function (rs) {\n"
+            "    rs.forEach(function (r) { r.unregister(); });\n"
+            "  });\n"
+            "}\n"
         )
     )
 
@@ -476,6 +601,18 @@ class _HostApi:
             ),
         )
         return list(result) if result else []
+
+    def set_provider_viewport(self, viewport: dict[str, object]) -> bool:
+        """Place or hide the dedicated provider WebView inside Stockroom's modal."""
+
+        surface = _PROVIDER_SURFACE
+        return bool(surface and surface.set_provider_viewport(viewport))
+
+    def provider_command(self, request: dict[str, object]) -> bool:
+        """Apply one allowlisted command to the dedicated provider WebView."""
+
+        surface = _PROVIDER_SURFACE
+        return bool(surface and surface.provider_command(request))
 
 
 def _set_signature(function, argument_types, result_type) -> None:
@@ -966,9 +1103,9 @@ def _apply_window_icon(window, *, user32=None, icon_path: Path | None = None) ->
 def _webview_start_kwargs(start_fn, profile_dir) -> dict:
     """Return supported kwargs for the persistent native-shell WebView profile.
 
-    pywebview configures storage once at ``webview.start``. Provider sessions do
-    not share this profile; they use provider-scoped Chromium profiles owned by
-    the capture package.
+    pywebview configures storage once at ``webview.start``. The provider-only
+    window uses this same persistent native-shell profile so sign-in survives,
+    while rendered-DOM automation remains isolated elsewhere.
     """
 
     import inspect
@@ -1611,6 +1748,16 @@ def run_window(base_url: str, token: str) -> None:
     if window is None:
         raise RuntimeError("pywebview did not create the Stockroom window")
     _ACTIVE_WINDOW = window
+
+    def _follow_stockroom_window(*_arguments) -> None:
+        surface = _PROVIDER_SURFACE
+        if surface is not None:
+            surface.reapply_provider_viewport()
+
+    for event_name in ("moved", "resized"):
+        event = getattr(window.events, event_name, None)
+        if event is not None:
+            event += _follow_stockroom_window
 
     def _spa_is_current() -> bool:
         try:
