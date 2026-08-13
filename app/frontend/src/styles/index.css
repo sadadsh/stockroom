@@ -128,8 +128,8 @@
        Three weights: a dark groove under a raised edge, the ordinary hairline,
        and the light bevel on top of it. */
     --c-line-dark: #15171a;
-    --c-line: #464a4f;
-    --c-line2: #565b61;
+    --c-line: #383b3f;
+    --c-line2: #45494e;
     --c-edge: #666c73;
     --edge-hi: rgba(255, 255, 255, 0.05);
 
@@ -356,8 +356,8 @@
     --c-row-alt: #e6e8ea;
 
     --c-line-dark: #9aa0a7;
-    --c-line: #b9bec4;
-    --c-line2: #a8aeb5;
+    --c-line: #d7dade;
+    --c-line2: #c8ccd1;
     --c-edge: #ffffff;
     --edge-hi: rgba(255, 255, 255, 0.9);
 

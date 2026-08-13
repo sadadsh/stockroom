@@ -43,8 +43,7 @@ function cx(...parts: Array<string | false | null | undefined>): string {
   return parts.filter(Boolean).join(" ");
 }
 
-// A flat, hairline-bordered surface (Altium reads through borders, not shadow): the mockup's
-// .file / .ss / .srcbar card, restyled flat.
+// A quiet grouped surface. Ordinary cards separate with tone and spacing; major regions use Panel.
 export function Card({
   className,
   children,
@@ -53,7 +52,7 @@ export function Card({
   return (
     <div
       className={cx(
-        "rounded-card border border-line bg-raise",
+        "rounded-card bg-raise",
         className,
       )}
       {...rest}
@@ -81,11 +80,11 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 // destructive action could not read as destructive and the two controls' tones could drift apart.
 const BUTTON_VARIANTS: Record<ButtonVariant, string> = {
   default:
-    "border-line-dark bg-control-bottom text-t1 hover:bg-control-hover active:bg-control-pressed",
+    "bg-control-bottom text-t1 hover:bg-control-hover active:bg-control-pressed",
   accent:
-    "border-line-dark bg-acc text-acc-on hover:brightness-110 active:brightness-95 font-semibold",
+    "bg-acc text-acc-on hover:brightness-110 active:brightness-95 font-semibold",
   danger:
-    "border-line-dark bg-err text-white hover:brightness-110 active:brightness-95 font-semibold",
+    "bg-err text-white hover:brightness-110 active:brightness-95 font-semibold",
   // A quiet destructive TRIGGER (north-star restraint): a danger-tinted outline, not a solid
   // fill, so a page-level Remove/Delete/Clear reads as available without shouting. The loud
   // solid `danger` is reserved for the final in-modal confirm (the committed action). The err
@@ -93,12 +92,12 @@ const BUTTON_VARIANTS: Record<ButtonVariant, string> = {
   // so wears the text strength `--c-err-text`, which clears 4.5:1 in both themes where the mark
   // strength `--c-err` reached only 3.98 dark. Hover is a colour shift only (flat idiom).
   "ghost-danger":
-    "border-[color-mix(in_srgb,var(--c-err)_42%,transparent)] " +
+    "border border-[color-mix(in_srgb,var(--c-err)_42%,transparent)] " +
     "bg-[color-mix(in_srgb,var(--c-err)_7%,transparent)] text-err-text font-semibold " +
     "hover:border-[color-mix(in_srgb,var(--c-err)_60%,transparent)] " +
     "hover:bg-[color-mix(in_srgb,var(--c-err)_15%,transparent)]",
   // A neutral action tile, flat: a bordered fill that lightens one step on hover.
-  soft: "border-line2 bg-raise2 text-t1 font-semibold hover:bg-control-hover",
+  soft: "bg-raise2 text-t1 font-semibold hover:bg-control-hover",
 };
 
 export function Button({
@@ -113,10 +112,10 @@ export function Button({
   // states its unavailability with the disabled TEXT TIER rather than by fading the whole button,
   // because a 50% opacity control also fades its border and stops reading as a control at all.
   const base =
-    "inline-flex items-center gap-1.5 whitespace-nowrap rounded-control border " +
+    "inline-flex items-center gap-1.5 whitespace-nowrap rounded-control " +
     "transition-[color,background-color,border-color] duration-100 ease-out " +
     UI_CONTROL_LABEL +
-    " disabled:cursor-not-allowed disabled:border-line disabled:bg-control-pressed " +
+    " disabled:cursor-not-allowed disabled:bg-control-pressed " +
     "disabled:text-t5 disabled:hover:brightness-100 " +
     FOCUS_RING;
   // The two control heights, both on the 11px control label. `small` is the toolbar step.

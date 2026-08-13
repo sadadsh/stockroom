@@ -258,6 +258,14 @@ describe("the type scale is fixed, narrow, and Windows-sized", () => {
   });
 });
 
+describe("quiet separator hierarchy", () => {
+  it.each(THEMES)("%s routine lines stay subordinate to surface changes", (_theme, selector) => {
+    const block = themeBlock(selector);
+    expect(contrast(property(block, "--c-line"), property(block, "--c-surface"))).toBeLessThan(1.45);
+    expect(contrast(property(block, "--c-line2"), property(block, "--c-surface"))).toBeLessThan(1.75);
+  });
+});
+
 describe("the chrome is neutral", () => {
   it.each(THEMES)("%s chrome tokens carry no hue, selection and focus included", (_theme, selector) => {
     const block = themeBlock(selector);

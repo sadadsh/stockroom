@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { useState } from "react";
 import { describe, expect, it } from "vitest";
-import { RouteHeader, TabStrip } from "./primitives";
+import { Button, Card, Panel, RouteHeader, TabStrip } from "./primitives";
 
 const TABS = [
   { id: "specs", label: "Specs" },
@@ -99,5 +99,23 @@ describe("RouteHeader's count", () => {
     expect(bar.className).not.toContain("justify-between");
     const spans = Array.from(bar.querySelectorAll("span"));
     expect(spans[spans.indexOf(title) + 1]?.textContent).toBe("1");
+  });
+});
+
+describe("quiet hierarchy", () => {
+  it("leaves routine cards and secondary actions unboxed", () => {
+    render(
+      <>
+        <Card data-testid="card">Routine content</Card>
+        <Button>Secondary Action</Button>
+        <Button variant="accent">Primary Action</Button>
+        <Panel data-testid="panel">Major region</Panel>
+      </>,
+    );
+
+    expect(screen.getByTestId("card")).not.toHaveClass("border");
+    expect(screen.getByRole("button", { name: "Secondary Action" })).not.toHaveClass("border");
+    expect(screen.getByRole("button", { name: "Primary Action" })).toHaveClass("bg-acc");
+    expect(screen.getByTestId("panel")).toHaveClass("border");
   });
 });
