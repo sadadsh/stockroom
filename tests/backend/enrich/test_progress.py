@@ -89,7 +89,9 @@ def test_extract_from_url_emits_the_full_stage_sequence(tmp_path):
     )
     # the render signal came from the fetcher, not invented by the pipeline
     assert fetcher.on_stage_calls == [Stage.RENDERING]
-    assert _stages(events) == ["fetching", "rendering", "extracting", "validating"]
+    # The pasted page owns the first four phases. A substantive exact identity then continues
+    # through the exhaustive LCSC/datasheet ladder, which may honestly emit later fetch phases.
+    assert _stages(events)[:4] == ["fetching", "rendering", "extracting", "validating"]
     assert [e["pct"] for e in events] == sorted(e["pct"] for e in events)  # monotonic
     assert r.mpn.value == "ERJ-P03F1101V"  # the real extraction still happened
 
