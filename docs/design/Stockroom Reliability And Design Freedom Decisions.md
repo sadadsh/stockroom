@@ -171,3 +171,11 @@ Restart Now, retains the previous accepted generation for rollback, and leaves t
 Design Studio Draft, and Applied Design outside release directories. Update status reports Current,
 Downloading, Ready, Offline, Blocked, Retry, or Rollback from durable host state rather than guessing
 from a Git checkout.
+
+### Repository Byte Fidelity On Windows
+
+Every Git repository created or cloned by Stockroom sets repository-local `core.autocrlf=false`,
+and clone checkout receives the same setting before files are materialized. Generated CAD,
+transaction snapshots, rollback files, and publish comparisons are byte contracts; they must not
+change because a machine-wide Windows Git preference converts line endings. This local boundary
+does not alter the person's global Git configuration or normalize unrelated repositories.

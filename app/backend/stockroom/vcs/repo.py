@@ -217,8 +217,16 @@ class GitRepo:
         args = ["init", "-b", "main"]
         if bare:
             args.append("--bare")
-        subprocess.run([self.git, "-C", str(self.root), *args], capture_output=True, text=True,
-                       check=True, creationflags=_NO_WINDOW)
+        subprocess.run(
+            [self.git, "-C", str(self.root), *args],
+            capture_output=True,
+            text=True,
+            check=True,
+            creationflags=_NO_WINDOW,
+        )
+        # Repository-owned generated and rollback files are byte-sensitive. Do
+        # not let a machine-wide Windows autocrlf setting rewrite them.
+        self._run("config", "--local", "core.autocrlf", "false")
         if not bare:
             self._set_test_identity_if_missing()
 
@@ -226,11 +234,14 @@ class GitRepo:
     def clone_from(self, origin: Path) -> None:
         self.root.parent.mkdir(parents=True, exist_ok=True)
         proc = subprocess.run(
-            [self.git, "clone", str(origin), str(self.root)],
-            capture_output=True, text=True, creationflags=_NO_WINDOW,
+            [self.git, "-c", "core.autocrlf=false", "clone", str(origin), str(self.root)],
+            capture_output=True,
+            text=True,
+            creationflags=_NO_WINDOW,
         )
         if proc.returncode != 0:
             raise GitError(f"git clone failed: {proc.stderr.strip()}")
+        self._run("config", "--local", "core.autocrlf", "false")
         self._set_test_identity_if_missing()
 
     def is_git_repo(self) -> bool:

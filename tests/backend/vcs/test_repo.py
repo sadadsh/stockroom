@@ -19,6 +19,42 @@ def test_init_and_empty_head(tmp_path):
     assert r.head() == ""
 
 
+def test_init_disables_inherited_autocrlf_and_restores_exact_bytes(tmp_path, monkeypatch):
+    inherited_config = tmp_path / "global.gitconfig"
+    inherited_config.write_text("[core]\n\tautocrlf = true\n", encoding="utf-8")
+    monkeypatch.setenv("GIT_CONFIG_GLOBAL", str(inherited_config))
+    repo = GitRepo(tmp_path)
+    repo.init()
+    tracked = tmp_path / "exact.txt"
+    tracked.write_bytes(b"first\nsecond\n")
+    repo.commit("add exact bytes", [tracked])
+    tracked.write_bytes(b"changed\n")
+
+    repo.restore_paths([tracked])
+
+    assert repo._run("config", "--local", "--get", "core.autocrlf").stdout.strip() == "false"
+    assert tracked.read_bytes() == b"first\nsecond\n"
+
+
+def test_clone_disables_inherited_autocrlf_before_checkout(tmp_path, monkeypatch):
+    origin_root = tmp_path / "origin"
+    origin = GitRepo(origin_root)
+    origin.init()
+    tracked = origin_root / "exact.txt"
+    tracked.write_bytes(b"first\nsecond\n")
+    origin.commit("add exact bytes", [tracked])
+
+    inherited_config = tmp_path / "global.gitconfig"
+    inherited_config.write_text("[core]\n\tautocrlf = true\n", encoding="utf-8")
+    monkeypatch.setenv("GIT_CONFIG_GLOBAL", str(inherited_config))
+    clone_root = tmp_path / "clone"
+    clone = GitRepo(clone_root)
+    clone.clone_from(origin_root)
+
+    assert clone._run("config", "--local", "--get", "core.autocrlf").stdout.strip() == "false"
+    assert (clone_root / "exact.txt").read_bytes() == b"first\nsecond\n"
+
+
 def test_commit_returns_sha_and_advances_head(tmp_path):
     r = _repo(tmp_path)
     (tmp_path / "a.txt").write_text("hello")
