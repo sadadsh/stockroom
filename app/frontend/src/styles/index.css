@@ -127,9 +127,9 @@
     /* --- Borders ----------------------------------------------------------
        Three weights: a dark groove under a raised edge, the ordinary hairline,
        and the light bevel on top of it. */
-    --c-line-dark: #15171a;
-    --c-line: #383b3f;
-    --c-line2: #45494e;
+    --c-line-dark: #242629;
+    --c-line: #303236;
+    --c-line2: #383b3f;
     --c-edge: #666c73;
     --edge-hi: rgba(255, 255, 255, 0.05);
 
@@ -355,9 +355,9 @@
     --c-selected-edge: #24272b;
     --c-row-alt: #e6e8ea;
 
-    --c-line-dark: #9aa0a7;
-    --c-line: #d7dade;
-    --c-line2: #c8ccd1;
+    --c-line-dark: #d7dadd;
+    --c-line: #e3e5e7;
+    --c-line2: #dadddf;
     --c-edge: #ffffff;
     --edge-hi: rgba(255, 255, 255, 0.9);
 
@@ -513,6 +513,12 @@
 
 .design-studio-resizer {
   cursor: col-resize;
+}
+
+/* Docked Studio actions read as tools, not a wall of boxed buttons. Inputs retain
+   their boundary; selection is carried by the pressed fill and focus outline. */
+.design-studio-shell aside button {
+  border-color: transparent;
 }
 
 /* ==============================================================================

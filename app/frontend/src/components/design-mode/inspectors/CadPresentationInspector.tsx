@@ -55,7 +55,7 @@ export function CadPresentationInspector({ inspection }: DomainInspectorProps) {
     studio.setCadPresentation(target.targetId, target.kind, patch as never, themeSpecific);
   };
   return (
-    <section className="border-t border-line px-3.5 py-3" aria-label={title}>
+    <section className="px-3.5 py-3" aria-label={title}>
       <div className="flex items-center justify-between gap-2">
         <h4 className="ui-property-label">{title}</h4>
         <button type="button" onClick={() => studio.resetCadPresentation(target.targetId)} className="text-2xs font-semibold text-t2 hover:text-t1">{reset}</button>

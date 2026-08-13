@@ -140,7 +140,7 @@ export function LayersHierarchyPanel() {
 
   return (
     <div className="min-h-0 flex-1 overflow-y-auto">
-      <section className="border-b border-line p-2" aria-labelledby="studio-variations-heading">
+      <section className="p-2" aria-labelledby="studio-variations-heading">
         <h2 id="studio-variations-heading" className="mb-1 text-xs font-semibold text-t1">{variationsLabel}</h2>
         <button
           type="button"
@@ -204,7 +204,7 @@ export function LayersHierarchyPanel() {
       </section>
 
       <section aria-labelledby="studio-structure-heading">
-        <header className="flex items-center gap-1 border-b border-line bg-band px-2 py-1.5">
+        <header className="flex items-center gap-1 bg-band px-2 py-1.5">
           <h2 id="studio-structure-heading" className="sr-only">{structureLabel}</h2>
           {(["layers", "hierarchy"] as const).map((item) => (
             <button

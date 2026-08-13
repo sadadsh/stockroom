@@ -150,7 +150,7 @@ describe("the attribute and deferred forms follow the same rules", () => {
 
 describe("Dev Mode copy selection", () => {
   function EnabledText() {
-    const { enabled, toggle } = useDevMode();
+    const { enabled, toggle, studioMode, setStudioMode } = useDevMode();
     return (
       <>
         {enabled ? null : (
@@ -158,6 +158,11 @@ describe("Dev Mode copy selection", () => {
             on
           </button>
         )}
+        {enabled && studioMode !== "edit" ? (
+          <button type="button" onClick={() => setStudioMode("edit")}>
+            edit
+          </button>
+        ) : null}
         <Text id="k.probe">Probe Label</Text>
       </>
     );
@@ -172,6 +177,7 @@ describe("Dev Mode copy selection", () => {
       </ThemeProvider>,
     );
     fireEvent.click(screen.getByText("on"));
+    fireEvent.click(screen.getByText("edit"));
     return screen.getByText("Probe Label");
   }
 

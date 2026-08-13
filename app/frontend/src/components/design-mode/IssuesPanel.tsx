@@ -166,7 +166,7 @@ export function IssuesSection({
     ));
 
   return (
-    <div data-dev-id="design.issues" className="border-t border-line">
+    <div data-dev-id="design.issues">
       <button
         type="button"
         aria-expanded={open}

@@ -44,7 +44,7 @@ export function StatesInspector({ inspection, affectedTargetIds }: DomainInspect
         ))}
       </div>
       {state !== "default" ? (
-        <section className="mt-3 border-t border-line pt-3">
+        <section className="mt-3 pt-3">
           <h4 className="ui-property-label">{appearanceLabel}</h4>
           {(["color", "background-color", "border-color", "opacity", "box-shadow", "transform"] as const).map((property) => {
             const overrideId = `${inspection.id}::state:${state}`;

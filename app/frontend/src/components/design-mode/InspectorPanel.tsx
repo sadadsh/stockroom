@@ -192,8 +192,8 @@ export function InspectorPanel({ root }: { root?: Element; integrated?: boolean 
   const textContentIds = inspection.editTargets.text.contentIds;
   const iconContentIds = inspection.editTargets.icon.contentIds;
   return (
-    <section aria-label={contextualInspectorLabel} className="border-b border-line">
-      <div className="border-b border-line px-3.5 py-2.5">
+    <section aria-label={contextualInspectorLabel}>
+      <div className="px-3.5 py-2.5">
         <div className="flex items-baseline justify-between gap-2">
           <div>
             <div className="ui-property-label">{targetDomainsLabel}</div>
@@ -207,7 +207,7 @@ export function InspectorPanel({ root }: { root?: Element; integrated?: boolean 
         </div>
       </div>
 
-      <div role="tablist" aria-label={inspectorDomainsLabel} className="flex flex-wrap gap-1 border-b border-line px-3.5 py-1.5">
+      <div role="tablist" aria-label={inspectorDomainsLabel} className="flex flex-wrap gap-1 bg-band/50 px-3.5 py-1.5">
         {facets.map((item) => (
           <button key={item.id} type="button" role="tab" aria-selected={facet === item.id} onClick={() => setFacet(item.id)} className={`rounded-control px-2 py-1 text-2xs font-semibold ${facet === item.id ? "bg-raise2 text-t1" : "text-t3 hover:text-t2"}`}>
             {item.label}
@@ -216,7 +216,7 @@ export function InspectorPanel({ root }: { root?: Element; integrated?: boolean 
       </div>
 
       {facet === "content" ? (
-        <div className="border-b border-line px-3.5 py-2 font-mono text-2xs text-t3">
+        <div className="px-3.5 py-2 font-mono text-2xs text-t3">
           <div aria-label={textDomainPreviewLabel}>{textContentIds.join(" ")}</div>
           <div aria-label={iconDomainPreviewLabel}>{iconContentIds.join(" ")}</div>
         </div>
@@ -227,7 +227,7 @@ export function InspectorPanel({ root }: { root?: Element; integrated?: boolean 
       {facet === "content" ? <><TextInspector {...inspectorProps} /><IconInspector {...inspectorProps} /><CadPresentationInspector {...inspectorProps} /></> : null}
       {facet === "advanced" ? <><BehaviorInspector {...inspectorProps} /><AdvancedInspector {...inspectorProps} /></> : null}
 
-      <div className="border-t border-line px-3.5 py-2">
+      <div className="mt-2 bg-band/50 px-3.5 py-2">
         <div className="ui-property-label mb-1.5">{resetLabel}</div>
         <div className="flex flex-wrap gap-x-3 gap-y-1">
           <button type="button" onClick={() => resetTargets([inspection.id])} className="text-2xs font-semibold text-t2 hover:text-t1">{targetLabel}</button>

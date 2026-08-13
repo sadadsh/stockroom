@@ -261,8 +261,10 @@ describe("the type scale is fixed, narrow, and Windows-sized", () => {
 describe("quiet separator hierarchy", () => {
   it.each(THEMES)("%s routine lines stay subordinate to surface changes", (_theme, selector) => {
     const block = themeBlock(selector);
-    expect(contrast(property(block, "--c-line"), property(block, "--c-surface"))).toBeLessThan(1.45);
-    expect(contrast(property(block, "--c-line2"), property(block, "--c-surface"))).toBeLessThan(1.75);
+    const surface = property(block, "--c-surface");
+    expect(contrast(property(block, "--c-line-dark"), surface)).toBeLessThan(1.3);
+    expect(contrast(property(block, "--c-line"), surface)).toBeLessThan(1.2);
+    expect(contrast(property(block, "--c-line2"), surface)).toBeLessThan(1.35);
   });
 });
 

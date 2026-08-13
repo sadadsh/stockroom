@@ -25,8 +25,8 @@ export function ScenarioCatalog() {
   }
 
   return (
-    <section aria-labelledby="studio-screens-heading" className="border-b border-line">
-      <header className="border-b border-line bg-band px-2.5 py-1.5">
+    <section aria-labelledby="studio-screens-heading">
+      <header className="bg-band px-2.5 py-1.5">
         <h2 id="studio-screens-heading" className="text-xs font-semibold text-t1">{screensLabel}</h2>
       </header>
       <div className="p-2">

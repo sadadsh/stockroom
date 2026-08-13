@@ -27,4 +27,17 @@ describe("quiet dense-screen hierarchy", () => {
       'className="flex min-h-[24px] items-baseline gap-2 border-b border-line/60 px-2 py-1 last:border-b-0"',
     );
   });
+
+  it("does not box every Design Studio subsection", () => {
+    const sources = [
+      read("src/components/design-mode/ScenarioCatalog.tsx"),
+      read("src/components/design-mode/InspectorPanel.tsx"),
+      read("src/components/design-mode/LayersHierarchyPanel.tsx"),
+      read("src/components/design-mode/inspectors/BoxInspector.tsx"),
+      read("src/components/design-mode/inspectors/CadPresentationInspector.tsx"),
+      read("src/components/design-mode/inspectors/StatesInspector.tsx"),
+    ].join("\n");
+    expect(sources).not.toContain('className="border-b border-line"');
+    expect(sources).not.toContain('className="border-t border-line');
+  });
 });

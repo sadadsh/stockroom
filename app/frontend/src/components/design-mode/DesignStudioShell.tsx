@@ -104,7 +104,7 @@ function PanelResizer({
         event.preventDefault();
         resize(event.key === "ArrowRight" ? 16 : -16);
       }}
-      className="design-studio-resizer flex w-[18px] flex-none items-center justify-center border-x border-line bg-band text-2xs text-t3 hover:bg-control-hover hover:text-t1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-acc"
+      className="design-studio-resizer flex w-[18px] flex-none items-center justify-center bg-band text-2xs text-t3 hover:bg-control-hover hover:text-t1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-acc"
     >
       <span className="[writing-mode:vertical-rl]">{resizeLabel}</span>
     </button>
@@ -327,7 +327,7 @@ export function DesignStudioShell({ children }: { children: ReactNode }) {
 
   return (
     <div
-      className={studio.enabled ? "fixed inset-0 z-[190] flex flex-col overflow-hidden bg-canvas text-t1" : "contents"}
+      className={studio.enabled ? "design-studio-shell fixed inset-0 z-[190] flex flex-col overflow-hidden bg-canvas text-t1" : "contents"}
       data-studio-mode={studio.enabled ? mode : undefined}
       data-scenario-id={studio.activeScenario?.id ?? "global.real-data"}
       data-preview-live-product-requests={studio.activeScenario ? "0" : undefined}
@@ -361,7 +361,7 @@ export function DesignStudioShell({ children }: { children: ReactNode }) {
               className="flex min-h-0 flex-none flex-col border-r border-line bg-surface"
               style={{ width: leftWidth }}
             >
-              <div className="flex items-center justify-end border-b border-line bg-band px-2 py-1">
+              <div className="flex items-center justify-end bg-band px-2 py-1">
                 <button
                   type="button"
                   onClick={() => setLeftPanelCollapsed(true)}
@@ -438,7 +438,7 @@ export function DesignStudioShell({ children }: { children: ReactNode }) {
               className="flex min-h-0 flex-none flex-col border-l border-line bg-popover"
               style={{ width: rightWidth }}
             >
-              <div className="flex items-center justify-end border-b border-line bg-band px-2 py-1">
+              <div className="flex items-center justify-end bg-band px-2 py-1">
                 <button
                   type="button"
                   onClick={() => setRightPanelCollapsed(true)}

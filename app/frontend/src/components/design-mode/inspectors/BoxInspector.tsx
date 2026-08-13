@@ -34,7 +34,7 @@ export function BoxInspector(props: DomainInspectorProps & { section?: "layout" 
   return (
     <div className="px-3.5 py-2">
       {GROUPS.filter(([group]) => !section || group === section).map(([, title, properties]) => (
-        <section key={title} className="border-b border-line py-2 last:border-b-0">
+        <section key={title} className="py-2">
           <h4 className="ui-property-label mb-1">{title}</h4>
           {properties.map((property) => <PropertyRow key={property} property={property} {...props} />)}
         </section>

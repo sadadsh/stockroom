@@ -265,3 +265,14 @@ remove data, provenance, conflicts, accessibility, or a unique workflow.
 Every Design Studio range uses one visible-value contract. Its current value and unit remain visible
 during pointer and keyboard use, and exact entry is available where a precise number matters. Slider
 position is never the only representation of the saved value.
+
+### Quiet Preview And Structural Separation
+
+Preview mode renders normal Stockroom without editor underlines, tab stops, tooltips, or pointer
+interception. Edit mode alone exposes those authoring affordances. The target identities remain in the
+Preview DOM so switching modes never changes what can be edited.
+
+Separators use low-contrast structural tokens instead of outlining routine content. Dark and Light
+themes keep stronger boundaries for the application frame, floating surfaces, active inputs, tables
+that require column tracking, and the selected editing target; nested cards, rows, labels, and quiet
+actions must not recreate a grid of boxes.

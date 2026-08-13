@@ -67,10 +67,21 @@ export function Text({
   values?: CopyValues;
   children: string;
 }) {
-  const { enabled, selectCopy, selectedCopyId, isCopyOverridden } = useDevMode();
+  const { enabled, studioMode, selectCopy, selectedCopyId, isCopyOverridden } = useDevMode();
   const resolved = useResolvedCopy(id, children, values);
 
   if (!enabled) return <>{resolved}</>;
+
+  // Preview is the real product, not an editor overlay. Keep the stable copy identity in the DOM
+  // for Layers and target coverage, but add no underline, tab stop, tooltip, or event interception
+  // until Edit is explicitly chosen.
+  if (studioMode !== "edit") {
+    return (
+      <span data-copy-id={id} data-copy-default={children}>
+        {resolved}
+      </span>
+    );
+  }
 
   const selected = selectedCopyId === id;
   const overridden = isCopyOverridden(id);

@@ -170,11 +170,14 @@ describe("DevPanel inspect-first shell", () => {
    * reported), or Save is gated on the warning - which would make the rule a block, in the owner's
    * own product, over their own words.
    */
-  it("warns about the blocked letter in reworded text without blocking the Save", () => {
+  it("warns about the blocked letter in reworded text without blocking the Save", async () => {
     render(<Harness />);
     toggleDevMode();
-    fireEvent.click(screen.getByText("Original Title"));
-    const editor = screen.getByLabelText("Edit copy text");
+    clickButton("Edit");
+    const copy = document.querySelector('[data-copy-id="detail.title.copy"]')!;
+    fireEvent.pointerDown(copy, { button: 0 });
+    fireEvent.click(copy, { detail: 1 });
+    const editor = await screen.findByLabelText("Edit copy text");
     const warning = () => document.querySelector('[data-dev-id="design.letter-rule-warn"]');
     const save = () => screen.getByRole("button", { name: "Save to source" });
     expect(warning()).toBeNull();
@@ -198,12 +201,15 @@ describe("DevPanel inspect-first shell", () => {
     expect(warning()).toBeNull();
   });
 
-  it("a direct <Text> click still selects the copy and surfaces the Copy tab", () => {
+  it("a direct <Text> click still selects the copy and surfaces the Copy tab", async () => {
     render(<Harness />);
     toggleDevMode();
-    fireEvent.click(screen.getByText("Original Title")); // inspect OFF: the copy layer handles it
+    clickButton("Edit");
+    const copy = document.querySelector('[data-copy-id="detail.title.copy"]')!;
+    fireEvent.pointerDown(copy, { button: 0 });
+    fireEvent.click(copy, { detail: 1 });
     // The Copy tab is now active with the clicked label loaded (the one-click shortcut is preserved).
-    expect(screen.getByLabelText("Edit copy text")).toHaveValue("Original Title");
+    expect(await screen.findByLabelText("Edit copy text")).toHaveValue("Original Title");
   });
 
   it("the catalogue filters by search and clicking an entry locates the element", () => {

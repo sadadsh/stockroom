@@ -71,8 +71,13 @@ describe("dev mode", () => {
 
     toggleDevMode();
     expect(screen.getByText("Save To Source")).toBeInTheDocument();
-    // now the label is wrapped as an editable target
-    expect(document.querySelector('[data-copy-id="test.label"]')).not.toBeNull();
+    // Preview keeps the identity available without drawing editor affordances over Stockroom.
+    const previewCopy = document.querySelector('[data-copy-id="test.label"]');
+    expect(previewCopy).not.toBeNull();
+    expect(previewCopy).not.toHaveClass("underline");
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    expect(document.querySelector('[data-copy-id="test.label"]')).toHaveClass("underline");
 
     // toggling again closes it
     toggleDevMode();
@@ -95,6 +100,7 @@ describe("dev mode", () => {
   it("edits a label's copy in place through the panel", () => {
     render(<Harness />);
     toggleDevMode();
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
 
     // clicking the label (without firing its button) selects it for editing
     fireEvent.click(screen.getByText("Original"));

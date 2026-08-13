@@ -47,7 +47,7 @@ export function IconBrowser({
   });
 
   return (
-    <section className="mt-3 border-t border-line pt-3" aria-label={catalogAria}>
+    <section className="mt-3 pt-3" aria-label={catalogAria}>
       <label className="block text-xs text-t2">
         {searchLabel}
         <input

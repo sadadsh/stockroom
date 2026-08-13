@@ -263,13 +263,16 @@ try {
   await page.getByRole("tab", { name: "Tokens", exact: true }).click();
   const showAll = page.getByRole("button", { name: "Show All", exact: true });
   if (await showAll.count()) await showAll.click();
-  const persistedAccent = "#c1c4c8";
+  const accentInput = page.getByLabel("Accent value", { exact: true });
+  const persistedAccent = (await accentInput.inputValue()).toLowerCase() === "#c1c4c8"
+    ? "#c2c5c9"
+    : "#c1c4c8";
   const saveResponse = page.waitForResponse((response) => {
     const url = new URL(response.url());
     return url.pathname === "/api/design-studio/personal" &&
       response.request().method() === "PUT" && response.ok();
   });
-  await page.getByLabel("Accent value", { exact: true }).fill(persistedAccent);
+  await accentInput.fill(persistedAccent);
   const saved = await (await saveResponse).json();
   assert.equal(saved.document.variations["full-data"].patch.tokens.root["--c-acc"], persistedAccent);
   await writeFile(

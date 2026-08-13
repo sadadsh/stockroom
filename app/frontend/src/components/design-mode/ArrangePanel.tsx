@@ -139,7 +139,7 @@ export function ArrangeSection({
   }, []);
 
   return (
-    <div data-dev-id="design.arrange" className="border-t border-line">
+    <div data-dev-id="design.arrange">
       <button
         type="button"
         aria-expanded={open}

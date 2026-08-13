@@ -98,6 +98,7 @@ describe("WIN-02 - the DevPanel edits an open modal through its focus trap", () 
     await screen.findByText("Altium Database Catalog");
 
     toggleDevMode();
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
 
     // Click the modal's title label: in dev mode the <Text> span is click-to-select (onClickCapture).
     const title = container.querySelector('[data-copy-id="modal.altium.title"]') as HTMLElement;
@@ -127,6 +128,7 @@ describe("WIN-02 - the DevPanel edits an open modal through its focus trap", () 
     await screen.findByText("Altium Database Catalog");
 
     toggleDevMode();
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
 
     // The panel is a sibling of, not a descendant of, the dialog: it is outside the focus trap.
     const dialog = screen.getByRole("dialog");
@@ -152,6 +154,7 @@ describe("WIN-02 - the DevPanel edits the open Complete Part window through its 
     await screen.findByText("Files From The Provider");
 
     toggleDevMode();
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
 
     // Click the window's subtitle: in dev mode the <Text> span is click-to-select (onClickCapture).
     const subtitle = container.querySelector(

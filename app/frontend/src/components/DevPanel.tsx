@@ -354,7 +354,7 @@ function Toolbar({ search, setSearch }: { search: string; setSearch: (s: string)
   // not `<Text>`). Inspect and Show IDs stay the editor's own chrome, per this file's header.
   const editLabel = useText("design.edit-mode", "Edit");
   return (
-    <div className="flex shrink-0 items-center gap-1.5 border-b border-line px-3.5 py-2">
+    <div className="flex shrink-0 items-center gap-1.5 px-3.5 py-2">
       <ToggleButton
         pressed={dev.studioMode === "edit"}
         onClick={() => dev.setStudioMode(dev.studioMode === "edit" ? "preview" : "edit")}
@@ -1292,7 +1292,7 @@ function Catalogue({
   }
 
   return (
-    <div className="border-t border-line">
+    <div>
       <button
         type="button"
         aria-expanded={open}
@@ -1388,7 +1388,7 @@ function SelectionPane({
 
   return (
     <div>
-      <div className="border-b border-line px-3.5 py-2.5">
+      <div className="px-3.5 py-2.5">
         <div className="flex items-baseline gap-1.5">
           <span className="ui-property-label">
             Selected
@@ -1442,7 +1442,7 @@ function SelectionPane({
       <div
         role="tablist"
         aria-label="Selection facets"
-        className="flex items-center gap-1 border-b border-line px-3.5 py-1.5"
+        className="flex items-center gap-1 bg-band/50 px-3.5 py-1.5"
       >
         <FacetTab id="tokens" active={facet} onSelect={setFacet}>
           Tokens
@@ -1569,7 +1569,7 @@ export function DevPanel({
 
   return (
     <aside data-design-studio-chrome="true" aria-label="Dev mode" className="flex h-full min-h-0 w-full flex-col bg-popover">
-      <header className="flex shrink-0 items-center gap-2 border-b border-line px-3.5 py-3">
+      <header className="flex shrink-0 items-center gap-2 px-3.5 py-3">
         <span className="rounded-control bg-acc px-1.5 py-0.5 text-2xs font-semibold text-acc-on">
           DEV
         </span>
@@ -1612,7 +1612,7 @@ export function DevPanel({
         <Catalogue search={search} open={catalogueOpen} setOpen={setCatalogueOpen} />
       </div>
 
-      <footer className="max-h-[55vh] shrink-0 overflow-y-auto border-t border-line bg-popover px-3.5 py-3">
+      <footer className="max-h-[55vh] shrink-0 overflow-y-auto bg-band/30 px-3.5 py-3">
         {dev.lastError ? (
           <div className="mb-2 text-2xs text-err-text">{dev.lastError}</div>
         ) : null}
