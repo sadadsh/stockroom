@@ -77,7 +77,7 @@ describe("ManageModelsWorkspace", () => {
     ]));
   });
 
-  it("uses every provider row as a person-chosen quick link", async () => {
+  it("uses provider rows for selection only and opens only from the explicit action", async () => {
     const user = userEvent.setup();
     const dossier = makeDossier();
     dossier.cadSourceCoverage.rows = [providerRow("partial-a", false), providerRow("partial-b", false)];
@@ -98,6 +98,9 @@ describe("ManageModelsWorkspace", () => {
     const lastProvider = providers[providers.length - 1]!;
     await user.click(lastProvider);
     expect(lastProvider).toHaveAttribute("aria-checked", "true");
+    expect(onOpenProvider).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("button", { name: "Open Provider" }));
     expect(onOpenProvider).toHaveBeenCalledWith("partial-b", [
       "kicad_symbol",
       "kicad_footprint",
@@ -123,10 +126,10 @@ describe("ManageModelsWorkspace", () => {
       />,
     );
 
-    expect(screen.queryByRole("dialog", { name: "SnapEDA Provider" })).toBeNull();
+    expect(screen.queryByRole("region", { name: "SnapEDA Browser" })).toBeNull();
     await user.click(screen.getByRole("button", { name: "Open Provider" }));
 
-    expect(screen.queryByRole("dialog", { name: "SnapEDA Provider" })).toBeNull();
+    expect(screen.queryByRole("region", { name: "SnapEDA Browser" })).toBeNull();
     expect(screen.getByTestId("manage-models-workspace")).toBeVisible();
     expect(onOpenProvider).toHaveBeenCalledTimes(1);
   });
@@ -154,6 +157,7 @@ describe("ManageModelsWorkspace", () => {
         completionEvidenceReported: false,
       },
       closeProvider,
+      showProvider: vi.fn().mockResolvedValue(undefined),
     };
     captureMocks.useOptionalCapture.mockImplementation(() => capture);
     const onOpenProvider = vi.fn().mockResolvedValue(undefined);
@@ -166,10 +170,9 @@ describe("ManageModelsWorkspace", () => {
       />,
     );
 
-    expect(screen.getByRole("dialog", { name: "SnapEDA Provider" })).toBeVisible();
+    expect(screen.getByRole("region", { name: "SnapEDA Browser" })).toBeVisible();
     await user.click(screen.getByRole("button", { name: "Close Provider" }));
     expect(closeProvider).toHaveBeenCalledTimes(1);
-    expect(screen.queryByRole("dialog", { name: "SnapEDA Provider" })).toBeNull();
 
     capture = {
       ...capture,
@@ -190,7 +193,10 @@ describe("ManageModelsWorkspace", () => {
         onOpenProvider={onOpenProvider}
       />,
     );
+    expect(screen.queryByRole("region", { name: "SnapEDA Browser" })).toBeNull();
     await user.click(screen.getByRole("radio", { name: /Ultra Librarian/ }));
+    expect(onOpenProvider).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: "Open Provider" }));
     expect(onOpenProvider).toHaveBeenCalledWith("partial", expect.any(Array));
 
     capture = {
@@ -212,7 +218,7 @@ describe("ManageModelsWorkspace", () => {
         onOpenProvider={onOpenProvider}
       />,
     );
-    expect(screen.getByRole("dialog", { name: "Ultra Librarian Provider" })).toBeVisible();
+    expect(screen.getByRole("region", { name: "Ultra Librarian Browser" })).toBeVisible();
   });
 
   it("reopens the current route when closing it fails", async () => {
@@ -238,6 +244,7 @@ describe("ManageModelsWorkspace", () => {
         completionEvidenceReported: false,
       },
       closeProvider,
+      showProvider: vi.fn().mockResolvedValue(undefined),
     });
 
     render(
@@ -251,7 +258,7 @@ describe("ManageModelsWorkspace", () => {
     await user.click(screen.getByRole("button", { name: "Close Provider" }));
 
     expect(await screen.findByText("Coordinator unavailable")).toBeInTheDocument();
-    expect(screen.getByRole("dialog", { name: "SnapEDA Provider" })).toBeVisible();
+    expect(screen.getByRole("region", { name: "SnapEDA Browser" })).toBeVisible();
   });
 
   it("starts the provider task with only the selected EDAs", async () => {

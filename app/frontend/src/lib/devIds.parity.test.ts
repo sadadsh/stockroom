@@ -206,14 +206,12 @@ const KNOWN_PROP_PASSED: readonly string[] = [
   // component-workspace/SourcingParts.tsx SourcingDisclosure: compact secondary facts share one
   // native details shell while every exact id stays source-spelled at its call site.
   "component-browser.lifecycle-details",
-  "component-browser.offer-details",
   "component-browser.document-details",
   "component-browser.related-evidence",
   // component-workspace/SheetParts.tsx: the exhaustive sourcing sheet shares one section and one
   // table shell, so a section's or a table's id arrives as a `devId` string prop. Spelled out in
   // full at each call site for the same reason as the regions above.
   "component-browser.pinout-table",
-  "component-browser.offer-ladder",
   // components/modalParts.tsx ModalShell: the scrim, the 38px header and the close control are ONE
   // frame now, so each window names its own parts through `devId` / `headerDevId` / `closeDevId`
   // string props. Spelled out in full at each call site. Four windows had hand-written the same

@@ -441,7 +441,7 @@
 <section data-dev-id="component-browser.offers" class="border-b border-line last:border-b-0">
 <header class="flex min-h-[21px] items-center gap-2 border-b border-line px-2 py-0.5" data-design-id="auto.sourcing-parts.0x26wza">
 <h3 class="ui-section-title min-w-0 truncate" data-design-id="auto.sourcing-parts.0cq1ub8">
-<span class="flex items-center gap-1.5" data-design-id="auto.offers-section.0cn8pca">
+<span class="flex items-center gap-1.5" data-design-id="auto.offers-section.15193ro">
 <svg class="ico h-3.5 w-3.5 text-t3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" data-design-id="auto.icon.074vuqd" data-icon-id="action.enrich">
 <path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z">
 </path>
@@ -456,14 +456,15 @@
 </span>
 </h3>
 <span class="ml-auto flex-none" data-design-id="auto.sourcing-parts.0ka1869">
-<span class="flex items-center gap-1" data-design-id="auto.offers-section.0fervcj">
-<button class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-control transition-[color,background-color,border-color] duration-100 ease-out ui-control-label disabled:cursor-not-allowed disabled:bg-control-pressed disabled:text-t5 disabled:hover:brightness-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus h-[22px] px-2 text-xs bg-control-bottom text-t1 hover:bg-control-hover active:bg-control-pressed" data-dev-id="component-browser.offers-all" data-design-id="auto.primitives-kit.1dylkrc">
+<span class="flex items-center gap-0.5" data-design-id="auto.offers-section.12epmyt">
+<button type="button" data-dev-id="component-browser.offers-all" aria-label="View Full Sourcing Record" title="View Full Sourcing Record" class="flex h-[20px] w-[20px] flex-none items-center justify-center rounded-control text-t3 hover:bg-control-hover hover:text-t1 disabled:text-t5 disabled:hover:bg-transparent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus">
 <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-design-id="auto.icon.1h0wakp" data-icon-id="action.view">
 <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z">
 </path>
 <circle cx="12" cy="12" r="3">
 </circle>
-</svg>View Full Sourcing Record</button>
+</svg>
+</button>
 <button type="button" data-dev-id="component-browser.refresh-offers" aria-label="Refresh Offers" title="Refresh Offers" class="flex h-[20px] w-[20px] flex-none items-center justify-center rounded-control text-t3 hover:bg-control-hover hover:text-t1 disabled:text-t5 disabled:hover:bg-transparent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus">
 <svg class="ico h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" data-design-id="auto.icon.1v8m503" data-icon-id="action.refresh">
 <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8">
@@ -480,11 +481,38 @@
 </span>
 </header>
 <div data-design-id="auto.sourcing-parts.1tavmqf">
-<ul data-dev-id="component-browser.offers-table" aria-label="Distributor offers" class="flex min-w-0 flex-col">
-<li data-dev-id="component-browser.offer-row" data-offer-provider="mouser" class="min-w-0 border-b border-line/60 px-2 py-2 last:border-b-0 even:bg-row-alt/50">
-<header class="flex min-w-0 flex-wrap items-start gap-x-2 gap-y-1" data-design-id="auto.offers-section.0qlwbet">
-<span class="ui-row-secondary min-w-0 flex-1 break-words text-t1" data-design-id="auto.offers-section.1j8xd9b">Mouser</span>
-<a data-dev-id="component-browser.offer-listing" href="https://example.invalid/p" target="_blank" rel="noreferrer" aria-label="Open Mouser Listing" title="Open Mouser Listing" class="inline-flex flex-none items-center rounded-control p-0.5 text-t2 transition-colors hover:text-t1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus">
+<ul data-dev-id="component-browser.offers-table" aria-label="Distributor offers" class="min-w-0">
+<li data-sourcing-provider="mouser" class="border-b border-line last:border-b-0" data-design-id="auto.offers-section.1xgir31">
+<div class="flex min-h-[26px] items-center gap-2 bg-row-alt/45 px-2 py-1" data-design-id="auto.offers-section.1othet0">
+<span class="ui-row-secondary min-w-0 flex-1 truncate text-t1" data-design-id="auto.offers-section.1szwqm8">Mouser</span>
+<span class="ui-component-metadata flex-none tabular-nums" data-design-id="auto.offers-section.0fmwhfl">1 offer</span>
+</div>
+<ul class="divide-y divide-line/60" data-design-id="auto.offers-section.04pejv7">
+<li data-design-id="auto.offers-section.1vy1vq1">
+<details data-dev-id="component-browser.offer-row" data-offer-provider="mouser" class="group min-w-0">
+<summary aria-label="595-LM358DR, 2 price breaks" class="flex min-h-[48px] cursor-pointer list-none items-center gap-2 px-2 py-1.5 hover:bg-[var(--c-hover)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-focus" data-design-id="auto.offers-section.10dluvq">
+<span class="min-w-0 flex-1" data-design-id="auto.offers-section.060cct4">
+<span class="ui-row-primary block truncate" title="595-LM358DR" data-design-id="auto.offers-section.1tkrfmb">595-LM358DR</span>
+<span class="mt-0.5 flex min-w-0 items-baseline gap-2" data-design-id="auto.offers-section.1lixjky">
+<span class="ui-component-metadata min-w-0 truncate" data-design-id="auto.offers-section.1htxfu9">
+<span data-copy-id="component-browser.offer-col-stock" data-copy-default="Stock" data-design-id="auto.copy.1w1xklu">Stock</span> <span class="ui-numeric text-t2" data-design-id="auto.offers-section.15061wh">1,000</span>
+</span>
+<span class="ui-component-metadata ml-auto flex-none" data-design-id="auto.offers-section.0q2llto">
+<span data-copy-id="component-browser.offer-col-price" data-copy-default="Unit Price" data-design-id="auto.copy.1do2jll">Unit Price</span> <span class="ui-key-fact ui-numeric" data-design-id="auto.offers-section.1khomeo">$0.38</span>
+</span>
+</span>
+</span>
+<svg class="h-3 w-3 flex-none text-t3 transition-transform group-open:rotate-90" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" data-design-id="auto.icon.1dj0jcf" data-icon-id="detail.chevron-right">
+<path d="m9 18 6-6-6-6">
+</path>
+</svg>
+</summary>
+<div data-dev-id="component-browser.offer-details" class="border-t border-line/40 bg-field/25 px-2 pb-2 pt-1.5">
+<div class="flex items-center gap-2" data-design-id="auto.offers-section.1kw0dzn">
+<h4 class="ui-property-label min-w-0 flex-1" data-design-id="auto.offers-section.1rjwnpj">
+<span data-copy-id="component-browser.price-breaks" data-copy-default="Price Breaks" data-design-id="auto.copy.1clv8hc">Price Breaks</span> <span class="font-normal text-t4" data-design-id="auto.offers-section.0lfdb1b">2</span>
+</h4>
+<a data-dev-id="component-browser.offer-listing" href="https://example.invalid/p" target="_blank" rel="noreferrer" aria-label="Open Mouser Listing" title="Open Mouser Listing" class="inline-flex flex-none rounded-control p-0.5 text-t2 hover:text-t1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus">
 <svg class="h-3.5 w-3.5" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-design-id="auto.icon.1te4cyn" data-icon-id="action.external">
 <g transform="translate(0 0) scale(1)" fill="currentColor" stroke="none">
 <path fill="currentColor" d="M17 3.34a10 10 0 1 1-14.995 8.984L2 12l.005-.324A10 10 0 0 1 17 3.34M15 8H9l-.117.007A1 1 0 0 0 8 9l.007.117A1 1 0 0 0 9 10h3.584l-4.291 4.293l-.083.094a1 1 0 0 0 1.497 1.32L14 11.414V15l.007.117A1 1 0 0 0 16 15V9l-.007-.117l-.029-.149l-.035-.105l-.054-.113l-.071-.111a1 1 0 0 0-.097-.112l-.09-.08l-.096-.067l-.098-.052l-.11-.044l-.112-.03l-.126-.017z">
@@ -492,94 +520,84 @@
 </g>
 </svg>
 </a>
-<span class="ui-component-metadata basis-full break-all" title="595-LM358DR" data-design-id="auto.offers-section.04j0h9r">595-LM358DR</span>
-</header>
-<div data-dev-id="component-browser.offer-price-ladder" class="mt-2 min-w-0 border-t border-line/60 pt-2">
-<h4 class="ui-property-label" data-design-id="auto.offers-section.1y3f2bp">
-<span data-copy-id="component-browser.price-breaks" data-copy-default="Price Breaks" data-design-id="auto.copy.1clv8hc">Price Breaks</span>
-</h4>
-<dl class="mt-1 grid min-w-0 grid-cols-2 gap-x-3 gap-y-1" data-design-id="auto.offers-section.0qo6981">
-<div class="flex min-w-0 items-baseline justify-between gap-2 border-b border-line/40 py-0.5" data-design-id="auto.offers-section.19lgge0">
-<dt class="ui-component-metadata min-w-0 break-words" data-design-id="auto.offers-section.1h244sx">1</dt>
-<dd class="ui-key-fact ui-numeric min-w-0 break-words text-right" data-design-id="auto.offers-section.04g56pi">$0.38</dd>
 </div>
-<div class="flex min-w-0 items-baseline justify-between gap-2 border-b border-line/40 py-0.5" data-design-id="auto.offers-section.19lgge0">
-<dt class="ui-component-metadata min-w-0 break-words" data-design-id="auto.offers-section.1h244sx">100</dt>
-<dd class="ui-key-fact ui-numeric min-w-0 break-words text-right" data-design-id="auto.offers-section.04g56pi">$0.31</dd>
+<div data-dev-id="component-browser.offer-price-ladder" class="mt-1">
+<dl class="grid min-w-0 grid-cols-2 gap-x-3" data-design-id="auto.offers-section.0dbvz4o">
+<div class="flex min-w-0 items-baseline justify-between gap-2 border-b border-line/40 py-0.5" data-design-id="auto.offers-section.03e22q1">
+<dt class="ui-component-metadata min-w-0 break-words" data-design-id="auto.offers-section.0g90vld">1</dt>
+<dd class="ui-key-fact ui-numeric min-w-0 break-words text-right" data-design-id="auto.offers-section.0smgba6">$0.38</dd>
+</div>
+<div class="flex min-w-0 items-baseline justify-between gap-2 border-b border-line/40 py-0.5" data-design-id="auto.offers-section.03e22q1">
+<dt class="ui-component-metadata min-w-0 break-words" data-design-id="auto.offers-section.0g90vld">100</dt>
+<dd class="ui-key-fact ui-numeric min-w-0 break-words text-right" data-design-id="auto.offers-section.0smgba6">$0.31</dd>
 </div>
 </dl>
 </div>
-<dl class="mt-2 grid min-w-0 grid-cols-2 gap-x-3 gap-y-2" data-design-id="auto.offers-section.1w782za">
-<div class="min-w-0" data-design-id="auto.offers-section.0n178ha">
-<dt class="ui-property-label break-words" data-design-id="auto.offers-section.07jhu3u">
-<span data-copy-id="component-browser.offer-col-stock" data-copy-default="Stock" data-design-id="auto.copy.1w1xklu">Stock</span>
-</dt>
-<dd class="ui-property-value min-w-0 break-words ui-numeric" data-design-id="auto.offers-section.11iymhr">1,000</dd>
-</div>
-<div class="min-w-0" data-design-id="auto.offers-section.0n178ha">
-<dt class="ui-property-label break-words" data-design-id="auto.offers-section.07jhu3u">
-<span data-copy-id="component-browser.offer-col-price" data-copy-default="Unit Price" data-design-id="auto.copy.1do2jll">Unit Price</span>
-</dt>
-<dd class="ui-key-fact min-w-0 break-words ui-numeric" data-design-id="auto.offers-section.11iymhr">$0.38</dd>
-</div>
-</dl>
-<div class="mt-2 -mx-2 -mb-2" data-design-id="auto.offers-section.14sck3f">
-<details data-dev-id="component-browser.offer-details" class="group border-t border-line/60">
-<summary class="flex min-h-[24px] cursor-pointer list-none items-center gap-1.5 px-2 py-1 text-xs font-medium text-t2 hover:bg-[var(--c-hover)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-focus" data-design-id="auto.sourcing-parts.10pj96y">
-<svg class="h-3.5 w-3.5 flex-none text-t3" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-design-id="auto.icon.09ge218" data-icon-id="status.info">
-<circle cx="12" cy="12" r="10">
-</circle>
-<path d="M12 16v-4">
-</path>
-<path d="M12 8h.01">
-</path>
-</svg>
-<span data-design-id="auto.sourcing-parts.1lg9oqk">
-<span data-copy-id="component-browser.offer-details" data-copy-default="Offer Details" data-design-id="auto.copy.1dx6yql">Offer Details</span>
-</span>
-<svg class="ml-auto h-3 w-3 flex-none text-t3 transition-transform group-open:rotate-90" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" data-design-id="auto.icon.1dj0jcf" data-icon-id="detail.chevron-right">
-<path d="m9 18 6-6-6-6">
-</path>
-</svg>
-</summary>
-<div data-design-id="auto.sourcing-parts.19dhx1n">
-<dl class="grid min-w-0 grid-cols-2 gap-x-3 gap-y-2 px-2 pb-2 pt-1" data-design-id="auto.offers-section.1ughq6v">
-<div class="min-w-0" data-design-id="auto.offers-section.0n178ha">
-<dt class="ui-property-label break-words" data-design-id="auto.offers-section.07jhu3u">
+<dl class="mt-2 grid min-w-0 grid-cols-2 gap-x-3 gap-y-1 border-t border-line/40 pt-1.5" data-design-id="auto.offers-section.0duh0ik">
+<div class="min-w-0" data-design-id="auto.offers-section.1a1bb16">
+<dt class="ui-property-label break-words" data-design-id="auto.offers-section.1i12ezm">
 <span data-copy-id="component-browser.offer-col-currency" data-copy-default="Quote Code" data-design-id="auto.copy.0s5irm7">Quote Code</span>
 </dt>
-<dd class="ui-property-value min-w-0 break-words " data-design-id="auto.offers-section.11iymhr">$</dd>
+<dd class="ui-property-value min-w-0 break-words " data-design-id="auto.offers-section.079k5or">$</dd>
 </div>
-<div class="min-w-0" data-design-id="auto.offers-section.0n178ha">
-<dt class="ui-property-label break-words" data-design-id="auto.offers-section.07jhu3u">
+<div class="min-w-0" data-design-id="auto.offers-section.1a1bb16">
+<dt class="ui-property-label break-words" data-design-id="auto.offers-section.1i12ezm">
 <span data-copy-id="component-browser.offer-col-moq" data-copy-default="MOQ" data-design-id="auto.copy.08yg8f3">MOQ</span>
 </dt>
-<dd class="ui-property-value min-w-0 break-words ui-numeric" data-design-id="auto.offers-section.11iymhr">1</dd>
+<dd class="ui-property-value min-w-0 break-words ui-numeric" data-design-id="auto.offers-section.079k5or">1</dd>
 </div>
-<div class="min-w-0" data-design-id="auto.offers-section.0n178ha">
-<dt class="ui-property-label break-words" data-design-id="auto.offers-section.07jhu3u">
+<div class="min-w-0" data-design-id="auto.offers-section.1a1bb16">
+<dt class="ui-property-label break-words" data-design-id="auto.offers-section.1i12ezm">
 <span data-copy-id="component-browser.lifecycle-state" data-copy-default="Product Status" data-design-id="auto.copy.15ouklk">Product Status</span>
 </dt>
-<dd class="ui-property-value min-w-0 break-words " data-design-id="auto.offers-section.11iymhr">Active</dd>
+<dd class="ui-property-value min-w-0 break-words " data-design-id="auto.offers-section.079k5or">Active</dd>
 </div>
-<div class="min-w-0" data-design-id="auto.offers-section.0n178ha">
-<dt class="ui-property-label break-words" data-design-id="auto.offers-section.07jhu3u">
+<div class="min-w-0" data-design-id="auto.offers-section.1a1bb16">
+<dt class="ui-property-label break-words" data-design-id="auto.offers-section.1i12ezm">
 <span data-copy-id="component-browser.offer-col-checked" data-copy-default="Last Checked" data-design-id="auto.copy.0e0zo9h">Last Checked</span>
 </dt>
-<dd class="ui-property-value min-w-0 break-words " data-design-id="auto.offers-section.11iymhr">
-<span title="Jul 31, 2026, 8:00 PM" data-design-id="auto.offers-section.1a55rcb">2&nbsp;d ago · <span data-copy-id="component-browser.staleness-fresh" data-copy-default="Fresh" data-design-id="auto.copy.1gd3f0j">Fresh</span>
+<dd class="ui-property-value min-w-0 break-words " data-design-id="auto.offers-section.079k5or">
+<span title="Jul 31, 2026, 8:00 PM" data-design-id="auto.offers-section.0do1f91">2&nbsp;d ago · <span data-copy-id="component-browser.staleness-fresh" data-copy-default="Fresh" data-design-id="auto.copy.1gd3f0j">Fresh</span>
 </span>
 </dd>
 </div>
 </dl>
 </div>
 </details>
-</div>
 </li>
-<li data-dev-id="component-browser.offer-row" data-offer-provider="digikey" class="min-w-0 border-b border-line/60 px-2 py-2 last:border-b-0 even:bg-row-alt/50">
-<header class="flex min-w-0 flex-wrap items-start gap-x-2 gap-y-1" data-design-id="auto.offers-section.0qlwbet">
-<span class="ui-row-secondary min-w-0 flex-1 break-words text-t1" data-design-id="auto.offers-section.1j8xd9b">DigiKey</span>
-<a data-dev-id="component-browser.offer-listing" href="https://example.invalid/p" target="_blank" rel="noreferrer" aria-label="Open DigiKey Listing" title="Open DigiKey Listing" class="inline-flex flex-none items-center rounded-control p-0.5 text-t2 transition-colors hover:text-t1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus">
+</ul>
+</li>
+<li data-sourcing-provider="digikey" class="border-b border-line last:border-b-0" data-design-id="auto.offers-section.1xgir31">
+<div class="flex min-h-[26px] items-center gap-2 bg-row-alt/45 px-2 py-1" data-design-id="auto.offers-section.1othet0">
+<span class="ui-row-secondary min-w-0 flex-1 truncate text-t1" data-design-id="auto.offers-section.1szwqm8">DigiKey</span>
+<span class="ui-component-metadata flex-none tabular-nums" data-design-id="auto.offers-section.0fmwhfl">1 offer</span>
+</div>
+<ul class="divide-y divide-line/60" data-design-id="auto.offers-section.04pejv7">
+<li data-design-id="auto.offers-section.1vy1vq1">
+<details data-dev-id="component-browser.offer-row" data-offer-provider="digikey" class="group min-w-0">
+<summary aria-label="296-1234-1-ND, 1 price break" class="flex min-h-[48px] cursor-pointer list-none items-center gap-2 px-2 py-1.5 hover:bg-[var(--c-hover)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-focus" data-design-id="auto.offers-section.10dluvq">
+<span class="min-w-0 flex-1" data-design-id="auto.offers-section.060cct4">
+<span class="ui-row-primary block truncate" title="296-1234-1-ND" data-design-id="auto.offers-section.1tkrfmb">296-1234-1-ND</span>
+<span class="mt-0.5 flex min-w-0 items-baseline gap-2" data-design-id="auto.offers-section.1lixjky">
+<span class="ui-component-metadata min-w-0 truncate" data-design-id="auto.offers-section.1htxfu9">
+<span data-copy-id="component-browser.offer-col-stock" data-copy-default="Stock" data-design-id="auto.copy.1w1xklu">Stock</span> <span class="ui-numeric text-t2" data-design-id="auto.offers-section.15061wh">512</span>
+</span>
+<span class="ui-component-metadata ml-auto flex-none" data-design-id="auto.offers-section.0q2llto">
+<span data-copy-id="component-browser.offer-col-price" data-copy-default="Unit Price" data-design-id="auto.copy.1do2jll">Unit Price</span> <span class="ui-key-fact ui-numeric" data-design-id="auto.offers-section.1khomeo">$0.42</span>
+</span>
+</span>
+</span>
+<svg class="h-3 w-3 flex-none text-t3 transition-transform group-open:rotate-90" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" data-design-id="auto.icon.1dj0jcf" data-icon-id="detail.chevron-right">
+<path d="m9 18 6-6-6-6">
+</path>
+</svg>
+</summary>
+<div data-dev-id="component-browser.offer-details" class="border-t border-line/40 bg-field/25 px-2 pb-2 pt-1.5">
+<div class="flex items-center gap-2" data-design-id="auto.offers-section.1kw0dzn">
+<h4 class="ui-property-label min-w-0 flex-1" data-design-id="auto.offers-section.1rjwnpj">
+<span data-copy-id="component-browser.price-breaks" data-copy-default="Price Breaks" data-design-id="auto.copy.1clv8hc">Price Breaks</span> <span class="font-normal text-t4" data-design-id="auto.offers-section.0lfdb1b">1</span>
+</h4>
+<a data-dev-id="component-browser.offer-listing" href="https://example.invalid/p" target="_blank" rel="noreferrer" aria-label="Open DigiKey Listing" title="Open DigiKey Listing" class="inline-flex flex-none rounded-control p-0.5 text-t2 hover:text-t1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus">
 <svg class="h-3.5 w-3.5" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-design-id="auto.icon.1te4cyn" data-icon-id="action.external">
 <g transform="translate(0 0) scale(1)" fill="currentColor" stroke="none">
 <path fill="currentColor" d="M17 3.34a10 10 0 1 1-14.995 8.984L2 12l.005-.324A10 10 0 0 1 17 3.34M15 8H9l-.117.007A1 1 0 0 0 8 9l.007.117A1 1 0 0 0 9 10h3.584l-4.291 4.293l-.083.094a1 1 0 0 0 1.497 1.32L14 11.414V15l.007.117A1 1 0 0 0 16 15V9l-.007-.117l-.029-.149l-.035-.105l-.054-.113l-.071-.111a1 1 0 0 0-.097-.112l-.09-.08l-.096-.067l-.098-.052l-.11-.044l-.112-.03l-.126-.017z">
@@ -587,85 +605,48 @@
 </g>
 </svg>
 </a>
-<span class="ui-component-metadata basis-full break-all" title="296-1234-1-ND" data-design-id="auto.offers-section.04j0h9r">296-1234-1-ND</span>
-</header>
-<div data-dev-id="component-browser.offer-price-ladder" class="mt-2 min-w-0 border-t border-line/60 pt-2">
-<h4 class="ui-property-label" data-design-id="auto.offers-section.1y3f2bp">
-<span data-copy-id="component-browser.price-breaks" data-copy-default="Price Breaks" data-design-id="auto.copy.1clv8hc">Price Breaks</span>
-</h4>
-<dl class="mt-1 grid min-w-0 grid-cols-2 gap-x-3 gap-y-1" data-design-id="auto.offers-section.0qo6981">
-<div class="flex min-w-0 items-baseline justify-between gap-2 border-b border-line/40 py-0.5" data-design-id="auto.offers-section.19lgge0">
-<dt class="ui-component-metadata min-w-0 break-words" data-design-id="auto.offers-section.1h244sx">1</dt>
-<dd class="ui-key-fact ui-numeric min-w-0 break-words text-right" data-design-id="auto.offers-section.04g56pi">$0.42</dd>
+</div>
+<div data-dev-id="component-browser.offer-price-ladder" class="mt-1">
+<dl class="grid min-w-0 grid-cols-2 gap-x-3" data-design-id="auto.offers-section.0dbvz4o">
+<div class="flex min-w-0 items-baseline justify-between gap-2 border-b border-line/40 py-0.5" data-design-id="auto.offers-section.03e22q1">
+<dt class="ui-component-metadata min-w-0 break-words" data-design-id="auto.offers-section.0g90vld">1</dt>
+<dd class="ui-key-fact ui-numeric min-w-0 break-words text-right" data-design-id="auto.offers-section.0smgba6">$0.42</dd>
 </div>
 </dl>
 </div>
-<dl class="mt-2 grid min-w-0 grid-cols-2 gap-x-3 gap-y-2" data-design-id="auto.offers-section.1w782za">
-<div class="min-w-0" data-design-id="auto.offers-section.0n178ha">
-<dt class="ui-property-label break-words" data-design-id="auto.offers-section.07jhu3u">
-<span data-copy-id="component-browser.offer-col-stock" data-copy-default="Stock" data-design-id="auto.copy.1w1xklu">Stock</span>
-</dt>
-<dd class="ui-property-value min-w-0 break-words ui-numeric" data-design-id="auto.offers-section.11iymhr">512</dd>
-</div>
-<div class="min-w-0" data-design-id="auto.offers-section.0n178ha">
-<dt class="ui-property-label break-words" data-design-id="auto.offers-section.07jhu3u">
-<span data-copy-id="component-browser.offer-col-price" data-copy-default="Unit Price" data-design-id="auto.copy.1do2jll">Unit Price</span>
-</dt>
-<dd class="ui-key-fact min-w-0 break-words ui-numeric" data-design-id="auto.offers-section.11iymhr">$0.42</dd>
-</div>
-</dl>
-<div class="mt-2 -mx-2 -mb-2" data-design-id="auto.offers-section.14sck3f">
-<details data-dev-id="component-browser.offer-details" class="group border-t border-line/60">
-<summary class="flex min-h-[24px] cursor-pointer list-none items-center gap-1.5 px-2 py-1 text-xs font-medium text-t2 hover:bg-[var(--c-hover)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-focus" data-design-id="auto.sourcing-parts.10pj96y">
-<svg class="h-3.5 w-3.5 flex-none text-t3" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-design-id="auto.icon.09ge218" data-icon-id="status.info">
-<circle cx="12" cy="12" r="10">
-</circle>
-<path d="M12 16v-4">
-</path>
-<path d="M12 8h.01">
-</path>
-</svg>
-<span data-design-id="auto.sourcing-parts.1lg9oqk">
-<span data-copy-id="component-browser.offer-details" data-copy-default="Offer Details" data-design-id="auto.copy.1dx6yql">Offer Details</span>
-</span>
-<svg class="ml-auto h-3 w-3 flex-none text-t3 transition-transform group-open:rotate-90" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" data-design-id="auto.icon.1dj0jcf" data-icon-id="detail.chevron-right">
-<path d="m9 18 6-6-6-6">
-</path>
-</svg>
-</summary>
-<div data-design-id="auto.sourcing-parts.19dhx1n">
-<dl class="grid min-w-0 grid-cols-2 gap-x-3 gap-y-2 px-2 pb-2 pt-1" data-design-id="auto.offers-section.1ughq6v">
-<div class="min-w-0" data-design-id="auto.offers-section.0n178ha">
-<dt class="ui-property-label break-words" data-design-id="auto.offers-section.07jhu3u">
+<dl class="mt-2 grid min-w-0 grid-cols-2 gap-x-3 gap-y-1 border-t border-line/40 pt-1.5" data-design-id="auto.offers-section.0duh0ik">
+<div class="min-w-0" data-design-id="auto.offers-section.1a1bb16">
+<dt class="ui-property-label break-words" data-design-id="auto.offers-section.1i12ezm">
 <span data-copy-id="component-browser.offer-col-currency" data-copy-default="Quote Code" data-design-id="auto.copy.0s5irm7">Quote Code</span>
 </dt>
-<dd class="ui-property-value min-w-0 break-words " data-design-id="auto.offers-section.11iymhr">$</dd>
+<dd class="ui-property-value min-w-0 break-words " data-design-id="auto.offers-section.079k5or">$</dd>
 </div>
-<div class="min-w-0" data-design-id="auto.offers-section.0n178ha">
-<dt class="ui-property-label break-words" data-design-id="auto.offers-section.07jhu3u">
+<div class="min-w-0" data-design-id="auto.offers-section.1a1bb16">
+<dt class="ui-property-label break-words" data-design-id="auto.offers-section.1i12ezm">
 <span data-copy-id="component-browser.offer-col-moq" data-copy-default="MOQ" data-design-id="auto.copy.08yg8f3">MOQ</span>
 </dt>
-<dd class="ui-property-value min-w-0 break-words ui-numeric" data-design-id="auto.offers-section.11iymhr">1</dd>
+<dd class="ui-property-value min-w-0 break-words ui-numeric" data-design-id="auto.offers-section.079k5or">1</dd>
 </div>
-<div class="min-w-0" data-design-id="auto.offers-section.0n178ha">
-<dt class="ui-property-label break-words" data-design-id="auto.offers-section.07jhu3u">
+<div class="min-w-0" data-design-id="auto.offers-section.1a1bb16">
+<dt class="ui-property-label break-words" data-design-id="auto.offers-section.1i12ezm">
 <span data-copy-id="component-browser.lifecycle-state" data-copy-default="Product Status" data-design-id="auto.copy.15ouklk">Product Status</span>
 </dt>
-<dd class="ui-property-value min-w-0 break-words " data-design-id="auto.offers-section.11iymhr">Active</dd>
+<dd class="ui-property-value min-w-0 break-words " data-design-id="auto.offers-section.079k5or">Active</dd>
 </div>
-<div class="min-w-0" data-design-id="auto.offers-section.0n178ha">
-<dt class="ui-property-label break-words" data-design-id="auto.offers-section.07jhu3u">
+<div class="min-w-0" data-design-id="auto.offers-section.1a1bb16">
+<dt class="ui-property-label break-words" data-design-id="auto.offers-section.1i12ezm">
 <span data-copy-id="component-browser.offer-col-checked" data-copy-default="Last Checked" data-design-id="auto.copy.0e0zo9h">Last Checked</span>
 </dt>
-<dd class="ui-property-value min-w-0 break-words " data-design-id="auto.offers-section.11iymhr">
-<span title="Jul 31, 2026, 8:00 PM" data-design-id="auto.offers-section.1a55rcb">2&nbsp;d ago · <span data-copy-id="component-browser.staleness-fresh" data-copy-default="Fresh" data-design-id="auto.copy.1gd3f0j">Fresh</span>
+<dd class="ui-property-value min-w-0 break-words " data-design-id="auto.offers-section.079k5or">
+<span title="Jul 31, 2026, 8:00 PM" data-design-id="auto.offers-section.0do1f91">2&nbsp;d ago · <span data-copy-id="component-browser.staleness-fresh" data-copy-default="Fresh" data-design-id="auto.copy.1gd3f0j">Fresh</span>
 </span>
 </dd>
 </div>
 </dl>
 </div>
 </details>
-</div>
+</li>
+</ul>
 </li>
 </ul>
 </div>

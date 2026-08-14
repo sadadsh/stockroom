@@ -12,6 +12,28 @@
  */
 import type { DistributorOffer } from "../../api/dossierTypes";
 
+export interface OfferGroup {
+  provider: string;
+  providerLabel: string;
+  offers: DistributorOffer[];
+}
+
+/** Preserve normalized provider and package order while naming each distributor once. */
+export function groupOffersByProvider(offers: readonly DistributorOffer[]): OfferGroup[] {
+  const groups = new Map<string, OfferGroup>();
+  for (const offer of offers) {
+    const key = offer.provider || offer.providerLabel;
+    const group = groups.get(key);
+    if (group) group.offers.push(offer);
+    else groups.set(key, {
+      provider: offer.provider,
+      providerLabel: offer.providerLabel,
+      offers: [offer],
+    });
+  }
+  return [...groups.values()];
+}
+
 /** The best volume break on an offer, or null when only one quantity was ever quoted. */
 export function volumeBreak(offer: DistributorOffer): { qty: number; price: number } | null {
   const usable = offer.priceBreaks.filter(

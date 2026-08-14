@@ -17,7 +17,7 @@ import { Button } from "../primitives";
 import { useScenarioUiState } from "../../design-studio/scenarioState";
 import { bestCompleteProvider, orderedManageModelsProviders } from "./manageModelsModel";
 import { ProviderList } from "./ProviderList";
-import { ProviderBrowserModal } from "./ProviderBrowserModal";
+import { ProviderBrowserFrame } from "./ProviderBrowserFrame";
 
 export function CadWorkspaceTabs({
   view,
@@ -85,7 +85,6 @@ export function ManageModelsWorkspace({
   const bestProvider = bestCompleteProvider(providers);
   const initialProviderId = bestProvider?.row.id ?? providers[0]?.row.id ?? null;
   const [selectedProviderId, setSelectedProviderId] = useState<string | null>(initialProviderId);
-  const [dismissedCaptureKey, setDismissedCaptureKey] = useState<string | null>(null);
   const [activityMessage, setActivityMessage] = useState<string | null>(null);
   const [recovering, setRecovering] = useState(false);
   const [selectedEdas, setSelectedEdas] = useState<CaptureEda[]>(() => CAPTURE_EDAS.map((eda) => eda.key));
@@ -95,7 +94,6 @@ export function ManageModelsWorkspace({
   const openProvider = useCallback(
     async (providerId: string) => {
       setActivityMessage(null);
-      setDismissedCaptureKey(null);
       const needs = captureRequirementsForEdas(selectedEdas);
       setSelectionLocked(true);
       try {
@@ -137,16 +135,7 @@ export function ManageModelsWorkspace({
       && capture.active.routeToken
       && capture.active.url,
   );
-  const activeRouteKey = activeNativeRoute
-    ? `${componentId}:${capture!.active.workflowItemId}:${capture!.active.routeToken}`
-    : null;
-  const browserOpen = Boolean(
-    selectedProviderKey
-      && (scenarioProviderState || (
-        activeNativeRoute
-        && dismissedCaptureKey !== activeRouteKey
-      )),
-  );
+  const browserOpen = Boolean(selectedProviderKey && (scenarioProviderState || activeNativeRoute));
   const captureBusy = Boolean(ownsCapture && capture && captureInFlight(capture.active));
   const previewStatus = scenarioProviderState
     ? {
@@ -181,6 +170,23 @@ export function ManageModelsWorkspace({
         idle: "Select a provider to get models",
       }[capture.active.status]
     : "Select a provider to get models");
+
+  async function closeActiveProvider() {
+    if (!activeNativeRoute || !capture) return;
+    setActivityMessage("Closing provider page...");
+    try {
+      await capture.closeProvider();
+      setSelectionLocked(false);
+      setActivityMessage("Provider closed. Select another provider when ready.");
+    } catch (error) {
+      setActivityMessage(error instanceof Error ? error.message : "Could not close provider");
+      try {
+        await capture.showProvider();
+      } catch {
+        // The active route and inline browser remain mounted; its status carries the exact failure.
+      }
+    }
+  }
 
   async function recoverFiles() {
     setRecovering(true);
@@ -226,8 +232,10 @@ export function ManageModelsWorkspace({
           selectedId={selectedProvider?.row.id ?? null}
           disabled={captureBusy}
           onSelect={(providerId) => {
+            // Selection is inert. A provider page opens only through the explicit Open Provider
+            // action after the person has reviewed the provider and EDA choices.
             setSelectedProviderId(providerId);
-            void openProvider(providerId);
+            setActivityMessage(null);
           }}
         />
         <div className="flex min-w-0 flex-1 flex-col">
@@ -267,14 +275,23 @@ export function ManageModelsWorkspace({
             </span>
           </fieldset>
           {selectedProvider ? (
-            <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 px-6 text-center">
-              <h3 className="text-sm font-semibold text-t1">{selectedProvider.row.label}</h3>
-              <p className="max-w-[420px] text-xs text-t3">
-                <Text id="component-browser.manage-models-provider-modal-help">
-                  The provider opens in a movable window while Manage Models remains available.
-                </Text>
-              </p>
-            </div>
+            browserOpen ? (
+              <ProviderBrowserFrame
+                componentId={componentId}
+                providerLabel={selectedProvider.row.label}
+                url={activeNativeRoute ? capture!.active.url! : selectedProvider.row.url}
+                onClose={() => void closeActiveProvider()}
+              />
+            ) : (
+              <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 px-6 text-center">
+                <h3 className="text-sm font-semibold text-t1">{selectedProvider.row.label}</h3>
+                <p className="max-w-[420px] text-xs text-t3">
+                  <Text id="component-browser.manage-models-provider-modal-help">
+                    Choose EDAs, then open this provider in the workspace.
+                  </Text>
+                </p>
+              </div>
+            )
           ) : (
             <div className="flex min-h-0 flex-1 items-center justify-center text-sm text-t3">
               <Text id="component-browser.manage-models-no-providers">No providers found</Text>
@@ -291,15 +308,17 @@ export function ManageModelsWorkspace({
               {activityMessage ??
                 captureStatus}
             </span>
-            <Button
-              type="button"
-              small
-              data-dev-id="component-browser.provider-open"
-              disabled={!selectedProvider || captureBusy}
-              onClick={() => selectedProvider && void openProvider(selectedProvider.row.id)}
-            >
-              <Text id="component-browser.manage-models-open">Open Provider</Text>
-            </Button>
+            {!browserOpen ? (
+              <Button
+                type="button"
+                small
+                data-dev-id="component-browser.provider-open"
+                disabled={!selectedProvider || captureBusy}
+                onClick={() => selectedProvider && void openProvider(selectedProvider.row.id)}
+              >
+                <Text id="component-browser.manage-models-open">Open Provider</Text>
+              </Button>
+            ) : null}
             <Button
               type="button"
               small
@@ -312,35 +331,6 @@ export function ManageModelsWorkspace({
           </div>
         </div>
       </div>
-      {selectedProvider ? (
-        <ProviderBrowserModal
-          open={browserOpen}
-          componentId={componentId}
-          providerLabel={selectedProvider.row.label}
-          url={
-            activeNativeRoute
-              ? capture!.active.url!
-              : selectedProvider.row.url
-          }
-          onClose={() => {
-            if (activeRouteKey) setDismissedCaptureKey(activeRouteKey);
-            if (!activeNativeRoute || !capture) return;
-            setActivityMessage("Closing provider page...");
-            void capture.closeProvider().then(
-              () => {
-                setSelectionLocked(false);
-                setActivityMessage("Provider closed. Select another provider when ready.");
-              },
-              (error: unknown) => {
-                setDismissedCaptureKey(null);
-                setActivityMessage(
-                  error instanceof Error ? error.message : "Could not close provider",
-                );
-              },
-            );
-          }}
-        />
-      ) : null}
     </section>
   );
 }

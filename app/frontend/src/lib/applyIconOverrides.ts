@@ -18,7 +18,13 @@ interface OriginalIcon {
   ariaHidden: string | null;
 }
 
+interface AppliedIconBody {
+  requested: string;
+  serialized: string;
+}
+
 const originals = new WeakMap<SVGElement, OriginalIcon>();
+const appliedBodies = new WeakMap<SVGElement, AppliedIconBody>();
 const VOID_INSERTION_TARGETS = new Set([
   "area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta",
   "param", "source", "track", "wbr",
@@ -61,10 +67,23 @@ function setAttribute(icon: SVGElement, name: string, value: string | null): voi
   else icon.setAttribute(name, value);
 }
 
+function writeBody(icon: SVGElement, requested: string): void {
+  const applied = appliedBodies.get(icon);
+  // SVG innerHTML is serialized differently from the source string by WebView2 (self-closing paths
+  // become paired tags, attribute whitespace is normalized). Comparing the live serialization with
+  // the source therefore rewrote the same body forever, and the child-list observer immediately
+  // called us again. Remember both forms so a settled icon is a true no-op while a real external DOM
+  // mutation is still repaired.
+  if (applied?.requested === requested && icon.innerHTML === applied.serialized) return;
+  icon.innerHTML = requested;
+  appliedBodies.set(icon, { requested, serialized: icon.innerHTML });
+}
+
 function restore(icon: SVGElement): void {
   const original = originals.get(icon);
   if (!original) return;
   if (icon.innerHTML !== original.body) icon.innerHTML = original.body;
+  appliedBodies.delete(icon);
   setAttribute(icon, "aria-label", original.ariaLabel);
   setAttribute(icon, "role", original.role);
   setAttribute(icon, "fill", original.fill);
@@ -80,10 +99,10 @@ function apply(icon: SVGElement, override: IconOverride): void {
   const swappedBody = override.swapToId ? resolveIcon(override.swapToId)?.body : undefined;
   const body = override.body ?? swappedBody;
   if (body !== undefined) {
-    const safe = sanitizeIconMarkup(body, override.a11yLabel);
-    if (icon.innerHTML !== safe) icon.innerHTML = safe;
+    writeBody(icon, sanitizeIconMarkup(body, override.a11yLabel));
   } else if (icon.innerHTML !== original.body) {
     icon.innerHTML = original.body;
+    appliedBodies.delete(icon);
   }
   if (override.a11yLabel) {
     icon.removeAttribute("aria-hidden");

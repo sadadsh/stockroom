@@ -187,10 +187,7 @@ def test_in_app_provider_surface_applies_modal_viewport_and_commands(monkeypatch
         assert provider_window.hidden_calls == 2
 
 
-def test_native_provider_placement_uses_client_origin_dpi_and_no_activation(monkeypatch) -> None:
-    import ctypes
-    from ctypes import wintypes
-
+def test_native_provider_is_embedded_in_client_coordinates_without_activation(monkeypatch) -> None:
     app = SimpleNamespace(native=SimpleNamespace(_scale=1.5))
     provider = SimpleNamespace()
     monkeypatch.setattr(W, "_is_windows", lambda: True)
@@ -202,18 +199,20 @@ def test_native_provider_placement_uses_client_origin_dpi_and_no_activation(monk
 
     class _User32:
         def __init__(self) -> None:
-            self.owner_calls: list[tuple[int, int, int]] = []
+            self.parent_calls: list[tuple[int, int]] = []
+            self.style_calls: list[tuple[int, int, int]] = []
             self.position_calls: list[tuple[int, int, int, int, int, int, int]] = []
 
-        def ClientToScreen(self, hwnd, pointer) -> int:
-            assert hwnd == 101
-            point = ctypes.cast(pointer, ctypes.POINTER(wintypes.POINT)).contents
-            point.x = 150
-            point.y = 90
-            return 1
+        def GetWindowLongW(self, hwnd, index) -> int:
+            assert (hwnd, index) == (202, -16)
+            return 0x80000000
 
-        def SetWindowLongPtrW(self, hwnd, index, owner) -> int:
-            self.owner_calls.append((hwnd, index, owner))
+        def SetWindowLongW(self, hwnd, index, style) -> int:
+            self.style_calls.append((hwnd, index, style))
+            return 0
+
+        def SetParent(self, child, parent) -> int:
+            self.parent_calls.append((child, parent))
             return 0
 
         def SetWindowPos(self, hwnd, after, x, y, width, height, flags) -> int:
@@ -230,9 +229,10 @@ def test_native_provider_placement_uses_client_origin_dpi_and_no_activation(monk
         560,
         user32=user32,
     )
-    assert user32.owner_calls == [(202, -8, 101)]
+    assert user32.parent_calls == [(202, 101)]
+    assert user32.style_calls == [(202, -16, 0x46000000)]
     assert user32.position_calls == [
-        (202, 0, 300, 210, 1350, 840, 0x0004 | 0x0010 | 0x0040)
+        (202, 0, 150, 120, 1350, 840, 0x0010 | 0x0020 | 0x0040)
     ]
 
 

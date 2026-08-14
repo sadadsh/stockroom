@@ -3,7 +3,7 @@
 The shell hosts Stockroom's FastAPI-served frontend, injects the loopback API
 base and per-launch token, owns native window lifecycle, exposes the project
 folder picker, and provides separate WebViews for rendered-DOM fetching and the
-in-app provider modal. Provider acquisition owns task-bound downloads and status;
+in-app provider workspace pane. Provider acquisition owns task-bound downloads and status;
 the host only supplies the human-operated provider surface.
 
 pywebview is imported lazily inside the Windows-only entry points so this module
@@ -123,12 +123,12 @@ def _place_provider_window_over_client(
     *,
     user32=None,
 ) -> bool:
-    """Place an owned provider HWND in Stockroom client coordinates without activation.
+    """Embed the provider HWND in Stockroom's client area without activation.
 
-    React reports CSS pixels from the WebView client origin, while pywebview's public ``x``/``y``
-    are the outer-window origin. Adding those directly puts the provider under the Windows title
-    bar and over Stockroom's browser controls. An owned, no-activate HWND also stays above its app
-    while the person drags the React title bar instead of falling behind the owner window.
+    The provider is a dedicated pywebview form because it needs its own WebView2 profile and
+    download lifecycle. Leaving that form top-level merely overlays React: its WebView child can
+    remain detached or behind the shell and paint white. Reparenting the form as a true child keeps
+    its compositor, clipping, movement, focus, and lifetime inside the Stockroom workspace.
     """
 
     if not _is_windows():
@@ -142,19 +142,24 @@ def _place_provider_window_over_client(
         from ctypes import wintypes
 
         api = user32 or ctypes.windll.user32
-        point = wintypes.POINT(0, 0)
-        client_to_screen = api.ClientToScreen
-        set_owner = getattr(api, "SetWindowLongPtrW", None) or api.SetWindowLongW
+        get_style = api.GetWindowLongW
+        set_style = api.SetWindowLongW
+        set_parent = api.SetParent
         set_window_pos = api.SetWindowPos
         _set_signature(
-            client_to_screen,
-            [wintypes.HWND, ctypes.POINTER(wintypes.POINT)],
-            wintypes.BOOL,
+            get_style,
+            [wintypes.HWND, ctypes.c_int],
+            ctypes.c_long,
         )
         _set_signature(
-            set_owner,
-            [wintypes.HWND, ctypes.c_int, wintypes.HANDLE],
-            wintypes.HANDLE,
+            set_style,
+            [wintypes.HWND, ctypes.c_int, ctypes.c_long],
+            ctypes.c_long,
+        )
+        _set_signature(
+            set_parent,
+            [wintypes.HWND, wintypes.HWND],
+            wintypes.HWND,
         )
         _set_signature(
             set_window_pos,
@@ -169,8 +174,6 @@ def _place_provider_window_over_client(
             ],
             wintypes.BOOL,
         )
-        if not bool(client_to_screen(app_hwnd, ctypes.byref(point))):
-            return False
         native = getattr(app, "native", None)
         try:
             scale = float(getattr(native, "_scale", 1.0) or 1.0)
@@ -178,19 +181,27 @@ def _place_provider_window_over_client(
             scale = 1.0
         if not math.isfinite(scale) or scale <= 0:
             scale = 1.0
-        # GWLP_HWNDPARENT makes this a true owned window, not a global top-most window.
-        set_owner(provider_hwnd, -8, app_hwnd)
-        # SWP_NOZORDER | SWP_NOACTIVATE | SWP_SHOWWINDOW. The provider receives focus only when the
-        # person clicks its page; geometry publication must never steal a drag from React.
+        # SetParent does not update WS_CHILD/WS_POPUP. Apply both sides of that contract before
+        # positioning in client coordinates. Clip flags keep each WebView2 compositor inside its
+        # own rectangle while the Stockroom window repaints or resizes.
+        style = int(get_style(provider_hwnd, -16))
+        set_parent(provider_hwnd, app_hwnd)
+        set_style(
+            provider_hwnd,
+            -16,
+            (style & ~0x80000000) | 0x40000000 | 0x04000000 | 0x02000000,
+        )
+        # HWND_TOP with SWP_NOACTIVATE | SWP_FRAMECHANGED | SWP_SHOWWINDOW. As a child HWND it is
+        # clipped by Stockroom and receives focus only when the person clicks the provider page.
         return bool(
             set_window_pos(
                 provider_hwnd,
                 0,
-                round(point.x + x * scale),
-                round(point.y + y * scale),
+                round(x * scale),
+                round(y * scale),
                 max(1, round(width * scale)),
                 max(1, round(height * scale)),
-                0x0004 | 0x0010 | 0x0040,
+                0x0010 | 0x0020 | 0x0040,
             )
         )
     except Exception:  # noqa: BLE001 - older pywebview backends use the safe public fallback
@@ -299,7 +310,7 @@ class InAppProviderBrowserSurface:
         _PROVIDER_SURFACE = self
 
     def set_provider_viewport(self, viewport: dict[str, object]) -> bool:
-        """Place the provider-only window over the React modal's content rectangle."""
+        """Place the provider-only WebView in the React workspace pane's rectangle."""
 
         if type(viewport) is not dict or set(viewport) != {
             "componentId",
@@ -327,7 +338,7 @@ class InAppProviderBrowserSurface:
             if provider is not None:
                 provider.hide()
             else:
-                # A measured modal can disappear before any native lease opens. Do not let that
+                # A measured pane can disappear before any native lease opens. Do not let that
                 # abandoned pre-lease component identity reject the next component's viewport.
                 self._active_component_id = None
             self._provider_visible = False
@@ -345,7 +356,7 @@ class InAppProviderBrowserSurface:
             self._provider_visible = False
             return False
         self._last_provider_viewport = dict(viewport)
-        # React often measures and publishes the modal before the durable capture worker has
+        # React often measures and publishes the pane before the durable capture worker has
         # acquired its native provider lease. Retaining that valid rectangle is success: the
         # lease's first show/navigation applies it once the provider WebView exists.
         if provider is None:
@@ -464,8 +475,8 @@ class InAppProviderBrowserSurface:
             chrome = window_chrome()
 
             def show() -> None:
-                # Visibility belongs to the React modal's measured viewport. Showing here would
-                # flash a free-standing provider window before the modal can publish its bounds.
+                # Visibility belongs to the React pane's measured viewport. Showing here would
+                # flash a free-standing provider window before the pane can publish its bounds.
                 self.reapply_provider_viewport()
                 if chrome is not None:
                     chrome.provider_shown()
@@ -782,7 +793,7 @@ class _HostApi:
         return list(result) if result else []
 
     def set_provider_viewport(self, viewport: dict[str, object]) -> bool:
-        """Place or hide the dedicated provider WebView inside Stockroom's modal."""
+        """Place or hide the dedicated provider WebView inside Stockroom's workspace."""
 
         surface = _PROVIDER_SURFACE
         return bool(surface and surface.set_provider_viewport(viewport))

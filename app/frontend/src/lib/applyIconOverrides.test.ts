@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { applyGeneratedIconOverrides, insertedIconOverrideId } from "./applyIconOverrides";
+import {
+  applyGeneratedIconOverrides,
+  insertedIconOverrideId,
+  startGeneratedIconOverrideObserver,
+} from "./applyIconOverrides";
 
 afterEach(() => document.body.replaceChildren());
 
@@ -56,5 +60,41 @@ describe("applyGeneratedIconOverrides", () => {
     const input = document.querySelector("input");
     expect(input?.previousElementSibling).toHaveAttribute("data-design-inserted-icon", id);
     expect(input).toHaveValue("MPN");
+  });
+
+  it("settles after WebView normalizes an inserted SVG body", async () => {
+    document.body.innerHTML = '<span data-design-id="auto.copy.0abc123">Specifications</span>';
+    const id = insertedIconOverrideId("auto.copy.0abc123");
+    const current = {
+      [id]: {
+        body: '<path d="M4 12h16" />',
+        insertInto: "auto.copy.0abc123",
+        placement: "before" as const,
+      },
+    };
+    let childListMutations = 0;
+    const counter = new MutationObserver((records) => {
+      childListMutations += records.filter((record) => record.type === "childList").length;
+    });
+    counter.observe(document.body, { childList: true, subtree: true });
+    const stop = startGeneratedIconOverrideObserver(() => current);
+
+    try {
+      applyGeneratedIconOverrides(current, {});
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      const icon = document.querySelector<SVGElement>(`[data-design-inserted-icon="${id}"]`)!;
+      const settledBody = icon.innerHTML;
+      const settledMutations = childListMutations;
+
+      applyGeneratedIconOverrides(current);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(icon.innerHTML).toBe(settledBody);
+      expect(childListMutations).toBe(settledMutations);
+      expect(settledMutations).toBeLessThanOrEqual(3);
+    } finally {
+      stop();
+      counter.disconnect();
+    }
   });
 });

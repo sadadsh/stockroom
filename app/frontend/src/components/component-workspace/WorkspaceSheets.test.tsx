@@ -381,16 +381,46 @@ describe("the full sourcing sheet", () => {
     },
   });
 
-  it("lists every price break for every offer, with stock, currency and fetch time", async () => {
-    const { dialog } = await openSheet(dossier, "View Full Sourcing Record", "Full Sourcing Record");
+  it("summarizes each offer once and keeps every price break in one collapsed detail", async () => {
+    const { user, dialog } = await openSheet(dossier, "View Full Sourcing Record", "Full Sourcing Record");
     const offer = within(dialog).getByLabelText("Mouser 511-LM358");
-    expect(within(offer).getByText("511-LM358")).toBeInTheDocument();
-    expect(within(offer).getByText("1,240")).toBeInTheDocument();
-    expect(within(offer).getByText("MOQ 1")).toBeInTheDocument();
+    expect(offer).not.toHaveAttribute("open");
+    expect(within(offer).getByText("511-LM358")).toBeVisible();
+    expect(within(offer).getByText("1,240")).toBeVisible();
+    expect(within(offer).getByText("3 price breaks")).toBeVisible();
     const ladder = within(offer).getByRole("table", { name: "Price breaks Mouser" });
-    // Three quoted breaks plus the header row: the ladder is complete, not a "from" price.
+    expect(ladder).not.toBeVisible();
+
+    await user.click(within(offer).getByText("511-LM358"));
+
+    expect(offer).toHaveAttribute("open");
+    expect(ladder).toBeVisible();
+    // Three quoted breaks plus the header row: collapsing the detail never truncates the record.
     expect(within(ladder).getAllByRole("row")).toHaveLength(4);
-    expect(within(ladder).getByText("USD0.22")).toBeInTheDocument();
+    expect(within(ladder).getByText("USD0.22")).toBeVisible();
+    expect(within(offer).getByText("MOQ").parentElement).toHaveTextContent("1");
+  });
+
+  it("groups repeated package offers under one provider heading", async () => {
+    const groupedDossier = makeDossier({
+      distributorOffers: [
+        makeOffer({ provider: "mouser", providerLabel: "Mouser", sku: "MOUSER-1" }),
+        makeOffer({ provider: "mouser", providerLabel: "Mouser", sku: "MOUSER-2" }),
+        makeOffer({ provider: "digikey", providerLabel: "DigiKey", sku: "DK-1" }),
+      ],
+      supplySummary: { offerCount: 3, totalStock: 1536 },
+    });
+    const { dialog } = await openSheet(
+      groupedDossier,
+      "View Full Sourcing Record",
+      "Full Sourcing Record",
+    );
+    const groups = [...dialog.querySelectorAll<HTMLElement>("[data-sourcing-provider]")];
+    expect(groups.map((group) => group.getAttribute("aria-label"))).toEqual(["Mouser", "DigiKey"]);
+    expect(groups[0]).toHaveTextContent("2 offers");
+    expect(within(groups[0]).getByText("MOUSER-1")).toBeVisible();
+    expect(within(groups[0]).getByText("MOUSER-2")).toBeVisible();
+    expect(within(dialog).getByText("1,536")).toBeVisible();
   });
 
   it("uses the normalized Mouser-first order in the exhaustive record too", async () => {
@@ -416,9 +446,10 @@ describe("the full sourcing sheet", () => {
     const { dialog } = await openSheet(dossier, "View Full Sourcing Record", "Full Sourcing Record");
     const related = within(dialog).getByLabelText("Related Parts");
     expect(
-      within(related).getByText(/Stockroom has not checked whether these parts are interchangeable/),
-    ).toBeInTheDocument();
-    // And on the ROW itself, with the reason it is here at all.
+      within(related).getByText(/Distributor suggestions are not verified replacements/),
+    ).toBeVisible();
+    expect(within(related).getAllByText(/not verified replacements/)).toHaveLength(1);
+    // The warning is stated once for the group; each row keeps its specific reason.
     expect(within(related).getByText(/Offered as a substitution/)).toBeInTheDocument();
     expect(within(related).getByText("LM2904DR")).toBeInTheDocument();
   });
@@ -442,7 +473,7 @@ describe("the full sourcing sheet", () => {
     const { dialog } = await openSheet(dossier, "View Full Sourcing Record", "Full Sourcing Record");
     const documents = within(dialog).getByLabelText("Documents");
     expect(within(documents).getByText("3D Model")).toBeInTheDocument();
-    expect(within(documents).getByText("Reference")).toBeInTheDocument();
+    expect(documents).toHaveTextContent("Reference");
   });
 
   it("gives the sourcing column a Source, Fields Used, Retrieved and State table", async () => {

@@ -21,6 +21,25 @@ and `P2` meaningful fit, finish, or clarity debt.
 
 ## Acceptance Captures
 
+### 2026-08-14 — True In-Workspace Provider Browser
+
+- Capture layer: current source in the real Windows pywebview/WebView2 Development host, using the
+  isolated Development configuration and the `ADG714BRUZ-REEL` component.
+- Evidence: `work/True Embedded Provider Maximized.png`, 1,936 × 1,048, SHA-256
+  `6f54f6c2232f`; `work/True Embedded Provider Second Provider.png`, 1,936 × 1,048, SHA-256
+  `3eb18c1ebe1e`; and `work/True Embedded Provider Light Theme.png`, 1,936 × 1,048, SHA-256
+  `e19e81d64eda`.
+- Intended claim: selecting a provider remains inert; **Open Provider** creates the provider route;
+  DigiKey and Ultra Librarian render inside the large Manage Models pane rather than in a floating
+  window; the embedded WebView follows maximization; and Stockroom chrome remains usable in both
+  themes.
+- Acceptance result: pass after replacing the owned top-level overlay with a true child HWND. The
+  failed overlay exposed only a white form because its WebView2 compositor was not in Stockroom's
+  client tree. The corrected captures show real provider documents, exact component identity,
+  Stockroom-owned Back/Forward/Reload/address/close controls, and provider-native scrolling. Ultra
+  Librarian's advertising and horizontal overflow remain provider-owned presentation covered by
+  VA-045; neither obscures Stockroom's provider controls.
+
 ### 2026-08-12 — Manage Models Browser Workspace
 
 - Capture layer: current production frontend plus the real local Stockroom service through locked

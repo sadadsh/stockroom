@@ -236,7 +236,7 @@ describe("the opened component renders the same DOM it shipped with", () => {
     await expectTree(
       "populated",
       await renderWorkspace(populatedDossier()),
-      "85065-1c94d193-fc21203f",
+      "84619-99424bbc-4570c1ab",
     );
   });
 
@@ -245,7 +245,7 @@ describe("the opened component renders the same DOM it shipped with", () => {
     await expectTree(
       "populated-developer",
       await renderWorkspace(populatedDossier()),
-      "100282-d130fc2a-9bc2062f",
+      "99514-40c21aa5-3fa9a9f3",
     );
   });
 

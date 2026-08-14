@@ -1176,35 +1176,22 @@ describe("CaptureProvider store", () => {
     );
   });
 
-  it("drops a superseded reconnect instead of letting it overwrite the live capture", async () => {
-    // The reconnect loop tests its generation token BEFORE its two requests. A real capture started
-    // while those requests are in flight bumps that token, so the abandoned reconnect must not go on
-    // to write the identity refs and the state - it would replace the capture the person is actually
-    // watching with the one it had set out to restore.
+  it("claims a saved workflow before reconnect I/O can submit a duplicate provider batch", async () => {
     const restored = defaultUiSession();
-    restored.selected_ids.workflow_batch = "batch-stale";
-    restored.selected_ids.workflow_item = "item-stale";
+    restored.selected_ids.workflow_batch = "batch-restoring";
+    restored.selected_ids.workflow_item = "item-restoring";
     restored.event_sequence = 3;
     resetUiSessionForTests(restored);
 
-    mockSource();
-    mockCapture();
-    const liveSession = vi.mocked(api.captureWorkflow).getMockImplementation();
-    vi.mocked(api.captureWorkflow).mockImplementation(async (batchId: string) =>
-      batchId === "batch-stale"
-        ? ({
-            workflow_batch_id: "batch-stale",
-            workflow_item_id: "item-stale",
-            part_id: "p1",
-            vendor: "ultralibrarian",
-            background: false,
-            initial_needs: ["kicad_symbol"],
-            report: null,
-          } as never)
-        : ((await liveSession?.(batchId)) as never),
-    );
-
-    // Held open so the superseded reconnect is genuinely mid-request when the real capture starts.
+    vi.spyOn(api, "captureWorkflow").mockResolvedValue({
+      workflow_batch_id: "batch-restoring",
+      workflow_item_id: "item-restoring",
+      part_id: "p1",
+      vendor: "ultralibrarian",
+      background: false,
+      initial_needs: ["kicad_symbol"],
+      report: null,
+    } as never);
     let releaseDetail: (() => void) | null = null;
     vi.spyOn(api, "partDetail").mockImplementation(
       () =>
@@ -1213,23 +1200,25 @@ describe("CaptureProvider store", () => {
             resolve({ id: "p1", derived: { display_name: "Part One" } } as never);
         }),
     );
+    vi.spyOn(api, "workflowEvents").mockReturnValue(new Promise(() => undefined));
+    const run = vi.spyOn(api, "runCapture");
 
     const { result } = renderHook(() => useCapture(), { wrapper: wrap(new QueryClient()) });
-    await waitFor(() => expect(api.partDetail).toHaveBeenCalled());
-    expect(result.current.active.partId).toBeNull();
 
-    await act(async () => {
-      await result.current.start("p2", "Part Two", ["kicad_symbol"]);
-    });
-    expect(result.current.active.partId).toBe("p2");
+    // The durable identity read has not returned yet, but the slot is already owned. Before this
+    // guard a provider click here created a second queued batch and replaced the saved id while the
+    // first batch's native provider HWND remained hidden.
+    expect(result.current.active.status).toBe("resolving");
+    await expect(
+      result.current.start("p2", "Part Two", ["kicad_symbol"]),
+    ).rejects.toThrow("Finish the active completion");
+    expect(run).not.toHaveBeenCalled();
 
     await act(async () => {
       releaseDetail?.();
       await Promise.resolve();
-      await Promise.resolve();
     });
-
-    expect(result.current.active.partId).toBe("p2");
-    expect(result.current.active.status).toBe("done");
+    await waitFor(() => expect(result.current.active.partId).toBe("p1"));
+    expect(result.current.active.status).toBe("receiving");
   });
 });

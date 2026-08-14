@@ -361,7 +361,21 @@ export function CaptureProvider({
   const scenarioUi = useScenarioUiState();
   const scenarioCapture = scenarioUi.capture;
   const scenarioProvider = scenarioUi.provider;
-  const [state, setState] = useState<CaptureState>(() => initialCapture?.state ?? IDLE);
+  // Claim a persisted durable workflow before the first effect or network read. Without this
+  // synchronous busy state, one click during renderer hydration could submit a second batch while
+  // the first batch already owned the hidden native provider HWND. The new queued batch then
+  // replaced the saved id, so the renderer followed the wrong batch and never published a viewport
+  // for the active page.
+  const savedOnMount = useRef(initialCapture ? null : savedWorkflow()).current;
+  const [state, setState] = useState<CaptureState>(() =>
+    initialCapture?.state ?? (savedOnMount
+      ? {
+          ...IDLE,
+          status: "resolving",
+          message: "Restoring the active completion before accepting another provider...",
+        }
+      : IDLE),
+  );
   const stateRef = useRef(state);
   // Synced in a layout effect, not during render: render can be replayed or thrown away, and the
   // busy-slot guard in `start` must never reject against a capture state that no commit ever
@@ -618,7 +632,7 @@ export function CaptureProvider({
   );
 
   useEffect(() => {
-    const saved = savedWorkflow();
+    const saved = savedOnMount;
     if (!saved) return;
     const { batchId, itemId, cursor } = saved;
     const generation = ++followGenerationRef.current;
@@ -695,7 +709,7 @@ export function CaptureProvider({
       cancelled = true;
       if (followGenerationRef.current === generation) followGenerationRef.current += 1;
     };
-  }, [followDurable]);
+  }, [followDurable, savedOnMount]);
 
   const runStart = useCallback(
     async (

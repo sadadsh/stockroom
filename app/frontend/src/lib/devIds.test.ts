@@ -197,7 +197,7 @@ import { DEV_IDS, DEV_ID_AREAS, DEV_ID_BY_ID } from "./devIds";
 // keeping the component-scoped Manage Models tab, EDA selection, modal browser, navigation,
 // and status. 501 exposes each opened component's inline offer price ladder for direct editing.
 // Missing CAD art/status and the authored datasheet page cluster replace generated identities.
-const EXPECTED_ENTRIES = 512;
+const EXPECTED_ENTRIES = 510;
 
 describe("devIds catalogue", () => {
   // The count is asserted from a single constant so bumping it is one edit, and so the test NAME can

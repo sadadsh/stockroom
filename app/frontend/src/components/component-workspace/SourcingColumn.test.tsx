@@ -422,22 +422,24 @@ describe("the distributor offers ledger", () => {
     },
   });
 
-  it("shows every price break immediately and discloses repetitive offer facts on demand", async () => {
+  it("shows one compact offer summary and reveals its complete ladder and metadata together", async () => {
     const { user } = await open(offersDossier);
     const ledger = screen.getByRole("list", { name: "Distributor offers" });
-    const offer = within(ledger).getByRole("listitem");
+    const offer = region("component-browser.offer-row");
 
     expect(ledger).not.toHaveClass("overflow-x-auto");
     expect(ledger.querySelector("table")).toBeNull();
-    for (const label of ["Stock", "Unit Price", "Price Breaks"]) {
-      expect(within(offer).getByText(label)).toBeVisible();
-    }
+    expect(offer).not.toHaveAttribute("open");
+    expect(within(offer).getByText("Stock")).toBeVisible();
+    expect(within(offer).getByText("Unit Price")).toBeVisible();
     expect(within(offer).getByText("1,240")).toBeVisible();
-    const details = within(offer).getByText("Offer Details").closest("details")!;
-    expect(details).not.toHaveAttribute("open");
+    expect(within(offer).getByText("Price Breaks")).not.toBeVisible();
     expect(within(offer).getByText("20 weeks")).not.toBeVisible();
-    await user.click(within(offer).getByText("Offer Details"));
-    expect(details).toHaveAttribute("open");
+
+    await user.click(within(offer).getByTitle("511-LM358"));
+
+    expect(offer).toHaveAttribute("open");
+    expect(within(offer).getByText("Price Breaks")).toBeVisible();
     for (const label of [
       "Quote Code",
       "MOQ",
@@ -452,7 +454,7 @@ describe("the distributor offers ledger", () => {
     expect(within(offer).getByText("NRND")).toBeVisible();
     expect(within(offer).getByText(/Stale$/)).toBeVisible();
     expect(within(offer).getAllByText("USD0.42")).toHaveLength(2);
-    expect(within(offer).getByText("USD0.22")).toBeInTheDocument();
+    expect(within(offer).getByText("USD0.22")).toBeVisible();
   });
 
   it("renders the normalized provider priority without locally reordering package variants", () => {
@@ -485,7 +487,8 @@ describe("the distributor offers ledger", () => {
     expect(within(row).getByText("1,240")).toHaveClass("ui-numeric");
     expect(within(row).getAllByText("USD0.42").every((value) => value.classList.contains("ui-numeric"))).toBe(true);
     expect(within(row).getByText("USD0.22")).toHaveClass("ui-numeric");
-    expect(within(row).getByText("Mouser")).not.toHaveClass("ui-numeric");
+    const provider = document.querySelector<HTMLElement>('[data-sourcing-provider="mouser"]')!;
+    expect(within(provider).getByText("Mouser")).not.toHaveClass("ui-numeric");
   });
 
   it("keeps the provider name quieter than the price it is quoting", async () => {
@@ -494,7 +497,8 @@ describe("the distributor offers ledger", () => {
     // `ui-key-fact` is 11/600 primary; `ui-row-secondary` is 11/400 secondary. The engineering
     // datum outranks the brand, which is the whole point of a comparison table.
     expect(within(row).getAllByText("USD0.42").every((value) => value.classList.contains("ui-key-fact"))).toBe(true);
-    expect(within(row).getByText("Mouser")).toHaveClass("ui-row-secondary");
+    const provider = document.querySelector<HTMLElement>('[data-sourcing-provider="mouser"]')!;
+    expect(within(provider).getByText("Mouser")).toHaveClass("ui-row-secondary");
   });
 
   it("names the destination of a listing action rather than saying Product Page", async () => {

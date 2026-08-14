@@ -324,8 +324,6 @@ export const DEV_IDS: DevIdEntry[] = [
   { id: "component-browser.provider-back", label: "Provider browser Back", area: "component-browser" },
   { id: "component-browser.provider-forward", label: "Provider browser Forward", area: "component-browser" },
   { id: "component-browser.provider-reload", label: "Provider browser Reload", area: "component-browser" },
-  { id: "component-browser.provider-dialog", label: "Provider browser modal", area: "component-browser" },
-  { id: "component-browser.provider-dialog-titlebar", label: "Provider browser modal title bar", area: "component-browser" },
   { id: "component-browser.provider-close", label: "Close provider browser", area: "component-browser" },
   { id: "component-browser.provider-viewport", label: "Embedded provider page", area: "component-browser" },
   { id: "component-browser.provider-status", label: "Model download status", area: "component-browser" },

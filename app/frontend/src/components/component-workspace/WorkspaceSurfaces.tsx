@@ -166,6 +166,7 @@ export function WorkspaceSurfaces({
           documents={dossier.documents.items}
           relatedParts={dossier.relatedParts}
           sources={dossier.provenance.sources}
+          supplySummary={dossier.supplySummary}
         />
       </WorkspaceModal>
 

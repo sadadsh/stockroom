@@ -1,22 +1,29 @@
 import { useCallback, useLayoutEffect, useRef, useState } from "react";
 import { sendProviderCommand, setProviderViewport } from "../../lib/hostProviderViewport";
-import { Text, useText } from "../../lib/copy";
+import { Text, useCopyFormatter, useText } from "../../lib/copy";
 import { Button } from "../primitives";
 
 export function ProviderBrowserFrame({
   componentId,
   providerLabel,
   url,
+  onClose,
 }: {
   componentId: string;
   providerLabel: string;
   url: string;
+  onClose?: () => void;
 }) {
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const backLabel = useText("component-browser.manage-models-back", "Back");
   const forwardLabel = useText("component-browser.manage-models-forward", "Forward");
   const reloadLabel = useText("component-browser.manage-models-reload", "Reload");
+  const closeLabel = useText("component-browser.manage-models-close", "Close Provider");
   const addressLabel = useText("component-browser.manage-models-address", "Provider Address");
+  const browserLabel = useCopyFormatter(
+    "component-browser.manage-models-browser-label",
+    "{provider} Browser",
+  );
   const [address, setAddress] = useState(url);
 
   function navigate() {
@@ -77,13 +84,18 @@ export function ProviderBrowserFrame({
     };
   }, [componentId, publish]);
 
-  // A modal move changes only its x/y; ResizeObserver deliberately does not fire for position.
-  // Publish after every committed parent render so pointer-driven geometry keeps the native
-  // WebView on the exact React placeholder throughout move and resize gestures.
+  // Workspace movement changes only x/y; ResizeObserver deliberately does not fire for position.
+  // Publish after every committed parent render so host geometry keeps the native WebView on the
+  // exact React placeholder throughout window movement and resizing.
   useLayoutEffect(() => publish());
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
+    <div
+      role="region"
+      aria-label={browserLabel({ provider: providerLabel })}
+      data-testid="provider-browser-pane"
+      className="flex min-h-0 flex-1 flex-col"
+    >
       <div className="flex h-[36px] flex-none items-center gap-1 border-b border-line bg-band px-2">
         <Button
           type="button"
@@ -132,6 +144,21 @@ export function ProviderBrowserFrame({
           <span className="text-xs text-positive">
             <Text id="component-browser.manage-models-secure">Secure</Text>
           </span>
+        ) : null}
+        {onClose ? (
+          <Button
+            type="button"
+            small
+            data-dev-id="component-browser.provider-close"
+            aria-label={closeLabel}
+            title={closeLabel}
+            onClick={() => {
+              sendProviderCommand(componentId, "close");
+              onClose();
+            }}
+          >
+            ×
+          </Button>
         ) : null}
       </div>
       <div
