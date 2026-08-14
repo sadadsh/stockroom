@@ -356,7 +356,9 @@ describe("CaptureProvider store", () => {
     expect(readUiSession().selected_ids.workflow_batch).toBeNull();
   });
 
-  it("keeps a blocked exact provider route active and reopenable", async () => {
+  it.each(["blocked", "running"] as const)(
+    "keeps a %s exact provider route active and reopenable",
+    async (batchStatus) => {
     mockSource(undefined, {
       needs: ["kicad_symbol"],
       completion_evidence: {
@@ -375,11 +377,11 @@ describe("CaptureProvider store", () => {
       batch: {
         id: "batch-active-handoff",
         kind: "guided_capture",
-        status: "blocked",
+        status: batchStatus,
         created_at: 1,
         updated_at: 2,
         total_items: 1,
-        item_counts: { blocked: 1 },
+        item_counts: { [batchStatus]: 1 },
         cancellation: null,
         actions: {
           can_pause: true,
@@ -425,7 +427,8 @@ describe("CaptureProvider store", () => {
 
     act(() => result.current.reset());
     await act(async () => running);
-  });
+    },
+  );
 
   it("single-flights the same capture command and submits one idempotent durable request", async () => {
     mockSource();

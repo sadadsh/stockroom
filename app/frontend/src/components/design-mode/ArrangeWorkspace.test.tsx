@@ -233,7 +233,7 @@ describe("arrange over the real sourcing column", () => {
     expect(screen.getByTestId("edited").textContent).toBe("true");
     const moved = screen.getByTestId("body-order").textContent ?? "";
     expect(moved).not.toBe(shipped);
-    expect(moved.split(" ")[1]).toBe("workspace.place.sourcing-lifecycle");
+    expect(moved.split(" ")[2]).toBe("workspace.place.sourcing-lifecycle");
 
     // ONE step is a document change that this component nobody has sourced cannot SHOW, because the
     // sibling it swapped with is one of the five conditional sections and draws nothing here. So the

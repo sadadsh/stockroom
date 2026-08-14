@@ -24,22 +24,17 @@ def test_build_refresh_adapters_enables_only_the_configured_vendors():
     assert lib_router.build_refresh_adapters(ctx) == []
 
 
-def test_refresh_endpoint_updates_a_part_via_the_api_adapters(client, app_ctx, monkeypatch):
-    import stockroom.api.routers.library as lib_router
+def test_refresh_endpoint_persists_complete_official_refresh(client, app_ctx, monkeypatch):
     from stockroom.enrich.schema import EnrichmentResult, PriceBreak, Sourced
 
-    class FakeAdapter:
-        enabled = True
-        vendor = "Mouser"
+    def refresh_official_evidence(part_id, _config, now_iso):
+        result = EnrichmentResult()
+        result.stock = Sourced(4321, "mouser", "high")
+        result.price_breaks = [PriceBreak(1, 1.23)]
+        return app_ctx.ops.refresh_procurement(part_id, [("Mouser", result)], now_iso)
 
-        def lookup(self, mpn):
-            r = EnrichmentResult()
-            r.stock = Sourced(4321, "mouser", "high")
-            r.price_breaks = [PriceBreak(1, 1.23)]
-            return r
-
-    # force the endpoint to use our fake adapter regardless of configured creds (no network)
-    monkeypatch.setattr(lib_router, "build_refresh_adapters", lambda ctx: [FakeAdapter()])
+    # The route owns job/rebuild/push behavior; raw provider persistence is covered at LibraryOps.
+    monkeypatch.setattr(app_ctx.ops, "refresh_official_evidence", refresh_official_evidence)
 
     r = client.post("/api/library/parts/tps62130/refresh")
     assert r.status_code == 200

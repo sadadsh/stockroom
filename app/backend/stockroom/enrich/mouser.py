@@ -69,8 +69,8 @@ def clean_mouser_description(description: str, mouser_part_number: str) -> str:
        `&nbsp;` decodes to U+00A0, which is not a space to anything that measures or wraps
        text, so every whitespace run is normalized to a single space.
 
-    The raw payload is untouched by all of this -- it stays byte-for-byte under `sourced/`,
-    which is what makes cleaning at DERIVE time safe rather than lossy.
+    The complete decoded JSON payload is untouched by all of this under `sourced/`, which makes
+    cleaning at DERIVE time safe rather than lossy.
     """
     text = re.sub(r"\s+", " ", html.unescape(description or "")).strip()
     code = _catalogue_code(mouser_part_number)
@@ -239,6 +239,44 @@ def _default_requester(api_key: str, timeout: int = 8):
     return request
 
 
+def _mouser_catalog_offers(parts: list, mpn: str) -> list[dict]:
+    """Every exact Mouser catalogue row and its complete quantity ladder."""
+    target = normalize_mpn(mpn)
+    offers: list[dict] = []
+    for part in parts:
+        if not isinstance(part, dict):
+            continue
+        if normalize_mpn(part.get("ManufacturerPartNumber") or "") != target:
+            continue
+        breaks: list[dict] = []
+        for item in part.get("PriceBreaks") or []:
+            if not isinstance(item, dict):
+                continue
+            price = _coerce_price(item.get("Price"))
+            try:
+                quantity = int(item.get("Quantity") or 0)
+            except (TypeError, ValueError):
+                continue
+            if price is not None and quantity > 0:
+                breaks.append(
+                    {
+                        "qty": quantity,
+                        "price": price,
+                        "currency": str(item.get("Currency") or "USD"),
+                    }
+                )
+        breaks.sort(key=lambda item: item["qty"])
+        offers.append(
+            {
+                "product_number": str(part.get("MouserPartNumber") or "").strip(),
+                "stock": part.get("AvailabilityInStock"),
+                "product_url": str(part.get("ProductDetailUrl") or "").strip(),
+                "price_breaks": breaks,
+            }
+        )
+    return offers
+
+
 def parse_mouser_payload(body: dict | None, mpn: str) -> EnrichmentResult:
     """The WHOLE Mouser response -> one EnrichmentResult, with no network and no credentials.
 
@@ -272,6 +310,9 @@ def parse_mouser_payload(body: dict | None, mpn: str) -> EnrichmentResult:
     if not isinstance(chosen, dict):
         return EnrichmentResult()
     result = _parse_mouser_part(chosen)
+    catalog_offers = _mouser_catalog_offers(parts, mpn)
+    if catalog_offers:
+        result.catalog["mouser"] = {"schema_version": 1, "offers": catalog_offers}
     if exact is None and result.mpn is not None:
         # no exact match: downgrade confidence so a manual review flags it
         result.mpn = Sourced(result.mpn.value, "mouser", "low")
@@ -293,7 +334,7 @@ class MouserAdapter:
         return bool(self.api_key)
 
     def fetch_payload(self, mpn: str) -> dict | None:
-        """The RAW response body, for storing under `sourced/` verbatim as evidence.
+        """The complete decoded response JSON, for lossless storage under `sourced/`.
 
         `lookup` parses and discards the body; an IMPORT has to keep it, because the whole point of
         the sourced layer is that the derivation can be re-run later against what the vendor

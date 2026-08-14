@@ -36,9 +36,9 @@
  */
 import { createContext, useContext, useMemo, useState } from "react";
 import type { ComponentDossier, Staleness } from "../../api/dossierTypes";
-import { Text, useCopyFormatter, useText } from "../../lib/copy";
+import { Text, useCopyFormatter } from "../../lib/copy";
 import { useDevMode } from "../../lib/devMode";
-import { formatCount, formatPrice, formatTimestamp } from "../../lib/formatValue";
+import { formatCount, formatTimestamp } from "../../lib/formatValue";
 import { LayoutRuntimeScope, type RegionChromeProps } from "../../layout/LayoutRenderer";
 import { WORKSPACE_CONDITION } from "../../layout/defaultWorkspaceLayout";
 import { useWorkspaceRender } from "../../layout/workspaceRenderContext";
@@ -50,6 +50,7 @@ import {
 } from "./WorkspaceColumns";
 import { latestCheck } from "./offerFacts";
 import { OffersSection } from "./OffersSection";
+import { OfficialApiDataSection } from "./OfficialApiDataSection";
 import { ProvenanceHistory } from "./ProvenanceHistory";
 import { DocumentsSection, RelatedPartsSection } from "./ResourcesSection";
 import { PropertyRow, SourcingSection } from "./SourcingParts";
@@ -151,9 +152,16 @@ export function SourcingOffersPart() {
       offers={dossier.distributorOffers}
       failures={dossier.supplySummary.failures}
       onRefresh={sourcing.onRefresh}
+      onViewAll={sourcing.onViewOffers}
       refreshing={sourcing.refreshing}
     />
   );
+}
+
+export function SourcingOfficialApiPart() {
+  const workspace = useWorkspaceRender();
+  if (!workspace) return null;
+  return <OfficialApiDataSection data={workspace.dossier.officialApiData} />;
 }
 
 export function SourcingDocumentsPart() {
@@ -243,144 +251,71 @@ export function SourcingEmptySectionsPart() {
  */
 export function SourcingLifecyclePart() {
   const workspace = useWorkspaceRender();
-  const unknown = useText("component-browser.value-unknown", "Unknown");
   if (!workspace) return null;
   const dossier: ComponentDossier = workspace.dossier;
   const { supplySummary } = dossier;
   const lifecycle = supplySummary.lifecycle || dossier.identity.lifecycle || "";
   const lastChecked = latestCheck(dossier.distributorOffers);
   const checkedStamp = lastChecked ? formatTimestamp(lastChecked) : null;
+  if (
+    !lifecycle
+    && !supplySummary.manufacturerStatus
+    && supplySummary.totalStock === null
+    && !supplySummary.leadTime
+    && !checkedStamp
+  ) return null;
 
   return (
     <SourcingSection
       devId="component-browser.lifecycle"
       title={<Text id="component-browser.lifecycle-title">Product Status and Stock</Text>}
     >
-      <PropertyRow label={<Text id="component-browser.lifecycle-state">Product Status</Text>}>
-        {lifecycle ? (
+      {lifecycle ? (
+        <PropertyRow label={<Text id="component-browser.lifecycle-state">Product Status</Text>}>
           <StatusText tone={lifecycleTone(lifecycle)}>{lifecycle}</StatusText>
-        ) : (
-          <span className="ui-property-value ui-disabled">{unknown}</span>
-        )}
-      </PropertyRow>
-      <PropertyRow
-        label={<Text id="component-browser.manufacturer-status">Manufacturer Status</Text>}
-      >
-        <span data-dev-id="component-browser.manufacturer-status">
-          {supplySummary.manufacturerStatus ? (
+        </PropertyRow>
+      ) : null}
+      {supplySummary.manufacturerStatus ? (
+        <PropertyRow
+          label={<Text id="component-browser.manufacturer-status">Manufacturer Status</Text>}
+        >
+          <span data-dev-id="component-browser.manufacturer-status">
             <StatusText tone={lifecycleTone(supplySummary.manufacturerStatus)}>
               {supplySummary.manufacturerStatus}
             </StatusText>
-          ) : (
-            <span className="ui-property-value ui-disabled">{unknown}</span>
-          )}
-        </span>
-      </PropertyRow>
-      <PropertyRow label={<Text id="component-browser.total-stock">Total Stock</Text>}>
-        {/* `null` is UNKNOWN. Rendering it as 0 would claim every distributor was asked and every
-            one of them answered none, which is a different and much stronger fact. */}
-        <span
-          data-dev-id="component-browser.total-stock"
-          data-stock-known={supplySummary.totalStock === null ? "false" : "true"}
-          className="ui-property-value ui-numeric"
-        >
-          {supplySummary.totalStock === null ? (
-            <span className="ui-disabled">{unknown}</span>
-          ) : (
-            formatCount(supplySummary.totalStock)
-          )}
-        </span>
-      </PropertyRow>
-      <PropertyRow label={<Text id="component-browser.lead-time">Lead Time</Text>}>
-        <span className="ui-property-value">
-          {supplySummary.leadTime || <span className="ui-disabled">{unknown}</span>}
-        </span>
-      </PropertyRow>
-      <PropertyRow label={<Text id="component-browser.last-checked">Last Checked</Text>}>
-        {checkedStamp ? (
+          </span>
+        </PropertyRow>
+      ) : null}
+      {supplySummary.totalStock !== null ? (
+        <PropertyRow label={<Text id="component-browser.total-stock">Total Stock</Text>}>
+          <span
+            data-dev-id="component-browser.total-stock"
+            data-stock-known="true"
+            className="ui-property-value ui-numeric"
+          >
+            {formatCount(supplySummary.totalStock)}
+          </span>
+        </PropertyRow>
+      ) : null}
+      {supplySummary.leadTime ? (
+        <PropertyRow label={<Text id="component-browser.lead-time">Lead Time</Text>}>
+          <span className="ui-property-value">{supplySummary.leadTime}</span>
+        </PropertyRow>
+      ) : null}
+      {checkedStamp ? (
+        <PropertyRow label={<Text id="component-browser.last-checked">Last Checked</Text>}>
           <span className="flex items-baseline gap-1.5">
-            {/* Relative, with the absolute time in the tooltip. Never one without the other. */}
             <span className="ui-component-metadata" title={checkedStamp.title}>
               {checkedStamp.text}
             </span>
-            <StatusText tone={STALENESS_TONE[supplySummary.staleness]} className="flex-none">
-              <StalenessLabel staleness={supplySummary.staleness} />
-            </StatusText>
+            {supplySummary.staleness === "unknown" ? null : (
+              <StatusText tone={STALENESS_TONE[supplySummary.staleness]} className="flex-none">
+                <StalenessLabel staleness={supplySummary.staleness} />
+              </StatusText>
+            )}
           </span>
-        ) : (
-          <span className="ui-property-value ui-disabled">{unknown}</span>
-        )}
-      </PropertyRow>
-    </SourcingSection>
-  );
-}
-
-/**
- * What it costs at quantity, and how long the wait is.
- *
- * The best price names the distributor quoting it, because "$0.42" without a name is not a price
- * anyone can act on. The ladder itself stays one click away: a column is the wrong shape for eight
- * quantity breaks per distributor, and the full sheet is the right one.
- */
-export function SourcingPricingPart() {
-  const workspace = useWorkspaceRender();
-  const unknown = useText("component-browser.value-unknown", "Unknown");
-  const fromText = useCopyFormatter("component-browser.price-from", "from {provider}");
-  if (!workspace) return null;
-  const { supplySummary, distributorOffers } = workspace.dossier;
-  const best = distributorOffers.find(
-    (offer) => offer.provider === supplySummary.bestUnitPriceProvider,
-  );
-  const breakCount = distributorOffers.reduce(
-    (total, offer) => total + offer.priceBreaks.length,
-    0,
-  );
-
-  return (
-    <SourcingSection
-      devId="component-browser.pricing"
-      title={<Text id="component-browser.pricing-title">Pricing and Lead Time</Text>}
-      action={
-        breakCount > 0 ? (
-          <Button
-            small
-            data-dev-id="component-browser.offers-all"
-            onClick={workspace.sourcing.onViewOffers}
-          >
-            <Text id="component-browser.offers-all">View Price Breaks</Text>
-          </Button>
-        ) : undefined
-      }
-    >
-      <PropertyRow label={<Text id="component-browser.best-price">Best Unit Price</Text>}>
-        {supplySummary.bestUnitPrice === null ? (
-          <span className="ui-property-value ui-numeric ui-disabled">{unknown}</span>
-        ) : (
-          <span className="flex items-baseline gap-1.5">
-            <span className="ui-key-fact ui-numeric flex-none">
-              {formatPrice(
-                supplySummary.bestUnitPrice,
-                supplySummary.bestUnitPriceCurrency || "$",
-              )}
-            </span>
-            {best ? (
-              <span className="ui-component-metadata min-w-0 truncate">
-                {fromText({ provider: best.providerLabel })}
-              </span>
-            ) : null}
-          </span>
-        )}
-      </PropertyRow>
-      <PropertyRow label={<Text id="component-browser.price-breaks">Price Breaks</Text>}>
-        <span className="ui-property-value ui-numeric">
-          {breakCount > 0 ? formatCount(breakCount) : <span className="ui-disabled">{unknown}</span>}
-        </span>
-      </PropertyRow>
-      <PropertyRow label={<Text id="component-browser.factory-lead-time">Manufacturer Lead Time</Text>}>
-        <span className="ui-property-value">
-          {supplySummary.factoryLeadTime || <span className="ui-disabled">{unknown}</span>}
-        </span>
-      </PropertyRow>
+        </PropertyRow>
+      ) : null}
     </SourcingSection>
   );
 }

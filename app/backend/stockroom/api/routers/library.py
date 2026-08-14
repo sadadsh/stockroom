@@ -40,6 +40,7 @@ from stockroom.dossier.cad_preference import (
 )
 from stockroom.dossier.decisions import UnknownSpecification, UnpinnableSource
 from stockroom.dossier.documents import find_document
+from stockroom.dossier.official_evidence import OFFICIAL_API_PROVIDERS
 from stockroom.enrich.datasheet import fetch_datasheet
 from stockroom.enrich.errors import EnrichError
 from stockroom.enrich.image_proxy import allowed_image_url
@@ -52,6 +53,7 @@ from stockroom.ingest.passive_add import (
 )
 from stockroom.model.part import PartRecord
 from stockroom.model.part_id import is_valid_part_id
+from stockroom.model.sourced import read_json
 from stockroom.mutation.transaction import Transaction
 from stockroom.provider_coverage import provider_coverage, set_user_assertion
 from stockroom.verify.record_diff import extract_symbol_node, field_diff
@@ -824,12 +826,24 @@ def library_router(require_token) -> APIRouter:
         if ctx.index.get(part_id) is None:
             raise FileNotFoundError(f"no such part: {part_id}")
         record = ctx.ops.load_record(part_id)
+        official_payloads = {}
+        for provider in OFFICIAL_API_PROVIDERS:
+            entry = record.sources.get(provider)
+            if entry is None or not entry.file:
+                continue
+            try:
+                official_payloads[provider] = read_json(ctx.repo.root, record.id, provider)
+            except (OSError, ValueError, TypeError):
+                # The source ledger still reports the indexed failure. One malformed retained
+                # provider file must not make the whole opened component unreadable.
+                continue
         # The reading clock is passed IN so the projection stays a pure function; it is the one
         # thing offer freshness cannot answer without, and reading it inside would make the
         # whole dossier untestable.
         return component_dossier(
             record,
             coverage=_coverage(record),
+            official_payloads=official_payloads,
             now=datetime.now(UTC).isoformat(),
         )
 
@@ -1160,10 +1174,12 @@ def library_router(require_token) -> APIRouter:
 
     @r.post("/parts/{part_id}/refresh")
     def refresh_part(request: Request, part_id: str) -> dict:
-        """Refresh one part's volatile procurement data (price/stock/lifecycle/lead/dist P/N) from
-        the free distributor APIs (Mouser + DigiKey) - the API lane, no anti-bot. A write-lane
-        background job (spec section 8): the record is committed through a git Transaction, so it
-        runs on the serialized write pool. The terminal `result` event carries the updated record."""
+        """Refresh complete official-source evidence and rederive the opened component.
+
+        Mouser and DigiKey payloads are retained under ``sourced/`` in the same commit as the
+        rederived record. The terminal result therefore carries every normalized API fact, while
+        the raw evidence remains available when a future projection learns another field.
+        """
         ctx = request.app.state.ctx
         if ctx.index.get(part_id) is None:
             raise FileNotFoundError(f"no such part: {part_id}")
@@ -1171,13 +1187,10 @@ def library_router(require_token) -> APIRouter:
         def work(progress):
             from datetime import datetime, timezone
 
-            from stockroom.enrich.refresh import refresh_via_adapters
-
             record = ctx.ops.load_record(part_id)
-            progress({"pct": 10, "message": f"querying distributor APIs for {record.mpn}"})
-            per_vendor = refresh_via_adapters(record.mpn, build_refresh_adapters(ctx))
+            progress({"pct": 10, "message": f"querying complete official evidence for {record.mpn}"})
             now_iso = datetime.now(timezone.utc).isoformat()
-            updated = ctx.ops.refresh_procurement(part_id, per_vendor, now_iso)
+            updated = ctx.ops.refresh_official_evidence(part_id, ctx.config, now_iso)
             ctx.rebuild_index()
             ctx.auto_push()
             return updated.to_dict()

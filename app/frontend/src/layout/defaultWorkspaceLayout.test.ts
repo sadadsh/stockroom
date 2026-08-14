@@ -297,16 +297,16 @@ describe("the sections each column stacks", () => {
    * the test below it compares the same list against `COLLAPSIBLE_SOURCING_SECTIONS`, so the two
    * together say both "this is the reading order" and "the document did not retype it".
    */
-  it("asks the six sourcing questions in the order a person asks them, ledger last", () => {
+  it("puts distributor prices first and the evidence ledger last", () => {
     const body = findRegion(DEFAULT_WORKSPACE_LAYOUT, "workspace.column-sourcing-body");
     expect(
       (body?.slots ?? []).map((slot) =>
         slot.content?.kind === "placement" ? slot.content.piece : null,
       ),
     ).toEqual([
-      "workspace.sourcing-lifecycle",
       "workspace.sourcing-offers",
-      "workspace.sourcing-pricing",
+      "workspace.sourcing-lifecycle",
+      "workspace.sourcing-official-api",
       "workspace.sourcing-documents",
       "workspace.sourcing-related",
       "workspace.sourcing-provenance",
@@ -360,7 +360,7 @@ describe("the sections each column stacks", () => {
     ).toEqual([...REPRESENTATION_KINDS]);
   });
 
-  it("places the sourcing sections in sourcingSections' fixed order, lifecycle first", () => {
+  it("places offer ladders before lifecycle and the remaining sourced sections", () => {
     // The order a person asks the questions in. Fails if the document hard-codes an order that
     // drifts from COLLAPSIBLE_SOURCING_SECTIONS.
     const body = findRegion(DEFAULT_WORKSPACE_LAYOUT, "workspace.column-sourcing-body");
@@ -368,8 +368,11 @@ describe("the sections each column stacks", () => {
       slot.content?.kind === "placement" ? slot.content.piece : null,
     );
     expect(pieces).toEqual([
+      "workspace.sourcing-offers",
       "workspace.sourcing-lifecycle",
-      ...COLLAPSIBLE_SOURCING_SECTIONS.map((id) => `workspace.sourcing-${id}`),
+      ...COLLAPSIBLE_SOURCING_SECTIONS.filter((id) => id !== "offers").map(
+        (id) => `workspace.sourcing-${id}`,
+      ),
       "workspace.sourcing-empty-sections",
     ]);
   });

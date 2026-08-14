@@ -231,7 +231,8 @@ export function IngestPage() {
       const r = enrich.result;
       setResult(r);
       const exactIdentity = hasExactPulledIdentity(r, lookedUpInput);
-      if (!exactIdentity) {
+      const officialFailure = Object.values(r.source_states ?? {}).includes("failed");
+      if (!exactIdentity || officialFailure) {
         setStaged(null);
         toast(toastNothing, "neutral");
       } else if (!r.add_plan) {
@@ -302,11 +303,14 @@ export function IngestPage() {
   }
 
   const plan = result?.add_plan ?? null;
+  const officialFailure = Boolean(
+    result && Object.values(result.source_states ?? {}).includes("failed"),
+  );
   const pulledSomething = result !== null && hasExactPulledIdentity(result, lookedUpInput);
   // A real non-passive part (data pulled, needs its assets) vs a fetch that came back
   // empty (blocked/not a product page) - the latter must NOT assert "needs files".
-  const nonPassive = result !== null && plan === null && pulledSomething;
-  const blockedFetch = result !== null && plan === null && !pulledSomething;
+  const nonPassive = result !== null && plan === null && pulledSomething && !officialFailure;
+  const blockedFetch = result !== null && (officialFailure || (plan === null && !pulledSomething));
   // When the empty pull came from a recognized distributor link and the matching API key
   // is absent, the blocked card names THE fix (the API-first lane is what makes those
   // Akamai-guarded links reliable) instead of a generic shrug. Unknown settings (still
@@ -336,7 +340,7 @@ export function IngestPage() {
         showPath={!result}
       />
 
-      {result && plan ? (
+      {result && plan && !officialFailure ? (
         <Card data-dev-id="ingest.passive" className="px-4 py-4">
           <PassiveAddSection
             key={lookedUpInput}
@@ -499,12 +503,21 @@ function BlockedFetchCard({
   onCorrect: (mpn: string) => void;
 }) {
   const candidates = [...new Set(Object.values(suggestions).flat())];
+  const failedProviders = Object.entries(sourceStates)
+    .filter(([, state]) => state === "failed")
+    .map(([provider]) => provider === "digikey" ? "DigiKey" : provider === "mouser" ? "Mouser" : provider);
   const correctionLabel = useCopyFormatter("ingest.blocked-use-correction", "Use {mpn}");
   return (
     <Card data-dev-id="ingest.blocked" className="px-4 py-4">
       <div className="flex flex-col gap-3">
         <span className="text-sm text-warn">
-          {vendor === "mouser" ? (
+          {failedProviders.length > 0 ? (
+            <Text id="ingest.blocked-official-source">
+              A configured official source failed. Stockroom kept the successful evidence but will
+              not add this component as complete. Repair the named source in Settings and look it
+              up again.
+            </Text>
+          ) : vendor === "mouser" ? (
             <Text id="ingest.blocked-mouser-key">Nothing was pulled, and no Mouser API credential is set. Mouser blocks the page fetch, so the credential is what makes a Mouser link resolve. Add one in Settings under Sourcing, then look this up again.</Text>
           ) : vendor === "digikey" ? (
             <Text id="ingest.blocked-digikey-key">Nothing was pulled, and no DigiKey API credential is set. DigiKey blocks the page fetch, so the credential is what makes a DigiKey link resolve. Add one in Settings under Sourcing, then look this up again.</Text>
@@ -530,6 +543,9 @@ function BlockedFetchCard({
             </>
           )}
         </span>
+        {failedProviders.length > 0 ? (
+          <p className="text-xs font-semibold text-warn">{failedProviders.join(", ")}</p>
+        ) : null}
         {sourceStates.digikey === "unavailable" ? (
           <p className="text-xs text-t2">
             <Text id="ingest.blocked-digikey-checked">DigiKey was checked and returned no exact match.</Text>

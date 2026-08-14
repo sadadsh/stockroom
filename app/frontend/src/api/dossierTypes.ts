@@ -420,6 +420,33 @@ export interface DistributorOffer {
   failureState: string;
 }
 
+export type OfficialApiValueKind = "null" | "boolean" | "number" | "string" | "array" | "object";
+
+/** One exact leaf or explicit empty container from a retained provider response. */
+export interface OfficialApiDataRow {
+  path: string;
+  endpoint: string;
+  kind: OfficialApiValueKind;
+  value: unknown;
+  displayValue: string;
+}
+
+export interface OfficialApiProviderData {
+  provider: string;
+  providerLabel: string;
+  state: string;
+  fetchedAt: string;
+  payloadRef: string;
+  fieldCount: number;
+  rows: OfficialApiDataRow[];
+}
+
+export interface OfficialApiDataView {
+  providers: OfficialApiProviderData[];
+  providerCount: number;
+  fieldCount: number;
+}
+
 /**
  * The buying answer in one line.
  *
@@ -801,6 +828,8 @@ export interface ComponentDossier {
   cadSourceCoverage: ComponentProvidersView;
   supplySummary: SupplySummaryView;
   distributorOffers: DistributorOffer[];
+  /** Lossless leaf projection of every retained Mouser and DigiKey response. */
+  officialApiData: OfficialApiDataView;
   documents: DocumentsView;
   relatedParts: RelatedPart[];
   provenance: ProvenanceView;

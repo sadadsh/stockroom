@@ -117,10 +117,10 @@ export function sourcingFillCondition(id: SourcingSectionId): string {
   return `workspace.sourcing-fill.${id}`;
 }
 
-/** Which piece draws each of the five conditional sourcing sections. */
+/** Which piece draws each conditional sourcing section. */
 const SOURCING_SECTION_PIECE: Record<SourcingSectionId, string> = {
   offers: "workspace.sourcing-offers",
-  pricing: "workspace.sourcing-pricing",
+  "official-api": "workspace.sourcing-official-api",
   documents: "workspace.sourcing-documents",
   related: "workspace.sourcing-related",
   provenance: "workspace.sourcing-provenance",
@@ -359,11 +359,9 @@ const specificationsColumn: LayoutRegion = {
 };
 
 /**
- * The Sourcing and Resources column: title strip, then six sections and the reveal control.
- *
- * The five conditional sections are generated from `COLLAPSIBLE_SOURCING_SECTIONS`, so the
- * document's order IS the column's fixed order rather than a second copy of it. Lifecycle is not in
- * that list and is not conditional here either - it is the section that never collapses.
+ * The Sourcing and Resources column: distributor ladders first, then returned supply facts and
+ * supporting resources. The redundant aggregate-pricing piece remains available to Design Studio
+ * but is not part of the shipped reading order.
  */
 const sourcingColumn: LayoutRegion = {
   kind: "region",
@@ -384,10 +382,18 @@ const sourcingColumn: LayoutRegion = {
       scroll: "vertical",
       slots: [
         slot(
+          "workspace.slot.sourcing-offers",
+          placeWhen(
+            "workspace.place.sourcing-offers",
+            "workspace.sourcing-offers",
+            [sourcingFillCondition("offers"), WORKSPACE_CONDITION.sourcingShowEmpty],
+          ),
+        ),
+        slot(
           "workspace.slot.sourcing-lifecycle",
           place("workspace.place.sourcing-lifecycle", "workspace.sourcing-lifecycle"),
         ),
-        ...COLLAPSIBLE_SOURCING_SECTIONS.map((section) =>
+        ...COLLAPSIBLE_SOURCING_SECTIONS.filter((section) => section !== "offers").map((section) =>
           slot(
             `workspace.slot.sourcing-${section}`,
             placeWhen(

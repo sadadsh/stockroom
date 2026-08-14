@@ -50,8 +50,8 @@ function original(markup: string): Element {
 }
 
 // --- byte-identical cases: the adopted render must equal the pre-adoption svg exactly ------------
-// One primary rail glyph with an explicit size, the brand wordmark (asserting the `ico` token
-// survives), a bespoke SearchOverlay glyph, and a PartsList category thumbnail.
+// One primary rail glyph with an explicit size, the brand wordmark (asserting the `ico` token),
+// and a bespoke SearchOverlay glyph.
 const IDENTICAL: Array<{ name: string; el: React.ReactElement; svg: string }> = [
   {
     name: "nav.theme (primary rail glyph, explicit h-4 w-4)",
@@ -80,13 +80,6 @@ const IDENTICAL: Array<{ name: string; el: React.ReactElement; svg: string }> = 
     svg:
       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="h-3 w-3 text-t3">' +
       '<path d="m6 9 6 6 6-6"/></svg>',
-  },
-  {
-    name: "glyph.resistor (PartsList category thumbnail)",
-    el: <Icon id="glyph.resistor" className="h-3.5 w-6 text-t2" />,
-    svg:
-      '<svg viewBox="0 0 32 18" class="h-3.5 w-6 text-t2" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">' +
-      '<path d="M2 9h5l1.5-4 3 8 3-8 3 8 1.5-4H32"/></svg>',
   },
 ];
 

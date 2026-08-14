@@ -244,11 +244,11 @@ class DigiKeyClient:
     def intake_bundle(self, mpn: str) -> dict:
         """Complete non-order evidence for a newly resolved part.
 
-        ProductDetails and Media are unconditional.  Relationship endpoints are kept separate in
-        the bundle so alternate packaging can drive identity de-duplication without ever being
-        confused with substitutions, recommendations or associations.  Quantity pricing and
-        DigiReel are intentionally absent because they have no meaning until a BOM/order supplies
-        a requested quantity.
+        ProductDetails, Media, and Product Pricing are unconditional. Relationship endpoints are
+        kept separate in the bundle so alternate packaging can drive identity de-duplication
+        without ever being confused with substitutions, recommendations or associations.
+        Quantity-specific and DigiReel quote endpoints remain absent because they have no meaning
+        until a BOM/order supplies a requested quantity.
         """
         search = self.keyword_search(mpn)
         product = _choose_product(search, mpn)
@@ -260,6 +260,7 @@ class DigiKeyClient:
         calls = (
             ("product_details", self.product_details),
             ("media", self.media),
+            ("product_pricing", self.product_pricing),
             ("alternate_packaging", self.alternate_packaging),
             ("substitutions", self.substitutions),
             ("recommended_products", self.recommended_products),
@@ -435,21 +436,36 @@ def _exact_filter_match(body: dict | None, mpn: str) -> bool | None:
     )
 
 
-def pricing_options_from_payload(body: dict | None) -> list[dict]:
-    """Flatten DigiKey quantity-pricing revisions into one stable purchasing view."""
+def pricing_options_from_payload(body: dict | None, mpn: str = "") -> list[dict]:
+    """Flatten DigiKey quantity-pricing revisions into one stable purchasing view.
+
+    When ``mpn`` is supplied, only ladders nested under that exact manufacturer part are kept;
+    keyword search responses commonly include neighboring products that are evidence, but are not
+    offers for the component being opened.
+    """
     if not isinstance(body, dict):
         return []
     options: list[dict] = []
     seen: set[tuple] = set()
-    def visit(value, inherited_product_number: str = "", inherited_packaging: str = "") -> None:
+    target_mpn = normalize_mpn(mpn)
+
+    def visit(
+        value,
+        inherited_product_number: str = "",
+        inherited_packaging: str = "",
+        inherited_mpn: str = "",
+    ) -> None:
         if isinstance(value, list):
             for child in value:
-                visit(child, inherited_product_number, inherited_packaging)
+                visit(child, inherited_product_number, inherited_packaging, inherited_mpn)
             return
         if not isinstance(value, dict):
             return
         item = value
         product_number = _obj_str(item.get("DigiKeyProductNumber")) or inherited_product_number
+        manufacturer_mpn = (
+            _obj_str(item.get("ManufacturerProductNumber")) or inherited_mpn
+        )
         packaging = (
             _obj_str(item.get("PackageType"), "Name")
             or _obj_str(item.get("Packaging"), "Name")
@@ -474,7 +490,8 @@ def pricing_options_from_payload(body: dict | None) -> list[dict]:
                 quantity_value = 0
             currency = _obj_str(item.get("Currency")) or "USD"
             key = (product_number, packaging, quantity_value, unit_price, currency)
-            if key not in seen:
+            exact_product = not target_mpn or normalize_mpn(manufacturer_mpn) == target_mpn
+            if exact_product and key not in seen:
                 seen.add(key)
                 options.append(
                     {
@@ -486,7 +503,7 @@ def pricing_options_from_payload(body: dict | None) -> list[dict]:
                     }
                 )
         for child in item.values():
-            visit(child, product_number, packaging)
+            visit(child, product_number, packaging, manufacturer_mpn)
 
     visit(body)
     return sorted(options, key=lambda option: (option["unit_price"], option["product_number"]))
@@ -521,6 +538,11 @@ def digikey_catalog_from_payload(body: dict | None, mpn: str) -> dict:
             "providers": providers,
         },
         "media": media,
+        # Every quantity ladder from every package variation remains available to the dossier.
+        # The single canonical purchase row cannot represent several DigiKey SKUs without losing
+        # the rest, so this provider-neutral list is the complete purchasing projection over the
+        # retained raw response.
+        "pricing_options": pricing_options_from_payload(body, mpn),
         # These remain separately named raw responses.  Their semantics are intentionally not
         # collapsed into one "related parts" list: alternate packaging is identity-equivalent;
         # substitutions, recommendations and associations are progressively weaker/different.
@@ -670,6 +692,11 @@ def parse_digikey_payload(body: dict | None, mpn: str) -> EnrichmentResult:
             result.identity_suggestions["digikey"] = suggestions
         return result
     result = _parse_digikey_part(chosen)
+    # Product Details is authoritative when present, but DigiKey's Keyword Search can carry
+    # parameters or package fields omitted by that endpoint. Both are the same provider response
+    # bundle, so fill only missing values and do not manufacture cross-source conflicts.
+    if detailed and exact and detailed is not exact:
+        result.merge_missing(_parse_digikey_part(exact), record_conflicts=False)
     catalog = digikey_catalog_from_payload(body, mpn)
     if catalog:
         result.catalog["digikey"] = catalog
@@ -694,7 +721,7 @@ class DigiKeyAdapter:
         return bool(self.client_id and self.client_secret)
 
     def fetch_payload(self, mpn: str) -> dict | None:
-        """The RAW response body, for storing under `sourced/` verbatim. See the Mouser twin."""
+        """The complete decoded response JSON for lossless storage. See the Mouser twin."""
         if not self.enabled or not mpn or self._requester is None:
             return None
         try:

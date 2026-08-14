@@ -4,7 +4,7 @@ This is the wave-2 importer of `docs/progress/rebuild-plan.json`, and its job is
 
     for each part that needs evidence:
         for each usable source, in priority order:
-            fetch the RAW body        -> write it verbatim under sourced/<id>/<source>.json
+            fetch the complete JSON   -> write every JSON value under sourced/<id>/<source>.json
         re-derive the derived block   -> by CALLING stockroom.derive.engine, never re-deriving here
 
 It contains NO derivation logic. That is the point of the plan step *"Calls the existing derive
@@ -48,11 +48,19 @@ from stockroom.derive.naming import DEFAULT_SCHEME
 from stockroom.importer.classify import reclassify
 from stockroom.importer.sources import PayloadFetcher, build_sources
 from stockroom.model.part_id import is_valid_part_id
-from stockroom.model.sourced import SOURCED_DIRNAME, source_rel_path, sourced_file, write_payload
+from stockroom.model.sourced import (
+    SOURCED_DIRNAME,
+    SourceEntry,
+    source_rel_path,
+    sourced_file,
+    write_payload,
+)
 
 # The `last_status` values the adapters set when a provider refuses for QUOTA reasons rather than
 # because the part is unknown. Data, so a new provider's wording is one entry rather than a branch.
-DEFERRABLE_STATUSES: frozenset[str] = frozenset({"rate_limited", "quota", "auth", "http_429"})
+DEFERRABLE_STATUSES: frozenset[str] = frozenset(
+    {"rate_limited", "quota", "auth", "auth_error", "http_429"}
+)
 
 
 class Outcome(str, Enum):
@@ -83,6 +91,10 @@ class PartResult:
     # failed BEFORE the record was persisted - indexed and re-derived from this pass without a
     # new fetch. See `import_part`'s orphaned-evidence handling (cold-eyes finding 5).
     recovered: list[str] = field(default_factory=list)
+    # The record can change even when no payload was imported: failed/unavailable attempts are
+    # durable source truth too. run_import uses this to persist those states without pretending
+    # the evidence refresh succeeded.
+    record_changed: bool = False
 
 
 @dataclass
@@ -172,6 +184,7 @@ def import_part(
 
     by_name = dict(sources)
     fetched: dict[str, dict] = {}
+    source_outcomes: dict[str, str] = {}
     for name in todo:
         adapter = by_name[name]
         try:
@@ -185,6 +198,7 @@ def import_part(
             # this module documents is "one part never fails the whole run", and a source library
             # can raise anything from a malformed response.
             result.errors.append(f"{name}: {type(exc).__name__}: {exc}")
+            source_outcomes[name] = "failed"
             continue
         status = (getattr(adapter, "last_status", "") or "").strip().lower()
         if body is None:
@@ -193,8 +207,28 @@ def import_part(
             # from here, and conflating them is what would make a quota blip look like a bad part.
             if status in DEFERRABLE_STATUSES:
                 result.deferred.append(name)
+                source_outcomes[name] = "failed"
+            else:
+                source_outcomes[name] = "unavailable"
             continue
         fetched[name] = body
+        source_outcomes[name] = "success"
+
+    def persist_attempt_states() -> None:
+        """Record current verdicts without making a failed attempt freshen old evidence."""
+        for name, state in source_outcomes.items():
+            if state == "success":
+                continue
+            entry = record.sources.get(name)
+            if entry is None:
+                entry = SourceEntry()
+                record.sources[name] = entry
+            before = (entry.extra.get("state"), entry.extra.get("last_attempted_at"))
+            entry.extra["state"] = state
+            entry.extra["last_attempted_at"] = derived_at
+            # fetched_at belongs only to the payload currently on disk. In particular, an auth
+            # error must not stamp last month's price ladder as freshly fetched today.
+            result.record_changed = result.record_changed or before != (state, derived_at)
 
     if not fetched and not orphaned:
         # A source that RAISED is neither "deferred" (it never told us it was rate-limited) nor
@@ -211,6 +245,8 @@ def import_part(
         else:
             result.outcome = Outcome.NO_DATA
             result.detail = "no usable source knows this MPN"
+        if not dry_run:
+            persist_attempt_states()
         return result
 
     # Orphaned entries already covered by a fetch this pass (a --refetch that re-pulled the same
@@ -233,10 +269,11 @@ def import_part(
 
     try:
         for name, body in fetched.items():
-            # VERBATIM, and this is the one line the whole sourced layer exists for. `indent=1`
-            # only so a git diff of a re-pull is readable; the KEYS ARE NOT SORTED and no value is
-            # touched, because re-serializing with sorted keys would already be a rewrite of
-            # evidence. `refetch=True` is required to replace an existing payload, so an accidental
+            # LOSSLESS JSON VALUE SEMANTICS, and this is the one line the sourced layer exists
+            # for. `indent=1` only makes a re-pull diff readable; keys retain response order and
+            # every scalar, null, and empty container survives. HTTP whitespace/number spelling is
+            # not an evidence contract because adapters intentionally return decoded JSON objects.
+            # `refetch=True` is required to replace an existing payload, so an accidental
             # second pass cannot silently overwrite the only copy of what a vendor said.
             rel = write_payload(
                 library_root,
@@ -245,14 +282,22 @@ def import_part(
                 json.dumps(body, indent=1, ensure_ascii=False),
                 refetch=True,
             )
-            record.record_source(name, file=rel, fetched_at=derived_at)
+            entry = record.record_source(name, file=rel, fetched_at=derived_at)
+            entry.extra["state"] = "success"
+            entry.extra.pop("last_attempted_at", None)
             result.written.append(name)
+            result.record_changed = True
+
+        persist_attempt_states()
 
         for name in to_recover:
             # The file is ALREADY correct on disk (see the orphaned-evidence comment above): index
             # it without touching the payload, so a stale evidence write is never re-timestamped or
             # re-serialized just because the record fell behind it.
-            record.record_source(name, file=source_rel_path(record.id, name), fetched_at=derived_at)
+            entry = record.record_source(
+                name, file=source_rel_path(record.id, name), fetched_at=derived_at
+            )
+            entry.extra["state"] = "success"
             result.recovered.append(name)
 
         rederive(record, library_root, derived_at=derived_at, scheme=scheme)
@@ -365,7 +410,11 @@ def run_import(
             refetch=refetch,
             dry_run=dry_run,
         )
-        if result.outcome is Outcome.IMPORTED and not dry_run and save is not None:
+        if (
+            (result.outcome is Outcome.IMPORTED or result.record_changed)
+            and not dry_run
+            and save is not None
+        ):
             save(record)
         report.results.append(result)
         if on_result is not None:

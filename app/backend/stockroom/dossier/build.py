@@ -28,7 +28,13 @@ from stockroom.dossier.categories import CategorySchema, resolve_schema
 from stockroom.dossier.documents import build_documents
 from stockroom.dossier.fields import field_for, humanize, normalize_key
 from stockroom.dossier.manufacturer import manufacturer_page
-from stockroom.dossier.offers import build_offers, manufacturer_status, supply_summary
+from stockroom.dossier.offers import (
+    build_offers,
+    indexed_source_failures,
+    manufacturer_status,
+    supply_summary,
+)
+from stockroom.dossier.official_evidence import build_official_evidence
 from stockroom.dossier.raw import build_compatibility, build_conflicts, build_raw_levels
 from stockroom.dossier.related import build_related_parts
 from stockroom.dossier.revisions import build_revisions, manual_overrides
@@ -291,6 +297,7 @@ def component_dossier(
     record,
     *,
     coverage: Mapping[str, Any] | None = None,
+    official_payloads: Mapping[str, Any] | None = None,
     now: str = "",
 ) -> dict[str, Any]:
     """The whole opened-component presentation model for one record.
@@ -338,9 +345,17 @@ def component_dossier(
         "cadAssets": build_cad_assets(record, schema, sources),
         "cadSourceCoverage": sources,
         "supplySummary": supply_summary(
-            offers, manufacturer_status=manufacturer_status(record)
+            offers,
+            manufacturer_status=manufacturer_status(record),
+            source_failures=indexed_source_failures(record, offers),
         ),
         "distributorOffers": offers,
+        # Every leaf from every retained official response. The caller reads bytes and passes the
+        # payloads in, preserving this projection's no-I/O boundary.
+        "officialApiData": build_official_evidence(
+            official_payloads,
+            source_entries=getattr(record, "sources", None),
+        ),
         "documents": documents,
         "relatedParts": build_related_parts(record, specifications),
         "provenance": {

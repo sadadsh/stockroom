@@ -1,4 +1,5 @@
 import shutil
+from types import SimpleNamespace
 
 import pytest
 
@@ -75,6 +76,78 @@ def _setup(tmp_path, fixtures_dir):
         purchase=[Purchase(vendor="Mouser", url="https://www.mouser.com/ProductDetail/595-TPS62130RGTR")],
     )
     return repo, profile, staged
+
+
+def test_official_refresh_retains_raw_payload_and_projects_digikey_ladders(
+    tmp_path, fixtures_dir, monkeypatch
+):
+    repo, profile, staged = _setup(tmp_path, fixtures_dir)
+    ops = LibraryOps(profile, repo)
+    record = ops.add_part(staged)
+
+    class DigiKeySource:
+        last_status = ""
+
+        def fetch_payload(self, mpn):
+            self.last_status = "ok"
+            return {
+                "schema_version": 1,
+                "product_number": "296-TPS62130-ND",
+                "keyword_search": {
+                    "Products": [
+                        {
+                            "ManufacturerProductNumber": mpn,
+                            "Manufacturer": {"Name": "Texas Instruments"},
+                            "QuantityAvailable": 4321,
+                            "ProductUrl": "https://www.digikey.com/example",
+                            "Parameters": [
+                                {"ParameterText": "Output Current", "ValueText": "3 A"}
+                            ],
+                            "ProductVariations": [
+                                {
+                                    "DigiKeyProductNumber": "296-TPS62130CT-ND",
+                                    "PackageType": {"Name": "Cut Tape"},
+                                    "QuantityAvailableforPackageType": 4321,
+                                    "StandardPricing": [
+                                        {"BreakQuantity": 1, "UnitPrice": 2.5},
+                                        {"BreakQuantity": 10, "UnitPrice": 2.1},
+                                    ],
+                                }
+                            ],
+                        }
+                    ]
+                },
+            }
+
+    monkeypatch.setattr(
+        "stockroom.importer.engine.build_sources", lambda _config: [("digikey", DigiKeySource())]
+    )
+    updated = ops.refresh_official_evidence(
+        record.id, SimpleNamespace(), "2026-08-14T12:00:00+00:00"
+    )
+
+    assert (repo.root / f"sourced/{record.id}/digikey.json").is_file()
+    assert updated.sources["digikey"].extra["state"] == "success"
+    assert updated.specs["Output Current"] == "3 A"
+    assert updated.catalog["digikey"]["pricing_options"] == [
+        {
+            "product_number": "296-TPS62130CT-ND",
+            "packaging": "Cut Tape",
+            "quantity": 10,
+            "unit_price": 2.1,
+            "currency": "USD",
+        },
+        {
+            "product_number": "296-TPS62130CT-ND",
+            "packaging": "Cut Tape",
+            "quantity": 1,
+            "unit_price": 2.5,
+            "currency": "USD",
+        },
+    ]
+    purchase = next(item for item in updated.purchase if item.vendor == "DigiKey")
+    assert purchase.stock == 4321
+    assert purchase.price_breaks == [{"qty": 1, "price": 2.5}, {"qty": 10, "price": 2.1}]
 
 
 def test_add_part_places_everything_and_commits(tmp_path, fixtures_dir):

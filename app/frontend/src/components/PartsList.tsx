@@ -21,8 +21,11 @@ import {
 } from "@tanstack/react-virtual";
 import type { PartSummary } from "../api/types";
 import { WarnIcon } from "./icons";
-import { Icon } from "./Icon";
 import { Text, useText } from "../lib/copy";
+import {
+  ElectricalSymbol,
+  electricalSymbolForCategory,
+} from "../lib/electricalSymbolLibrary";
 import { Badge } from "./primitives";
 import { partAttention } from "./partAttention";
 
@@ -42,22 +45,15 @@ export function RowThumbnail({ category }: { category: string }) {
   );
 }
 
-// A small monochrome category glyph for the row thumbnail (north-star .rthumb): the part seen
-// as its kind at a glance. Neutral stroke art, so it inherits the row's text color and never
-// carries a hue. Falls back to a generic chip for a category with no dedicated glyph.
+// IEC/UK artwork for the electrical identities it defines, with Tabler's dedicated Electrical
+// family for switch/device identities. The resolver is the one category-to-symbol authority.
 function CategoryGlyph({ category }: { category: string }) {
-  const c = category.toLowerCase();
-  // The thumbnail geometry (viewBox 32x18, weight 1.6, round caps) now lives in the registry entry;
-  // the branch only picks the id + forwards the same className, so each glyph is identical + editable.
-  const cls = "h-3.5 w-6 text-t2";
-  if (c.includes("resistor")) return <Icon id="glyph.resistor" className={cls} />;
-  if (c.includes("capacitor")) return <Icon id="glyph.capacitor" className={cls} />;
-  if (c.includes("inductor") || c.includes("ferrite")) return <Icon id="glyph.inductor" className={cls} />;
-  if (c.includes("diode") || c.includes("led")) return <Icon id="glyph.diode" className={cls} />;
-  if (c.includes("connector") || c.includes("header")) return <Icon id="glyph.connector" className={cls} />;
-  if (c.includes("crystal") || c.includes("oscillator")) return <Icon id="glyph.crystal" className={cls} />;
-  // ICs, modules, sensors, and anything else: a chip with pins
-  return <Icon id="glyph.ic" className={cls} />;
+  return (
+    <ElectricalSymbol
+      kind={electricalSymbolForCategory(category)}
+      className="h-5 w-7 text-t2"
+    />
+  );
 }
 
 interface Props {

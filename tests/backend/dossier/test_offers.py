@@ -75,6 +75,87 @@ def test_the_price_ladder_is_sorted_and_the_unit_price_is_its_first_break():
     assert offers["mouser"]["moq"] == 1
 
 
+def test_digikey_catalog_projects_every_exact_package_ladder_without_duplicate_purchase():
+    record = _sourced_record()
+    record.catalog["digikey"] = {
+        "product_url": "https://www.digikey.com/en/products/detail/497-STM32H743",
+        "pricing_options": [
+            {
+                "product_number": "497-STM32H743CT-ND",
+                "packaging": "Cut Tape",
+                "quantity": 1,
+                "unit_price": 13.10,
+                "currency": "USD",
+            },
+            {
+                "product_number": "497-STM32H743CT-ND",
+                "packaging": "Cut Tape",
+                "quantity": 10,
+                "unit_price": 12.30,
+                "currency": "USD",
+            },
+            {
+                "product_number": "497-STM32H743TR-ND",
+                "packaging": "Tape & Reel",
+                "quantity": 1000,
+                "unit_price": 8.40,
+                "currency": "USD",
+            },
+        ],
+    }
+    record.sources["digikey"] = SourceEntry(
+        fetched_at="2026-08-05T10:00:00+00:00", extra={"state": "success"}
+    )
+
+    digikey = [offer for offer in build_offers(record, now=_NOW) if offer["provider"] == "digikey"]
+    assert [offer["sku"] for offer in digikey] == [
+        "497-STM32H743CT-ND · Cut Tape",
+        "497-STM32H743TR-ND · Tape & Reel",
+    ]
+    assert digikey[0]["priceBreaks"] == [
+        {"qty": 1, "price": 13.10},
+        {"qty": 10, "price": 12.30},
+    ]
+    assert digikey[1]["priceBreaks"] == [{"qty": 1000, "price": 8.40}]
+
+
+def test_mouser_catalog_projects_every_exact_stock_number_without_duplicate_purchase():
+    record = _sourced_record()
+    record.catalog["mouser"] = {
+        "offers": [
+            {
+                "product_number": "511-STM32H743VIT6",
+                "stock": "1240",
+                "product_url": "https://www.mouser.com/ProductDetail/511-STM32H743",
+                "price_breaks": [
+                    {"qty": 1, "price": 12.48, "currency": "USD"},
+                    {"qty": 10, "price": 11.92, "currency": "USD"},
+                ],
+            },
+            {
+                "product_number": "511-STM32H743VIT6-CT",
+                "stock": "120",
+                "product_url": "https://www.mouser.com/ProductDetail/511-STM32H743-CT",
+                "price_breaks": [{"qty": 1, "price": 13.25, "currency": "USD"}],
+            },
+        ]
+    }
+    record.sources["mouser"] = SourceEntry(
+        fetched_at="2026-08-05T09:00:00+00:00", extra={"state": "success"}
+    )
+
+    mouser = [offer for offer in build_offers(record, now=_NOW) if offer["provider"] == "mouser"]
+
+    assert [offer["sku"] for offer in mouser] == [
+        "511-STM32H743VIT6",
+        "511-STM32H743VIT6-CT",
+    ]
+    assert mouser[0]["priceBreaks"] == [
+        {"qty": 1, "price": 12.48},
+        {"qty": 10, "price": 11.92},
+    ]
+
+
 def test_the_provider_comes_from_the_offer_url_not_from_a_free_text_vendor():
     offers = {item["provider"]: item for item in build_offers(_sourced_record(), now=_NOW)}
     assert offers["digikey"]["providerLabel"] == "DigiKey"
@@ -108,11 +189,18 @@ def test_staleness_thresholds_are_measured_from_the_reading():
     assert staleness("", _NOW) == "unknown"
 
 
-def test_a_failed_source_is_reported_on_the_offer_it_affects():
+def test_a_failed_source_is_reported_without_freshening_its_old_offer():
     record = _sourced_record()
-    record.sources = {"digikey": SourceEntry(extra={"state": "failed"})}
+    record.sources = {
+        "digikey": SourceEntry(
+            fetched_at="2026-05-01T09:00:00+00:00",
+            extra={"state": "failed", "last_attempted_at": _NOW},
+        )
+    }
     offers = {item["provider"]: item for item in build_offers(record, now=_NOW)}
     assert offers["digikey"]["failureState"] == "failed"
+    assert offers["digikey"]["lastCheckedAt"] == "2026-05-01T09:00:00+00:00"
+    assert offers["digikey"]["staleness"] == "stale"
     assert offers["mouser"]["failureState"] == ""
 
 

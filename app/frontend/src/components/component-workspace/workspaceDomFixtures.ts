@@ -161,6 +161,46 @@ export function populatedDossier(): ComponentDossier {
       staleness: "fresh",
       failures: [],
     },
+    officialApiData: {
+      providerCount: 2,
+      fieldCount: 2,
+      providers: [
+        {
+          provider: "digikey",
+          providerLabel: "DigiKey",
+          state: "success",
+          fetchedAt: "2026-08-01T00:00:00Z",
+          payloadRef: "sourced/lm358/digikey.json",
+          fieldCount: 1,
+          rows: [
+            {
+              path: "product_details.Product.QuantityAvailable",
+              endpoint: "product_details",
+              kind: "number",
+              value: 512,
+              displayValue: "512",
+            },
+          ],
+        },
+        {
+          provider: "mouser",
+          providerLabel: "Mouser",
+          state: "success",
+          fetchedAt: "2026-08-01T00:00:00Z",
+          payloadRef: "sourced/lm358/mouser.json",
+          fieldCount: 1,
+          rows: [
+            {
+              path: "SearchResults.Parts[0].AvailabilityInStock",
+              endpoint: "SearchResults",
+              kind: "number",
+              value: 1000,
+              displayValue: "1000",
+            },
+          ],
+        },
+      ],
+    },
     distributorOffers: [
       makeOffer(),
       makeOffer({

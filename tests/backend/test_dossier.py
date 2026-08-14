@@ -114,6 +114,7 @@ def test_the_dossier_has_every_top_level_region():
         "cadSourceCoverage",
         "supplySummary",
         "distributorOffers",
+        "officialApiData",
         "documents",
         "relatedParts",
         "provenance",

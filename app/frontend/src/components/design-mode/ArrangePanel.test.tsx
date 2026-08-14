@@ -28,7 +28,7 @@ import { resolveWorkspaceLayout } from "../../layout/resolveWorkspaceLayout";
 import { ArrangeSection } from "./ArrangePanel";
 
 const HIDDEN_PLACEMENT = "workspace.place.sourcing-documents";
-const COLLAPSED_PLACEMENT = "workspace.place.sourcing-pricing";
+const COLLAPSED_PLACEMENT = "workspace.place.sourcing-official-api";
 
 /** The shipped arrangement with one section off the screen each way. */
 function editedDocument(): LayoutDocument {

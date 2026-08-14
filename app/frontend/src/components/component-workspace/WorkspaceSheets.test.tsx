@@ -382,7 +382,7 @@ describe("the full sourcing sheet", () => {
   });
 
   it("lists every price break for every offer, with stock, currency and fetch time", async () => {
-    const { dialog } = await openSheet(dossier, "View Price Breaks", "Price Breaks");
+    const { dialog } = await openSheet(dossier, "View Full Sourcing Record", "Full Sourcing Record");
     const offer = within(dialog).getByLabelText("Mouser 511-LM358");
     expect(within(offer).getByText("511-LM358")).toBeInTheDocument();
     expect(within(offer).getByText("1,240")).toBeInTheDocument();
@@ -394,7 +394,7 @@ describe("the full sourcing sheet", () => {
   });
 
   it("labels distributor relationships as unvalidated suggestions, in prose", async () => {
-    const { dialog } = await openSheet(dossier, "View Price Breaks", "Price Breaks");
+    const { dialog } = await openSheet(dossier, "View Full Sourcing Record", "Full Sourcing Record");
     const related = within(dialog).getByLabelText("Related Parts");
     expect(
       within(related).getByText(/Stockroom has not checked whether these parts are interchangeable/),
@@ -405,7 +405,7 @@ describe("the full sourcing sheet", () => {
   });
 
   it("distinguishes a source that failed from one that does not carry the part", async () => {
-    const { dialog } = await openSheet(dossier, "View Price Breaks", "Price Breaks");
+    const { dialog } = await openSheet(dossier, "View Full Sourcing Record", "Full Sourcing Record");
     const states = within(dialog).getByLabelText("Sources");
     expect(within(within(states).getByText("Mouser").closest("li")!).getByText("Supplied"))
       .toBeInTheDocument();
@@ -420,7 +420,7 @@ describe("the full sourcing sheet", () => {
   });
 
   it("carries the typed documents, each labelled with what kind of document it is", async () => {
-    const { dialog } = await openSheet(dossier, "View Price Breaks", "Price Breaks");
+    const { dialog } = await openSheet(dossier, "View Full Sourcing Record", "Full Sourcing Record");
     const documents = within(dialog).getByLabelText("Documents");
     expect(within(documents).getByText("3D Model")).toBeInTheDocument();
     expect(within(documents).getByText("Reference")).toBeInTheDocument();

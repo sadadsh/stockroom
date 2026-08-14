@@ -85,7 +85,6 @@ export function ManageModelsWorkspace({
   const bestProvider = bestCompleteProvider(providers);
   const initialProviderId = bestProvider?.row.id ?? providers[0]?.row.id ?? null;
   const [selectedProviderId, setSelectedProviderId] = useState<string | null>(initialProviderId);
-  const [openProviderKey, setOpenProviderKey] = useState<string | null>(null);
   const [dismissedCaptureKey, setDismissedCaptureKey] = useState<string | null>(null);
   const [activityMessage, setActivityMessage] = useState<string | null>(null);
   const [recovering, setRecovering] = useState(false);
@@ -110,7 +109,6 @@ export function ManageModelsWorkspace({
             providerId,
           );
         }
-        setOpenProviderKey(`${componentId}:${providerId}`);
       } catch (error) {
         setSelectionLocked(false);
         setActivityMessage(error instanceof Error ? error.message : "Could not open provider");
@@ -124,11 +122,23 @@ export function ManageModelsWorkspace({
   const selectedProviderKey = selectedProvider
     ? `${componentId}:${selectedProvider.row.id}`
     : null;
-  const captureProviderKey = ownsCapture && selectedProviderKey ? selectedProviderKey : null;
+  const captureProviderKey = ownsCapture && capture?.active.vendor
+    ? `${componentId}:${capture.active.vendor}`
+    : null;
+  // Browser chrome is evidence of a REAL task-bound native route, never an optimistic loading
+  // shell. A provider that declines before leasing the native surface stays inline with its exact
+  // reason instead of opening the fake `Provider Page` placeholder the owner caught.
+  const activeNativeRoute = Boolean(
+    captureProviderKey
+      && selectedProviderKey === captureProviderKey
+      && capture?.active.status === "window-open"
+      && capture.active.routeToken
+      && capture.active.url,
+  );
   const browserOpen = Boolean(
     selectedProviderKey
-      && (scenarioProviderState || openProviderKey === selectedProviderKey || (
-        captureProviderKey === selectedProviderKey
+      && (scenarioProviderState || (
+        activeNativeRoute
         && dismissedCaptureKey !== captureProviderKey
       )),
   );
@@ -154,7 +164,7 @@ export function ManageModelsWorkspace({
       }[scenarioProviderState] ?? scenarioProviderState
     : null;
   const captureStatus = previewStatus ?? (ownsCapture && capture
-    ? {
+    ? capture.active.message || {
         resolving: "Checking provider",
         "window-open": "Provider ready",
         receiving: "Downloading models",
@@ -303,12 +313,11 @@ export function ManageModelsWorkspace({
           componentId={componentId}
           providerLabel={selectedProvider.row.label}
           url={
-            ownsCapture
-              ? (capture?.active.url ?? selectedProvider.row.url)
+            activeNativeRoute
+              ? capture!.active.url!
               : selectedProvider.row.url
           }
           onClose={() => {
-            setOpenProviderKey(null);
             if (captureProviderKey) setDismissedCaptureKey(captureProviderKey);
           }}
         />

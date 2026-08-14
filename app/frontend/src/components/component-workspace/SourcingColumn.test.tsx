@@ -222,9 +222,9 @@ describe("the column's shape", () => {
     );
   });
 
-  it("says Unknown for a manufacturer status nobody stated, and never assumes active", async () => {
+  it("omits a manufacturer status nobody stated", async () => {
     await open(makeDossier({ supplySummary: { manufacturerStatus: "" } }));
-    expect(region("component-browser.manufacturer-status")).toHaveTextContent("Unknown");
+    expect(document.querySelector('[data-dev-id="component-browser.manufacturer-status"]')).toBeNull();
   });
 
   it("renders a lifecycle state as text with no control affordance at all", async () => {
@@ -277,7 +277,7 @@ describe("the empty sections", () => {
 
   it("says how many sections are silent, and reveals them in the column's own order", async () => {
     const { user } = await open(bare);
-    // The count is the answer as well as the action: five of the six sections have nothing in them.
+    // The count is the answer as well as the action: five conditional sections are silent.
     const toggle = screen.getByRole("button", { name: "Show 5 Blank Sections" });
     expect(toggle).toHaveAttribute("aria-expanded", "false");
 
@@ -302,23 +302,16 @@ describe("the empty sections", () => {
     ).toBe("true");
   });
 
-  it("keeps the product-status rows even when every one of them reads Unknown", async () => {
+  it("renders only product-status facts a source actually stated", async () => {
     await open(bare);
     const lifecycle = region("component-browser.lifecycle");
-    // Five rows, four of them Unknown and the fifth the library's own product-status state, all
-    // present. `Last Checked: Unknown` is the fact that explains why the rest of the column is
-    // silent; collapsing it would hide the reason the reader needs.
-    expect(lifecycle).toBeInTheDocument();
-    for (const label of [
-      "Product Status",
-      "Manufacturer Status",
-      "Total Stock",
-      "Lead Time",
-      "Last Checked",
-    ]) {
-      expect(within(lifecycle).getByText(label)).toBeInTheDocument();
-    }
-    expect(within(lifecycle).getAllByText("Unknown").length).toBe(4);
+    expect(within(lifecycle).getByText("Product Status")).toBeInTheDocument();
+    expect(within(lifecycle).getByText("Active")).toBeInTheDocument();
+    expect(within(lifecycle).queryByText("Manufacturer Status")).toBeNull();
+    expect(within(lifecycle).queryByText("Total Stock")).toBeNull();
+    expect(within(lifecycle).queryByText("Lead Time")).toBeNull();
+    expect(within(lifecycle).queryByText("Last Checked")).toBeNull();
+    expect(within(lifecycle).queryByText("Unknown")).toBeNull();
   });
 
   it("offers no reveal at all when nothing is hidden", async () => {
@@ -512,6 +505,7 @@ describe("a sourcing refresh", () => {
         offers={offers}
         failures={[]}
         onRefresh={() => {}}
+        onViewAll={() => {}}
         refreshing={refreshing}
       />,
     );
@@ -526,7 +520,7 @@ describe("a sourcing refresh", () => {
     // yet written the new ones. On screen that is indistinguishable from "no distributor carries
     // this part", so the last numbers stand.
     rerenderWrapped(
-      <OffersSection offers={[]} failures={[]} onRefresh={() => {}} refreshing />,
+      <OffersSection offers={[]} failures={[]} onRefresh={() => {}} onViewAll={() => {}} refreshing />,
     );
     expect(screen.getByText("512")).toBeInTheDocument();
     expect(screen.getByText("DigiKey")).toBeInTheDocument();
@@ -537,7 +531,7 @@ describe("a sourcing refresh", () => {
     const offers = [makeOffer({ providerLabel: "DigiKey", stock: 512 })];
     const { rerenderWrapped } = renderOffers(offers, false);
     rerenderWrapped(
-      <OffersSection offers={[]} failures={[]} onRefresh={() => {}} refreshing={false} />,
+      <OffersSection offers={[]} failures={[]} onRefresh={() => {}} onViewAll={() => {}} refreshing={false} />,
     );
     // A distributor genuinely dropping the part is a real answer and is not hidden behind the
     // rule that protects a refresh in flight.

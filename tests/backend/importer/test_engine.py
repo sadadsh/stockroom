@@ -149,9 +149,8 @@ def test_a_part_is_classified_but_a_human_class_is_never_overridden(tmp_path):
 
 # ------------------------------------------------------------------ DEFERRED != FAILED
 
-def test_a_quota_refusal_is_DEFERRED_and_leaves_the_part_untouched(tmp_path):
-    """A healthy part whose fetch was refused for quota reasons must not carry a permanent red
-    mark, and must not be counted with the genuinely broken ones."""
+def test_a_quota_refusal_is_DEFERRED_and_persists_attempt_truth_without_evidence(tmp_path):
+    """A retryable refusal stays DEFERRED while its visible provider state survives reload."""
     rec = _record()
     res = import_part(rec, library_root=tmp_path,
                       sources=[("mouser", FakeFetcher(None, status="rate_limited"))],
@@ -160,7 +159,12 @@ def test_a_quota_refusal_is_DEFERRED_and_leaves_the_part_untouched(tmp_path):
     assert res.deferred == ["mouser"]
     assert "retryable" in res.detail
     assert not (tmp_path / "sourced").exists(), "a deferred part must write no evidence"
-    assert rec.sources == {}
+    assert rec.sources["mouser"].fetched_at == ""
+    assert rec.sources["mouser"].file == ""
+    assert rec.sources["mouser"].extra == {
+        "state": "failed",
+        "last_attempted_at": AT,
+    }
 
 
 def test_a_source_that_simply_does_not_know_the_part_is_NO_DATA_not_deferred(tmp_path):
@@ -368,6 +372,7 @@ def test_a_raising_fetcher_fails_only_that_part_never_the_whole_run(tmp_path):
     )
     ids = [r.part_id for r in report.results]
     assert ids == ["a-0000", "bad-0000", "c-0000"], "a raising source must not stop the pass early"
+    assert calls == ids, "failure state must be persisted even when no payload was written"
 
 
 def test_an_unknown_naming_scheme_fails_the_one_part_not_the_batch(tmp_path):

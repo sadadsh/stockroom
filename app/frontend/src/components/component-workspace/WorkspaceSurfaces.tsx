@@ -98,7 +98,7 @@ export function WorkspaceSurfaces({
     "Edit Class and Classification",
   );
   const provenanceTitle = useText("component-browser.provenance-modal", "Data Provenance");
-  const offersTitle = useText("component-browser.offers-modal", "Price Breaks");
+  const offersTitle = useText("component-browser.offers-modal", "Full Sourcing Record");
   const pinoutTitle = useText("component-browser.pinout-modal", "Pinout");
   const confirmDeleteTitle = useText("component-browser.delete-title", "Delete Component");
   const confirmDeleteLabel = useText("component-browser.delete-confirm", "Delete Component");

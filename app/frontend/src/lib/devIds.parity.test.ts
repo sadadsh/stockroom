@@ -189,7 +189,7 @@ const KNOWN_PROP_PASSED: readonly string[] = [
   "component-browser.column-sourcing",
   "component-browser.lifecycle",
   "component-browser.offers",
-  "component-browser.pricing",
+  "component-browser.official-api-data",
   "component-browser.documents",
   "component-browser.related",
   "component-browser.provenance",

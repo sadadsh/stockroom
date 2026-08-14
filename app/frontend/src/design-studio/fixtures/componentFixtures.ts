@@ -394,6 +394,36 @@ export function fullComponentDossier(): ComponentDossier {
         failureState: "",
       },
     ],
+    officialApiData: {
+      providerCount: 2,
+      fieldCount: 4,
+      providers: [
+        {
+          provider: "digikey",
+          providerLabel: "DigiKey",
+          state: "success",
+          fetchedAt: "2026-08-11T12:00:00Z",
+          payloadRef: "sourced/lm358dr/digikey.json",
+          fieldCount: 2,
+          rows: [
+            { path: "product_details.Product.QuantityAvailable", endpoint: "product_details", kind: "number", value: 512, displayValue: "512" },
+            { path: "product_details.Product.Parameters[0].ValueText", endpoint: "product_details", kind: "string", value: "3.3 V", displayValue: "3.3 V" },
+          ],
+        },
+        {
+          provider: "mouser",
+          providerLabel: "Mouser",
+          state: "success",
+          fetchedAt: "2026-08-11T12:00:00Z",
+          payloadRef: "sourced/lm358dr/mouser.json",
+          fieldCount: 2,
+          rows: [
+            { path: "SearchResults.Parts[0].AvailabilityInStock", endpoint: "SearchResults", kind: "number", value: 1000, displayValue: "1000" },
+            { path: "SearchResults.Parts[0].ProductAttributes[0].AttributeValue", endpoint: "SearchResults", kind: "string", value: "5 V", displayValue: "5 V" },
+          ],
+        },
+      ],
+    },
     documents: {
       types: ["datasheet", "datasheet_page", "package_drawing", "application_note", "pcn", "pdn", "compliance_declaration", "certificate", "attachment", "other"],
       items: [document],

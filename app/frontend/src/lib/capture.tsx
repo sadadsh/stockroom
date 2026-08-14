@@ -529,7 +529,11 @@ export function CaptureProvider({
           persistWorkflow(batchId, itemId, cursor);
           setState((current) => ({
             ...current,
-            status: page.batch.status === "blocked" ? "window-open" : "receiving",
+            status: liveSession.active_route?.route_token
+              ? "window-open"
+              : page.batch.status === "blocked"
+                ? "window-open"
+                : "receiving",
             message: durableMessage(page.batch, page.events, vendor),
             needs: durableNeeds,
             vendor: liveSession.active_route?.vendor ?? current.vendor,

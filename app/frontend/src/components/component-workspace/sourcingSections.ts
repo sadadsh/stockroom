@@ -33,17 +33,17 @@
  */
 import type { ComponentDossier } from "../../api/dossierTypes";
 
-/** The five sections that can be empty, in the column's fixed order. Lifecycle is not one. */
+/** The four conditional sections in their reading order. Pricing lives in each offer. */
 export type SourcingSectionId =
   | "offers"
-  | "pricing"
+  | "official-api"
   | "documents"
   | "related"
   | "provenance";
 
 export const COLLAPSIBLE_SOURCING_SECTIONS: readonly SourcingSectionId[] = [
   "offers",
-  "pricing",
+  "official-api",
   "documents",
   "related",
   "provenance",
@@ -59,8 +59,6 @@ export type SourcingSectionFill = Record<SourcingSectionId, boolean>;
  *
  *   offers      a quote, or a NAMED failure. "DigiKey could not be read" is content: it is the
  *               difference between a part nobody sells and a source nobody could reach.
- *   pricing     any of the three facts it states. Unlike lifecycle it carries no "last checked",
- *               so three Unknown rows here are three restatements of the empty offers table.
  *   documents   one document of any type.
  *   related     one suggested part.
  *   provenance  a consulted source, a disagreement, a reviewed decision, a dated event, or a
@@ -71,17 +69,17 @@ export function sourcingSectionFill(
   dossier: ComponentDossier,
   developerMode: boolean,
 ): SourcingSectionFill {
-  const { supplySummary, distributorOffers, documents, relatedParts, provenance } = dossier;
-  const priceBreaks = distributorOffers.reduce(
-    (total, offer) => total + offer.priceBreaks.length,
-    0,
-  );
+  const {
+    supplySummary,
+    distributorOffers,
+    officialApiData,
+    documents,
+    relatedParts,
+    provenance,
+  } = dossier;
   return {
     offers: distributorOffers.length > 0 || supplySummary.failures.length > 0,
-    pricing:
-      supplySummary.bestUnitPrice !== null ||
-      priceBreaks > 0 ||
-      supplySummary.factoryLeadTime !== "",
+    "official-api": officialApiData.fieldCount > 0,
     documents: documents.items.length > 0,
     related: relatedParts.length > 0,
     provenance:
@@ -100,8 +98,8 @@ export function emptySourcingSections(fill: SourcingSectionFill): SourcingSectio
 }
 
 /**
- * Nothing has been sourced for this component AT ALL: no offer, no price, no document, no related
- * part, no provenance. The column holds the five lifecycle rows and the reveal control, and nothing
+ * Nothing has been sourced for this component AT ALL: no offer, document, related part, or
+ * provenance. The column keeps only facts that exist plus the reveal control, and nothing
  * else, whatever it is given room for.
  *
  * This is what the column's WIDTH is decided from (`lib/workspaceColumns`). It is read off the

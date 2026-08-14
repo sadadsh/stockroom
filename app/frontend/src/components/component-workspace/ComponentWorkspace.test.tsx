@@ -989,17 +989,15 @@ describe("the sourcing column", () => {
     expect(node("component-browser.provenance")).toBeInTheDocument();
   });
 
-  it("says Unknown when no distributor reported a count, and never renders it as zero", async () => {
+  it("omits stock when no distributor reported a count, rather than inventing Unknown or zero", async () => {
     await open(
       makeDossier({
         distributorOffers: [makeOffer({ stock: null })],
         supplySummary: { offerCount: 1, totalStock: null },
       }),
     );
-    const stock = node("component-browser.total-stock");
-    expect(stock.dataset.stockKnown).toBe("false");
-    expect(stock).toHaveTextContent("Unknown");
-    expect(stock).not.toHaveTextContent("0");
+    expect(document.querySelector('[data-dev-id="component-browser.total-stock"]')).toBeNull();
+    expect(node("component-browser.column-sourcing")).not.toHaveTextContent("Unknown");
   });
 
   it("distinguishes a real zero from an unknown count", async () => {

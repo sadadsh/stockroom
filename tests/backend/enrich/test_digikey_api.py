@@ -159,6 +159,34 @@ def test_quantity_pricing_is_normalized_and_sorted_without_losing_raw_variants()
     ]
 
 
+def test_quantity_pricing_can_be_scoped_to_the_exact_manufacturer_part():
+    payload = {
+        "Products": [
+            {
+                "ManufacturerProductNumber": "WANTED",
+                "ProductVariations": [
+                    {
+                        "DigiKeyProductNumber": "WANTED-ND",
+                        "StandardPricing": [{"BreakQuantity": 1, "UnitPrice": 1.0}],
+                    }
+                ],
+            },
+            {
+                "ManufacturerProductNumber": "NEIGHBOR",
+                "ProductVariations": [
+                    {
+                        "DigiKeyProductNumber": "WRONG-ND",
+                        "StandardPricing": [{"BreakQuantity": 1, "UnitPrice": 0.5}],
+                    }
+                ],
+            },
+        ]
+    }
+
+    options = pricing_options_from_payload(payload, "WANTED")
+    assert {item["product_number"] for item in options} == {"WANTED-ND"}
+
+
 def test_lookup_refuses_a_near_match_instead_of_storing_the_wrong_part():
     body = {"Products": [
         {"ManufacturerProductNumber": "CLOSE-BUT-NOT-IT", "Manufacturer": {"Name": "TI"}},
@@ -453,6 +481,46 @@ def test_complete_bundle_prefers_product_details_and_exposes_media_model_facts()
     assert {item["media_type"] for item in catalog["media"]} == {"EDA Models", "Datasheets"}
     assert catalog["alternate_packaging"]["ProductVariations"][0]["DigiKeyProductNumber"] == "296-X-2-ND"
     assert catalog["substitutions"]["Products"][0]["ManufacturerProductNumber"] == "SUB"
+
+
+def test_product_details_keeps_keyword_parameters_that_details_omits():
+    bundle = {
+        "keyword_search": {"Products": [{
+            "ManufacturerProductNumber": "X",
+            "Parameters": [{"ParameterText": "Output Current", "ValueText": "30 mA"}],
+            "ProductVariations": [{"DigiKeyProductNumber": "X-ND"}],
+        }]},
+        "product_details": {"Product": {
+            "ManufacturerProductNumber": "X",
+            "Description": {"DetailedDescription": "Detailed X"},
+        }},
+    }
+
+    result = parse_digikey_payload(bundle, "X")
+
+    assert result.description.value == "Detailed X"
+    assert result.specs["Output Current"].value == "30 mA"
+
+
+def test_intake_bundle_retains_the_dedicated_product_pricing_response(monkeypatch):
+    client = DigiKeyClient("id", "secret")
+    monkeypatch.setattr(client, "keyword_search", lambda *_args, **_kwargs: {
+        "Products": [{
+            "ManufacturerProductNumber": "X",
+            "ProductVariations": [{"DigiKeyProductNumber": "X-ND"}],
+        }]
+    })
+    monkeypatch.setattr(client, "product_details", lambda *_: {"Product": {}})
+    monkeypatch.setattr(client, "media", lambda *_: {"MediaLinks": []})
+    monkeypatch.setattr(client, "product_pricing", lambda *_: {"Price": "only-here"})
+    monkeypatch.setattr(client, "alternate_packaging", lambda *_: {})
+    monkeypatch.setattr(client, "substitutions", lambda *_: {})
+    monkeypatch.setattr(client, "recommended_products", lambda *_: {})
+    monkeypatch.setattr(client, "associations", lambda *_: {})
+
+    bundle = client.intake_bundle("X")
+
+    assert bundle["product_pricing"] == {"Price": "only-here"}
 
 
 def test_catalog_keeps_unknown_availability_honest_when_a_probe_failed():

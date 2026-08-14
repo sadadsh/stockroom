@@ -472,8 +472,9 @@ describe("movePlacement", () => {
     expect(piecesIn(after, WORKSPACE_REGION.specificationsBody)).not.toContain(
       "workspace.specifications-pinout",
     );
-    expect(piecesIn(after, WORKSPACE_REGION.sourcingBody)[0]).toBe(
-      "workspace.specifications-pinout",
+    const sourcing = piecesIn(after, WORKSPACE_REGION.sourcingBody);
+    expect(sourcing.indexOf("workspace.specifications-pinout")).toBe(
+      sourcing.indexOf("workspace.sourcing-lifecycle") - 1,
     );
     // Its per-placement settings, including the visibility the document gave it, travelled intact.
     expect(findPlacement(after, "workspace.place.specifications-pinout")?.visibility?.anyOf).toEqual(

@@ -101,7 +101,7 @@ describe("ManageModelsWorkspace", () => {
     expect(providers[0]).toHaveTextContent("Missing 3D Model");
   });
 
-  it("opens the selected provider in a closable modal while Manage Models stays mounted", async () => {
+  it("does not open browser chrome until the capture owns a real native route", async () => {
     const user = userEvent.setup();
     const dossier = makeDossier();
     dossier.cadSourceCoverage.rows = [providerRow("complete", true)];
@@ -118,9 +118,6 @@ describe("ManageModelsWorkspace", () => {
 
     expect(screen.queryByRole("dialog", { name: "SnapEDA Provider" })).toBeNull();
     await user.click(screen.getByRole("button", { name: "Open Provider" }));
-    expect(await screen.findByRole("dialog", { name: "SnapEDA Provider" })).toBeVisible();
-    expect(screen.getByTestId("manage-models-workspace")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Close Provider" }));
 
     expect(screen.queryByRole("dialog", { name: "SnapEDA Provider" })).toBeNull();
     expect(screen.getByTestId("manage-models-workspace")).toBeVisible();

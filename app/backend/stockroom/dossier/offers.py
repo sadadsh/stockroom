@@ -117,18 +117,174 @@ def manufacturer_status(record) -> str:
     return _spec_lookup(record, _MANUFACTURER_STATUS_KEYS)
 
 
+def _digikey_catalog_offers(
+    record,
+    *,
+    now: str,
+    lead_time: str,
+    factory_lead_time: str,
+    lifecycle: str,
+) -> list[dict[str, Any]]:
+    """Every exact-part DigiKey package ladder retained in catalog intelligence."""
+    catalog = (getattr(record, "catalog", None) or {}).get("digikey")
+    options = catalog.get("pricing_options") if isinstance(catalog, dict) else None
+    if not isinstance(options, list):
+        return []
+
+    grouped: dict[tuple[str, str, str], list[dict[str, Any]]] = {}
+    for item in options:
+        if not isinstance(item, dict):
+            continue
+        sku = str(item.get("product_number") or "").strip()
+        packaging = str(item.get("packaging") or "").strip()
+        currency = str(item.get("currency") or "USD").strip() or "USD"
+        try:
+            qty = int(item.get("quantity") or 0)
+            price = float(item.get("unit_price"))
+        except (TypeError, ValueError):
+            continue
+        if not sku or qty <= 0:
+            continue
+        row = {"qty": qty, "price": price}
+        bucket = grouped.setdefault((sku, packaging, currency), [])
+        if row not in bucket:
+            bucket.append(row)
+
+    source = (getattr(record, "sources", None) or {}).get("digikey")
+    fetched_at = str(getattr(source, "fetched_at", "") or "")
+    purchase = next(
+        (
+            item
+            for item in getattr(record, "purchase", None) or []
+            if str(getattr(item, "vendor", "") or "").casefold() == "digikey"
+        ),
+        None,
+    )
+    product_url = str(catalog.get("product_url") or "") if isinstance(catalog, dict) else ""
+    offers: list[dict[str, Any]] = []
+    for (sku, packaging, currency), breaks in grouped.items():
+        breaks.sort(key=lambda item: item["qty"])
+        purchase_sku = str(getattr(purchase, "part_number", "") or "")
+        offers.append(
+            {
+                "provider": "digikey",
+                "providerLabel": provider_label("digikey") or "DigiKey",
+                "sku": f"{sku} · {packaging}" if packaging else sku,
+                "stock": getattr(purchase, "stock", None) if purchase_sku == sku else None,
+                "currency": currency,
+                "unitPrice": breaks[0]["price"],
+                "priceBreaks": breaks,
+                "moq": breaks[0]["qty"],
+                "leadTime": lead_time,
+                "factoryLeadTime": factory_lead_time,
+                "lifecycle": lifecycle,
+                "offerUrl": product_url or str(getattr(purchase, "url", "") or ""),
+                "lastCheckedAt": fetched_at or str(getattr(purchase, "fetched_at", "") or ""),
+                "staleness": staleness(
+                    fetched_at or getattr(purchase, "fetched_at", ""), now
+                ),
+                "failureState": _failure_state(record, "digikey"),
+            }
+        )
+    return offers
+
+
+def _mouser_catalog_offers(
+    record,
+    *,
+    now: str,
+    lead_time: str,
+    factory_lead_time: str,
+    lifecycle: str,
+) -> list[dict[str, Any]]:
+    """Every exact Mouser catalogue row, not only the canonical purchase companion."""
+    catalog = (getattr(record, "catalog", None) or {}).get("mouser")
+    rows = catalog.get("offers") if isinstance(catalog, dict) else None
+    if not isinstance(rows, list):
+        return []
+    source = (getattr(record, "sources", None) or {}).get("mouser")
+    fetched_at = str(getattr(source, "fetched_at", "") or "")
+    offers: list[dict[str, Any]] = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        sku = str(row.get("product_number") or "").strip()
+        breaks: list[dict[str, Any]] = []
+        currency = "USD"
+        for raw in row.get("price_breaks") or []:
+            if not isinstance(raw, dict):
+                continue
+            try:
+                quantity = int(raw.get("qty") or 0)
+                price = float(raw.get("price"))
+            except (TypeError, ValueError):
+                continue
+            if quantity <= 0:
+                continue
+            currency = str(raw.get("currency") or currency)
+            breaks.append({"qty": quantity, "price": price})
+        breaks.sort(key=lambda item: item["qty"])
+        if not sku:
+            continue
+        try:
+            stock = int(row.get("stock")) if row.get("stock") not in (None, "") else None
+        except (TypeError, ValueError):
+            stock = None
+        offers.append(
+            {
+                "provider": "mouser",
+                "providerLabel": provider_label("mouser") or "Mouser",
+                "sku": sku,
+                "stock": stock,
+                "currency": currency,
+                "unitPrice": breaks[0]["price"] if breaks else None,
+                "priceBreaks": breaks,
+                "moq": breaks[0]["qty"] if breaks else None,
+                "leadTime": lead_time,
+                "factoryLeadTime": factory_lead_time,
+                "lifecycle": lifecycle,
+                "offerUrl": str(row.get("product_url") or ""),
+                "lastCheckedAt": fetched_at,
+                "staleness": staleness(fetched_at, now),
+                "failureState": _failure_state(record, "mouser"),
+            }
+        )
+    return offers
+
+
 def build_offers(record, *, now: str = "") -> list[dict[str, Any]]:
-    """One normalized offer per stored purchase entry, sorted by provider label."""
+    """One normalized offer per stored purchase entry or exact provider package ladder."""
     lead_time = _spec_lookup(record, _LEAD_TIME_KEYS)
     factory_lead_time = _spec_lookup(record, _FACTORY_LEAD_TIME_KEYS)
     lifecycle = normalize_lifecycle(_spec_lookup(record, frozenset({"lifecycle"}))) or ""
     declared_moq = _spec_lookup(record, _MOQ_KEYS)
 
-    offers: list[dict[str, Any]] = []
+    digikey_catalog_offers = _digikey_catalog_offers(
+        record,
+        now=now,
+        lead_time=lead_time,
+        factory_lead_time=factory_lead_time,
+        lifecycle=lifecycle,
+    )
+    mouser_catalog_offers = _mouser_catalog_offers(
+        record,
+        now=now,
+        lead_time=lead_time,
+        factory_lead_time=factory_lead_time,
+        lifecycle=lifecycle,
+    )
+    offers = [*digikey_catalog_offers, *mouser_catalog_offers]
     for entry in getattr(record, "purchase", None) or []:
         vendor = str(getattr(entry, "vendor", "") or "")
         provider = provider_of(getattr(entry, "url", ""))
         provider_key = (provider.key if provider is not None else vendor.casefold()).strip()
+        if (
+            (provider_key == "digikey" and digikey_catalog_offers)
+            or (provider_key == "mouser" and mouser_catalog_offers)
+        ):
+            # Catalog projections carry every exact package/SKU ladder; a canonical purchase row
+            # is only the volatile companion for one of them, not another distinct offer.
+            continue
         breaks = _price_breaks(entry)
         unit_price = breaks[0]["price"] if breaks else None
         moq = breaks[0]["qty"] if breaks else None
@@ -160,12 +316,39 @@ def build_offers(record, *, now: str = "") -> list[dict[str, Any]]:
                 "failureState": _failure_state(record, provider_key),
             }
         )
-    offers.sort(key=lambda item: (item["providerLabel"].casefold(), item["provider"]))
+    offers.sort(
+        key=lambda item: (
+            str(item["providerLabel"]).casefold(),
+            str(item["provider"]),
+            str(item["sku"]).casefold(),
+        )
+    )
     return offers
 
 
+def indexed_source_failures(record, offers: list[dict[str, Any]]) -> list[dict[str, str]]:
+    """Failed official checks without an offer row still belong in Sourcing."""
+    offered = {str(item.get("provider", "")) for item in offers}
+    failures: list[dict[str, str]] = []
+    for provider, entry in (getattr(record, "sources", None) or {}).items():
+        state = str((getattr(entry, "extra", None) or {}).get("state", "")).casefold()
+        if provider in offered or state not in _FAILURE_STATES:
+            continue
+        failures.append(
+            {
+                "provider": provider,
+                "providerLabel": provider_label(provider) or provider,
+                "state": state,
+            }
+        )
+    return failures
+
+
 def supply_summary(
-    offers: list[dict[str, Any]], *, manufacturer_status: str = ""
+    offers: list[dict[str, Any]],
+    *,
+    manufacturer_status: str = "",
+    source_failures: list[dict[str, str]] | None = None,
 ) -> dict[str, Any]:
     """The buying answer in one line, derived only from the offers themselves.
 
@@ -211,7 +394,7 @@ def supply_summary(
             }
             for item in offers
             if item["failureState"]
-        ],
+        ] + list(source_failures or []),
     }
 
 
@@ -219,6 +402,7 @@ __all__ = [
     "STALENESS_STATES",
     "STALENESS_THRESHOLDS",
     "build_offers",
+    "indexed_source_failures",
     "manufacturer_status",
     "staleness",
     "supply_summary",

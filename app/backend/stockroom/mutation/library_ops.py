@@ -2042,6 +2042,58 @@ class LibraryOps:
             txn.commit(f"Set specs on {part_id}: {', '.join(sorted(specs))}")
         return record
 
+    def refresh_official_evidence(self, part_id: str, config, now_iso: str) -> PartRecord:
+        """Refetch complete official payloads, index them, rederive, and commit one part.
+
+        This is the durable counterpart to the lightweight preview lookup: every successful
+        Mouser/DigiKey response lands under ``sourced/`` before the record is rederived, so no API
+        field disappears merely because today's UI has no dedicated row for it.
+        """
+        from stockroom.derive.payloads import parse_one
+        from stockroom.enrich.refresh import apply_procurement_refresh
+        from stockroom.importer.engine import Outcome, run_import
+        from stockroom.model.sourced import read_json
+        from stockroom.providers import provider_label
+
+        record = self.load_record(part_id)
+
+        def save(updated: object) -> None:
+            if not isinstance(updated, PartRecord):
+                raise TypeError("official source refresh expected a PartRecord")
+            per_vendor = []
+            for source in ("mouser", "digikey"):
+                entry = updated.sources.get(source)
+                if entry is None or entry.extra.get("state") != "success" or not entry.file:
+                    continue
+                parsed = parse_one(source, read_json(self.repo.root, part_id, source), updated.mpn)
+                if parsed.filled_fields():
+                    per_vendor.append((provider_label(source) or source, parsed))
+            apply_procurement_refresh(updated, per_vendor, now_iso)
+
+            json_path = self.lib.parts_dir / f"{part_id}.json"
+            with Transaction(self.repo) as txn:
+                json_path.write_text(updated.dumps(), encoding="utf-8")
+                txn.track(json_path)
+                for entry in updated.sources.values():
+                    source_path = self.repo.root / entry.file if entry.file else None
+                    if source_path is not None and source_path.is_file():
+                        txn.track(source_path)
+                txn.commit(f"Refresh {part_id}: official source evidence")
+
+        report = run_import(
+            [record],
+            library_root=self.repo.root,
+            config=config,
+            derived_at=now_iso,
+            refetch=True,
+            save=save,
+        )
+        result = report.results[0] if report.results else None
+        if result is None or result.outcome is not Outcome.IMPORTED:
+            detail = result.detail if result is not None else "no official source is configured"
+            raise RuntimeError(f"official source refresh failed: {detail}")
+        return self.load_record(part_id)
+
     def refresh_procurement(self, part_id: str, per_vendor, now_iso: str) -> PartRecord:
         """Refresh a part's volatile procurement data (price / stock / lifecycle / distributor
         P/N / fetched_at) from the per-vendor distributor-API results, atomically. A change-free

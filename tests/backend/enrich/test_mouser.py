@@ -6,7 +6,12 @@ from pathlib import Path
 import pytest
 
 from stockroom.enrich.errors import EnrichError
-from stockroom.enrich.mouser import MouserAdapter, _default_requester, _parse_mouser_part
+from stockroom.enrich.mouser import (
+    MouserAdapter,
+    _default_requester,
+    _parse_mouser_part,
+    parse_mouser_payload,
+)
 
 FIX = Path(__file__).parent / "fixtures"
 
@@ -59,6 +64,32 @@ def test_parse_captures_parametrics_category_and_compliance():
     # order quantities
     assert r.specs["Minimum Order Quantity"].value == "1"
     assert r.specs["Maximum Order Quantity"].value == "240"
+
+
+def test_parse_keeps_every_exact_mouser_catalogue_ladder():
+    second = {
+        **_FULL_PART,
+        "MouserPartNumber": "595-TPD6E05U06RVZR-CT",
+        "AvailabilityInStock": "44",
+        "PriceBreaks": [
+            {"Quantity": 1, "Price": "$0.75", "Currency": "USD"},
+            {"Quantity": 100, "Price": "$0.25", "Currency": "USD"},
+        ],
+    }
+    result = parse_mouser_payload(
+        {"SearchResults": {"Parts": [_FULL_PART, second]}},
+        "TPD6E05U06RVZR",
+    )
+
+    offers = result.catalog["mouser"]["offers"]
+    assert [offer["product_number"] for offer in offers] == [
+        "595-TPD6E05U06RVZR",
+        "595-TPD6E05U06RVZR-CT",
+    ]
+    assert offers[1]["price_breaks"] == [
+        {"qty": 1, "price": 0.75, "currency": "USD"},
+        {"qty": 100, "price": 0.25, "currency": "USD"},
+    ]
 
 
 def test_parse_never_raises_on_missing_rich_blocks():

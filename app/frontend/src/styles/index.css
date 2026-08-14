@@ -2,6 +2,22 @@
 @tailwind components;
 @tailwind utilities;
 
+/* CC0 IEC artwork enters as source SVG, not a font or generated approximation. */
+.electrical-symbol > svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.electrical-symbol > svg * {
+  stroke: currentColor !important;
+}
+
+.electrical-symbol > svg [fill="#000000"],
+.electrical-symbol > svg [fill="#000"] {
+  fill: currentColor !important;
+}
+
 @layer base {
   /* ------------------------------------------------------------------------
      Windows desktop chrome tokens.

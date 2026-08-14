@@ -11,16 +11,17 @@ import {
 // outside src/ - the inventory JSON lives under the gitignored .planning/ and is not present in CI.
 
 describe("iconRegistry", () => {
-  it("has 69 entries with a matching by-id map", () => {
+  it("has 62 application icons with a matching by-id map", () => {
     // 62 as of Batch 4c: +action.view (an eye, replacing the literal word "View" on an asset tile)
     // and +detail.datasheet-link (the document glyph that lets the datasheet row carry the same
     // anatomy as Filing). Deliberate re-baseline, which is what this gate is for.
     // 69 as of the 3D icon-chip move (+6 view/shading glyphs, 2026-07-26).
     // 63 as of the rail-collapse move: +nav.collapse-rail, replacing the raw mono guillemet that was
     // the only control in the app drawing its own text glyph instead of a registry icon.
-    // The Projects frontend removal drops its two navigation glyphs and card thumbnail.
-    expect(ICON_REGISTRY).toHaveLength(69);
-    expect(ICON_BY_ID.size).toBe(69);
+    // The Projects frontend removal drops its two navigation glyphs and card thumbnail. Component
+    // identities now live in the separate electrical-symbol library, removing seven generic glyphs.
+    expect(ICON_REGISTRY).toHaveLength(62);
+    expect(ICON_BY_ID.size).toBe(62);
     for (const entry of ICON_REGISTRY) {
       expect(ICON_BY_ID.get(entry.id), entry.id).toBe(entry);
     }
@@ -44,7 +45,7 @@ describe("iconRegistry", () => {
       acc[entry.category] = (acc[entry.category] ?? 0) + 1;
       return acc;
     }, {});
-    expect(counts).toEqual({ primary: 30, bespoke: 33, art: 3, brand: 3 });
+    expect(counts).toEqual({ primary: 30, bespoke: 26, art: 3, brand: 3 });
   });
 
   it("only uses the four declared categories", () => {
