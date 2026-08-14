@@ -34,7 +34,7 @@ const COLLAPSED_LABEL = "w-0 overflow-hidden opacity-0";
 const RAIL_ROW =
   "grid h-[27px] w-full grid-cols-[35px_minmax(0,1fr)] items-center gap-2.5 " +
   "rounded-control px-0 text-left";
-const RAIL_GLYPH = "flex h-[17px] w-[35px] items-center justify-center";
+const RAIL_GLYPH = "flex h-[17px] w-[35px] flex-none items-center justify-center";
 
 // The update glyph carried exactly ONE tone - ok, for current - so a blocked adoption and a
 // healthy one were the same grey icon beside different words. These are the app's existing tone
@@ -175,14 +175,17 @@ export function Rail() {
         "group/rail flex flex-col border-r border-line py-4 " +
         "transition-[width,padding] duration-150 motion-reduce:transition-none " +
         (collapsed
-          // A compact, opaque icon rail. Labels are available through the accessible name and
-          // native title; the header toggle is the only operation that changes rail width.
-          ? "absolute inset-y-0 left-0 h-full w-[52px] overflow-hidden px-2 " +
+          // Width is structural state, not styling. `rail.root` is an editable Design Studio
+          // target, so a saved inline width used to outrank these classes: Expand showed labels
+          // inside a 56px strip and wrapped every footer word. The important widths keep the
+          // control authoritative while leaving the rail's colour and other authored styling
+          // editable. Both states retain the same 8px inset and 35px icon column.
+          ? "absolute inset-y-0 left-0 h-full !w-[52px] overflow-hidden px-2 " +
             // --c-rail is a translucent tint. Composite it over an opaque canvas base so content
             // never reads through the compact rail. Padding stays identical to the pinned rail,
             // keeping every glyph on one centerline.
             "bg-canvas [background-image:linear-gradient(var(--c-rail),var(--c-rail))]"
-          : "bg-rail h-full w-[190px] px-2")
+          : "bg-rail h-full !w-[190px] px-2")
       }
     >
       {/* wordmark (north-star .wm): the rail's panel-title bar - same band + bottom hairline as every
@@ -240,12 +243,10 @@ export function Rail() {
           </button>
         </span>
         {collapsed ? (
-          <span
-            className={
-            COLLAPSED_LABEL +
-              " whitespace-nowrap text-base font-semibold text-t1"
-            }
-          >
+          // Keep the product name available to document-level queries and assistive technology,
+          // but absolutely remove it from the title band's flex geometry. The old zero-width flex
+          // sibling still consumed `gap-2.5` and shrank the expand glyph five pixels left.
+          <span className="sr-only">
             <Text id="nav.brand">Stockroom</Text>
           </span>
         ) : null}

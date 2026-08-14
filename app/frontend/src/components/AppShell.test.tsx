@@ -290,18 +290,21 @@ describe("Rail collapse", () => {
     window.__STOCKROOM_UI__ = {};
   });
 
-  it("collapses to icons and back, and says which it will do", async () => {
+  it("collapses to icons and back without letting a saved design width break either state", async () => {
     const user = userEvent.setup();
     renderShell();
     const toggle = await screen.findByRole("button", { name: "Collapse Rail" });
     const rail = document.querySelector('[data-dev-id="rail.root"]') as HTMLElement;
-    expect(rail).toHaveClass("w-[190px]");
+    // Personal Design Studio state is applied inline. Rail width is nevertheless owned by this
+    // control: otherwise Expand reveals labels inside the saved narrow width and wraps each word.
+    rail.style.width = "56px";
+    expect(rail).toHaveClass("!w-[190px]");
     // labels are visible while expanded
     expect(screen.getByText("Components")).toBeTruthy();
     await user.click(toggle);
     const expand = screen.getByRole("button", { name: "Expand Rail" });
     expect(expand).toHaveAttribute("aria-expanded", "false");
-    expect(rail).toHaveClass("w-[52px]");
+    expect(rail).toHaveClass("!w-[52px]");
     // the nav items survive as icons: still reachable by their accessible names
     expect(screen.getByRole("button", { name: "Components" })).toBeTruthy();
     await user.click(expand);
@@ -309,7 +312,8 @@ describe("Rail collapse", () => {
       "aria-expanded",
       "true",
     );
-    expect(rail).toHaveClass("w-[190px]");
+    expect(rail).toHaveClass("!w-[190px]");
+    expect(rail).toHaveStyle({ width: "56px" });
   });
 
   it("remembers the choice across a remount, because it is a workspace preference", async () => {

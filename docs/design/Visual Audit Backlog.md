@@ -21,6 +21,23 @@ and `P2` meaningful fit, finish, or clarity debt.
 
 ## Acceptance Captures
 
+### 2026-08-14 — Navigation Rail State And Alignment
+
+- Capture layer: current source in the real Windows pywebview/WebView2 Development host with the
+  owner's applied Design Studio document still setting `rail.root` to a narrow inline width.
+- Evidence: `work/Nav Rail Expanded Aligned.png`, 1,400 × 900, SHA-256 `b7b929df74b7`;
+  `work/Nav Rail Collapsed Aligned.png`, 1,400 × 900, SHA-256 `49a3a4bc9019`;
+  `work/Nav Rail Expanded Aligned Light.png`, 1,400 × 900, SHA-256 `90daecdc5689`; and
+  `work/Nav Rail Collapsed Aligned Light.png`, 1,400 × 900, SHA-256 `1ff220556c7f`.
+- Intended claim: the explicit toggle owns the rail's 190 px open and 52 px closed geometry even
+  when personal styling supplies an inline width; expanded labels remain single-line; compact icons,
+  utilities, and the expand control share one centerline; and workspace content reflows without an
+  overlay in both themes.
+- Acceptance result: pass. The saved 56 px width had previously exposed expanded labels inside the
+  compact strip. Structural important widths now outrank that styling. Removing the compact band's
+  hidden brand from flex flow and making the 35 px glyph wrapper non-shrinking moved the expand
+  control from x=28 to the common x=33 centerline measured for the destination and utility controls.
+
 ### 2026-08-14 — True In-Workspace Provider Browser
 
 - Capture layer: current source in the real Windows pywebview/WebView2 Development host, using the
@@ -354,7 +371,7 @@ and `P2` meaningful fit, finish, or clarity debt.
 | VA-003 | P1 | Search | An equal minimum/maximum rendered a slider with duplicate endpoints and implied a selectable range that did not exist. | Equal bounds now render one static `Only value` fact and no range input; invalid bounds disappear. Exact-current WebView2 frames in both themes show `channels · Only value · 6`, one result value, zero slider/tick controls, no overflow, and an empty console. |
 | VA-005 | P1 | Components empty state | An empty library rendered competing `No Components Yet` and `Select a part` instructions across separate panes, even though no selection was possible. | The current source host replaces both panes with one centered intake state and one working `Add Parts` action. Exact-current WebView2 frames in both themes contain no selection instruction; activating Add Parts opens the shared network intake modal. |
 | VA-015 | P1 | Native navigation rail, all destinations | In auto-collapsed mode, `focus-within` treated a pointer click as keyboard intent and held the 190 px peek open over a 52 px layout slot. It covered the first 138 px of Components, STM Viewer, and Settings until another click moved focus. | Replaced the width and label reveal with `:has(:focus-visible)`. Real WebView2 pointer navigation leaves the rail at 52 px and the destination at x=52; keyboard focus still reveals it and leaving the rail closes it. Verified in both themes on 2026-07-28. |
-| VA-016 | P2 | Native navigation rail, pinned and collapsed | The rail used separate flex/padding arrangements: collapsed centers were nav/about 25.5 px, Update 16 px, Theme 20.5 px; pinned centers were nav/about 30.5 px and Update 31 px. Pinning visibly shifted the column. | Rebuilt every destination and utility as the same `35px minmax(0,1fr)` row grid with the same 8 px panel inset. Real WebView2 measurements are 25.5 px for Components, STM Viewer, Settings, About, Update, and Theme in both pinned and collapsed states. |
+| VA-016 | P2 | Native navigation rail, pinned and collapsed | The rail used separate flex/padding arrangements: collapsed centers were nav/about 25.5 px, Update 16 px, Theme 20.5 px; pinned centers were nav/about 30.5 px and Update 31 px. A later personal Design Studio width overrode both state widths, wrapping open labels inside 56 px, while the compact band's hidden brand sibling shrank the expand glyph five pixels left of the shared column. | Rebuilt every destination and utility as the same `35px minmax(0,1fr)` row grid with the same 8 px panel inset. The open/closed control now owns structural 190/52 px widths over personal styling; the title glyph wrapper cannot shrink and its hidden brand no longer participates in flex gaps. Real WebView2 dark/light captures at 1,400 × 900 show single-line expanded labels and x=33 compact centers for Expand, Projects, STM Viewer, Settings, and utilities. |
 | VA-011 | P2 | Components | The 3D preview used decorative copper/gold color while the approved visual language requires neutral previews unless color carries data. | Studio is now the neutral default and `Source Color` is an explicit authored-material mode. Source/Vite browser captures at 1384×861 in both themes show the neutral whole-object frame and truthful `Visible model · Whole object framed` state. |
 | VA-020 | P0 | Components, 3D preview | STEP-native Z-up positions were passed to a glTF/Three Y-up viewer without basis normalization, standing board-mounted parts on their side. Placement controls could not repair a coordinate system that was already wrong. | Added one non-destructive −90° X parent to each converted STEP scene, recorded basis metadata, and bumped the GLB cache to `c5`. The real WebView2 0603 now lies flat and aligns with its production footprint pads in both themes; converter structure is regression-tested. |
 | VA-021 | P0 | Components, workbench tabs | Selecting a non-Overview tab left the entire Overview grid visible above the selected panel. Tailwind `grid` overrode the browser's `[hidden]` display rule, so two mutually exclusive routes occupied the screen at once. | Inactive workbench panels now receive an authoritative inline `display:none` while retaining `hidden` for accessibility. A regression test switches routes and asserts both layout states; real WebView2 dark/light Representations captures contain only the selected route. |

@@ -400,6 +400,15 @@ describe("the rail's three reported defects", () => {
     const row = document.querySelector('[data-dev-id="rail.nav-components"]')!;
     expect(row.className).toContain("grid-cols-[35px_minmax(0,1fr)]");
     expect(row.querySelector("span[aria-hidden]")!.className).toContain("w-[35px]");
+
+    // The brand remains available to assistive technology but is absolutely removed from flex
+    // geometry. Its old zero-width in-flow box created a gap, shrank this wrapper to 25px, and
+    // pulled the expand glyph five pixels left of every row.
+    const toggle = document.querySelector('[data-dev-id="rail.collapse"]')!;
+    expect(toggle.parentElement).toHaveClass("w-[35px]", "flex-none");
+    const wordmark = document.querySelector('[data-dev-id="rail.wordmark"]')!;
+    expect(wordmark.children).toHaveLength(2);
+    expect(wordmark.lastElementChild).toHaveClass("sr-only");
   });
 
   it("uses the same glyph centerline when pinned and for every collapsed utility", () => {
