@@ -17,6 +17,7 @@ No em dashes anywhere (standing owner rule).
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 from stockroom.store.library_location import library_is_initialized, resolve_libraries_root
@@ -27,13 +28,33 @@ from stockroom.vcs.repo import GitRepo
 _DEFAULT_PROFILE = "Stockroom"
 
 
+def _library_root_boundary() -> Path | None:
+    configured = os.environ.get("STOCKROOM_LIBRARY_ROOT_BOUNDARY", "").strip()
+    return Path(configured).resolve() if configured else None
+
+
+def _require_library_root_boundary(root: Path) -> Path:
+    candidate = Path(root).resolve(strict=False)
+    boundary = _library_root_boundary()
+    if boundary is None:
+        return candidate
+    try:
+        candidate.relative_to(boundary)
+    except ValueError as exc:
+        raise ValueError(
+            f"library path must remain inside the development boundary: {boundary}"
+        ) from exc
+    return candidate
+
+
 def default_library_dir() -> Path:
     """The USER-FACING default location for a fresh / cloned library when the user gives no
     explicit path: a `library` dir beside the per-machine config (writable + portable on every
     OS, and it travels with STOCKROOM_CONFIG_DIR so tests and portable installs stay
     self-contained). Kept DISTINCT from the boot placeholder below, so a first-run clone or
     create into the default is never blocked by the auto-created placeholder library."""
-    return config_dir() / "library"
+    boundary = _library_root_boundary()
+    return (boundary / "library") if boundary is not None else (config_dir() / "library")
 
 
 def _bootstrap_dir() -> Path:
@@ -41,7 +62,12 @@ def _bootstrap_dir() -> Path:
     server can start and serve the onboarding UI). Distinct from default_library_dir() on
     purpose: if bootstrap occupied the user default, a first-run clone/create into that
     default would always collide with it and fail."""
-    return config_dir() / ".bootstrap-library"
+    boundary = _library_root_boundary()
+    return (
+        (boundary / ".bootstrap-library")
+        if boundary is not None
+        else (config_dir() / ".bootstrap-library")
+    )
 
 
 def _same_path(a, b) -> bool:
@@ -111,6 +137,8 @@ def bootstrap_library(config: MachineConfig) -> Path:
     (at the configured path if one was set, else the internal boot dir) so the app can serve
     the onboarding UI."""
     resolved = resolve_libraries_root(config)
+    if resolved is not None:
+        resolved = _require_library_root_boundary(resolved)
     if resolved is not None and library_is_initialized(resolved):
         # An already-usable library: repair a drifted active_profile (a cloned / pulled
         # library, or a config copied from another machine, may not carry this machine's
@@ -135,7 +163,9 @@ def bootstrap_library(config: MachineConfig) -> Path:
     # onboarding rather than silently handing back a fresh empty library as if the user's
     # parts were never there; a genuine first run (no path set) uses the internal placeholder.
     was_configured = bool((config.libraries_root or "").strip())
-    target = Path((config.libraries_root or "").strip() or _bootstrap_dir())
+    target = _require_library_root_boundary(
+        Path((config.libraries_root or "").strip() or _bootstrap_dir())
+    )
     target.mkdir(parents=True, exist_ok=True)
     lib = _finalize(target, config, onboarded=False)
     if was_configured and config.onboarded:
@@ -161,11 +191,13 @@ def set_library(
     if mode == "open":
         if not path:
             raise ValueError("a library directory is required to open")
-        root = Path(path)
+        root = _require_library_root_boundary(Path(path))
         if not root.is_dir():
             raise ValueError(f"no such directory: {root}")
     elif mode == "create":
-        root = Path(path) if path else default_library_dir()
+        root = _require_library_root_boundary(
+            Path(path) if path else default_library_dir()
+        )
         # Create means a FRESH library: refuse a path that is a file, or a non-empty directory
         # (which is likely a user's existing library or repo we must not commit into). This is
         # symmetric with clone's emptiness guard, and turns an opaque mkdir crash into a 400.
@@ -181,7 +213,9 @@ def set_library(
         clone_url = (url or "").strip()
         if not clone_url:
             raise ValueError("a git URL is required to clone a library")
-        root = Path(dest) if dest else default_library_dir()
+        root = _require_library_root_boundary(
+            Path(dest) if dest else default_library_dir()
+        )
         if root.exists() and any(root.iterdir()):
             raise ValueError(f"clone destination is not empty: {root}")
         GitRepo(root).clone_from(clone_url)

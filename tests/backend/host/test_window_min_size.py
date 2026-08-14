@@ -103,7 +103,7 @@ def test_provider_navigation_is_not_mistaken_for_startup_renderer_recovery(
 
     webview.start = start
     monkeypatch.setitem(sys.modules, "webview", webview)
-    monkeypatch.setattr(W, "_configure_windows_process_identity", lambda: None)
+    monkeypatch.setattr(W, "_configure_windows_process_identity", lambda **_kwargs: None)
     monkeypatch.setattr(W, "_apply_window_icon", lambda _window: True)
     monkeypatch.setattr(W, "_release_window_icons", lambda _window: None)
     monkeypatch.setattr(

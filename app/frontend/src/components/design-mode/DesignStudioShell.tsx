@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode, type SyntheticEvent } from "react";
 import { useDesignStudio } from "../../design-studio/DesignStudioProvider";
 import { useDevMode } from "../../lib/devMode";
 import { useText } from "../../lib/copy";
@@ -70,6 +70,11 @@ function clampPanelWidth(value: number): number {
   return Math.max(MIN_PANEL_WIDTH, Math.min(MAX_PANEL_WIDTH, value));
 }
 
+function blockProductInteraction(event: SyntheticEvent): void {
+  event.preventDefault();
+  event.stopPropagation();
+}
+
 function focusStudioEntry(): void {
   window.setTimeout(() => {
     document.querySelector<HTMLButtonElement>("[data-design-studio-entry]")?.focus();
@@ -121,7 +126,7 @@ export function DesignStudioShell({ children }: { children: ReactNode }) {
   const [viewport, setViewport] = useState<StudioViewport>(() => readPref("design_studio_viewport", VIEWPORT_KEY, parseViewport, "desktop-1366"));
   const [customViewportWidth, setCustomViewportWidth] = useState(() => readPref("design_studio_custom_viewport_width", CUSTOM_VIEWPORT_WIDTH_KEY, parseNumber, 1366));
   const [zoom, setZoom] = useState(() => readPref("design_studio_zoom", ZOOM_KEY, parseNumber, 0));
-  const [grid, setGrid] = useState(() => readPref("design_studio_grid", GRID_KEY, parseBoolean, false));
+  const [grid, setGrid] = useState(() => readPref("design_studio_grid", GRID_KEY, parseBoolean, true));
   const [gridSize, setGridSize] = useState(() => readPref(
     "design_studio_grid_size",
     GRID_SIZE_KEY,
@@ -152,6 +157,7 @@ export function DesignStudioShell({ children }: { children: ReactNode }) {
   const fitLabel = useText("design-studio.zoom.fit", "Fit");
   const inspectorLabel = useText("design-studio.panel.inspector", "Inspector");
   const developerLabel = useText("design-studio.developer", "Developer Tools");
+  const drawersLabel = useText("design-studio.drawers", "Design Studio Drawers");
 
   const mode = dev.studioMode;
   const changeMode = useCallback((next: "preview" | "edit") => {
@@ -345,7 +351,7 @@ export function DesignStudioShell({ children }: { children: ReactNode }) {
       ) : null}
       <div className={studio.enabled ? "flex min-h-0 flex-1" : "contents"}>
         {studio.enabled && !presentation ? (
-          <nav data-design-studio-chrome="true" aria-label="Design Studio Drawers" className="flex w-11 flex-none flex-col gap-1 bg-band p-1.5">
+          <nav data-design-studio-chrome="true" aria-label={drawersLabel} className="flex w-11 flex-none flex-col gap-1 bg-band p-1.5">
             <button
               type="button"
               aria-label={screensLabel}
@@ -410,7 +416,7 @@ export function DesignStudioShell({ children }: { children: ReactNode }) {
           onPointerUp={studio.enabled ? () => { panStart.current = null; } : undefined}
           role={studio.enabled ? "region" : undefined}
           aria-label={studio.enabled ? previewLabel : undefined}
-          data-grid={studio.enabled ? (grid ? "visible" : "hidden") : undefined}
+          data-grid={studio.enabled ? (mode === "edit" && grid ? "visible" : "hidden") : undefined}
           data-grid-size={studio.enabled ? gridSize : undefined}
           data-snap={studio.enabled ? (snap ? "on" : "off") : undefined}
           style={studio.enabled ? previewRegionStyle : undefined}
@@ -422,13 +428,27 @@ export function DesignStudioShell({ children }: { children: ReactNode }) {
         >
           <div
             data-design-product-root="true"
+            data-product-interaction={studio.enabled ? (mode === "edit" ? "blocked" : "enabled") : undefined}
+            onAuxClickCapture={studio.enabled && mode === "edit" ? blockProductInteraction : undefined}
+            onChangeCapture={studio.enabled && mode === "edit" ? blockProductInteraction : undefined}
+            onClickCapture={studio.enabled && mode === "edit" ? blockProductInteraction : undefined}
+            onContextMenuCapture={studio.enabled && mode === "edit" ? blockProductInteraction : undefined}
+            onDoubleClickCapture={studio.enabled && mode === "edit" ? blockProductInteraction : undefined}
+            onDragStartCapture={studio.enabled && mode === "edit" ? blockProductInteraction : undefined}
+            onDropCapture={studio.enabled && mode === "edit" ? blockProductInteraction : undefined}
+            onInputCapture={studio.enabled && mode === "edit" ? blockProductInteraction : undefined}
+            onKeyDownCapture={studio.enabled && mode === "edit" ? blockProductInteraction : undefined}
+            onKeyUpCapture={studio.enabled && mode === "edit" ? blockProductInteraction : undefined}
+            onPointerDownCapture={studio.enabled && mode === "edit" ? blockProductInteraction : undefined}
+            onPointerUpCapture={studio.enabled && mode === "edit" ? blockProductInteraction : undefined}
+            onSubmitCapture={studio.enabled && mode === "edit" ? blockProductInteraction : undefined}
             className={studio.enabled ? "relative mx-auto min-h-full overflow-hidden border border-line bg-surface shadow-pop" : "contents"}
             style={studio.enabled ? previewStyle : undefined}
           >
             <DesignPreviewBoundary resetKey={JSON.stringify(dev.draft)} onRecover={dev.undo}>
               <ArrangePreferencesProvider snap={snap} gridSize={gridSize}>{children}</ArrangePreferencesProvider>
             </DesignPreviewBoundary>
-            {studio.enabled && grid ? <div aria-hidden="true" data-design-grid-overlay="true" className="design-studio-preview-grid-overlay pointer-events-none absolute inset-0 z-[180]" /> : null}
+            {studio.enabled && mode === "edit" && grid ? <div aria-hidden="true" data-design-grid-overlay="true" className="design-studio-preview-grid-overlay pointer-events-none absolute inset-0 z-[180]" /> : null}
           </div>
           {studio.enabled ? (
             <div data-design-studio-chrome="true" className="sticky bottom-2 left-2 z-10 w-fit rounded-control border border-line bg-popover/90 px-2 py-1 text-2xs text-t2" data-dev-id="design.pan-cue">

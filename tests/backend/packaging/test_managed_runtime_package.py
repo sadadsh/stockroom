@@ -118,12 +118,11 @@ def test_fixture_release_bundle_is_complete_valid_and_reproducible(
         "license",
         "notice",
         "sbom",
-        "window-host",
-        "window-host-runtime",
     }
-    window_host = [member for member in manifest.members if member.kind == "window-host"]
-    assert len(window_host) == 1
-    assert window_host[0].path == "WindowHost/Stockroom.WindowHost.exe"
+    assert not any(member.path.startswith("WindowHost/") for member in manifest.members)
+    assert first_evidence["window_host_sha256"] == hashlib.sha256(
+        b"MZwindow-host"
+    ).hexdigest()
     assert next(member for member in manifest.members if member.kind == "backend").path == (
         "Backend/Stockroom Worker.exe"
     )
@@ -470,6 +469,13 @@ class _ActivationBoundary:
             generation=generation,
         )
 
+    def rehearse_rollback(self, candidate, current, *, generation: int) -> None:
+        HostManifestRehearsal().rehearse_rollback(
+            candidate,
+            current,
+            generation=generation,
+        )
+
     def launch_shadow(self, candidate, *, generation: int):
         return (candidate.release_id, generation)
 
@@ -633,21 +639,24 @@ def test_persisted_v1_release_activates_packaged_v2_in_shared_data_root(
         control.close()
 
 
-def test_frozen_entry_and_spec_are_the_continuous_and_managed_runtime_contract() -> None:
+def test_frozen_worker_and_native_host_are_the_managed_runtime_contract() -> None:
     launcher = LAUNCHER.read_text(encoding="utf-8")
     spec = SPEC.read_text(encoding="utf-8")
     build = BUILD_SCRIPT.read_text(encoding="utf-8")
 
-    assert "stockroom.launcher.launch import main as continuous_main" in launcher
-    assert "raise SystemExit(continuous_main())" in launcher
+    assert "stockroom.launcher.launch import main as continuous_main" not in launcher
+    assert "raise SystemExit(continuous_main())" not in launcher
     assert "stockroom.host.worker import main as worker_main" in launcher
     assert "--managed-host-probe" in launcher
     assert 'collect_submodules("stockroom")' in spec
+    assert "COLLECT(" in spec
+    assert 'name="Stockroom Worker"' in spec
     assert '"app/frontend-dist"' in spec
     assert '"fastapi"' not in spec.partition("excludes=[")[2]
     assert '"verified-offline-fixture"' in build
     assert '"stable-managed-release-runtime"' in build
-    assert '"stockroom-managed-host-launch/1"' in build
+    assert '"stockroom-native-host-launch/1"' in build
+    assert '$probeStart.FileName = Join-Path $UnpackedRoot "WindowHost\\Stockroom.WindowHost.exe"' in build
     assert "immutable_release_bundle_round_trip = $true" in build
     assert "managed_service_authority = $true" in build
     assert "workflow_coordinator_running = $true" in build
@@ -661,12 +670,12 @@ def test_frozen_entry_and_spec_are_the_continuous_and_managed_runtime_contract()
     assert "$probeStart.Arguments" in build
     assert '$probeStart.EnvironmentVariables["STOCKROOM_CONFIG_DIR"]' in build
     assert "STOCKROOM_BUILD_IDENTITY" in spec
-    assert "STOCKROOM_UV_EXECUTABLE" in spec
+    assert "STOCKROOM_UV_EXECUTABLE" not in spec
     assert "stockroom-build-identity.json" in build
     assert '"--minimum-host-version", $MinimumHostVersion' in build
     assert "minimum_host_version = $MinimumHostVersion" in build
     assert "update_check_interval_seconds" in build
-    assert "[double]$ProbeReceipt.update_check_interval_seconds -ne 60" in build
+    assert '"--native-host-probe"' not in launcher
 
 
 def test_frozen_port_worker_failure_is_noninteractive(

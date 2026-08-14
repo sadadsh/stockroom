@@ -62,6 +62,7 @@ _NATIVE_DOWNLOAD_SEQUENCE = 0
 _NATIVE_DOWNLOAD_EVENTS: list["InAppProviderDownloadEvent"] = []
 
 UNPACKAGED_APP_USER_MODEL_ID = "Stockroom.Desktop.Unpackaged"
+DEVELOPMENT_APP_USER_MODEL_ID = "Stockroom.Development.Unpackaged"
 
 _APP_MODEL_ERROR_NO_PACKAGE = 15_700
 _ERROR_INSUFFICIENT_BUFFER = 122
@@ -743,7 +744,12 @@ def _process_has_package_identity(kernel32=None) -> bool:
         return True
 
 
-def _configure_windows_process_identity(*, kernel32=None, shell32=None) -> bool:
+def _configure_windows_process_identity(
+    *,
+    app_user_model_id: str = UNPACKAGED_APP_USER_MODEL_ID,
+    kernel32=None,
+    shell32=None,
+) -> bool:
     """Set Stockroom's stable AUMID only for an unpackaged Windows process.
 
     MSIX owns the installed application's AUMID. Overriding it would split
@@ -760,7 +766,7 @@ def _configure_windows_process_identity(*, kernel32=None, shell32=None) -> bool:
         api = shell32 or ctypes.windll.shell32
         setter = api.SetCurrentProcessExplicitAppUserModelID
         _set_signature(setter, [wintypes.LPCWSTR], ctypes.c_long)
-        result = int(setter(UNPACKAGED_APP_USER_MODEL_ID))
+        result = int(setter(app_user_model_id))
         if result != 0:
             _log.warning(
                 "Windows rejected Stockroom's unpackaged AppUserModelID (HRESULT %#x)",
@@ -1771,11 +1777,18 @@ def run_managed_window(
         raise RuntimeError("managed Stockroom command loop failed") from command_errors[0]
 
 
-def run_window(base_url: str, token: str) -> None:
+def run_window(
+    base_url: str,
+    token: str | None,
+    *,
+    initial_url: str | None = None,
+    title: str = "Stockroom",
+    app_user_model_id: str = UNPACKAGED_APP_USER_MODEL_ID,
+) -> None:
     """Open Stockroom's visible WebView2 shell and block until it closes."""
 
     global _ACTIVE_WINDOW, _APP_ORIGIN, _WINDOW_CHROME
-    _configure_windows_process_identity()
+    _configure_windows_process_identity(app_user_model_id=app_user_model_id)
     import webview  # pywebview, WebView2 backend on Windows; lazy so Linux imports
 
     _install_silent_webview2_download_handler(webview)
@@ -1805,8 +1818,8 @@ def run_window(base_url: str, token: str) -> None:
     # Real-window measurement found 884 px clean and 744 px structurally broken:
     # the fixed rail and picker left no usable detail-pane width below this floor.
     window = webview.create_window(
-        "Stockroom",
-        url=base_url,
+        title,
+        url=initial_url or base_url,
         width=1400,
         height=900,
         min_size=(960, 640),

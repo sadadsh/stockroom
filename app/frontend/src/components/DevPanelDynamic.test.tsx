@@ -168,8 +168,8 @@ describe("Copy ID returns the exact id", () => {
   });
 });
 
-describe("hover and inspect show the exact id", () => {
-  it("names the hovered instance and borrows its role's label", () => {
+describe("hover uses product labels", () => {
+  it("names the hovered role without exposing raw instance ids", () => {
     render(<Harness />);
     toggleDevMode();
     fireEvent.click(screen.getByRole("button", { name: "Edit" }));
@@ -179,7 +179,7 @@ describe("hover and inspect show the exact id", () => {
     fireEvent.pointerMove(third);
 
     const badge = screen.getByTestId("dev-hover");
-    expect(within(badge).getByText(candidateDevId("rc0402fr-07100rl"))).toBeInTheDocument();
+    expect(within(badge).queryByText(candidateDevId("rc0402fr-07100rl"))).not.toBeInTheDocument();
     expect(within(badge).getByText("Staged candidate card (one instance)")).toBeInTheDocument();
   });
 });

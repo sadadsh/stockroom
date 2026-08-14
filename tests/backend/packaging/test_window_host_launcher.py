@@ -1,138 +1,48 @@
 from __future__ import annotations
 
-import os
 import sys
-from pathlib import Path
 
 import pytest
 
 import packaging.stockroom_launcher as launcher
-from stockroom.host import window_process
-from stockroom.host.window_process import WindowHostArguments, WindowHostError
-from stockroom.launcher import launch as continuous_launch
-
-_PIPE_NAME = "Stockroom.WindowHandoff." + "a" * 32
 
 
-def _argv() -> list[str]:
-    return [
-        "Stockroom.exe",
-        "--window-host",
-        "--handoff-pipe",
-        _PIPE_NAME,
-        "--parent-pid",
-        "111",
-    ]
-
-
-def test_frozen_launcher_dispatches_the_exact_window_host_contract(
+def test_normal_launch_is_rejected_because_native_host_is_the_only_entry(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    prepared: list[bool] = []
-    dispatched: list[WindowHostArguments] = []
-    monkeypatch.setattr(
-        launcher,
-        "_prepare_runtime",
-        lambda *, needs_window: prepared.append(needs_window),
-    )
-    monkeypatch.setattr(
-        window_process,
-        "run_window_host",
-        dispatched.append,
-    )
-    monkeypatch.setattr(sys, "argv", _argv())
+    monkeypatch.setattr(sys, "argv", ["Stockroom Worker.exe"])
 
-    launcher._dispatch()
-
-    assert prepared == [True]
-    assert dispatched == [
-        WindowHostArguments(
-            pipe_name=_PIPE_NAME,
-            parent_process_id=111,
-        )
-    ]
-
-
-def test_normal_launch_dispatches_the_continuous_real_app(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    prepared: list[bool] = []
-    monkeypatch.setattr(
-        launcher,
-        "_prepare_runtime",
-        lambda *, needs_window: prepared.append(needs_window),
-    )
-    monkeypatch.setattr(continuous_launch, "main", lambda: 7)
-    monkeypatch.setattr(sys, "argv", ["Stockroom.exe"])
-
-    with pytest.raises(SystemExit) as stopped:
+    with pytest.raises(SystemExit, match="no interactive entry point"):
         launcher._dispatch()
 
-    assert stopped.value.code == 7
-    assert prepared == [False]
 
-
-def test_frozen_runtime_path_exposes_bundled_node_npm_and_git_lfs(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    bundle = tmp_path / "Bundle"
-    for directory in (
-        bundle / "mingit" / "cmd",
-        bundle / "mingit" / "bin",
-        bundle / "mingit" / "mingw64" / "bin",
-        bundle / "node",
-    ):
-        directory.mkdir(parents=True)
-    (bundle / "mingit" / "cmd" / "git.exe").write_bytes(b"git")
-    (bundle / "node" / "node.exe").write_bytes(b"node")
-    (bundle / "node" / "npm.cmd").write_text("npm", encoding="utf-8")
-    monkeypatch.setattr(sys, "frozen", True, raising=False)
-    monkeypatch.setattr(sys, "_MEIPASS", str(bundle), raising=False)
-    monkeypatch.setenv("PATH", "WINDOWS")
-
-    launcher._prepare_runtime(needs_window=False)
-
-    entries = os.environ["PATH"].split(os.pathsep)
-    assert str(bundle / "node") in entries
-    assert str(bundle / "mingit" / "mingw64" / "bin") in entries
-
-
-def test_malformed_window_host_argv_fails_before_webview_runtime_preparation(
+def test_window_host_contract_is_not_available_from_python_worker(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    prepared: list[bool] = []
-    monkeypatch.setattr(
-        launcher,
-        "_prepare_runtime",
-        lambda *, needs_window: prepared.append(needs_window),
-    )
     monkeypatch.setattr(
         sys,
         "argv",
         [
-            "Stockroom.exe",
+            "Stockroom Worker.exe",
             "--window-host",
             "--handoff-pipe",
-            _PIPE_NAME,
+            "Stockroom.WindowHandoff." + "a" * 32,
             "--parent-pid",
             "111",
-            "--unexpected",
         ],
     )
 
-    with pytest.raises(WindowHostError, match="arguments are invalid"):
+    with pytest.raises(SystemExit, match="no interactive entry point"):
         launcher._dispatch()
 
-    assert prepared == []
 
-
-def test_window_host_failure_is_noninteractive(
+def test_worker_failure_is_noninteractive(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     observed: list[tuple[str, bool]] = []
 
     def fail_dispatch() -> None:
-        raise RuntimeError("window child exploded")
+        raise RuntimeError("worker exploded")
 
     monkeypatch.setattr(launcher, "_dispatch", fail_dispatch)
     monkeypatch.setattr(
@@ -140,7 +50,7 @@ def test_window_host_failure_is_noninteractive(
         "_fatal",
         lambda message, *, interactive: observed.append((message, interactive)),
     )
-    monkeypatch.setattr(sys, "argv", _argv())
+    monkeypatch.setattr(sys, "argv", ["Stockroom Worker.exe", "--port", "39123"])
 
     with pytest.raises(SystemExit) as stopped:
         launcher._main()
@@ -148,73 +58,18 @@ def test_window_host_failure_is_noninteractive(
     assert stopped.value.code == 1
     assert observed == [
         (
-            "Stockroom's managed runtime could not start.\n\nwindow child exploded",
+            "Stockroom's managed runtime could not start.\n\nworker exploded",
             False,
         )
     ]
 
 
-def test_malformed_window_host_argv_is_sanitized_and_noninteractive(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    observed: list[tuple[str, bool]] = []
-    prepared: list[bool] = []
-    secret = "must-not-be-reflected"
-    monkeypatch.setattr(
-        launcher,
-        "_prepare_runtime",
-        lambda *, needs_window: prepared.append(needs_window),
-    )
-    monkeypatch.setattr(
-        launcher,
-        "_fatal",
-        lambda message, *, interactive: observed.append((message, interactive)),
-    )
-    monkeypatch.setattr(
-        sys,
-        "argv",
-        [
-            *_argv(),
-            "--api-token",
-            secret,
-        ],
-    )
-
-    with pytest.raises(SystemExit) as stopped:
-        launcher._main()
-
-    assert stopped.value.code == 1
-    assert prepared == []
-    assert len(observed) == 1
-    assert observed[0][1] is False
-    assert secret not in observed[0][0]
-    assert observed[0][0].endswith("window-host arguments are invalid")
-
-
-def test_window_host_mode_wins_dispatch_and_rejects_mixed_worker_arguments(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    prepared: list[bool] = []
-    monkeypatch.setattr(
-        launcher,
-        "_prepare_runtime",
-        lambda *, needs_window: prepared.append(needs_window),
-    )
-    monkeypatch.setattr(sys, "argv", [*_argv(), "--port", "32100"])
-
-    with pytest.raises(WindowHostError, match="arguments are invalid"):
-        launcher._dispatch()
-
-    assert prepared == []
-
-
-def test_launcher_source_keeps_credentials_out_of_the_window_host_argv() -> None:
-    source = (
-        Path(__file__).resolve().parents[3] / "packaging" / "stockroom_launcher.py"
-    ).read_text(encoding="utf-8")
-
-    assert "--window-host" in source
-    assert "--handoff-pipe" not in source
-    assert "--parent-pid" not in source
-    assert "--api-token" not in source
-    assert "--handoff-token" not in source
+def test_launcher_contains_no_mutable_startup_or_browser_provisioning() -> None:
+    source = launcher.__file__
+    assert source is not None
+    text = open(source, encoding="utf-8").read()
+    assert "stockroom.launcher.launch" not in text
+    assert "ensure_webview2" not in text
+    assert "STOCKROOM_UV" not in text
+    assert "mingit" not in text.casefold()
+    assert "node.exe" not in text.casefold()

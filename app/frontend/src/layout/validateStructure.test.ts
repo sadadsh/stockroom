@@ -79,7 +79,6 @@ describe("the shipped arrangement", () => {
     expect(manifests.filter((m) => m.minWidth !== undefined || m.minHeight !== undefined)).toEqual([]);
     const scrollers = manifests.filter((m) => m.scroll.owns);
     expect(scrollers.map((m) => m.id)).toEqual([
-      "workspace.sourcing-offers",
       "workspace.sourcing-provenance",
     ]);
     expect(scrollers.every((m) => m.scroll.axis === "horizontal")).toBe(true);

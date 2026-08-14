@@ -73,14 +73,16 @@ def _service_owner_process(
     ready: Any,
     finish: Any,
     fence_sender: Any,
+    purpose: str,
 ) -> None:
     try:
         control = ServiceControl(
             Path(database),
             mode=ServiceMode.COORDINATOR,
             identity=WindowsCurrentIdentity(),
-            mutex_factory=secure_windows_mutex_factory,
+            mutex_factory=WindowsNamedMutexFactory(purpose=purpose),
             storage_policy=_AllowTestStorage(),
+            authority_scope=purpose,
         )
         fence = control.acquire(now=1.0)
         fence_sender.send((fence.generation, fence.owner_id))
@@ -251,9 +253,10 @@ def test_real_final_handle_crash_recreates_mutex_and_fences_stale_generation(
     ready = context.Event()
     finish = context.Event()
     fence_receiver, fence_sender = context.Pipe(duplex=False)
+    purpose = f"Tests.ControlCrash.{uuid.uuid4().hex}"
     process = context.Process(
         target=_service_owner_process,
-        args=(str(database), ready, finish, fence_sender),
+        args=(str(database), ready, finish, fence_sender, purpose),
     )
     process.start()
     fence_sender.close()
@@ -274,8 +277,9 @@ def test_real_final_handle_crash_recreates_mutex_and_fences_stale_generation(
             database,
             mode=ServiceMode.COORDINATOR,
             identity=WindowsCurrentIdentity(),
-            mutex_factory=secure_windows_mutex_factory,
+            mutex_factory=WindowsNamedMutexFactory(purpose=purpose),
             storage_policy=_AllowTestStorage(),
+            authority_scope=purpose,
         )
         new_fence = reopened.acquire(now=2.0)
         assert new_fence.generation == old_fence.generation + 1

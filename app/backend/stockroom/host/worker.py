@@ -22,18 +22,23 @@ def main() -> None:
     control_secret = os.environ.pop("STOCKROOM_SERVICE_CONTROL_TOKEN", "")
     workflow_database = os.environ.pop("STOCKROOM_WORKFLOW_DATABASE", "")
     managed = bool(control_database)
+    coordinator = managed and service_mode == "coordinator"
     production = os.environ.get("STOCKROOM_UPDATE_MODE", "").strip().casefold() == "production"
     # Validate the complete managed identity before constructing any application
     # object. A malformed production candidate gets no opportunity to inspect,
     # migrate, or repair shared machine/library state.
     if managed:
+        shadow_identity_valid = (
+            service_mode == "shadow"
+            and generation_text.isdecimal()
+            and int(generation_text) > 0
+            and bool(control_secret)
+        )
+        coordinator_identity_valid = service_mode == "coordinator" and not generation_text
         if (
             not release_id
-            or not generation_text.isdecimal()
-            or int(generation_text) <= 0
-            or service_mode != "shadow"
-            or not control_secret
             or not workflow_database
+            or not (shadow_identity_valid or coordinator_identity_valid)
         ):
             raise SystemExit("managed release worker identity is incomplete")
     elif production:
@@ -43,17 +48,27 @@ def main() -> None:
 
     from stockroom.api.app import create_app
     from stockroom.api.serve import build_context
-    from stockroom.host.run import _install_injected_index
+    from stockroom.host.run import _install_injected_index, _prepare_managed_library
     from stockroom.host.service_authority import (
         ContextServiceAuthority,
         ContextServiceLifecycle,
         install_service_authority_routes,
     )
 
-    ctx = build_context(cold=managed)
+    package_probe_scope = os.environ.pop("STOCKROOM_PACKAGE_PROBE_SCOPE", "")
+    if coordinator:
+        prepared_library = _prepare_managed_library(
+            None,
+            service_state_root=Path(control_database).resolve().parent,
+            authority_scope=package_probe_scope or "ApplicationService",
+        )
+        ctx = build_context(prepared_library, cold=True)
+    else:
+        ctx = build_context(cold=managed)
     ctx.token = token
     authority = None
-    if managed:
+    production_update_runtime = None
+    if managed and not coordinator:
         from stockroom.planning.production_composition import (
             build_production_workflow_registry_for_context,
         )
@@ -70,12 +85,13 @@ def main() -> None:
             release_id=release_id,
             control_database=Path(control_database),
             lifecycle=lifecycle,
+            start_as_coordinator=coordinator,
         )
         snapshot = authority.snapshot()
         if (
             snapshot.status.value != "active"
-            or snapshot.generation != int(generation_text)
-            or snapshot.mode.value != "shadow"
+            or (not coordinator and snapshot.generation != int(generation_text))
+            or snapshot.mode.value != service_mode
         ):
             authority.close()
             ctx.close()
@@ -105,12 +121,37 @@ def main() -> None:
         "STOCKROOM_PUBLIC_BASE_URL",
         f"http://127.0.0.1:{args.port}",
     )
-    _install_injected_index(app, public_base_url, token)
+    _install_injected_index(
+        app,
+        public_base_url,
+        token,
+        expose_token_to_renderer=False,
+    )
+    served_app = app
+    if coordinator:
+        from stockroom.host.proxy import SwitchableBackendProxy
+        from stockroom.host.release_runtime import create_production_update_runtime
+
+        proxy = SwitchableBackendProxy(app)
+        production_update_runtime = create_production_update_runtime(
+            proxy,
+            context=ctx,
+            public_base_url=public_base_url,
+            token=token,
+            reload_window=lambda _url: None,
+            manage_native_window=False,
+            authority_scope=(package_probe_scope or None),
+        )
+        setattr(ctx, "update_convergence", production_update_runtime)
+        production_update_runtime.start()
+        served_app = proxy
     try:
-        uvicorn.run(app, host="127.0.0.1", port=args.port, log_level="warning")
+        uvicorn.run(served_app, host="127.0.0.1", port=args.port, log_level="warning")
     finally:
         try:
-            if authority is not None:
+            if production_update_runtime is not None:
+                production_update_runtime.close()
+            elif authority is not None:
                 authority.close()
         finally:
             ctx.close()

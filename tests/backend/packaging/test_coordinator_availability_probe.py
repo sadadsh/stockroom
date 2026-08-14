@@ -101,15 +101,11 @@ def test_command_reports_busy_coordinator_without_a_traceback(
     assert captured.err == ("Stockroom coordinator preflight failed: coordinator is busy\n")
 
 
-def test_windows_build_runs_advisory_probe_before_resetting_outputs() -> None:
+def test_windows_build_does_not_require_the_running_app_to_close() -> None:
     build_script = (
         Path(__file__).resolve().parents[3] / "packaging" / "Build-Windows-Package.ps1"
     ).read_text(encoding="utf-8")
 
-    invocation = '"run", "--frozen", "python", $CoordinatorProbeTool'
-    output_reset = '$WorkRoot = Initialize-OutputDirectory -Path (Join-Path $OutputRoot "Work")'
-
-    assert "$CoordinatorProbeTool = Join-Path $PackagingRoot " in build_script
-    assert build_script.index(invocation) < build_script.index(output_reset)
-    assert "Advisory fail-fast check only." in build_script
-    assert "runtime still performs the authoritative acquisition" in build_script
+    assert "$CoordinatorProbeTool" not in build_script
+    assert "coordinator_availability_probe.py" not in build_script
+    assert "Another Stockroom instance owns coordinator authority" not in build_script

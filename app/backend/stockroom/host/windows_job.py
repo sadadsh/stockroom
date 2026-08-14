@@ -320,20 +320,30 @@ def launch_in_windows_job(
     cwd: Path,
     environment: Mapping[str, str],
     creationflags: int,
+    diagnostic_path: Path | None = None,
 ) -> tuple[subprocess.Popen[bytes], WindowsProcessJob]:
     """Launch suspended, assign the exact root to a kill-on-close job, then resume."""
 
     if os.name != "nt":
         raise WindowsProcessJobError("Windows process jobs require Win32")
-    process = subprocess.Popen(
-        list(command),
-        cwd=str(cwd),
-        env=dict(environment),
-        stdin=subprocess.DEVNULL,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-        creationflags=creationflags | _CREATE_SUSPENDED,
-    )
+    diagnostic_stream = None
+    try:
+        if diagnostic_path is not None:
+            diagnostic_path = Path(diagnostic_path).resolve()
+            diagnostic_path.parent.mkdir(parents=True, exist_ok=True)
+            diagnostic_stream = diagnostic_path.open("ab", buffering=0)
+        process = subprocess.Popen(
+            list(command),
+            cwd=str(cwd),
+            env=dict(environment),
+            stdin=subprocess.DEVNULL,
+            stdout=(diagnostic_stream or subprocess.DEVNULL),
+            stderr=(diagnostic_stream or subprocess.DEVNULL),
+            creationflags=creationflags | _CREATE_SUSPENDED,
+        )
+    finally:
+        if diagnostic_stream is not None:
+            diagnostic_stream.close()
     kernel32 = _kernel32()
     handle = kernel32.CreateJobObjectW(None, None)
     if not handle:

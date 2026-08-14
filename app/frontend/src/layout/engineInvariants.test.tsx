@@ -622,8 +622,8 @@ describe("no layout document grows a page scrollbar", () => {
  *
  * The distinction matters because the two kinds answer different questions. A REGION's scroll is the
  * arrangement's - the plan's invariant, "each region owns at most one scroll axis", is about these.
- * A PIECE's internal scroll is the piece's own business (the offers table and the provenance ledger's
- * table each declare one in their manifest and scroll sideways inside their section); what the
+ * A PIECE's internal scroll is the piece's own business (the provenance ledger declares one in its
+ * manifest and scrolls sideways inside its section); what the
  * invariant has to say about those is that they are CONTAINED and DECLARED, never that they do not
  * exist.
  */
@@ -676,11 +676,8 @@ describe("every region the renderer draws owns at most one scroll axis", () => {
    *   the page scrolls. That it is also DECLARED by its piece's manifest is the next test.
    *
    * The nesting rule is deliberately NOT extended to piece-internal scrollers, because the shipped
-   * arrangement legitimately nests two on the horizontal axis: the column band scrolls sideways below
-   * the three columns' combined minimum (an emergency, not a reading axis) and the offers table
-   * scrolls sideways inside its section (the intended one). Scroll chaining resolves that pair in the
-   * order a person expects - the table first, the band once the table is at its end - and forbidding
-   * it would be forbidding the arrangement rather than testing it.
+   * arrangement may nest a piece-owned horizontal axis inside the column band's emergency horizontal
+   * overflow. The provenance ledger owns that contained axis; the offers ledger no longer does.
    *
    * FAILS IF: a scroller claims both axes (change `overflow-y-auto overflow-x-hidden` in
    * `WorkspaceColumnScroller` to `overflow-auto`), a region scroller ends up inside another on the
@@ -757,12 +754,12 @@ describe("every region the renderer draws owns at most one scroll axis", () => {
       const pieceScrollers = scrollersIn(container).filter(
         (entry) => !isRegionScroller(entry.element, regionDevIds),
       );
-      // The floor, and it is a real one: the two wide tables the manifests declare are both on screen
-      // for this component, so the scan below has something to be right about.
+      // The floor: the provenance ledger's declared horizontal scroller is on screen, so the scan
+      // below has something real to be right about.
       expect(
         pieceScrollers.length,
         `${document_.id}: piece-internal scrollers found`,
-      ).toBeGreaterThanOrEqual(2);
+      ).toBeGreaterThanOrEqual(1);
 
       const undeclared: string[] = [];
       for (const { element, axes } of pieceScrollers) {

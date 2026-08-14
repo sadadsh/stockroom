@@ -73,7 +73,7 @@ export function InspectorPanel({ root }: { root?: Element; integrated?: boolean 
     [dev.selectedDevId, resolvedRoot],
   );
   const contextualInspectorLabel = useText("design-studio.inspector.context", "Contextual Inspector");
-  const selectHint = useText("design-studio.inspector.select-hint", "Click anything in Stockroom to edit it.");
+  const selectHint = useText("design-studio.inspector.select-hint", "Click an item in Stockroom to edit it.");
   const inspectorDomainsLabel = useText("design-studio.inspector.domains", "Inspector Groups");
   const layoutLabel = useText("design-studio.inspector.domain.layout", "Arrangement");
   const quickLabel = useText("design-studio.inspector.domain.quick", "Quick");

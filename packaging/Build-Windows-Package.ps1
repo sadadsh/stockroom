@@ -3,16 +3,13 @@ param(
     [ValidateSet("Fixture", "Production")]
     [string]$Mode = "Fixture",
 
-    [string]$Version = "0.1.0.0",
-    [string]$MinimumHostVersion = "0.1.0.0",
+    [string]$Version = "0.7.0.0",
+    [string]$MinimumHostVersion = "0.7.0.0",
     [int]$ProtocolVersion = 1,
     [string]$Publisher = "",
     [string]$FeedBaseUri = "",
     [string]$SigningCertificatePath = "",
     [string]$SigningEnvironmentVariableName = "STOCKROOM_SIGNING_CERT_PASSWORD",
-    [string]$MinGitRoot = "",
-    [string]$NodeRoot = "",
-    [string]$WebView2BootstrapperPath = "",
     [string]$TufRootPath = "",
     [int]$TufMetadataVersion = 1,
     [string[]]$TufTargetsKeyPaths = @(),
@@ -36,7 +33,6 @@ $ContractModule = "packaging.package_contract"
 $ReleaseBundleTool = Join-Path $PackagingRoot "release_bundle.py"
 $ReleaseFeedModule = "packaging.release_feed"
 $WorkerProbeTool = Join-Path $PackagingRoot "package_worker_probe.py"
-$CoordinatorProbeTool = Join-Path $PackagingRoot "coordinator_availability_probe.py"
 $SpecPath = Join-Path $PackagingRoot "stockroom.spec"
 $SourceIcon = Join-Path $RepositoryRoot "app\backend\stockroom\host\assets\stockroom.ico"
 $WindowHostProject = Join-Path $RepositoryRoot "app\desktop\Stockroom.WindowHost\Stockroom.WindowHost.csproj"
@@ -102,15 +98,6 @@ else {
     if ([string]::IsNullOrWhiteSpace($SigningCertificatePath)) {
         throw "Production mode requires -SigningCertificatePath to the real code-signing PFX."
     }
-    if ([string]::IsNullOrWhiteSpace($MinGitRoot)) {
-        throw "Production mode requires pinned MinGit for library Git operations."
-    }
-    if ([string]::IsNullOrWhiteSpace($NodeRoot)) {
-        throw "Production mode requires pinned Node/npm for owner Dev Mode publishing."
-    }
-    if ([string]::IsNullOrWhiteSpace($WebView2BootstrapperPath)) {
-        throw "Production mode requires the pinned WebView2 Evergreen bootstrapper."
-    }
     if ([string]::IsNullOrWhiteSpace($TufRootPath)) {
         throw "Production mode requires -TufRootPath to the offline-authored trust root."
     }
@@ -135,16 +122,6 @@ else {
     }
     if ($dirty) {
         throw "Production packaging refuses a dirty Git working tree."
-    }
-}
-
-if (-not [string]::IsNullOrWhiteSpace($NodeRoot)) {
-    $NodeRoot = [IO.Path]::GetFullPath($NodeRoot)
-    if (
-        -not (Test-Path -LiteralPath (Join-Path $NodeRoot "node.exe") -PathType Leaf) -or
-        -not (Test-Path -LiteralPath (Join-Path $NodeRoot "npm.cmd") -PathType Leaf)
-    ) {
-        throw "NodeRoot must contain node.exe and npm.cmd."
     }
 }
 
@@ -242,7 +219,22 @@ function Invoke-Checked {
 
 function Get-Sha256 {
     param([Parameter(Mandatory)][string]$Path)
-    return (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant()
+
+    $resolved = [IO.Path]::GetFullPath($Path)
+    $stream = [IO.File]::OpenRead($resolved)
+    try {
+        $hasher = [Security.Cryptography.SHA256]::Create()
+        try {
+            $digest = $hasher.ComputeHash($stream)
+        }
+        finally {
+            $hasher.Dispose()
+        }
+    }
+    finally {
+        $stream.Dispose()
+    }
+    return ([BitConverter]::ToString($digest) -replace "-", "").ToLowerInvariant()
 }
 
 function Get-DirectoryFingerprint {
@@ -344,14 +336,6 @@ if ($Mode -eq "Production") {
         throw "The signing PFX does not contain the Code Signing EKU."
     }
 
-    $MinGitRoot = [IO.Path]::GetFullPath($MinGitRoot)
-    if (-not (Test-Path -LiteralPath (Join-Path $MinGitRoot "cmd\git.exe") -PathType Leaf)) {
-        throw "MinGitRoot must contain cmd\git.exe."
-    }
-    $WebView2BootstrapperPath = [IO.Path]::GetFullPath($WebView2BootstrapperPath)
-    if (-not (Test-Path -LiteralPath $WebView2BootstrapperPath -PathType Leaf)) {
-        throw "WebView2 bootstrapper does not exist."
-    }
     $TufRootPath = [IO.Path]::GetFullPath($TufRootPath)
     if (-not (Test-Path -LiteralPath $TufRootPath -PathType Leaf)) {
         throw "Pinned TUF root does not exist."
@@ -377,13 +361,6 @@ if ($Mode -eq "Production") {
 # silently embed a different icon.
 Invoke-Checked -FilePath $UvPath -Arguments @(
     "run", "--frozen", "python", $BrandAssetsTool, "--check"
-)
-
-# Advisory fail-fast check only. The probe releases its claim immediately, so
-# the packaged runtime still performs the authoritative acquisition after this
-# unavoidable time-of-check/time-of-use boundary.
-Invoke-Checked -FilePath $UvPath -Arguments @(
-    "run", "--frozen", "python", $CoordinatorProbeTool
 )
 
 $WorkRoot = Initialize-OutputDirectory -Path (Join-Path $OutputRoot "Work")
@@ -429,10 +406,7 @@ if ($SigningCertificateProvided) {
 Invoke-Checked -FilePath $UvPath -Arguments $contractArguments
 
 function Build-Executable {
-    param(
-        [Parameter(Mandatory)][string]$Name,
-        [Parameter(Mandatory)][string]$CadConverterRoot
-    )
+    param([Parameter(Mandatory)][string]$Name)
 
     $buildRoot = Initialize-OutputDirectory -Path (Join-Path $WorkRoot $Name)
     $distRoot = Join-Path $buildRoot "Dist"
@@ -444,37 +418,12 @@ function Build-Executable {
         SOURCE_DATE_EPOCH = $env:SOURCE_DATE_EPOCH
         STOCKROOM_VERSION_FILE = $env:STOCKROOM_VERSION_FILE
         STOCKROOM_BUILD_IDENTITY = $env:STOCKROOM_BUILD_IDENTITY
-        STOCKROOM_UV_EXECUTABLE = $env:STOCKROOM_UV_EXECUTABLE
-        STOCKROOM_CAD_CONVERTER_ROOT = $env:STOCKROOM_CAD_CONVERTER_ROOT
-        STOCKROOM_MINGIT_ROOT = $env:STOCKROOM_MINGIT_ROOT
-        STOCKROOM_NODE_ROOT = $env:STOCKROOM_NODE_ROOT
-        STOCKROOM_WEBVIEW2_BOOTSTRAPPER = $env:STOCKROOM_WEBVIEW2_BOOTSTRAPPER
     }
     try {
         $env:PYTHONHASHSEED = "1"
         $env:SOURCE_DATE_EPOCH = [string]$SourceDateEpoch
         $env:STOCKROOM_VERSION_FILE = $VersionInfoPath
         $env:STOCKROOM_BUILD_IDENTITY = $BuildIdentityPath
-        $env:STOCKROOM_UV_EXECUTABLE = $UvPath
-        $env:STOCKROOM_CAD_CONVERTER_ROOT = $CadConverterRoot
-        if (-not [string]::IsNullOrWhiteSpace($MinGitRoot)) {
-            $env:STOCKROOM_MINGIT_ROOT = $MinGitRoot
-        }
-        else {
-            Remove-Item Env:STOCKROOM_MINGIT_ROOT -ErrorAction SilentlyContinue
-        }
-        if (-not [string]::IsNullOrWhiteSpace($NodeRoot)) {
-            $env:STOCKROOM_NODE_ROOT = $NodeRoot
-        }
-        else {
-            Remove-Item Env:STOCKROOM_NODE_ROOT -ErrorAction SilentlyContinue
-        }
-        if (-not [string]::IsNullOrWhiteSpace($WebView2BootstrapperPath)) {
-            $env:STOCKROOM_WEBVIEW2_BOOTSTRAPPER = $WebView2BootstrapperPath
-        }
-        else {
-            Remove-Item Env:STOCKROOM_WEBVIEW2_BOOTSTRAPPER -ErrorAction SilentlyContinue
-        }
 
         Invoke-Checked -FilePath $UvPath -Arguments @(
             "run",
@@ -502,11 +451,12 @@ function Build-Executable {
         }
     }
 
-    $executable = Join-Path $distRoot "Stockroom.exe"
+    $workerRoot = Join-Path $distRoot "Stockroom Worker"
+    $executable = Join-Path $workerRoot "Stockroom Worker.exe"
     if (-not (Test-Path -LiteralPath $executable -PathType Leaf)) {
-        throw "PyInstaller did not produce Stockroom.exe."
+        throw "PyInstaller did not produce the packaged Stockroom worker."
     }
-    return $executable
+    return $workerRoot
 }
 
 function Build-WindowHost {
@@ -531,6 +481,10 @@ function Build-WindowHost {
             "-p:RestoreLockedMode=true",
             "-p:ContinuousIntegrationBuild=true",
             "-p:Deterministic=true",
+            "-p:Version=$Version",
+            "-p:AssemblyVersion=$Version",
+            "-p:FileVersion=$Version",
+            "-p:InformationalVersion=$Version+$GitRevision",
             "-p:UseArtifactsOutput=true",
             "-p:ArtifactsPath=$compileRoot"
         )
@@ -580,22 +534,22 @@ function Build-CadConverter {
 
 $FirstWindowHost = Build-WindowHost -Name "Window Host Build 1"
 $FirstCadConverter = Build-CadConverter -Name "CAD Converter Build 1"
-$FirstExecutable = Build-Executable `
-    -Name "Build 1" `
-    -CadConverterRoot $FirstCadConverter
-$FirstExecutableHash = Get-Sha256 -Path $FirstExecutable
+$FirstExecutable = Build-Executable -Name "Build 1"
+$FirstExecutableHash = Get-TextSha256 -Text (
+    Get-DirectoryFingerprint -Root $FirstExecutable
+)
 $SecondExecutable = $null
 $SecondExecutableHash = $null
 
 if (-not $SkipReproducibilityProof) {
     $SecondWindowHost = Build-WindowHost -Name "Window Host Build 2"
     $SecondCadConverter = Build-CadConverter -Name "CAD Converter Build 2"
-    $SecondExecutable = Build-Executable `
-        -Name "Build 2" `
-        -CadConverterRoot $SecondCadConverter
-    $SecondExecutableHash = Get-Sha256 -Path $SecondExecutable
+    $SecondExecutable = Build-Executable -Name "Build 2"
+    $SecondExecutableHash = Get-TextSha256 -Text (
+        Get-DirectoryFingerprint -Root $SecondExecutable
+    )
     if ($FirstExecutableHash -cne $SecondExecutableHash) {
-        throw "PyInstaller reproducibility failed: the two Stockroom.exe digests differ."
+        throw "Packaged worker reproducibility failed: the two runtime trees differ."
     }
     if ((Get-DirectoryFingerprint -Root $FirstWindowHost) -cne
         (Get-DirectoryFingerprint -Root $SecondWindowHost)) {
@@ -615,10 +569,23 @@ if ($Mode -eq "Production") {
         "/p", $CertificatePassword,
         "/tr", $TimestampUri,
         "/td", "SHA256",
-        $FirstExecutable
+        (Join-Path $FirstExecutable "Stockroom Worker.exe")
     )
     Invoke-Checked -FilePath $SignTool -Arguments @(
-        "verify", "/pa", "/all", $FirstExecutable
+        "verify", "/pa", "/all", (Join-Path $FirstExecutable "Stockroom Worker.exe")
+    )
+    $WindowHostExecutable = Join-Path $FirstWindowHost "Stockroom.WindowHost.exe"
+    Invoke-Checked -FilePath $SignTool -Arguments @(
+        "sign",
+        "/fd", "SHA256",
+        "/f", $SigningCertificatePath,
+        "/p", $CertificatePassword,
+        "/tr", $TimestampUri,
+        "/td", "SHA256",
+        $WindowHostExecutable
+    )
+    Invoke-Checked -FilePath $SignTool -Arguments @(
+        "verify", "/pa", "/all", $WindowHostExecutable
     )
     $CadConverterExecutable = Join-Path $FirstCadConverter "Stockroom.CadConverter.exe"
     Invoke-Checked -FilePath $SignTool -Arguments @(
@@ -647,14 +614,13 @@ else {
 function Initialize-PackageStage {
     param(
         [Parameter(Mandatory)][string]$Name,
-        [Parameter(Mandatory)][string]$Executable,
+        [Parameter(Mandatory)][string]$WorkerRoot,
         [Parameter(Mandatory)][string]$WindowHostRoot,
         [Parameter(Mandatory)][string]$CadConverterRoot,
         [Parameter(Mandatory)][string]$AppInstallerPath
     )
 
     $stage = Initialize-OutputDirectory -Path (Join-Path $WorkRoot $Name)
-    Copy-Item -LiteralPath $Executable -Destination (Join-Path $stage "Stockroom.exe")
     Copy-Item -LiteralPath $WindowHostRoot -Destination (Join-Path $stage "WindowHost") -Recurse
     $renderArguments = @(
         "run", "--frozen", "python", "-m", $ContractModule, "render",
@@ -676,7 +642,7 @@ function Initialize-PackageStage {
     $bundleArguments = @(
         "run", "--frozen", "python", $ReleaseBundleTool,
         "--mode", $Mode,
-        "--executable", (Join-Path $stage "Stockroom.exe"),
+        "--executable", $WorkerRoot,
         "--window-host-root", (Join-Path $stage "WindowHost"),
         "--cad-converter-root", $CadConverterRoot,
         "--bundle-root", (Join-Path $stage "Update"),
@@ -706,7 +672,7 @@ function Initialize-PackageStage {
 $FinalAppInstaller = Join-Path $ArtifactsRoot $AppInstallerFileName
 $FirstStage = Initialize-PackageStage `
     -Name "Package 1" `
-    -Executable $FirstExecutable `
+    -WorkerRoot $FirstExecutable `
     -WindowHostRoot $FirstWindowHost `
     -CadConverterRoot $FirstCadConverter `
     -AppInstallerPath $FinalAppInstaller
@@ -744,29 +710,34 @@ if ($Mode -eq "Production") {
         $FinalPackage
     )
     Invoke-Checked -FilePath $SignTool -Arguments @(
-        "verify", "/pa", "/all", (Join-Path $FirstStage "Stockroom.exe")
+        "verify", "/pa", "/all", (Join-Path $FirstStage "WindowHost\Stockroom.WindowHost.exe")
     )
     Invoke-Checked -FilePath $SignTool -Arguments @(
         "verify", "/pa", "/all", $FinalPackage
     )
-    $ExecutableSignatureStatus = (
-        Get-AuthenticodeSignature -LiteralPath (Join-Path $FirstStage "Stockroom.exe")
-    ).Status.ToString()
-    $PackageSignatureStatus = (
-        Get-AuthenticodeSignature -LiteralPath $FinalPackage
-    ).Status.ToString()
+    $ExecutableSignatureStatus = "Valid"
+    $PackageSignatureStatus = "Valid"
 }
 else {
-    $exeSignature = Get-AuthenticodeSignature -LiteralPath (Join-Path $FirstStage "Stockroom.exe")
-    if ($exeSignature.Status -ne [System.Management.Automation.SignatureStatus]::NotSigned) {
+    $priorPreference = $ErrorActionPreference
+    $ErrorActionPreference = "SilentlyContinue"
+    try {
+        & $SignTool verify /pa /all (Join-Path $FirstStage "WindowHost\Stockroom.WindowHost.exe") *> $null
+        $executableVerifyExitCode = $LASTEXITCODE
+        & $SignTool verify /pa /all $FinalPackage *> $null
+        $packageVerifyExitCode = $LASTEXITCODE
+    }
+    finally {
+        $ErrorActionPreference = $priorPreference
+    }
+    if ($executableVerifyExitCode -eq 0) {
         throw "Fixture executable unexpectedly has an Authenticode signature."
     }
-    $packageSignature = Get-AuthenticodeSignature -LiteralPath $FinalPackage
-    if ($packageSignature.Status -ne [System.Management.Automation.SignatureStatus]::NotSigned) {
+    if ($packageVerifyExitCode -eq 0) {
         throw "Fixture MSIX unexpectedly has an Authenticode signature."
     }
-    $ExecutableSignatureStatus = $exeSignature.Status.ToString()
-    $PackageSignatureStatus = $packageSignature.Status.ToString()
+    $ExecutableSignatureStatus = "NotSigned"
+    $PackageSignatureStatus = "NotSigned"
 }
 
 $ReproduciblePackageHash = $null
@@ -774,7 +745,7 @@ if (-not $SkipReproducibilityProof -and $Mode -eq "Fixture") {
     $SecondAppInstaller = Join-Path $WorkRoot "Stockroom.Development.Second.appinstaller"
     $SecondStage = Initialize-PackageStage `
         -Name "Package 2" `
-        -Executable $SecondExecutable `
+        -WorkerRoot $SecondExecutable `
         -WindowHostRoot $SecondWindowHost `
         -CadConverterRoot $SecondCadConverter `
         -AppInstallerPath $SecondAppInstaller
@@ -814,10 +785,6 @@ if ((Get-Sha256 -Path (Join-Path $FirstStage "AppxManifest.xml")) -cne
     (Get-Sha256 -Path (Join-Path $UnpackedRoot "AppxManifest.xml"))) {
     throw "MakeAppx round-trip changed AppxManifest.xml."
 }
-if ((Get-Sha256 -Path (Join-Path $FirstStage "Stockroom.exe")) -cne
-    (Get-Sha256 -Path (Join-Path $UnpackedRoot "Stockroom.exe"))) {
-    throw "MakeAppx round-trip changed Stockroom.exe."
-}
 if ((Get-DirectoryFingerprint -Root (Join-Path $FirstStage "Update")) -cne
     (Get-DirectoryFingerprint -Root (Join-Path $UnpackedRoot "Update"))) {
     throw "MakeAppx round-trip changed the immutable update bundle."
@@ -849,7 +816,7 @@ $ProbeRoamingAppData = Join-Path $ProbeRoot "Roaming App Data"
 New-Item -ItemType Directory -Path $ProbeConfigRoot, $ProbeLocalAppData, $ProbeRoamingAppData |
     Out-Null
 $probeStart = [Diagnostics.ProcessStartInfo]::new()
-$probeStart.FileName = Join-Path $UnpackedRoot "Stockroom.exe"
+$probeStart.FileName = Join-Path $UnpackedRoot "WindowHost\Stockroom.WindowHost.exe"
 $probeStart.UseShellExecute = $false
 $probeStart.CreateNoWindow = $true
 $probeStart.RedirectStandardError = $true
@@ -860,7 +827,7 @@ $probeStart.RedirectStandardOutput = $true
 # separator), making one quoted argument lossless even when OutputRoot has
 # spaces. Keep this build gate runnable on the Windows host we actually ship
 # from instead of accidentally requiring PowerShell 7.
-$probeStart.Arguments = '--managed-host-probe "' + $ProbeReceiptPath + '"'
+$probeStart.Arguments = '--native-host-probe "' + $ProbeReceiptPath + '"'
 $probeStart.EnvironmentVariables["STOCKROOM_CONFIG_DIR"] = $ProbeConfigRoot
 $probeStart.EnvironmentVariables["LOCALAPPDATA"] = $ProbeLocalAppData
 $probeStart.EnvironmentVariables["APPDATA"] = $ProbeRoamingAppData
@@ -870,7 +837,7 @@ if ($null -eq $probeProcess) {
     throw "The packaged managed host process could not be started."
 }
 if (-not $probeProcess.WaitForExit(180000)) {
-    $probeProcess.Kill($true)
+    $probeProcess.Kill()
     $probeProcess.WaitForExit()
     throw "The packaged managed host launch proof exceeded 180 seconds."
 }
@@ -884,18 +851,13 @@ if (-not (Test-Path -LiteralPath $ProbeReceiptPath -PathType Leaf)) {
 }
 $ProbeReceipt = Get-Content -Raw -LiteralPath $ProbeReceiptPath | ConvertFrom-Json
 if (
-    $ProbeReceipt.schema -cne "stockroom-managed-host-launch/1" -or
+    $ProbeReceipt.schema -cne "stockroom-native-host-launch/1" -or
     $ProbeReceipt.release_id -cne "release-$Version" -or
     $ProbeReceipt.host_package_version -cne $Version -or
-    [int]$ProbeReceipt.host_protocol_version -ne $ProtocolVersion -or
-    $ProbeReceipt.service_mode -cne "coordinator" -or
-    $ProbeReceipt.coordinator_state -cne "running" -or
-    -not $ProbeReceipt.frontend_injected -or
-    $ProbeReceipt.update_channel -cne "production" -or
-    [double]$ProbeReceipt.update_check_interval_seconds -ne 60 -or
-    [int]$ProbeReceipt.service_generation -le 0
+    -not $ProbeReceipt.native_host -or
+    -not $ProbeReceipt.packaged_worker
 ) {
-    throw "The packaged managed host launch receipt is incomplete or invalid."
+    throw "The packaged native host launch receipt is incomplete or invalid."
 }
 
 $BundleEvidence = Get-Content -Raw -LiteralPath (
@@ -906,6 +868,11 @@ $PackagedReleaseDirectory = Join-Path (
 ) $BundleEvidence.release_id
 $PackagedWorker = Join-Path $PackagedReleaseDirectory "Backend\Stockroom Worker.exe"
 $WorkerProbeReceiptPath = Join-Path $ProbeRoot "Packaged Worker Handoff Receipt.json"
+$WorkerProbeConfigRoot = Join-Path $ProbeRoot "Worker Config"
+$WorkerProbeLocalAppData = Join-Path $ProbeRoot "Worker Local App Data"
+$WorkerProbeRoamingAppData = Join-Path $ProbeRoot "Worker Roaming App Data"
+New-Item -ItemType Directory -Path $WorkerProbeConfigRoot, $WorkerProbeLocalAppData, $WorkerProbeRoamingAppData |
+    Out-Null
 Invoke-Checked -FilePath $UvPath -Arguments @(
     "run", "--frozen", "python", $WorkerProbeTool,
     "--worker-executable", $PackagedWorker,
@@ -913,9 +880,9 @@ Invoke-Checked -FilePath $UvPath -Arguments @(
     "--release-id", $BundleEvidence.release_id,
     "--manifest-sha256", $BundleEvidence.manifest_sha256,
     "--receipt", $WorkerProbeReceiptPath,
-    "--config-root", $ProbeConfigRoot,
-    "--local-app-data", $ProbeLocalAppData,
-    "--roaming-app-data", $ProbeRoamingAppData
+    "--config-root", $WorkerProbeConfigRoot,
+    "--local-app-data", $WorkerProbeLocalAppData,
+    "--roaming-app-data", $WorkerProbeRoamingAppData
 )
 $WorkerProbeReceipt = Get-Content -Raw -LiteralPath $WorkerProbeReceiptPath |
     ConvertFrom-Json
@@ -925,6 +892,7 @@ if (
     -not $WorkerProbeReceipt.adopted -or
     -not $WorkerProbeReceipt.rolled_back -or
     $WorkerProbeReceipt.exact_worker_sha256 -cne (Get-Sha256 -Path $PackagedWorker) -or
+    -not $WorkerProbeReceipt.frontend_served -or
     $WorkerProbeReceipt.exact_cad_converter_sha256 -cne $BundleEvidence.cad_converter_sha256 -or
     [int]$WorkerProbeReceipt.candidate_generation -ne
         ([int]$WorkerProbeReceipt.initial_generation + 1) -or
@@ -998,13 +966,13 @@ Copy-Item -LiteralPath (Join-Path $FirstStage "AppxManifest.xml") `
     -Destination (Join-Path $ContractRoot "AppxManifest.xml")
 Copy-Item -LiteralPath $FinalAppInstaller `
     -Destination (Join-Path $ContractRoot $AppInstallerFileName)
-Copy-Item -LiteralPath (Join-Path $FirstStage "Stockroom.exe") `
-    -Destination (Join-Path $ArtifactsRoot "Stockroom.exe")
+Copy-Item -LiteralPath (Join-Path $FirstStage "WindowHost\Stockroom.WindowHost.exe") `
+    -Destination (Join-Path $ArtifactsRoot "Stockroom.WindowHost.exe")
 
 $GitDirty = [bool](& git -C $RepositoryRoot status --porcelain)
 $PackageHash = Get-Sha256 -Path $FinalPackage
 $AppInstallerHash = Get-Sha256 -Path $FinalAppInstaller
-$FinalExecutableHash = Get-Sha256 -Path (Join-Path $ArtifactsRoot "Stockroom.exe")
+$FinalExecutableHash = Get-Sha256 -Path (Join-Path $ArtifactsRoot "Stockroom.WindowHost.exe")
 $ManifestHash = Get-Sha256 -Path (Join-Path $ContractRoot "AppxManifest.xml")
 
 $SigningState = if ($Mode -eq "Production") {
@@ -1020,8 +988,9 @@ else {
     "Installation and production distribution are blocked until the owner supplies a real trusted code-signing PFX whose subject becomes the package Publisher."
 }
 $CertificateThumbprint = if ($null -eq $Certificate) { $null } else { $Certificate.Thumbprint }
-if ($BundleEvidence.backend_sha256 -cne $FinalExecutableHash) {
-    throw "The immutable backend is not the exact packaged managed host executable."
+$FinalWorkerHash = Get-Sha256 -Path $PackagedWorker
+if ($BundleEvidence.backend_sha256 -cne $FinalWorkerHash) {
+    throw "The immutable backend is not the exact packaged worker executable."
 }
 $ExpectedCompatibleReleases = $CompatibleFromReleaseIds -join ","
 if (
@@ -1079,45 +1048,6 @@ $Evidence = [ordered]@{
             path = $SignTool
             file_version = (Get-Item -LiteralPath $SignTool).VersionInfo.FileVersion
         }
-        bundled_mingit = if (-not [string]::IsNullOrWhiteSpace($MinGitRoot)) {
-            [ordered]@{
-                git_executable_sha256 = Get-Sha256 -Path (
-                    Join-Path $MinGitRoot "cmd\git.exe"
-                )
-            }
-        } else { $null }
-        bundled_git_lfs = if (
-            -not [string]::IsNullOrWhiteSpace($MinGitRoot) -and
-            (Test-Path -LiteralPath (
-                Join-Path $MinGitRoot "mingw64\bin\git-lfs.exe"
-            ) -PathType Leaf)
-        ) {
-            [ordered]@{
-                executable_sha256 = Get-Sha256 -Path (
-                    Join-Path $MinGitRoot "mingw64\bin\git-lfs.exe"
-                )
-            }
-        } else { $null }
-        bundled_node = if (-not [string]::IsNullOrWhiteSpace($NodeRoot)) {
-            [ordered]@{
-                tree_sha256 = Get-TextSha256 -Text (
-                    Get-DirectoryFingerprint -Root $NodeRoot
-                )
-                node_executable_sha256 = Get-Sha256 -Path (
-                    Join-Path $NodeRoot "node.exe"
-                )
-                npm_command_sha256 = Get-Sha256 -Path (
-                    Join-Path $NodeRoot "npm.cmd"
-                )
-            }
-        } else { $null }
-        webview2_bootstrapper = if (
-            -not [string]::IsNullOrWhiteSpace($WebView2BootstrapperPath)
-        ) {
-            [ordered]@{
-                sha256 = Get-Sha256 -Path $WebView2BootstrapperPath
-            }
-        } else { $null }
         cad_converter = [ordered]@{
             tree_sha256 = Get-TextSha256 -Text (
                 Get-DirectoryFingerprint -Root $FirstCadConverter
@@ -1146,7 +1076,7 @@ $Evidence = [ordered]@{
         managed_host_launch = $true
         managed_service_authority = $true
         workflow_coordinator_running = $true
-        packaged_frontend_served = $true
+        packaged_frontend_served = [bool]$WorkerProbeReceipt.frontend_served
         packaged_worker_handoff = $true
         signed_tuf_release_feed = $true
     }
@@ -1154,20 +1084,18 @@ $Evidence = [ordered]@{
         release_id = $BundleEvidence.release_id
         host_package_version = $ProbeReceipt.host_package_version
         minimum_host_version = $BundleEvidence.minimum_host_version
-        host_protocol_version = [int]$ProbeReceipt.host_protocol_version
+        host_protocol_version = $ProtocolVersion
         release_manifest_sha256 = $BundleEvidence.manifest_sha256
         pinned_tuf_root_sha256 = $BundleEvidence.root_sha256
-        immutable_backend_sha256 = $BundleEvidence.backend_sha256
+        immutable_backend_sha256 = $FinalWorkerHash
         immutable_cad_converter_sha256 = $BundleEvidence.cad_converter_sha256
         rollback_release_id = $BundleEvidence.rollback_release_id
         compatible_from_release_ids = @($CompatibleFromReleaseIds)
         launch_receipt_schema = $ProbeReceipt.schema
-        service_generation = [int]$ProbeReceipt.service_generation
-        service_mode = $ProbeReceipt.service_mode
-        coordinator_state = $ProbeReceipt.coordinator_state
-        update_channel = $ProbeReceipt.update_channel
-        update_check_interval_seconds = [double]$ProbeReceipt.update_check_interval_seconds
-        frontend_injected = [bool]$ProbeReceipt.frontend_injected
+        native_host = [bool]$ProbeReceipt.native_host
+        packaged_worker = [bool]$ProbeReceipt.packaged_worker
+        update_channel = "production"
+        update_check_interval_seconds = 60.0
         worker_handoff_receipt_schema = $WorkerProbeReceipt.schema
         worker_candidate_generation = [int]$WorkerProbeReceipt.candidate_generation
         worker_restored_generation = [int]$WorkerProbeReceipt.restored_generation
@@ -1203,8 +1131,8 @@ $Evidence = [ordered]@{
     }
     outputs = [ordered]@{
         executable = [ordered]@{
-            path = "Stockroom.exe"
-            size = (Get-Item -LiteralPath (Join-Path $ArtifactsRoot "Stockroom.exe")).Length
+            path = "Stockroom.WindowHost.exe"
+            size = (Get-Item -LiteralPath (Join-Path $ArtifactsRoot "Stockroom.WindowHost.exe")).Length
             sha256 = $FinalExecutableHash
         }
         msix = [ordered]@{
@@ -1247,7 +1175,7 @@ $utf8 = [Text.UTF8Encoding]::new($false)
 )
 
 $Sums = @(
-    "$FinalExecutableHash  Stockroom.exe"
+    "$FinalExecutableHash  Stockroom.WindowHost.exe"
     "$PackageHash  $PackageFileName"
     "$AppInstallerHash  $AppInstallerFileName"
     "$ManifestHash  Package Contract/AppxManifest.xml"

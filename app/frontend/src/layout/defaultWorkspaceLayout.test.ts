@@ -466,14 +466,12 @@ describe("the manifests against the id systems that already exist", () => {
     ]);
   });
 
-  it("declares the two piece-level scroll owners, and names their axis", () => {
-    // TWO wide tables scroll inside a piece, and both scroll SIDEWAYS: the distributor offers table
-    // and the provenance ledger's `Source | Fields Used | Retrieved | State` table. Fails if a piece
-    // claims a scroll it does not own, or renders one it does not declare - the second half of which
-    // `engineInvariants.test.tsx` holds against the rendered DOM.
+  it("declares the one piece-level scroll owner and names its axis", () => {
+    // Offers now wrap all facts and price breaks in the column's vertical reading flow. Only the
+    // provenance ledger still needs an internal horizontal axis. Fails if a piece claims a scroll it
+    // does not own, or renders one it does not declare - `engineInvariants.test.tsx` checks the DOM.
     const owners = WORKSPACE_PIECES.filter((manifest) => manifest.scroll.owns);
     expect(owners.map((manifest) => [manifest.id, manifest.scroll.axis])).toEqual([
-      ["workspace.sourcing-offers", "horizontal"],
       ["workspace.sourcing-provenance", "horizontal"],
     ]);
     // NO piece scrolls vertically, and that is the load-bearing half: vertical scrolling belongs to

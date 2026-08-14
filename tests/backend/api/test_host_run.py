@@ -62,6 +62,7 @@ def test_run_windowed_serves_a_live_token_guarded_api_then_shuts_down(app_ctx):
         seen["anon"] = httpx.get(f"{base_url}/api/system/info").status_code
         # the M4 seam is closed at runtime: the WebView2 fetcher is wired onto the ctx
         seen["fetcher_wired"] = app_ctx.rendered_dom_fetcher is not None
+        seen["provider_surface"] = app_ctx.provider_browser_surface
 
     run_windowed(ctx=app_ctx, open_window=fake_window)
 
@@ -70,6 +71,9 @@ def test_run_windowed_serves_a_live_token_guarded_api_then_shuts_down(app_ctx):
     assert seen["authed"] == 200
     assert seen["anon"] == 401
     assert seen["fetcher_wired"] is True
+    from stockroom.host.window import InAppProviderBrowserSurface
+
+    assert isinstance(seen["provider_surface"], InAppProviderBrowserSurface)
     # after run_windowed returns the server is stopped: a fresh connect is refused
     with pytest.raises(httpx.HTTPError):
         httpx.get(
@@ -411,6 +415,43 @@ def test_windows_development_authority_mounts_continuous_convergence(
         "convergence-joined",
         "authority-closed",
     ]
+
+
+def test_isolated_development_disables_git_delivery_and_uses_its_own_authority(
+    app_ctx,
+    monkeypatch,
+    tmp_path,
+):
+    from stockroom.host import run as run_mod
+
+    captured: dict[str, object] = {}
+
+    class _Authority:
+        def close(self):
+            captured["closed"] = True
+
+    def start_authority(*args, **kwargs):
+        captured.update(kwargs)
+        return _Authority()
+
+    monkeypatch.setattr(run_mod, "_start_development_service_authority", start_authority)
+    monkeypatch.setattr(
+        run_mod,
+        "_mount_development_source_convergence",
+        lambda *args, **kwargs: pytest.fail("Git convergence mounted in isolated development"),
+    )
+
+    run_windowed(
+        ctx=app_ctx,
+        open_window=lambda _base_url, _token: None,
+        source_service_state_root=tmp_path,
+        source_authority_scope="DevelopmentApplicationService",
+        enable_source_convergence=False,
+    )
+
+    assert app_ctx.app_repo is None
+    assert captured["authority_scope"] == "DevelopmentApplicationService"
+    assert captured["closed"] is True
 
 
 def test_run_windowed_leaves_an_injected_context_open(app_ctx):

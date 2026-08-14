@@ -154,6 +154,7 @@ from stockroom.host.service_authority import (
 )
 
 MODE = %r
+AUTHORITY_SCOPE = %r
 parser = argparse.ArgumentParser()
 parser.add_argument("--port", required=True, type=int)
 args = parser.parse_args()
@@ -174,6 +175,7 @@ authority = ContextServiceAuthority(
     release_id=release_id,
     control_database=database,
     lifecycle=Lifecycle(),
+    authority_scope=AUTHORITY_SCOPE,
 )
 observed = authority.snapshot()
 if observed.generation != expected_generation or observed.mode.value != "shadow":
@@ -244,12 +246,13 @@ def _release(
     minimum_host_version: str = "0.1.0",
     package_version: str = "0.1.0",
     include_cad_converter: bool = False,
+    managed_authority_scope: str = "Coordinator",
 ) -> VerifiedReleaseSet:
     directory = releases / release_id
     backend = (
         (_WORKER % mode).encode()
         if managed_mode is None
-        else (_MANAGED_WORKER % managed_mode).encode()
+        else (_MANAGED_WORKER % (managed_mode, managed_authority_scope)).encode()
     )
     payloads = {
         "Backend/Worker.py": (backend, "backend"),
@@ -325,6 +328,11 @@ def test_release_cad_converter_resolves_only_the_manifest_bound_executable(
     assert _cad_converter_path(candidate) == (
         candidate.directory / "Tools" / "CadConverter" / "Stockroom.CadConverter.exe"
     )
+
+
+def _authority_scope(tmp_path: Path) -> str:
+    digest = hashlib.sha256(str(tmp_path).encode("utf-8")).hexdigest()[:16]
+    return f"Test.{digest}"
 
 
 def _control(tmp_path: Path):
@@ -832,6 +840,7 @@ def _managed_handoff(
     managed_mode: str,
 ):
     releases = tmp_path / "Managed Releases"
+    authority_scope = _authority_scope(tmp_path)
     current = cast(
         AcceptedRelease,
         _release(
@@ -849,6 +858,7 @@ def _managed_handoff(
             rollback_release_id=current.release_id,
             mode="ok",
             managed_mode=managed_mode,
+            managed_authority_scope=authority_scope,
         ),
     )
     context = SimpleNamespace()
@@ -870,6 +880,7 @@ def _managed_handoff(
         control_database=(tmp_path / "Service State" / "Control.sqlite").resolve(),
         lifecycle=Lifecycle(),
         start_as_coordinator=True,
+        authority_scope=authority_scope,
     )
     local = FastAPI()
 
@@ -1317,6 +1328,14 @@ def test_failed_production_bootstrap_restores_exact_context_identity(
         "TrustedReleaseRepository",
         reject_repository,
     )
+    real_authority = release_runtime.ContextServiceAuthority
+    authority_scope = _authority_scope(tmp_path)
+
+    def scoped_authority(*args, **kwargs):
+        kwargs.setdefault("authority_scope", authority_scope)
+        return real_authority(*args, **kwargs)
+
+    monkeypatch.setattr(release_runtime, "ContextServiceAuthority", scoped_authority)
     proxy = SwitchableBackendProxy(_local_app(release.release_id, 1))
 
     with pytest.raises(RuntimeError, match="repository setup failed"):

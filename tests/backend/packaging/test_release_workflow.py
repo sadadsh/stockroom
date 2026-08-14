@@ -85,9 +85,9 @@ def test_release_can_only_invoke_the_canonical_production_packager() -> None:
     assert r"& .\packaging\Build-Windows-Package.ps1" in build
     assert "-Mode Production" in build
     assert "-SigningCertificatePath $pfxPath" in build
-    assert "-MinGitRoot $env:STOCKROOM_MINGIT_ROOT" in build
-    assert "-NodeRoot $env:STOCKROOM_NODE_ROOT" in build
-    assert "-WebView2BootstrapperPath $env:STOCKROOM_WEBVIEW2_BOOTSTRAPPER" in build
+    assert "-MinGitRoot" not in build
+    assert "-NodeRoot" not in build
+    assert "-WebView2BootstrapperPath" not in build
     assert "-TufRootPath $env:STOCKROOM_TUF_ROOT_PATH" in build
     assert "-TufMetadataVersion ([int]$env:STOCKROOM_TUF_METADATA_VERSION)" in build
     assert "-TufTargetsKeyPaths $env:STOCKROOM_TUF_TARGETS_KEY_PATH" in build
@@ -130,36 +130,17 @@ def test_signing_secrets_are_step_scoped_and_always_destroyed() -> None:
     )
 
 
-def test_launcher_inputs_are_https_host_restricted_and_digest_pinned() -> None:
+def test_release_materializes_only_the_pinned_tuf_root() -> None:
     metadata = named_step("build-windows-package", "Resolve And Validate Release Metadata")["run"]
-    fetch = named_step("build-windows-package", "Fetch And Verify Pinned Launcher Inputs")["run"]
+    materialize = named_step("build-windows-package", "Materialize Pinned TUF Root")["run"]
 
-    for name in (
-        "STOCKROOM_MINGIT_URL",
-        "STOCKROOM_MINGIT_SHA256",
-        "STOCKROOM_WEBVIEW2_BOOTSTRAPPER_URL",
-        "STOCKROOM_WEBVIEW2_BOOTSTRAPPER_SHA256",
-    ):
-        assert name in metadata
-        assert name in fetch
-    assert '$parsed.Scheme -cne "https"' in fetch
-    assert "$parsed.UserInfo" in fetch
-    assert '"github.com"' in fetch
-    assert '"go.microsoft.com"' in fetch
-    assert "git-lfs-windows-amd64-v3.7.1.zip" in fetch
-    assert "8683cdc3d6c029b49393dcebbaa6265bd6efd9abdcf837be855b4cd42e5e80b6" in fetch
-    assert 'Join-Path $minGitRoot "mingw64\\bin\\git-lfs.exe"' in fetch
-    assert "node-v24.19.0-win-x64.zip" in fetch
-    assert "57f71ab3652e797d84acddc79c81cc9ff1c6ddb2a1974cdb83f00fee9bff4c73" in fetch
-    assert "STOCKROOM_NODE_ROOT=$nodeRoot" in fetch
-    assert "Get-FileHash -LiteralPath $Destination -Algorithm SHA256" in fetch
-    assert "Release input SHA-256 verification failed." in fetch
     assert "STOCKROOM_TUF_ROOT_BASE64" in metadata
-    assert "STOCKROOM_TUF_ROOT_BASE64" in fetch
-    assert "[Convert]::FromBase64String($env:STOCKROOM_TUF_ROOT_BASE64)" in fetch
-    assert "STOCKROOM_TUF_ROOT_PATH=$tufRoot" in fetch
+    assert "[Convert]::FromBase64String($env:STOCKROOM_TUF_ROOT_BASE64)" in materialize
+    assert "STOCKROOM_TUF_ROOT_PATH=$tufRoot" in materialize
     assert "STOCKROOM_TUF_METADATA_VERSION=$tufMetadataVersion" in metadata
     assert "Release version is older than an existing canonical release tag." in metadata
+    for obsolete in ("MINGIT", "NODE_ROOT", "WEBVIEW2_BOOTSTRAPPER"):
+        assert obsolete not in WORKFLOW_TEXT
 
 
 def test_only_the_exact_verified_release_asset_set_can_be_published() -> None:
@@ -208,15 +189,9 @@ def test_release_requires_complete_signed_canonical_evidence() -> None:
         '$evidence.release_feed.schema -cne "stockroom-release-feed/1"',
         "$evidence.release_feed.trusted_updater_round_trip",
         '$evidence.release_feed.deployment_state -cne "staged-not-deployed"',
-        '$evidence.managed_runtime.service_mode -cne "coordinator"',
-        '$evidence.managed_runtime.coordinator_state -cne "running"',
+        "-not $evidence.managed_runtime.native_host",
+        "-not $evidence.managed_runtime.packaged_worker",
         '$evidence.managed_runtime.update_channel -cne "production"',
-        "$evidence.tools.bundled_mingit.git_executable_sha256",
-        "$evidence.tools.bundled_git_lfs.executable_sha256",
-        "$evidence.tools.bundled_node.tree_sha256",
-        "$evidence.tools.bundled_node.node_executable_sha256",
-        "$evidence.tools.bundled_node.npm_command_sha256",
-        "$evidence.tools.webview2_bootstrapper.sha256",
         "$evidence.tools.cad_converter.tree_sha256",
         "$evidence.tools.cad_converter.executable_sha256",
         "$evidence.reproducibility.pyinstaller_payloads_match",

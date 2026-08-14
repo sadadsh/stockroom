@@ -45,6 +45,25 @@ internal sealed class HandoffBootstrap : IDisposable
     internal string ProfileId =>
         "window-" + HandoffId.Replace("-", string.Empty, StringComparison.Ordinal);
 
+    internal static HandoffBootstrap CreateDirect(
+        string releaseId,
+        Uri baseUri,
+        SensitiveCredential apiCredential)
+    {
+        if (string.IsNullOrWhiteSpace(releaseId))
+        {
+            throw new WindowHostException("release ID is unavailable");
+        }
+        ArgumentNullException.ThrowIfNull(baseUri);
+        ArgumentNullException.ThrowIfNull(apiCredential);
+        return new HandoffBootstrap(
+            Guid.NewGuid().ToString("D"),
+            releaseId,
+            baseUri,
+            apiCredential.Clone(),
+            SensitiveCredential.Generate());
+    }
+
     internal string CreateProof(uint parentProcessId, uint childProcessId)
     {
         if (parentProcessId == 0 || childProcessId == 0)

@@ -76,22 +76,23 @@ export function DesignStudioToolbar({
   const zoomLabel = useText("design-studio.zoom", "Zoom");
   const fitLabel = useText("design-studio.zoom.fit", "Fit");
   const gridLabel = useText("design-studio.grid", "Grid");
-  const gridSizeLabel = useText("design-studio.grid-size", "Grid Size");
+  const editGridControlsLabel = useText("design-studio.edit-grid-controls", "Edit Grid Controls");
+  const gridSizeLabel = useText("design-studio.grid-size", "Grid And Snap Size");
   const snapLabel = useText("design-studio.snap", "Snap");
   const undoLabel = useText("design-studio.undo", "Undo");
   const redoLabel = useText("design-studio.redo", "Redo");
   const viewLabel = useText("design-studio.view", "View");
   const developerLabel = useText("design-studio.developer", "Developer Tools");
-  const applyLabel = useText("design-studio.apply-local", "Apply");
-  const applyFixtureTitle = useText("design-studio.apply-local.fixture-help", "Return To Real Data To Apply This Draft");
-  const applyTitle = useText("design-studio.apply-local.help", "Apply This Draft On This PC");
+  const applyLabel = useText("design-studio.apply-local", "Commit");
+  const applyFixtureTitle = useText("design-studio.apply-local.fixture-help", "Return To Real Data To Commit This Draft");
+  const applyTitle = useText("design-studio.apply-local.help", "Commit This Draft On This PC");
   const appliedStatusLabel = useText("design-studio.applied-status", "Applied Design Status");
   const appliedLabel = useCopyFormatter(
     "design-studio.applied-this-pc",
     "Applied · {revision}",
   );
   const draftOnlyLabel = useText("design-studio.draft-only", "Draft");
-  const applyingLabel = useText("design-studio.applying", "Applying...");
+  const applyingLabel = useText("design-studio.applying", "Committing...");
   const presentationLabel = useText("design-studio.presentation", "Presentation");
   const closeLabel = useText("design-studio.close", "Exit");
 
@@ -99,7 +100,7 @@ export function DesignStudioToolbar({
     <header data-design-studio-chrome="true" className="relative z-30 flex min-h-11 flex-none items-center gap-2 bg-band px-2.5 py-1.5 shadow-card">
       <Button aria-label={closeLabel} onClick={onClose}>{closeLabel}</Button>
 
-      <div className="flex items-center overflow-hidden rounded-control bg-raise" aria-label={modeLabel}>
+      <div role="group" className="flex items-center overflow-hidden rounded-control bg-raise" aria-label={modeLabel}>
         {MODES.map((item) => (
           <button
             key={item}
@@ -115,6 +116,15 @@ export function DesignStudioToolbar({
           </button>
         ))}
       </div>
+
+      {mode === "edit" ? (
+        <div role="group" aria-label={editGridControlsLabel} className="flex min-w-0 items-center gap-2 rounded-control bg-raise px-2 py-1">
+          <Button aria-pressed={grid} onClick={() => onGridChange(!grid)}>{gridLabel}</Button>
+          <Button aria-pressed={snap} onClick={() => onSnapChange(!snap)}>{snapLabel}</Button>
+          <span className="sr-only">{gridSizeLabel}</span>
+          <ValueSlider ariaLabel={gridSizeLabel} min={1} max={64} step={1} value={gridSize} unit="px" onChange={onGridSizeChange} className="w-32" />
+        </div>
+      ) : null}
 
       <div className="min-w-0 flex-1 truncate text-center text-xs text-t2" aria-label={breadcrumbLabel}>
         <span className="sr-only">{stockroomLabel} / {studioLabel} / </span>
@@ -147,13 +157,7 @@ export function DesignStudioToolbar({
             </div>
             {viewport === "custom" ? <ValueSlider ariaLabel={customViewportLabel} min={320} max={3840} step={1} value={customViewportWidth} unit="px" onChange={onCustomViewportWidthChange} className="mt-3 w-full" /> : null}
             <div className="mt-3 flex items-center gap-2">
-              <Button aria-pressed={grid} onClick={() => onGridChange(!grid)}>{gridLabel}</Button>
-              <Button aria-pressed={snap} onClick={() => onSnapChange(!snap)}>{snapLabel}</Button>
               <Button aria-pressed={presentation} onClick={() => onPresentationChange(!presentation)}>{presentationLabel}</Button>
-            </div>
-            <div className="mt-3">
-              <div className="mb-1 text-xs text-t2">{gridSizeLabel}</div>
-              <ValueSlider ariaLabel={gridSizeLabel} min={1} max={64} step={1} value={gridSize} unit="px" onChange={onGridSizeChange} className="w-full" />
             </div>
             {onDeveloperOpen ? <button type="button" onClick={() => { setViewOpen(false); onDeveloperOpen(); }} className="mt-3 w-full rounded-control px-2 py-1.5 text-left text-xs text-t2 hover:bg-raise2 hover:text-t1">{developerLabel}</button> : null}
           </div>

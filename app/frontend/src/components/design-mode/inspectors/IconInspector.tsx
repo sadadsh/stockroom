@@ -18,7 +18,7 @@ function IconPickerModal({ targetViewBox, onSelect, onClose }: {
   onClose: () => void;
 }) {
   const title = useText("design-studio.icon-picker.title", "Choose Icon");
-  const closeLabel = useText("design-studio.icon-picker.close", "Close Icon Library");
+  const closeLabel = useText("design-studio.icon-picker.close", "Close Icon Catalog");
   const loadingLabel = useText("design-studio.inspector.icon.loading-catalog", "Loading icon catalog…");
   useEffect(() => {
     const closeOnEscape = (event: KeyboardEvent) => {
@@ -30,7 +30,7 @@ function IconPickerModal({ targetViewBox, onSelect, onClose }: {
     return () => window.removeEventListener("keydown", closeOnEscape);
   }, [onClose]);
   return (
-    <div className="fixed inset-0 z-[260] grid place-items-center bg-black/55 p-8" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+    <div role="presentation" className="fixed inset-0 z-[260] grid place-items-center bg-black/55 p-8" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
       <section role="dialog" aria-modal="true" aria-label={title} className="flex max-h-[82vh] w-full max-w-5xl flex-col rounded-card bg-popover p-5 shadow-pop">
         <header className="flex items-center justify-between">
           <h3 className="text-base font-semibold text-t1">{title}</h3>

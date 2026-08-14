@@ -1,21 +1,13 @@
 /**
- * Distributor offers, as a dense table.
+ * Every normalized distributor offer, as one wrapping ledger per provider.
  *
- * A table rather than a stack of provider cards, because the question is comparative: who has it,
- * how many, at what price, from what quantity, and how long ago we asked. Cards answer that one
- * provider at a time and make the brand the biggest thing in each of them; a column of tabular
- * figures answers it in one glance and keeps the provider name at the weight a provider name
- * deserves.
+ * The Sourcing column is intentionally narrow. A wide comparison table hid most facts behind a
+ * horizontal scrollbar and reduced each price ladder to one break. The ledger keeps every offer
+ * and every break in the normal vertical reading flow, while two-column fact grids preserve useful
+ * comparison without creating a second scroll axis.
  *
- * THE REFRESH IS THE CAREFUL PART. Three rules, all of them because the alternative was visible:
- *
- *   * the table is never blanked. `useRetainedOffers` holds the last non-empty list for as long as
- *     a refresh is running, so a job that momentarily reports nothing cannot wipe the numbers off
- *     the screen. Stale data with its staleness stated beats an empty table every time.
- *   * the column widths do not move. They are declared once in `<colgroup>`, so a spinner
- *     appearing in the toolbar cannot re-measure the price column underneath it.
- *   * a failure attaches to THIS section, above the numbers it failed to update, and never only to
- *     a toast that is gone before the reader looks up.
+ * Refresh never blanks the last known numbers, and a source failure stays attached above the data
+ * it failed to update rather than disappearing with a toast.
  */
 import { useEffect, useRef, type ReactNode } from "react";
 import type { DistributorOffer } from "../../api/dossierTypes";
@@ -24,7 +16,6 @@ import { formatCount, formatPrice, formatTimestamp } from "../../lib/formatValue
 import { ExternalIcon } from "../icons";
 import { EmptyState } from "../primitives";
 import { SourcingSection } from "./SourcingParts";
-import { volumeBreak } from "./offerFacts";
 import { useSupplyFailureText } from "./provenanceText";
 
 /**
@@ -61,7 +52,7 @@ export function OffersSection({
 }) {
   const refreshLabel = useText("component-browser.refresh-offers", "Refresh Offers");
   const refreshingLabel = useText("component-browser.refreshing-offers", "Refreshing...");
-  const tableLabel = useText("component-browser.offers-table", "Distributor offers");
+  const ledgerLabel = useText("component-browser.offers-table", "Distributor offers");
   const shown = useRetainedOffers(offers, refreshing);
 
   return (
@@ -100,48 +91,15 @@ export function OffersSection({
           No distributor has quoted this component.
         </EmptyState>
       ) : (
-        <div data-dev-id="component-browser.offers-table" className="overflow-x-auto">
-          <table className="w-full border-collapse" aria-label={tableLabel}>
-            {/* Declared once. A refresh cannot re-measure a column that was never measured. */}
-            <colgroup>
-              <col className="w-[7rem]" />
-              <col className="w-[4.5rem]" />
-              <col className="w-[5rem]" />
-              <col className="w-[7rem]" />
-              <col className="w-[3.5rem]" />
-              <col className="w-[4rem]" />
-              <col className="w-[6rem]" />
-              <col className="w-[6rem]" />
-              <col className="w-[1.75rem]" />
-            </colgroup>
-            <thead>
-              <tr className="border-b border-line-dark">
-                <Heading copyId="component-browser.offer-col-provider">Provider</Heading>
-                <Heading copyId="component-browser.offer-col-stock" numeric>
-                  Stock
-                </Heading>
-                <Heading copyId="component-browser.offer-col-price" numeric>
-                  Unit Price
-                </Heading>
-                <Heading copyId="component-browser.offer-col-break" numeric>
-                  Price Break
-                </Heading>
-                <Heading copyId="component-browser.offer-col-currency">Currency</Heading>
-                <Heading copyId="component-browser.offer-col-moq" numeric>
-                  MOQ
-                </Heading>
-                <Heading copyId="component-browser.offer-col-lead">Lead Time</Heading>
-                <Heading copyId="component-browser.offer-col-checked">Last Checked</Heading>
-                <th className="w-[1.75rem]" />
-              </tr>
-            </thead>
-            <tbody>
-              {shown.map((offer) => (
-                <OfferRow key={`${offer.provider}:${offer.sku}`} offer={offer} />
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <ul
+          data-dev-id="component-browser.offers-table"
+          aria-label={ledgerLabel}
+          className="flex min-w-0 flex-col"
+        >
+          {shown.map((offer) => (
+            <OfferRow key={`${offer.provider}:${offer.sku}`} offer={offer} />
+          ))}
+        </ul>
       )}
     </SourcingSection>
   );
@@ -156,72 +114,22 @@ export function OffersSection({
  */
 function OfferRow({ offer }: { offer: DistributorOffer }) {
   const stockUnknown = useText("component-browser.stock-unknown", "Stock unknown");
+  const unknown = useText("component-browser.value-unknown", "Unknown");
+  const noPrice = useText("component-browser.no-price", "No price");
   const listing = useCopyFormatter("component-browser.open-listing", "Open {provider} Listing");
-  const breakText = useCopyFormatter("component-browser.offer-break", "{qty} at {price}");
   const label = listing({ provider: offer.providerLabel });
   const stamp = offer.lastCheckedAt ? formatTimestamp(offer.lastCheckedAt) : null;
-  const volume = volumeBreak(offer);
+
   return (
-    <tr
+    <li
       data-dev-id="component-browser.offer-row"
       data-offer-provider={offer.provider}
-      // Fixed colgroup widths and numeric alignment carry the comparison. A restrained horizontal
-      // rhythm replaces the full cell grid so the values stay compact without looking boxed in.
-      className="border-b border-line/40 last:border-b-0 even:bg-row-alt/50 hover:bg-[var(--c-hover)]"
+      className="min-w-0 border-b border-line/60 px-2 py-2 last:border-b-0 even:bg-row-alt/50"
     >
-      <td className="px-2 py-1 align-baseline">
-        <span className="ui-row-secondary block truncate" title={offer.providerLabel}>
+      <header className="flex min-w-0 flex-wrap items-start gap-x-2 gap-y-1">
+        <span className="ui-row-secondary min-w-0 flex-1 break-words text-t1">
           {offer.providerLabel}
         </span>
-        {offer.sku ? (
-          <span className="ui-component-metadata block truncate" title={offer.sku}>
-            {offer.sku}
-          </span>
-        ) : null}
-      </td>
-      <td className="px-2 py-1 align-baseline">
-        {offer.stock === null ? (
-          <span className="ui-property-value ui-numeric ui-disabled block" title={stockUnknown}>
-            {stockUnknown}
-          </span>
-        ) : (
-          <span className="ui-property-value ui-numeric block">{formatCount(offer.stock)}</span>
-        )}
-      </td>
-      <td className="px-2 py-1 align-baseline">
-        <span className="ui-key-fact ui-numeric block">
-          {offer.unitPrice === null ? "" : formatPrice(offer.unitPrice, offer.currency)}
-        </span>
-      </td>
-      <td className="px-2 py-1 align-baseline">
-        <span className="ui-row-metadata ui-numeric block">
-          {volume
-            ? breakText({
-                qty: formatCount(volume.qty),
-                price: formatPrice(volume.price, offer.currency),
-              })
-            : ""}
-        </span>
-      </td>
-      <td className="px-2 py-1 align-baseline">
-        <span className="ui-row-metadata block">{offer.currency}</span>
-      </td>
-      <td className="px-2 py-1 align-baseline">
-        <span className="ui-row-metadata ui-numeric block">
-          {offer.moq === null ? "" : formatCount(offer.moq)}
-        </span>
-      </td>
-      <td className="px-2 py-1 align-baseline">
-        <span className="ui-row-metadata block truncate">{offer.leadTime}</span>
-      </td>
-      <td className="px-2 py-1 align-baseline">
-        {stamp ? (
-          <span className="ui-component-metadata block truncate" title={stamp.title}>
-            {stamp.text}
-          </span>
-        ) : null}
-      </td>
-      <td className="px-2 py-1 align-baseline">
         {offer.offerUrl ? (
           <a
             data-dev-id="component-browser.offer-listing"
@@ -231,7 +139,7 @@ function OfferRow({ offer }: { offer: DistributorOffer }) {
             aria-label={label}
             title={label}
             className={
-              "inline-flex items-center rounded-control p-0.5 text-t2 transition-colors " +
+              "inline-flex flex-none items-center rounded-control p-0.5 text-t2 transition-colors " +
               "hover:text-t1 focus-visible:outline focus-visible:outline-2 " +
               "focus-visible:outline-offset-1 focus-visible:outline-focus"
             }
@@ -239,38 +147,101 @@ function OfferRow({ offer }: { offer: DistributorOffer }) {
             <ExternalIcon className="h-3.5 w-3.5" />
           </a>
         ) : null}
-      </td>
-    </tr>
+        <span className="ui-component-metadata basis-full break-all" title={offer.sku || undefined}>
+          {offer.sku || unknown}
+        </span>
+      </header>
+
+      <dl className="mt-2 grid min-w-0 grid-cols-2 gap-x-3 gap-y-2">
+        <OfferFact label={<Text id="component-browser.offer-col-stock">Stock</Text>} numeric>
+          {offer.stock === null ? stockUnknown : formatCount(offer.stock)}
+        </OfferFact>
+        <OfferFact label={<Text id="component-browser.offer-col-price">Unit Price</Text>} numeric emphasis>
+          {offer.unitPrice === null ? noPrice : formatPrice(offer.unitPrice, offer.currency)}
+        </OfferFact>
+        <OfferFact label={<Text id="component-browser.offer-col-currency">Quote Code</Text>}>
+          {offer.currency || unknown}
+        </OfferFact>
+        <OfferFact label={<Text id="component-browser.offer-col-moq">MOQ</Text>} numeric>
+          {offer.moq === null ? unknown : formatCount(offer.moq)}
+        </OfferFact>
+        <OfferFact label={<Text id="component-browser.offer-col-lead">Lead Time</Text>}>
+          {offer.leadTime || unknown}
+        </OfferFact>
+        <OfferFact label={<Text id="component-browser.factory-lead-time">Manufacturer Lead Time</Text>}>
+          {offer.factoryLeadTime || unknown}
+        </OfferFact>
+        <OfferFact label={<Text id="component-browser.lifecycle-state">Product Status</Text>}>
+          {offer.lifecycle || unknown}
+        </OfferFact>
+        <OfferFact label={<Text id="component-browser.offer-col-checked">Last Checked</Text>}>
+          {stamp ? (
+            <span title={stamp.title}>
+              {stamp.text} · <StalenessLabel staleness={offer.staleness} />
+            </span>
+          ) : unknown}
+        </OfferFact>
+      </dl>
+
+      <div data-dev-id="component-browser.offer-price-ladder" className="mt-2 min-w-0 border-t border-line/60 pt-2">
+        <h4 className="ui-property-label">
+          <Text id="component-browser.price-breaks">Price Breaks</Text>
+        </h4>
+        {offer.priceBreaks.length === 0 ? (
+          <p className="ui-component-metadata mt-1">{noPrice}</p>
+        ) : (
+          <dl className="mt-1 grid min-w-0 grid-cols-2 gap-x-3 gap-y-1">
+            {offer.priceBreaks.map((entry, index) => (
+              <div
+                key={`${entry.qty ?? "unknown"}:${entry.price ?? "unknown"}:${index}`}
+                className="flex min-w-0 items-baseline justify-between gap-2 border-b border-line/40 py-0.5"
+              >
+                <dt className="ui-component-metadata min-w-0 break-words">
+                  {entry.qty === null ? unknown : formatCount(entry.qty)}
+                </dt>
+                <dd className="ui-key-fact ui-numeric min-w-0 break-words text-right">
+                  {entry.price === null ? noPrice : formatPrice(entry.price, offer.currency)}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        )}
+      </div>
+    </li>
   );
 }
 
-/**
- * One column header. Sentence case, 10/600, and right-aligned when the column below it is.
- *
- * `copyId` rather than `id` because that is this codebase's one prop name for "the copy layer
- * resolves my children", which is what makes the heading rewordable in dev mode like every other
- * string on the surface.
- */
-function Heading({
-  copyId,
-  numeric,
+function OfferFact({
+  label,
+  numeric = false,
+  emphasis = false,
   children,
 }: {
-  copyId: string;
+  label: ReactNode;
   numeric?: boolean;
-  children: string;
+  emphasis?: boolean;
+  children: ReactNode;
 }) {
   return (
-    <th
-      scope="col"
-      className={
-        "ui-table-header whitespace-nowrap px-2 py-1 " +
-        (numeric ? "text-right" : "text-left")
-      }
-    >
-      <Text id={copyId}>{children}</Text>
-    </th>
+    <div className="min-w-0">
+      <dt className="ui-property-label break-words">{label}</dt>
+      <dd
+        className={
+          `${emphasis ? "ui-key-fact" : "ui-property-value"} min-w-0 break-words ` +
+          (numeric ? "ui-numeric" : "")
+        }
+      >
+        {children}
+      </dd>
+    </div>
   );
+}
+
+function StalenessLabel({ staleness }: { staleness: DistributorOffer["staleness"] }) {
+  if (staleness === "fresh") return <Text id="component-browser.staleness-fresh">Fresh</Text>;
+  if (staleness === "aging") return <Text id="component-browser.staleness-aging">Aging</Text>;
+  if (staleness === "stale") return <Text id="component-browser.staleness-stale">Stale</Text>;
+  return <Text id="component-browser.staleness-unknown">Age Unknown</Text>;
 }
 
 /**

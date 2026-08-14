@@ -125,6 +125,18 @@ def test_unpacked_process_gets_one_stable_app_user_model_id(monkeypatch) -> None
     assert shell.identities == [W.UNPACKAGED_APP_USER_MODEL_ID]
 
 
+def test_development_process_gets_a_distinct_app_user_model_id(monkeypatch) -> None:
+    monkeypatch.setattr(W, "_is_windows", lambda: True)
+    shell = _Shell()
+
+    assert W._configure_windows_process_identity(
+        app_user_model_id=W.DEVELOPMENT_APP_USER_MODEL_ID,
+        kernel32=_PackageKernel(W._APP_MODEL_ERROR_NO_PACKAGE),
+        shell32=shell,
+    )
+    assert shell.identities == ["Stockroom.Development.Unpackaged"]
+
+
 def test_msix_process_keeps_the_shell_assigned_app_user_model_id(monkeypatch) -> None:
     monkeypatch.setattr(W, "_is_windows", lambda: True)
     shell = _Shell()
@@ -289,7 +301,7 @@ def test_process_identity_is_configured_before_pywebview_creates_the_window(
     monkeypatch.setattr(
         W,
         "_configure_windows_process_identity",
-        lambda: events.append("process-identity"),
+        lambda **_kwargs: events.append("process-identity"),
     )
     monkeypatch.setattr(
         "stockroom.store.machine_config.config_dir",
@@ -317,7 +329,7 @@ def test_run_window_releases_icons_and_clears_active_window_when_start_fails(
 
     setattr(webview, "start", fail_start)
     monkeypatch.setitem(sys.modules, "webview", webview)
-    monkeypatch.setattr(W, "_configure_windows_process_identity", lambda: None)
+    monkeypatch.setattr(W, "_configure_windows_process_identity", lambda **_kwargs: None)
     monkeypatch.setattr(
         "stockroom.store.machine_config.config_dir",
         lambda: tmp_path,

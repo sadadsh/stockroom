@@ -15,11 +15,20 @@ npm run build
 backend serves (see `stockroom.api.app._FRONTEND_DIST`). The built dist is
 committed so end users need no Node toolchain.
 
-## Local dev
+## Local development
 
+From the repository root on Windows, run:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\Start-Stockroom-Development.ps1
 ```
-npm run dev
-```
+
+That launcher starts the isolated source backend plus Vite, opens the SPA as **Stockroom
+Development**, and keeps production state untouched. Frontend edits use HMR. Backend Python edits
+restart the development child automatically. Dependency installation is an explicit separate
+`scripts\Setup-Stockroom-Development.ps1` step; startup never provisions tools or pulls Git.
+
+Direct `npm run dev` remains available for frontend-only work.
 
 The client resolves the API base and token in this order:
 
@@ -28,8 +37,10 @@ The client resolves the API base and token in this order:
 2. `VITE_API_BASE` / `VITE_API_TOKEN` (a `.env` for browser dev)
 3. a loopback default of `http://127.0.0.1:8765`
 
-To point dev at a running backend, start the server, then set `VITE_API_BASE`
-(and `VITE_API_TOKEN` if the server was started with a token) to match.
+The Stockroom Development launcher proxies `/api` through Vite and injects its per-session token
+only into the same-origin development renderer. It never writes the token into a committed file or
+`VITE_*` build variable. For manual browser-only work, start a backend and set `VITE_API_BASE` plus
+`VITE_API_TOKEN` to match.
 
 ## Design
 

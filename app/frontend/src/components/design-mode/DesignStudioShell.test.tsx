@@ -8,7 +8,9 @@ import { CaptureProvider } from "../../lib/capture";
 import { RouterProvider } from "../../lib/router";
 import { ThemeProvider } from "../../lib/theme";
 import { ToastProvider } from "../../lib/toast";
-import { DesignStudioProvider } from "../../design-studio/DesignStudioProvider";
+import { DesignStudioProvider, useDesignStudio } from "../../design-studio/DesignStudioProvider";
+import { useDevMode } from "../../lib/devMode";
+import { DevInspector } from "../DevInspector";
 import { DesignStudioShell } from "./DesignStudioShell";
 
 vi.mock("../../api/client", async (importActual) => {
@@ -115,6 +117,29 @@ function Providers({ children }: { children: ReactNode }) {
   );
 }
 
+function InteractionProduct({ onAction }: { onAction: () => void }) {
+  const studio = useDesignStudio();
+  const dev = useDevMode();
+  return (
+    <div data-dev-id="interaction.root">
+      <button type="button" data-design-studio-entry onClick={studio.open}>Open Design Studio</button>
+      <button type="button" data-dev-id="interaction.action" onClick={onAction}>Product Action</button>
+      <output data-testid="interaction-selection">{dev.selectedDevId ?? "none"}</output>
+    </div>
+  );
+}
+
+function renderInteractionProduct(onAction: () => void) {
+  return render(
+    <Providers>
+      <>
+        <DesignStudioShell><InteractionProduct onAction={onAction} /></DesignStudioShell>
+        <DevInspector />
+      </>
+    </Providers>,
+  );
+}
+
 function renderApp() {
   return render(
     <Providers>
@@ -194,8 +219,31 @@ describe("DesignStudioShell", () => {
         .getByRole("region", { name: "Stockroom Preview" })
         .querySelector('[data-dev-id="shell.root"]'),
     ).toBeVisible();
+    expect(
+      screen.getByRole("region", { name: "Stockroom Preview" })
+        .querySelector('[data-design-grid-overlay="true"]'),
+    ).not.toBeInTheDocument();
     await openView();
     expect(screen.getByLabelText("Zoom")).toHaveValue("0");
+  });
+
+  it("blocks product actions in Edit while preserving selection and Preview interaction", async () => {
+    const action = vi.fn();
+    renderInteractionProduct(action);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Open Design Studio" }));
+    await user.click(screen.getByRole("button", { name: "Edit" }));
+
+    const productAction = screen.getByRole("button", { name: "Product Action" });
+    await user.click(productAction);
+    expect(action).not.toHaveBeenCalled();
+    expect(screen.getByTestId("interaction-selection")).toHaveTextContent("interaction.action");
+    expect(productAction.closest("[data-design-product-root]"))
+      .toHaveAttribute("data-product-interaction", "blocked");
+
+    await user.click(screen.getByRole("button", { name: "Preview" }));
+    await user.click(productAction);
+    expect(action).toHaveBeenCalledOnce();
   });
 
   it("previews the exact desktop presets and an explicit custom width", async () => {
@@ -237,19 +285,24 @@ describe("DesignStudioShell", () => {
     expect(screen.getByLabelText("Zoom")).toHaveValue("75");
     expect(within(screen.getByLabelText("Studio Mode")).getByRole("button", { name: "Edit" })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByRole("button", { name: "Grid" })).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByRole("slider", { name: "Grid Size" })).toHaveValue("12");
+    expect(screen.getByRole("slider", { name: "Grid And Snap Size" })).toHaveValue("12");
     expect(screen.getByRole("button", { name: "Snap" })).toHaveAttribute("aria-pressed", "false");
     expect(screen.getByRole("button", { name: "Presentation" })).toHaveAttribute("aria-pressed", "false");
   });
 
   it("changes the visible and snapping grid from 1 to 64 pixels", async () => {
     await renderStudio();
-    await openView();
-    const gridSize = screen.getByRole("slider", { name: "Grid Size" });
+    await userEvent.setup().click(screen.getByRole("button", { name: "Edit" }));
+    const gridSize = screen.getByRole("slider", { name: "Grid And Snap Size" });
     const preview = screen.getByRole("region", { name: "Stockroom Preview" });
 
     expect(gridSize).toHaveValue("8");
-    fireEvent.click(screen.getByRole("button", { name: "Grid" }));
+    const grid = screen.getByRole("button", { name: "Grid" });
+    expect(grid).toHaveAttribute("aria-pressed", "true");
+    fireEvent.click(grid);
+    expect(preview).toHaveAttribute("data-grid", "hidden");
+    expect(preview.querySelector('[data-design-grid-overlay="true"]')).not.toBeInTheDocument();
+    fireEvent.click(grid);
     fireEvent.change(gridSize, { target: { value: "24" } });
     expect(preview).toHaveAttribute("data-grid-size", "24");
     expect(Number.parseFloat(preview.style.getPropertyValue("--design-studio-grid-size"))).toBeGreaterThan(20);

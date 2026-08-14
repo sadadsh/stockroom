@@ -23,14 +23,15 @@ from fastapi import FastAPI, Request
 from stockroom.api.errors import ApiError
 from stockroom.api.jobs import JobRunner
 from stockroom.service import (
+    DEFAULT_AUTHORITY_SCOPE,
     CoordinatorConflict,
     CoordinatorStatus,
     GenerationFence,
     ServiceControl,
     ServiceMode,
     WindowsCurrentIdentity,
+    WindowsNamedMutexFactory,
     WorkflowCoordinator,
-    secure_windows_mutex_factory,
 )
 from stockroom.workflow import (
     PublicationLease,
@@ -737,6 +738,7 @@ class ContextServiceAuthority:
         transition_timeout_seconds: float = 120.0,
         shadow_factory: Callable[[], ServiceControl] | None = None,
         coordinator_factory: Callable[[], ServiceControl] | None = None,
+        authority_scope: str = DEFAULT_AUTHORITY_SCOPE,
     ) -> None:
         if not release_id:
             raise ValueError("release_id must not be empty")
@@ -754,6 +756,7 @@ class ContextServiceAuthority:
         )
         self._shadow_factory = shadow_factory
         self._coordinator_factory = coordinator_factory
+        self._authority_scope = authority_scope
         self._lock = threading.RLock()
         self._control: ServiceControl
         self._fence: GenerationFence | None = None
@@ -865,6 +868,7 @@ class ContextServiceAuthority:
             self._database,
             mode=ServiceMode.SHADOW,
             identity=WindowsCurrentIdentity(),
+            authority_scope=self._authority_scope,
         )
 
     def _new_coordinator(self) -> ServiceControl:
@@ -879,7 +883,8 @@ class ContextServiceAuthority:
             self._database,
             mode=ServiceMode.COORDINATOR,
             identity=WindowsCurrentIdentity(),
-            mutex_factory=secure_windows_mutex_factory,
+            mutex_factory=WindowsNamedMutexFactory(purpose=self._authority_scope),
+            authority_scope=self._authority_scope,
         )
 
     def _bind(

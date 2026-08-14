@@ -25,6 +25,24 @@ declare module "node:module" {
   };
 }
 
+declare module "node:url" {
+  export class URL {
+    constructor(input: string);
+    readonly protocol: string;
+    readonly hostname: string;
+    readonly username: string;
+    readonly password: string;
+    readonly pathname: string;
+    readonly search: string;
+    readonly hash: string;
+    readonly origin: string;
+  }
+}
+
+declare const process: {
+  readonly env: Record<string, string | undefined>;
+};
+
 interface ImportMeta {
   readonly url: string;
 }

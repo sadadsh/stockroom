@@ -36,7 +36,13 @@ function Probe() {
   );
 }
 
-function Harness({ onAppClick }: { onAppClick?: () => void }) {
+function Harness({
+  onAppClick,
+  onChromePointerDown,
+}: {
+  onAppClick?: () => void;
+  onChromePointerDown?: () => void;
+}) {
   return (
     <ThemeProvider>
       <DevModeProvider>
@@ -62,9 +68,16 @@ function Harness({ onAppClick }: { onAppClick?: () => void }) {
           </div>
         </div>
         {createPortal(
-          <div data-dev-id="provider.backdrop">
-            <button type="button" data-dev-id="provider.close">Close Provider</button>
-          </div>,
+          <>
+            <div data-dev-id="provider.backdrop">
+              <button type="button" data-dev-id="provider.close">Close Provider</button>
+            </div>
+            {onChromePointerDown ? (
+              <div data-design-studio-chrome="true">
+                <button type="button" data-dev-id="design.placement-handle" onPointerDown={onChromePointerDown}>Move Piece</button>
+              </div>
+            ) : null}
+          </>,
           document.body,
         )}
         <DevInspector />
@@ -106,6 +119,18 @@ describe("DevInspector", () => {
     expect(appClick).not.toHaveBeenCalled(); // the click is swallowed in inspect mode
     expect(screen.getByTestId("selected")).toHaveTextContent("detail.complete-part");
     expect(screen.getByTestId("vars")).toHaveTextContent("--c-warn,--c-t1");
+  });
+
+  it("leaves Design Studio chrome pointer controls interactive without selecting them", () => {
+    const pointerDown = vi.fn();
+    render(<Harness onChromePointerDown={pointerDown} />);
+    on("toggle-dev");
+    on("toggle-inspect");
+
+    fireEvent.pointerDown(screen.getByRole("button", { name: "Move Piece" }), { button: 0 });
+
+    expect(pointerDown).toHaveBeenCalledOnce();
+    expect(screen.getByTestId("selected")).toHaveTextContent("none");
   });
 
   it("makes the highlighted element the editing selection on pointer press", () => {

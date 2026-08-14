@@ -77,10 +77,6 @@ jobs:
           GITHUB_RUN_NUMBER: ${{ github.run_number }}
           STOCKROOM_WINDOWS_PUBLISHER: ${{ vars.STOCKROOM_WINDOWS_PUBLISHER }}
           STOCKROOM_WINDOWS_FEED_BASE_URI: ${{ vars.STOCKROOM_WINDOWS_FEED_BASE_URI }}
-          STOCKROOM_MINGIT_URL: ${{ vars.STOCKROOM_MINGIT_URL }}
-          STOCKROOM_MINGIT_SHA256: ${{ vars.STOCKROOM_MINGIT_SHA256 }}
-          STOCKROOM_WEBVIEW2_BOOTSTRAPPER_URL: ${{ vars.STOCKROOM_WEBVIEW2_BOOTSTRAPPER_URL }}
-          STOCKROOM_WEBVIEW2_BOOTSTRAPPER_SHA256: ${{ vars.STOCKROOM_WEBVIEW2_BOOTSTRAPPER_SHA256 }}
           STOCKROOM_TUF_ROOT_BASE64: ${{ vars.STOCKROOM_TUF_ROOT_BASE64 }}
         run: |
           Set-StrictMode -Version Latest
@@ -89,24 +85,11 @@ jobs:
           $required = [ordered]@{
             STOCKROOM_WINDOWS_PUBLISHER = $env:STOCKROOM_WINDOWS_PUBLISHER
             STOCKROOM_WINDOWS_FEED_BASE_URI = $env:STOCKROOM_WINDOWS_FEED_BASE_URI
-            STOCKROOM_MINGIT_URL = $env:STOCKROOM_MINGIT_URL
-            STOCKROOM_MINGIT_SHA256 = $env:STOCKROOM_MINGIT_SHA256
-            STOCKROOM_WEBVIEW2_BOOTSTRAPPER_URL = $env:STOCKROOM_WEBVIEW2_BOOTSTRAPPER_URL
-            STOCKROOM_WEBVIEW2_BOOTSTRAPPER_SHA256 = $env:STOCKROOM_WEBVIEW2_BOOTSTRAPPER_SHA256
             STOCKROOM_TUF_ROOT_BASE64 = $env:STOCKROOM_TUF_ROOT_BASE64
           }
           foreach ($entry in $required.GetEnumerator()) {
             if ([string]::IsNullOrWhiteSpace([string]$entry.Value)) {
               throw "Required repository variable $($entry.Key) is missing."
-            }
-          }
-
-          foreach ($name in @(
-            "STOCKROOM_MINGIT_SHA256",
-            "STOCKROOM_WEBVIEW2_BOOTSTRAPPER_SHA256"
-          )) {
-            if ([string]$required[$name] -notmatch "^[0-9a-fA-F]{64}$") {
-              throw "$name must be an exact SHA-256 digest."
             }
           }
 
@@ -216,102 +199,19 @@ jobs:
         shell: pwsh
         run: uv sync --frozen
 
-      - name: Fetch And Verify Pinned Launcher Inputs
+      - name: Materialize Pinned TUF Root
         shell: pwsh
         env:
-          STOCKROOM_MINGIT_URL: ${{ vars.STOCKROOM_MINGIT_URL }}
-          STOCKROOM_MINGIT_SHA256: ${{ vars.STOCKROOM_MINGIT_SHA256 }}
-          STOCKROOM_WEBVIEW2_BOOTSTRAPPER_URL: ${{ vars.STOCKROOM_WEBVIEW2_BOOTSTRAPPER_URL }}
-          STOCKROOM_WEBVIEW2_BOOTSTRAPPER_SHA256: ${{ vars.STOCKROOM_WEBVIEW2_BOOTSTRAPPER_SHA256 }}
           STOCKROOM_TUF_ROOT_BASE64: ${{ vars.STOCKROOM_TUF_ROOT_BASE64 }}
         run: |
           Set-StrictMode -Version Latest
           $ErrorActionPreference = "Stop"
-
-          function Receive-VerifiedReleaseInput {
-            param(
-              [Parameter(Mandatory)][string]$Uri,
-              [Parameter(Mandatory)][string]$ExpectedSha256,
-              [Parameter(Mandatory)][string]$Destination,
-              [Parameter(Mandatory)][string[]]$AllowedHosts
-            )
-
-            $parsed = [Uri]::new($Uri)
-            if ($parsed.Scheme -cne "https") {
-              throw "Release input URLs must use HTTPS."
-            }
-            if (-not [string]::IsNullOrEmpty($parsed.UserInfo)) {
-              throw "Release input URLs cannot embed credentials."
-            }
-            if ($AllowedHosts -notcontains $parsed.DnsSafeHost.ToLowerInvariant()) {
-              throw "Release input URL is not hosted by the expected upstream."
-            }
-            Invoke-WebRequest -Uri $Uri -OutFile $Destination -MaximumRedirection 10
-            $actual = (Get-FileHash -LiteralPath $Destination -Algorithm SHA256).Hash
-            if ($actual -cne $ExpectedSha256.ToUpperInvariant()) {
-              Remove-Item -LiteralPath $Destination -Force
-              throw "Release input SHA-256 verification failed."
-            }
-          }
 
           $inputRoot = Join-Path $env:RUNNER_TEMP "Stockroom.Release.Inputs"
           if (Test-Path -LiteralPath $inputRoot) {
             throw "The release input directory unexpectedly already exists."
           }
           New-Item -ItemType Directory -Path $inputRoot | Out-Null
-
-          $minGitArchive = Join-Path $inputRoot "MinGit.zip"
-          Receive-VerifiedReleaseInput `
-            -Uri $env:STOCKROOM_MINGIT_URL `
-            -ExpectedSha256 $env:STOCKROOM_MINGIT_SHA256 `
-            -Destination $minGitArchive `
-            -AllowedHosts @("github.com")
-          $minGitRoot = Join-Path $inputRoot "MinGit"
-          Expand-Archive -LiteralPath $minGitArchive -DestinationPath $minGitRoot
-          if (-not (Test-Path -LiteralPath (Join-Path $minGitRoot "cmd\git.exe") -PathType Leaf)) {
-            throw "The verified MinGit archive does not contain cmd\git.exe."
-          }
-
-          $gitLfsArchive = Join-Path $inputRoot "git-lfs-windows-amd64-v3.7.1.zip"
-          Receive-VerifiedReleaseInput `
-            -Uri "https://github.com/git-lfs/git-lfs/releases/download/v3.7.1/git-lfs-windows-amd64-v3.7.1.zip" `
-            -ExpectedSha256 "8683cdc3d6c029b49393dcebbaa6265bd6efd9abdcf837be855b4cd42e5e80b6" `
-            -Destination $gitLfsArchive `
-            -AllowedHosts @("github.com")
-          $gitLfsRoot = Join-Path $inputRoot "Git LFS"
-          Expand-Archive -LiteralPath $gitLfsArchive -DestinationPath $gitLfsRoot
-          $gitLfsSource = Join-Path $gitLfsRoot "git-lfs-3.7.1\git-lfs.exe"
-          if (-not (Test-Path -LiteralPath $gitLfsSource -PathType Leaf)) {
-            throw "The verified Git LFS archive does not contain git-lfs.exe."
-          }
-          Copy-Item -LiteralPath $gitLfsSource `
-            -Destination (Join-Path $minGitRoot "mingw64\bin\git-lfs.exe")
-
-          $nodeArchive = Join-Path $inputRoot "node-v24.19.0-win-x64.zip"
-          Receive-VerifiedReleaseInput `
-            -Uri "https://nodejs.org/dist/v24.19.0/node-v24.19.0-win-x64.zip" `
-            -ExpectedSha256 "57f71ab3652e797d84acddc79c81cc9ff1c6ddb2a1974cdb83f00fee9bff4c73" `
-            -Destination $nodeArchive `
-            -AllowedHosts @("nodejs.org")
-          Expand-Archive -LiteralPath $nodeArchive -DestinationPath $inputRoot
-          $nodeRoot = Join-Path $inputRoot "node-v24.19.0-win-x64"
-          if (
-            -not (Test-Path -LiteralPath (Join-Path $nodeRoot "node.exe") -PathType Leaf) -or
-            -not (Test-Path -LiteralPath (Join-Path $nodeRoot "npm.cmd") -PathType Leaf)
-          ) {
-            throw "The verified Node runtime does not contain node.exe and npm.cmd."
-          }
-
-          $webView2 = Join-Path $inputRoot "MicrosoftEdgeWebview2Setup.exe"
-          Receive-VerifiedReleaseInput `
-            -Uri $env:STOCKROOM_WEBVIEW2_BOOTSTRAPPER_URL `
-            -ExpectedSha256 $env:STOCKROOM_WEBVIEW2_BOOTSTRAPPER_SHA256 `
-            -Destination $webView2 `
-            -AllowedHosts @(
-              "go.microsoft.com",
-              "msedge.sf.dl.delivery.mp.microsoft.com"
-            )
-
           $tufRoot = Join-Path $inputRoot "Root.json"
           try {
             $tufRootBytes = [Convert]::FromBase64String($env:STOCKROOM_TUF_ROOT_BASE64)
@@ -319,17 +219,21 @@ jobs:
           catch {
             throw "STOCKROOM_TUF_ROOT_BASE64 is not valid base64."
           }
-          if ($tufRootBytes.Length -eq 0) {
-            throw "STOCKROOM_TUF_ROOT_BASE64 decoded to an empty trust root."
+          try {
+            if ($tufRootBytes.Length -eq 0) {
+              throw "STOCKROOM_TUF_ROOT_BASE64 decoded to an empty trust root."
+            }
+            [IO.File]::WriteAllBytes($tufRoot, $tufRootBytes)
           }
-          [IO.File]::WriteAllBytes($tufRoot, $tufRootBytes)
-          [Array]::Clear($tufRootBytes, 0, $tufRootBytes.Length)
-
-          $utf8 = [Text.UTF8Encoding]::new($false)
+          finally {
+            if ($null -ne $tufRootBytes) {
+              [Array]::Clear($tufRootBytes, 0, $tufRootBytes.Length)
+            }
+          }
           [IO.File]::AppendAllText(
             $env:GITHUB_ENV,
-            "STOCKROOM_MINGIT_ROOT=$minGitRoot`nSTOCKROOM_NODE_ROOT=$nodeRoot`nSTOCKROOM_WEBVIEW2_BOOTSTRAPPER=$webView2`nSTOCKROOM_TUF_ROOT_PATH=$tufRoot`n",
-            $utf8
+            "STOCKROOM_TUF_ROOT_PATH=$tufRoot`n",
+            [Text.UTF8Encoding]::new($false)
           )
 
       - name: Materialize Ephemeral Signing Material
@@ -438,9 +342,6 @@ jobs:
             -Publisher $env:STOCKROOM_WINDOWS_PUBLISHER `
             -FeedBaseUri $env:STOCKROOM_WINDOWS_FEED_BASE_URI `
             -SigningCertificatePath $pfxPath `
-            -MinGitRoot $env:STOCKROOM_MINGIT_ROOT `
-            -NodeRoot $env:STOCKROOM_NODE_ROOT `
-            -WebView2BootstrapperPath $env:STOCKROOM_WEBVIEW2_BOOTSTRAPPER `
             -TufRootPath $env:STOCKROOM_TUF_ROOT_PATH `
             -TufMetadataVersion ([int]$env:STOCKROOM_TUF_METADATA_VERSION) `
             -TufTargetsKeyPaths $env:STOCKROOM_TUF_TARGETS_KEY_PATH `
@@ -590,11 +491,9 @@ jobs:
               $env:STOCKROOM_ROLLBACK_RELEASE_ID -or
             (@($evidence.managed_runtime.compatible_from_release_ids) -join ";") -cne
               $env:STOCKROOM_COMPATIBLE_FROM_RELEASE_IDS -or
-            $evidence.managed_runtime.service_mode -cne "coordinator" -or
-            $evidence.managed_runtime.coordinator_state -cne "running" -or
+            -not $evidence.managed_runtime.native_host -or
+            -not $evidence.managed_runtime.packaged_worker -or
             $evidence.managed_runtime.update_channel -cne "production" -or
-            -not $evidence.managed_runtime.frontend_injected -or
-            [int]$evidence.managed_runtime.service_generation -le 0 -or
             [string]$evidence.managed_runtime.release_manifest_sha256 -notmatch
               "^[0-9a-f]{64}$" -or
             [string]$evidence.managed_runtime.pinned_tuf_root_sha256 -notmatch
@@ -633,24 +532,12 @@ jobs:
             throw "Signed TUF release-feed evidence is incomplete or invalid."
           }
           if (
-            [string]$evidence.tools.bundled_mingit.git_executable_sha256 -notmatch
-              "^[0-9a-f]{64}$" -or
-            [string]$evidence.tools.bundled_git_lfs.executable_sha256 -notmatch
-              "^[0-9a-f]{64}$" -or
-            [string]$evidence.tools.bundled_node.tree_sha256 -notmatch
-              "^[0-9a-f]{64}$" -or
-            [string]$evidence.tools.bundled_node.node_executable_sha256 -notmatch
-              "^[0-9a-f]{64}$" -or
-            [string]$evidence.tools.bundled_node.npm_command_sha256 -notmatch
-              "^[0-9a-f]{64}$" -or
-            [string]$evidence.tools.webview2_bootstrapper.sha256 -notmatch
-              "^[0-9a-f]{64}$" -or
             [string]$evidence.tools.cad_converter.tree_sha256 -notmatch
               "^[0-9a-f]{64}$" -or
             [string]$evidence.tools.cad_converter.executable_sha256 -notmatch
               "^[0-9a-f]{64}$"
           ) {
-            throw "Bundled Windows runtime dependency evidence is incomplete."
+            throw "Native CAD converter evidence is incomplete."
           }
 
           $packageHash = (Get-FileHash -LiteralPath $packagePath -Algorithm SHA256).Hash.ToLowerInvariant()

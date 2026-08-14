@@ -10,6 +10,7 @@ import sys
 import tempfile
 from pathlib import Path
 from types import SimpleNamespace
+from typing import cast
 
 import httpx
 from fastapi import FastAPI
@@ -21,7 +22,9 @@ from stockroom.host.release_runtime import HostReleaseBoundary
 from stockroom.host.run import _serve_in_thread
 from stockroom.host.service_authority import ContextServiceAuthority
 from stockroom.service import ServiceMode
-from stockroom.update import ReleaseHealthStage, verify_local_release_set
+from stockroom.store.machine_config import MachineConfig
+from stockroom.store.onboarding import bootstrap_library
+from stockroom.update import AcceptedRelease, ReleaseHealthStage, verify_local_release_set
 
 
 class PackagedWorkerProbeError(RuntimeError):
@@ -71,10 +74,13 @@ def run_packaged_worker_probe(
         raise PackagedWorkerProbeError(
             "worker probe must launch the release manifest's exact backend"
         )
-    candidate = verify_local_release_set(
-        release_directory,
-        expected_release_id=release_id,
-        expected_manifest_sha256=manifest_sha256,
+    candidate = cast(
+        AcceptedRelease,
+        verify_local_release_set(
+            release_directory,
+            expected_release_id=release_id,
+            expected_manifest_sha256=manifest_sha256,
+        ),
     )
     backend_members = [
         candidate.members[member.path]
@@ -122,6 +128,7 @@ def run_packaged_worker_probe(
     os.environ["LOCALAPPDATA"] = str(Path(local_app_data).resolve(strict=True))
     os.environ["APPDATA"] = str(Path(roaming_app_data).resolve(strict=True))
     os.environ["GIT_TERMINAL_PROMPT"] = "0"
+    bootstrap_library(MachineConfig.load(migrate_credentials=False))
     service_root = Path(local_app_data).resolve() / "Stockroom" / "Service State"
     workflow_database = service_root / "Workflow.sqlite"
     prior_release_id = "release-package-probe-prior"
@@ -166,11 +173,21 @@ def run_packaged_worker_probe(
         drain_timeout_seconds=30.0,
         stop_timeout_seconds=10.0,
     )
-    current = SimpleNamespace(release_id=prior_release_id)
+    current = cast(AcceptedRelease, SimpleNamespace(release_id=prior_release_id))
     worker = None
     try:
         worker = boundary.launch_shadow(candidate, generation=1)
-        if Path(worker.process.args[0]).resolve() != worker_executable:
+        process_arguments = worker.process.args
+        launched_executable = (
+            process_arguments[0]
+            if isinstance(process_arguments, (list, tuple))
+            else process_arguments
+        )
+        if isinstance(launched_executable, os.PathLike):
+            launched_executable = launched_executable.__fspath__()
+        if not isinstance(launched_executable, (str, bytes)):
+            raise PackagedWorkerProbeError("worker launch command is invalid")
+        if Path(os.fsdecode(launched_executable)).resolve() != worker_executable:
             raise PackagedWorkerProbeError(
                 "managed boundary launched a different worker executable"
             )
@@ -208,6 +225,15 @@ def run_packaged_worker_probe(
             raise PackagedWorkerProbeError(
                 "stable route did not adopt the packaged worker: "
                 f"{candidate_health!r}"
+            )
+        frontend = httpx.get(
+            f"{public_base_url}/",
+            headers={"X-Stockroom-Token": "packaged-worker-probe-token"},
+            timeout=15.0,
+        )
+        if frontend.status_code != 200 or '<div id="root"></div>' not in frontend.text:
+            raise PackagedWorkerProbeError(
+                "packaged worker did not serve the committed frontend"
             )
         boundary.rollback(
             candidate,
@@ -248,6 +274,7 @@ def run_packaged_worker_probe(
                 "exact_worker_sha256": hashlib.sha256(
                     worker_executable.read_bytes()
                 ).hexdigest(),
+                "frontend_served": True,
                 "initial_generation": initial_generation,
                 "prior_release_id": prior_release_id,
                 "restored_generation": restored.generation,

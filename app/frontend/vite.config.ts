@@ -2,6 +2,7 @@
 import { execSync } from "node:child_process";
 import path from "node:path";
 import { createRequire } from "node:module";
+import { URL } from "node:url";
 import { defineConfig, normalizePath } from "vite";
 import react from "@vitejs/plugin-react";
 import { viteStaticCopy } from "vite-plugin-static-copy";
@@ -37,11 +38,67 @@ function buildVersion(): string {
 
 const appVersion = buildVersion();
 
+function developmentBootstrapPlugin() {
+  if (process.env.STOCKROOM_DEV_BOOTSTRAP !== "1") return null;
+  return {
+    name: "stockroom-development-bootstrap",
+    transformIndexHtml() {
+      return [
+        {
+          tag: "script",
+          injectTo: "head-prepend" as const,
+          children: `
+(function () {
+  var prefix = "#__stockroom_development_token=";
+  var token = "";
+  try {
+    if (window.location.hash.indexOf(prefix) === 0) {
+      token = decodeURIComponent(window.location.hash.slice(prefix.length));
+      sessionStorage.setItem("stockroom-development-token", token);
+      history.replaceState(history.state, "", window.location.pathname + window.location.search);
+    } else {
+      token = sessionStorage.getItem("stockroom-development-token") || "";
+    }
+  } catch (error) {
+    token = "";
+  }
+  if (token) window.__STOCKROOM_TOKEN__ = token;
+})();`,
+        },
+      ];
+    },
+  };
+}
+
+function developmentApiProxy() {
+  const targetText = process.env.STOCKROOM_DEV_BACKEND_URL?.trim() ?? "";
+  if (!targetText) return undefined;
+  const target = new URL(targetText);
+  if (
+    target.protocol !== "http:" ||
+    target.hostname !== "127.0.0.1" ||
+    target.username ||
+    target.password ||
+    (target.pathname !== "/" && target.pathname !== "") ||
+    target.search ||
+    target.hash
+  ) {
+    throw new Error("Stockroom development backend must be a bare 127.0.0.1 HTTP origin");
+  }
+  return {
+    "/api": {
+      target: target.origin,
+      changeOrigin: false,
+    },
+  };
+}
+
 // The backend serves the built SPA from app/frontend-dist/ (see
 // stockroom.api.app._FRONTEND_DIST), so emit there. Relative asset base so the
 // bundle works whether the host loads it from the API mount or from file://.
 export default defineConfig({
   plugins: [
+    developmentBootstrapPlugin(),
     stockroomDesignIdentityPlugin(),
     react(),
     // `stripBase: true` matters: without it the plugin reproduces each file's path from the
@@ -69,6 +126,7 @@ export default defineConfig({
     },
   ],
   base: "./",
+  envDir: process.env.STOCKROOM_DEV_ENV_DIR?.trim() || undefined,
   define: {
     __APP_VERSION__: JSON.stringify(appVersion),
   },
@@ -78,8 +136,10 @@ export default defineConfig({
     sourcemap: false,
   },
   server: {
+    host: "127.0.0.1",
     port: 5173,
     strictPort: false,
+    proxy: developmentApiProxy(),
   },
   // Vitest runs the component + client tests in jsdom. This is the frontend TDD
   // floor: every M6 slice ships with tests that run here (see the M6 plan).

@@ -307,6 +307,7 @@ describe("direct resize parity", () => {
   it("snaps the same placement resize from keyboard and pointer without rebinding it", () => {
     render(<Surface active start={baseDocument({ alpha: { size: { width: 480 } } })} />);
     const resize = document.querySelector<HTMLElement>('[data-arrange-resize="alpha"]')!;
+    expect(resize.closest('[data-design-studio-chrome="true"]')).toBeInTheDocument();
 
     fireEvent.keyDown(resize, { key: "ArrowRight" });
     expect(screen.getByTestId("sizes")).toHaveTextContent("alpha:488");

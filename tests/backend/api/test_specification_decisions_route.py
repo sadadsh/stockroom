@@ -188,13 +188,14 @@ def test_clearing_an_override_for_an_unknown_key_is_still_refused(client, app_ct
 # --------------------------------------------------------------- preferred source
 
 
-def test_preferring_a_source_promotes_it_without_dropping_the_others(client, app_ctx):
+def test_preferring_a_source_records_the_pin_without_overriding_fixed_authority(client, app_ctx):
     _add_part(app_ctx)
     row = _row(client.put(_PREFERRED, json={"sourceId": "digikey"}).json())
-    assert row["preferredValue"] == "2%"
-    assert row["preferredSource"]["sourceId"] == "digikey"
+    assert row["preferredValue"] == "1%"
+    assert row["preferredSource"]["sourceId"] == "mouser"
     assert {item["sourceId"] for item in row["sourceCandidates"]} == {"mouser", "digikey"}
-    assert row["preferredSourcePin"]["inForce"] is True
+    assert row["preferredSourcePin"]["sourceId"] == "digikey"
+    assert row["preferredSourcePin"]["inForce"] is False
 
 
 def test_a_source_that_never_answered_for_the_field_cannot_be_preferred(client, app_ctx):
@@ -240,13 +241,14 @@ def test_a_reviewed_value_outranks_a_preferred_source(client, app_ctx):
     assert row["preferredSourcePin"]["inForce"] is False
 
 
-def test_clearing_the_override_hands_the_field_back_to_the_preferred_source(client, app_ctx):
+def test_clearing_the_override_hands_the_field_back_to_fixed_authority(client, app_ctx):
     _add_part(app_ctx)
     client.put(_PREFERRED, json={"sourceId": "digikey"})
     client.put(_OVERRIDE, json={"value": "0.5%"})
     row = _row(client.delete(_OVERRIDE).json())
-    assert row["preferredValue"] == "2%"
-    assert row["preferredSourcePin"]["inForce"] is True
+    assert row["preferredValue"] == "1%"
+    assert row["preferredSourcePin"]["sourceId"] == "digikey"
+    assert row["preferredSourcePin"]["inForce"] is False
 
 
 # --------------------------------------------------------------- durability

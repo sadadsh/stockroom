@@ -455,7 +455,7 @@ def _validate_manifest(
     application = _one(root, PACKAGE_NAMESPACE, "Applications/Application")
     if application.attrib != {
         "Id": configuration.application_id,
-        "Executable": "Stockroom.exe",
+        "Executable": r"WindowHost\Stockroom.WindowHost.exe",
         "EntryPoint": "Windows.FullTrustApplication",
     }:
         raise PackageContractError("AppxManifest full-trust application changed")
@@ -465,7 +465,7 @@ def _validate_manifest(
         raise PackageContractError("AppxManifest visual elements are missing")
     expected_visual = {
         "DisplayName": configuration.display_name,
-        "Description": "Stockroom's stable Windows bootstrap and desktop host.",
+        "Description": "Stockroom's native Windows desktop host.",
         "BackgroundColor": "transparent",
         "Square44x44Logo": r"Assets\Square44x44Logo.png",
         "Square150x150Logo": r"Assets\Square150x150Logo.png",
@@ -478,15 +478,15 @@ def _validate_manifest(
         raise PackageContractError("AppxManifest must request only runFullTrust")
 
     referenced_files = {
-        "Stockroom.exe",
+        r"WindowHost\Stockroom.WindowHost.exe",
         r"Assets\StoreLogo.png",
         r"Assets\Square44x44Logo.png",
         r"Assets\Square150x150Logo.png",
     }
     for relative in referenced_files:
         if not (package_root / Path(relative.replace("\\", "/"))).is_file():
-            if relative == "Stockroom.exe":
-                # Rendering occurs before the deterministic executable is copied.
+            if relative == r"WindowHost\Stockroom.WindowHost.exe":
+                # Rendering occurs before the deterministic native host is copied.
                 continue
             raise PackageContractError(f"AppxManifest asset is missing: {relative}")
     _validate_assets(package_root)

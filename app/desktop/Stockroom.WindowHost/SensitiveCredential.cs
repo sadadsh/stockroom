@@ -19,6 +19,23 @@ internal sealed class SensitiveCredential : IDisposable
         _ascii = ascii;
     }
 
+    internal static SensitiveCredential Generate()
+    {
+        var bytes = RandomNumberGenerator.GetBytes(32);
+        try
+        {
+            var value = Convert.ToBase64String(bytes)
+                .TrimEnd('=')
+                .Replace('+', '-')
+                .Replace('/', '_');
+            return new SensitiveCredential(Encoding.ASCII.GetBytes(value));
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(bytes);
+        }
+    }
+
     internal static SensitiveCredential Parse(JsonElement element, string label)
     {
         if (element.ValueKind != JsonValueKind.String)
@@ -87,6 +104,12 @@ internal sealed class SensitiveCredential : IDisposable
             ObjectDisposedException.ThrowIf(_disposed, this);
             return _ascii;
         }
+    }
+
+    internal SensitiveCredential Clone()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        return new SensitiveCredential((byte[])_ascii.Clone());
     }
 
     internal string CreateEphemeralString()

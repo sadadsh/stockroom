@@ -34,6 +34,41 @@ user library: each library has its own root, Git history, optional remote, and c
 Changing libraries means changing repositories. The legacy one-profile folder inside a migrated
 library is an internal disk-compatibility boundary, not a user-facing workspace concept.
 
+## Windows process and delivery boundary
+
+Windows launches only the signed WPF executable declared by the MSIX:
+`WindowHost\Stockroom.WindowHost.exe`. The host owns single-instance activation,
+the visible WebView2 window, rotating diagnostics, and one crash-contained worker
+job. It resolves the package's TUF-bound built-in release, launches
+`Backend\Stockroom Worker.exe --port <loopback-port>`, and waits for an
+identity-aware health response before showing the window.
+
+The worker is a PyInstaller onedir runtime. It serves the committed frontend and
+owns backend/service coordination; it has no interactive entry point. Production
+startup does not execute application Git source, `uv`, or a source Python. It also
+does not install WebView2 or provider browsers. Windows/MSIX owns Start menu,
+Installed Apps, update, and uninstall registration. The in-process updater accepts
+only signed TUF release sets and keeps `repository_offline` as an honest degraded
+state instead of falling back to mutable source.
+
+A second native launch sends an activation request through a same-user secured
+named pipe and exits after the existing window acknowledges focus. Native-host
+logs live under `%LOCALAPPDATA%\Stockroom\Logs`; workers run in kill-on-close
+Windows jobs. The host removes only old, Stockroom-marked legacy `_MEI*`
+extractions.
+
+Source development is a separate product boundary. `scripts/Start-Stockroom-Development.ps1`
+starts the selected checkout directly through its existing `.venv`, an ephemeral loopback backend,
+and Vite. Vite proxies `/api`; the source host injects a per-session credential only into its
+same-origin app renderer, never a committed file or `VITE_*` build variable. Frontend edits use
+HMR; backend Python edits terminate the complete
+development child job and relaunch from fresh imports. This mode uses the title `Stockroom
+Development`, AUMID `Stockroom.Development.Unpackaged`, authority scope
+`DevelopmentApplicationService`, and state under `%LOCALAPPDATA%\Stockroom Development`. It
+removes inherited `STOCKROOM_*` production inputs and disables application Git convergence, so it
+can neither open production state nor pull over dirty source. Dependency setup and shortcut
+installation are explicit commands. None of this code is a production startup fallback.
+
 ## Backend packages (`app/backend/stockroom/`)
 
 Each package is a cohesive domain. Add code to the one whose job it already is; reach for a new

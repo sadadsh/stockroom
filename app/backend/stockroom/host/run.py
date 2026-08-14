@@ -371,6 +371,7 @@ def _prepare_managed_library(
     libraries_root: Path | None,
     *,
     service_state_root: Path,
+    authority_scope: str = "ApplicationService",
 ) -> Path:
     """Bootstrap the first-run library only while holding service authority."""
 
@@ -380,7 +381,7 @@ def _prepare_managed_library(
         ServiceControl,
         ServiceMode,
         WindowsCurrentIdentity,
-        secure_windows_mutex_factory,
+        WindowsNamedMutexFactory,
     )
     from stockroom.store.machine_config import MachineConfig
     from stockroom.store.onboarding import bootstrap_library
@@ -389,7 +390,8 @@ def _prepare_managed_library(
         Path(service_state_root).resolve() / "Control.sqlite",
         mode=ServiceMode.COORDINATOR,
         identity=WindowsCurrentIdentity(),
-        mutex_factory=secure_windows_mutex_factory,
+        mutex_factory=WindowsNamedMutexFactory(purpose=authority_scope),
+        authority_scope=authority_scope,
     )
     fence = control.acquire()
     try:
@@ -407,6 +409,7 @@ def _start_development_service_authority(
     *,
     state_root: Path,
     enable_altium: bool,
+    authority_scope: str = "ApplicationService",
 ):
     """Mount the production workflow owner without claiming signed delivery."""
 
@@ -440,6 +443,7 @@ def _start_development_service_authority(
         control_database=root / "Control.sqlite",
         lifecycle=lifecycle,
         start_as_coordinator=True,
+        authority_scope=authority_scope,
     )
 
 
@@ -484,6 +488,9 @@ def run_windowed(
     kicad_dir: Path | None = None,
     open_window: Callable[[str, str], None] | None = None,
     source_service_state_root: Path | None = None,
+    *,
+    source_authority_scope: str = "ApplicationService",
+    enable_source_convergence: bool = True,
 ) -> bool:
     """Run the app until the window closes. Returns True if the app requested a self-update
     restart (the launcher relaunches on the freshly pulled code), False on a normal close."""
@@ -520,6 +527,7 @@ def run_windowed(
             prepared_library = _prepare_managed_library(
                 libraries_root,
                 service_state_root=managed_service_state_root,
+                authority_scope=source_authority_scope,
             )
             ctx = build_context(
                 prepared_library,
@@ -529,6 +537,10 @@ def run_windowed(
         else:
             ctx = build_context(libraries_root, kicad_dir=kicad_dir)
     assert ctx is not None
+    if update_mode is HostUpdateMode.DEVELOPMENT_SOURCE and not enable_source_convergence:
+        # Local development follows the selected working tree directly. Never let its API
+        # fetch, rebase, pull, or replace dirty source while an editor is writing it.
+        ctx.app_repo = None
     host_config = getattr(ctx, "config", None)
     setattr(ctx, "host_update_mode", update_mode.value)
     background_sync_stop: threading.Event | None = None
@@ -596,6 +608,7 @@ def run_windowed(
                     # Native Altium work is user-triggered from Settings. Merely opening the
                     # source host must not consume a seat or create command windows.
                     enable_altium=False,
+                    authority_scope=source_authority_scope,
                 )
             )
         elif update_mode is HostUpdateMode.DEVELOPMENT_SOURCE:
@@ -621,15 +634,15 @@ def run_windowed(
             ctx.token,
             host_config,
         )  # auth + continuity from the first byte
-        if open_window is None and update_mode is HostUpdateMode.DEVELOPMENT_SOURCE:
-            # The stable launcher runs the continuously updated source host in this mode. Expose
-            # the original Stockroom WebView as the provider surface before the window starts, so
-            # a provider page opens inside Stockroom rather than in a separate Chromium window or
-            # the person's default browser. No debugging port is opened for it: capture observes
-            # the surface through its own download events and never drives it.
+        if update_mode is HostUpdateMode.DEVELOPMENT_SOURCE:
+            # Every mutable-source window uses the same pywebview-owned provider surface, including
+            # Stockroom Development's custom Vite opener. Restricting this to the default opener
+            # left Manage Models with chrome but no native page. No debugging port is opened:
+            # capture observes download events and never drives the provider page.
             from stockroom.host.window import InAppProviderBrowserSurface
 
-            setattr(ctx, "provider_browser_surface", InAppProviderBrowserSurface(base_url))
+            if getattr(ctx, "provider_browser_surface", None) is None:
+                setattr(ctx, "provider_browser_surface", InAppProviderBrowserSurface(base_url))
         if update_mode is HostUpdateMode.PRODUCTION:
             try:
                 production_update_runtime = create_production_update_runtime(
@@ -685,7 +698,8 @@ def run_windowed(
         # which mutation routes previously ran without any service fence.
         server, thread = _serve_in_thread(backend_proxy, port)
         if (
-            update_mode is not HostUpdateMode.PRODUCTION
+            enable_source_convergence
+            and update_mode is not HostUpdateMode.PRODUCTION
             and app_repo is not None
             and development_service_authority is None
         ):
@@ -780,7 +794,8 @@ def run_windowed(
                     daemon=True,
                 ).start()
         elif (
-            update_mode is not HostUpdateMode.PRODUCTION
+            enable_source_convergence
+            and update_mode is not HostUpdateMode.PRODUCTION
             and app_repo is not None
             and development_service_authority is not None
         ):

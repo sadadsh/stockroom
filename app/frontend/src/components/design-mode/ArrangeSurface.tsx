@@ -544,6 +544,7 @@ function PlacementAffordance({
 
   return (
     <div
+      data-design-studio-chrome="true"
       className="pointer-events-none fixed z-[185]"
       style={{ left: rect.left, top: rect.top, width: rect.width, height: rect.height }}
     >
@@ -763,6 +764,7 @@ function PieceMenu({ state }: { state: ArrangeMenuState }) {
 
   return (
     <div
+      data-design-studio-chrome="true"
       data-dev-id="design.piece-menu"
       data-arrange-menu={state.placementId}
       role="group"

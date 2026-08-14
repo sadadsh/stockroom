@@ -6,7 +6,9 @@ onboarding. All offline (clone copies a local source repo)."""
 
 from __future__ import annotations
 
+import os
 import shutil
+import subprocess
 
 import pytest
 
@@ -244,6 +246,55 @@ def test_create_refuses_an_existing_file_path(tmp_path):
 def test_create_into_a_new_dir_still_works(tmp_path):
     root = onboarding.set_library(MachineConfig(), "create", path=tmp_path / "brand-new")
     assert library_is_initialized(root)
+
+
+def test_development_boundary_confines_default_and_selected_libraries(
+    tmp_path,
+    monkeypatch,
+):
+    boundary = tmp_path / "development-libraries"
+    external = _library(tmp_path / "production-library")
+    monkeypatch.setenv("STOCKROOM_LIBRARY_ROOT_BOUNDARY", str(boundary))
+
+    assert onboarding.default_library_dir() == boundary.resolve() / "library"
+    with pytest.raises(ValueError, match="development boundary"):
+        onboarding.set_library(MachineConfig(), "open", path=external)
+    with pytest.raises(ValueError, match="development boundary"):
+        onboarding.set_library(MachineConfig(), "create", path=tmp_path / "outside")
+
+
+def test_development_boundary_rejects_persisted_external_library_before_bootstrap(
+    tmp_path,
+    monkeypatch,
+):
+    boundary = tmp_path / "development-libraries"
+    external = _library(tmp_path / "production-library")
+    monkeypatch.setenv("STOCKROOM_LIBRARY_ROOT_BOUNDARY", str(boundary))
+    config = MachineConfig(libraries_root=str(external), onboarded=True)
+
+    with pytest.raises(ValueError, match="development boundary"):
+        onboarding.bootstrap_library(config)
+
+
+def test_development_boundary_rejects_nested_junction_escape(tmp_path, monkeypatch):
+    if os.name != "nt":
+        pytest.skip("Windows junction proof")
+    boundary = tmp_path / "development-libraries"
+    boundary.mkdir()
+    external = _library(tmp_path / "production-library")
+    junction = boundary / "escaped"
+    result = subprocess.run(
+        ["cmd.exe", "/d", "/c", "mklink", "/J", str(junction), str(external)],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        pytest.skip("junction creation is unavailable")
+    monkeypatch.setenv("STOCKROOM_LIBRARY_ROOT_BOUNDARY", str(boundary))
+
+    with pytest.raises(ValueError, match="development boundary"):
+        onboarding.set_library(MachineConfig(), "open", path=junction)
 
 
 def test_bootstrap_reonboards_when_a_configured_library_went_missing(tmp_path, monkeypatch):

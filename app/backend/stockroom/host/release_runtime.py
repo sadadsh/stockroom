@@ -46,6 +46,7 @@ from stockroom.host.windows_job import (
     launch_in_windows_job,
 )
 from stockroom.service import (
+    DEFAULT_AUTHORITY_SCOPE,
     CoordinatorStatus,
     GenerationFence,
     ServiceControl,
@@ -119,6 +120,7 @@ class HostBackendProcess:
     directory: Path
     service_generation: int
     service_mode: str
+    diagnostic_path: Path | None = None
     process_job: WindowsProcessJob | None = None
 
 
@@ -622,6 +624,12 @@ class HostReleaseBoundary:
                 environment["STOCKROOM_WORKFLOW_DATABASE"] = str(self._workflow_database)
             if self._convergence_status_path is not None:
                 environment["STOCKROOM_CONVERGENCE_STATUS"] = str(self._convergence_status_path)
+            diagnostic_root = environment.get("LOCALAPPDATA", "").strip()
+            diagnostic_path = (
+                Path(diagnostic_root) / "Stockroom" / "Logs" / "Release Workers"
+                if diagnostic_root
+                else Path(tempfile.gettempdir()) / "Stockroom" / "Logs" / "Release Workers"
+            ) / f"{candidate.release_id} Generation {generation}.log"
             process_job = None
             try:
                 if os.name == "nt":
@@ -630,17 +638,23 @@ class HostReleaseBoundary:
                         cwd=candidate.directory,
                         environment=environment,
                         creationflags=_NO_WINDOW,
+                        diagnostic_path=diagnostic_path,
                     )
                 else:
-                    process = subprocess.Popen(
-                        command,
-                        cwd=str(candidate.directory),
-                        env=environment,
-                        stdin=subprocess.DEVNULL,
-                        stdout=subprocess.DEVNULL,
-                        stderr=subprocess.DEVNULL,
-                        creationflags=_NO_WINDOW,
-                    )
+                    diagnostic_path.parent.mkdir(parents=True, exist_ok=True)
+                    diagnostic_stream = diagnostic_path.open("ab", buffering=0)
+                    try:
+                        process = subprocess.Popen(
+                            command,
+                            cwd=str(candidate.directory),
+                            env=environment,
+                            stdin=subprocess.DEVNULL,
+                            stdout=diagnostic_stream,
+                            stderr=diagnostic_stream,
+                            creationflags=_NO_WINDOW,
+                        )
+                    finally:
+                        diagnostic_stream.close()
             except (OSError, subprocess.SubprocessError, WindowsProcessJobError) as exc:
                 raise HostReleaseProcessError("release worker could not be launched") from exc
             worker = HostBackendProcess(
@@ -651,6 +665,7 @@ class HostReleaseBoundary:
                 directory=candidate.directory,
                 service_generation=service_generation,
                 service_mode="shadow",
+                diagnostic_path=diagnostic_path,
                 process_job=process_job,
             )
             self._workers[candidate.release_id] = worker
@@ -991,7 +1006,14 @@ class HostReleaseBoundary:
         for index in range(probes):
             while True:
                 if worker.process.poll() is not None:
-                    raise HostReleaseHealthError("release worker exited during its health gate")
+                    diagnostic = (
+                        ""
+                        if worker.diagnostic_path is None
+                        else f"; diagnostics: {worker.diagnostic_path}"
+                    )
+                    raise HostReleaseHealthError(
+                        "release worker exited during its health gate" + diagnostic
+                    )
                 remaining = deadline - time.monotonic()
                 if remaining <= 0:
                     raise HostReleaseHealthError(
@@ -1787,12 +1809,16 @@ def _strict_feed_descriptor(path: Path) -> dict[str, str]:
 def _production_bundle_root(bundle_root: Path | None = None) -> Path:
     if bundle_root is not None:
         return Path(bundle_root).resolve()
-    if bool(getattr(sys, "frozen", False)):
-        return Path(sys.executable).resolve().parent / "Update"
     configured = os.environ.get("STOCKROOM_UPDATE_BUNDLE_ROOT", "")
-    if not configured:
-        raise ProductionUpdateConfigurationError("production update bundle root is unavailable")
-    return Path(configured).resolve()
+    if configured:
+        return Path(configured).resolve()
+    if bool(getattr(sys, "frozen", False)):
+        candidate = Path(sys.executable).resolve().parent
+        for parent in (candidate, *candidate.parents):
+            update_root = parent / "Update"
+            if (update_root / "Update Feed.json").is_file():
+                return update_root
+    raise ProductionUpdateConfigurationError("production update bundle root is unavailable")
 
 
 def production_data_root(data_root: Path | None = None) -> Path:
@@ -1915,6 +1941,7 @@ def create_production_update_runtime(
     manage_native_window: bool = True,
     bundle_root: Path | None = None,
     data_root: Path | None = None,
+    authority_scope: str | None = None,
 ) -> ProductionUpdateRuntime:
     """Compose the production TUF/store/activator boundary from packaged inputs."""
 
@@ -1961,12 +1988,16 @@ def create_production_update_runtime(
         require_publication_executor=True,
     )
 
+    update_authority_scope = (
+        f"{authority_scope}.UpdateBroker" if authority_scope else "UpdateBroker"
+    )
+    application_authority_scope = authority_scope or DEFAULT_AUTHORITY_SCOPE
     update_control = ServiceControl(
         state_directory / "Broker Control" / "Control.sqlite",
         mode=ServiceMode.COORDINATOR,
         identity=WindowsCurrentIdentity(),
-        mutex_factory=WindowsNamedMutexFactory(purpose="UpdateBroker"),
-        authority_scope="UpdateBroker",
+        mutex_factory=WindowsNamedMutexFactory(purpose=update_authority_scope),
+        authority_scope=update_authority_scope,
     )
     update_fence = update_control.acquire()
     service_authority: ContextServiceAuthority | None = None
@@ -2008,6 +2039,7 @@ def create_production_update_runtime(
             control_database=service_state_directory / "Control.sqlite",
             lifecycle=lifecycle,
             start_as_coordinator=True,
+            authority_scope=application_authority_scope,
         )
         status_path = state_directory / "Update Status.json"
         boundary = HostReleaseBoundary(

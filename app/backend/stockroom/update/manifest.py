@@ -25,7 +25,7 @@ _DIGEST_PATTERN = re.compile(r"[0-9a-f]{64}")
 _IDENTIFIER_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}")
 _VERSION_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9.+_-]{0,63}")
 _WORKFLOW_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}")
-_PATH_SEGMENT_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9 ._()+@-]{0,127}")
+_PATH_SEGMENT_PATTERN = re.compile(r"[A-Za-z0-9_][A-Za-z0-9 ._()+@-]{0,127}")
 _WINDOWS_RESERVED_NAMES = {
     "aux",
     "clock$",

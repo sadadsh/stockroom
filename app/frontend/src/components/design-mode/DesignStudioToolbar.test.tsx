@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DesignStudioToolbar } from "./DesignStudioToolbar";
@@ -28,10 +28,10 @@ vi.mock("../../lib/devMode", () => ({
 }));
 vi.mock("../../lib/theme", () => ({ useTheme: () => ({ theme: "dark", toggle: vi.fn() }) }));
 
-function renderToolbar() {
+function renderToolbar(mode: "preview" | "edit" = "preview") {
   return render(
     <DesignStudioToolbar
-      mode="preview"
+      mode={mode}
       onModeChange={vi.fn()}
       presentation={false}
       onPresentationChange={vi.fn()}
@@ -52,7 +52,7 @@ function renderToolbar() {
   );
 }
 
-describe("DesignStudioToolbar local Apply", () => {
+describe("DesignStudioToolbar local Commit", () => {
   beforeEach(() => {
     applyLocal.mockReset();
     studio.activeScenario = null;
@@ -61,33 +61,42 @@ describe("DesignStudioToolbar local Apply", () => {
     studio.appliedState = "ready";
   });
 
-  it("shows Draft Only before a design is explicitly applied", () => {
+  it("shows Draft Only before a design is explicitly committed", () => {
     renderToolbar();
     expect(screen.getByText("Draft")).toBeVisible();
-    expect(screen.getByRole("button", { name: "Apply" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Commit" })).toBeEnabled();
   });
 
   it("keeps secondary display controls inside one View menu", async () => {
     renderToolbar();
 
     expect(screen.queryByLabelText("Viewport")).not.toBeInTheDocument();
-    expect(screen.queryByRole("slider", { name: "Grid Size" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("slider", { name: "Grid And Snap Size" })).not.toBeInTheDocument();
     await userEvent.setup().click(screen.getByRole("button", { name: "View" }));
 
     expect(screen.getByLabelText("Viewport")).toBeVisible();
-    expect(screen.getByRole("slider", { name: "Grid Size" })).toHaveValue("8");
     expect(screen.getByRole("button", { name: "Presentation" })).toBeVisible();
   });
 
-  it("uses one clear Apply action and a short Exit action", () => {
+  it("restores direct grid, snap, and shared size controls in Edit", () => {
+    renderToolbar("edit");
+
+    expect(screen.getByRole("group", { name: "Studio Mode" })).toBeVisible();
+    const controls = screen.getByRole("group", { name: "Edit Grid Controls" });
+    expect(within(controls).getByRole("button", { name: "Grid" })).toBeVisible();
+    expect(within(controls).getByRole("button", { name: "Snap" })).toBeVisible();
+    expect(within(controls).getByRole("slider", { name: "Grid And Snap Size" })).toHaveValue("8");
+  });
+
+  it("uses one clear Commit action and a short Exit action", () => {
     renderToolbar();
-    expect(screen.getByRole("button", { name: "Apply" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Commit" })).toBeVisible();
     expect(screen.getByRole("button", { name: "Exit" })).toBeVisible();
     expect(screen.queryByRole("button", { name: "Set" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Close Design Studio" })).not.toBeInTheDocument();
   });
 
-  it("shows the active machine revision after Apply", () => {
+  it("shows the active machine revision after Commit", () => {
     studio.appliedRevision = "1234567890abcdef";
     renderToolbar();
     expect(screen.getByText("Applied · 12345678")).toBeVisible();
@@ -98,16 +107,16 @@ describe("DesignStudioToolbar local Apply", () => {
     studio.activeScenarioId = studio.activeScenario.id;
     renderToolbar();
 
-    const button = screen.getByRole("button", { name: "Apply" });
+    const button = screen.getByRole("button", { name: "Commit" });
     expect(button).toBeDisabled();
     await userEvent.setup().click(button);
     expect(applyLocal).not.toHaveBeenCalled();
   });
 
-  it("applies the personal draft only after the person presses Apply", async () => {
+  it("applies the personal draft only after the person presses Commit", async () => {
     renderToolbar();
 
-    await userEvent.setup().click(screen.getByRole("button", { name: "Apply" }));
+    await userEvent.setup().click(screen.getByRole("button", { name: "Commit" }));
     expect(applyLocal).toHaveBeenCalledOnce();
   });
 });

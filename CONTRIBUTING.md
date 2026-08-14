@@ -25,6 +25,28 @@ cd app/frontend && npm ci
 winget install --id rhysd.actionlint --exact
 ```
 
+## Run Stockroom Development
+
+Use the isolated source host for the normal edit loop. Vite updates frontend code in place; a
+backend Python edit closes and relaunches only the development window. It never pulls Git and
+never opens the installed app's configuration, service databases, WebView profile, or library.
+
+```powershell
+# Explicit dependency setup, only when the lockfiles change or the checkout is new.
+powershell -ExecutionPolicy Bypass -File scripts\Setup-Stockroom-Development.ps1
+
+# Normal development loop.
+powershell -ExecutionPolicy Bypass -File scripts\Start-Stockroom-Development.ps1
+
+# Optional Start Menu shortcut. Always name the exact checkout it should run.
+powershell -ExecutionPolicy Bypass -File scripts\Install-Stockroom-DevelopmentShortcut.ps1 `
+  -RepositoryRoot (Get-Location).Path
+```
+
+Development state lives under `%LOCALAPPDATA%\Stockroom Development`. Real data stays in the
+signed installed `Stockroom` app. Production behavior must still be verified through the packaged
+native host; hot reload is development evidence only.
+
 ## The gates
 
 A change is done when these pass. Run them before you commit; do not claim "done" off a subset.

@@ -298,8 +298,25 @@ def build_release_bundle(
     if normalized_mode not in {"fixture", "production"}:
         raise ReleaseBundleError("mode must be Fixture or Production")
     executable = Path(executable).resolve(strict=True)
-    if executable.suffix.casefold() != ".exe":
-        raise ReleaseBundleError("managed host must be a Windows executable")
+    if executable.is_dir():
+        worker_root = executable
+        worker_executable = worker_root / "Stockroom Worker.exe"
+        if not worker_executable.is_file():
+            raise ReleaseBundleError("packaged worker root is missing Stockroom Worker.exe")
+        worker_files = tuple(
+            sorted(
+                (path for path in worker_root.rglob("*") if path.is_file()),
+                key=lambda path: path.relative_to(worker_root).as_posix().casefold(),
+            )
+        )
+    elif executable.suffix.casefold() == ".exe":
+        worker_root = executable.parent
+        worker_executable = executable
+        worker_files = (executable,)
+    else:
+        raise ReleaseBundleError("packaged worker must be a Windows executable or runtime tree")
+    if any(path.is_symlink() for path in worker_files):
+        raise ReleaseBundleError("packaged worker runtime must not contain symlinks")
     window_host_root = Path(window_host_root).resolve(strict=True)
     if not window_host_root.is_dir():
         raise ReleaseBundleError("window host publish root must be a directory")
@@ -308,14 +325,7 @@ def build_release_bundle(
         raise ReleaseBundleError(
             "window host publish root is missing Stockroom.WindowHost.exe"
         )
-    window_host_files = tuple(
-        sorted(
-            (path for path in window_host_root.rglob("*") if path.is_file()),
-            key=lambda path: path.relative_to(window_host_root).as_posix().casefold(),
-        )
-    )
-    if any(path.is_symlink() for path in window_host_files):
-        raise ReleaseBundleError("window host publish root must not contain symlinks")
+    window_host_sha256 = _sha256(window_host_executable.read_bytes())
     cad_converter_root = Path(cad_converter_root).resolve(strict=True)
     if not cad_converter_root.is_dir():
         raise ReleaseBundleError("CAD converter publish root must be a directory")
@@ -381,40 +391,33 @@ def build_release_bundle(
 
     release_root = bundle_root / "Initial Release" / release_id
     backend_name = "Stockroom Worker.exe"
+    backend_members: list[dict[str, object]] = []
     backend_path = release_root / "Backend" / backend_name
-    backend_path.parent.mkdir(parents=True)
-    shutil.copyfile(executable, backend_path)
+    for source in worker_files:
+        relative = (
+            Path(backend_name)
+            if source == worker_executable
+            else source.relative_to(worker_root)
+        )
+        destination = release_root / "Backend" / relative
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(source, destination)
+        data = destination.read_bytes()
+        canonical_path = f"Backend/{relative.as_posix()}"
+        backend_members.append(
+            {
+                "kind": "backend" if source == worker_executable else "backend-runtime",
+                "path": canonical_path,
+                "sha256": _sha256(data),
+                "size": len(data),
+            }
+        )
     backend_bytes = backend_path.read_bytes()
     backend_sha1 = hashlib.sha1(  # noqa: S324 - required by SPDX 2.3
         backend_bytes,
         usedforsecurity=False,
     ).hexdigest()
     backend_sha256 = _sha256(backend_bytes)
-    window_host_members: list[dict[str, object]] = []
-    for source in window_host_files:
-        relative = source.relative_to(window_host_root)
-        destination = release_root / "WindowHost" / relative
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(source, destination)
-        data = destination.read_bytes()
-        canonical_path = f"WindowHost/{relative.as_posix()}"
-        window_host_members.append(
-            {
-                "kind": (
-                    "window-host"
-                    if canonical_path == "WindowHost/Stockroom.WindowHost.exe"
-                    else "window-host-runtime"
-                ),
-                "path": canonical_path,
-                "sha256": _sha256(data),
-                "size": len(data),
-            }
-        )
-    window_host_sha256 = next(
-        str(member["sha256"])
-        for member in window_host_members
-        if member["kind"] == "window-host"
-    )
     cad_converter_members: list[dict[str, object]] = []
     cad_converter_spdx: list[tuple[str, str, str]] = []
     for source in cad_converter_files:
@@ -459,15 +462,12 @@ def build_release_bundle(
     license_path = release_root / "Support" / "Licenses" / "AltiumSharp Apache-2.0.txt"
     license_path.parent.mkdir(parents=True)
     license_path.write_bytes(license_bytes)
+    # MSIX/App Installer own the native WPF host. TUF release sets own only
+    # rolling worker payloads, tools, and support evidence; downloading another
+    # self-contained WPF runtime could not update the already-running host.
     members = [
-        *window_host_members,
         *cad_converter_members,
-        {
-            "kind": "backend",
-            "path": f"Backend/{backend_name}",
-            "sha256": backend_sha256,
-            "size": len(backend_bytes),
-        },
+        *backend_members,
         {
             "kind": "sbom",
             "path": "Support/SBOM.spdx.json",

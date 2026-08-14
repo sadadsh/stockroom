@@ -12,7 +12,7 @@
   <Properties>
     <DisplayName>@@DISPLAY_NAME@@</DisplayName>
     <PublisherDisplayName>@@PUBLISHER_DISPLAY_NAME@@</PublisherDisplayName>
-    <Description>Stockroom's stable Windows bootstrap and desktop host.</Description>
+    <Description>Stockroom's native Windows desktop host.</Description>
     <Logo>Assets\StoreLogo.png</Logo>
   </Properties>
   <Resources>
@@ -27,11 +27,11 @@
   <Applications>
     <Application
       Id="@@APPLICATION_ID@@"
-      Executable="Stockroom.exe"
+      Executable="WindowHost\Stockroom.WindowHost.exe"
       EntryPoint="Windows.FullTrustApplication">
       <uap:VisualElements
         DisplayName="@@DISPLAY_NAME@@"
-        Description="Stockroom's stable Windows bootstrap and desktop host."
+        Description="Stockroom's native Windows desktop host."
         BackgroundColor="transparent"
         Square44x44Logo="Assets\Square44x44Logo.png"
         Square150x150Logo="Assets\Square150x150Logo.png" />

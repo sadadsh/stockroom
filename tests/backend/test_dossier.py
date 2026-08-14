@@ -374,12 +374,11 @@ def test_a_conflict_becomes_one_attention_item_per_field():
     assert "specification.conflict.package" in ids
 
 
-def test_a_category_expected_gap_is_actionable_rather_than_invisible():
-    ids = {
-        item["id"]
-        for item in component_dossier(_record())["qualitySummary"]["attention"]
-    }
-    assert "specification.missing.program_memory_size" in ids
+def test_a_category_expected_gap_stays_in_completeness_not_attention():
+    dossier = component_dossier(_record())
+    ids = {item["id"] for item in dossier["qualitySummary"]["attention"]}
+    assert "specification.missing.program_memory_size" not in ids
+    assert "program_memory_size" in dossier["qualitySummary"]["completeness"]["missingExpected"]
 
 
 def test_the_passport_gate_is_reported_beside_the_category_completeness_not_as_it():

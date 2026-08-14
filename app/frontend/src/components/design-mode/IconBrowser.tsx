@@ -42,8 +42,9 @@ export function IconBrowser({
   const resultsAria = useText("design-studio.icon-catalog.results", "Icon Search Results");
   const selectAria = useCopyFormatter("design-studio.icon-catalog.select", "Select {icon} from {family}");
   const countLabel = useCopyFormatter("design-studio.icon-catalog.count", "{count} offline icons");
-  const allLibrariesLabel = useText("design-studio.icon-catalog.all-libraries", "All Libraries");
-  const libraryLabel = useText("design-studio.icon-catalog.library", "Icon Library");
+  const totalLabel = useText("design-studio.icon-catalog.total", "Total");
+  const allLibrariesLabel = useText("design-studio.icon-catalog.all-libraries", "All Catalogs");
+  const libraryLabel = useText("design-studio.icon-catalog.library", "Icon Catalog");
   return (
     <section className="mt-3 pt-3" aria-label={catalogAria}>
       <div className="grid grid-cols-[1fr_9rem] gap-2">
@@ -80,7 +81,7 @@ export function IconBrowser({
           ))}
         </div>
       </div>
-      <p className="mt-2 text-2xs text-t3">{countLabel({ count: entries.length.toLocaleString() })} · {(fontAwesomeCatalogEntries().length + extraEntries.length).toLocaleString()} total</p>
+      <p className="mt-2 text-2xs text-t3">{countLabel({ count: entries.length.toLocaleString() })} · {(fontAwesomeCatalogEntries().length + extraEntries.length).toLocaleString()} {totalLabel}</p>
     </section>
   );
 }

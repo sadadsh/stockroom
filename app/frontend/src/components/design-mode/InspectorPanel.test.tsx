@@ -115,7 +115,7 @@ describe("InspectorPanel", () => {
     });
   });
 
-  it("opens the complete offline icon library instead of hiding it behind quick picks", async () => {
+  it("opens the complete offline icon catalog instead of hiding it behind quick picks", async () => {
     render(<Harness />);
     fireEvent.click(screen.getByRole("button", { name: "Select First" }));
     openGroup("Content");
@@ -123,7 +123,7 @@ describe("InspectorPanel", () => {
 
     expect(await screen.findByRole("searchbox", { name: "Search Icon Catalog" })).toBeVisible();
     expect(await screen.findByText(/offline icons/)).toBeVisible();
-    expect(screen.getByRole("combobox", { name: "Icon Library" })).toContainHTML("Lucide");
+    expect(screen.getByRole("combobox", { name: "Icon Catalog" })).toContainHTML("Lucide");
   });
 
   it("offers the complete library for a raw automatically exposed interface SVG", async () => {

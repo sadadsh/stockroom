@@ -96,6 +96,25 @@ function Enable-KiCadCli {
     Write-Host "KiCad CLI: $version ($($command.Source))"
 }
 
+function Get-FileSha256 {
+    param(
+        [Parameter(Mandatory)]
+        [string]$Path
+    )
+
+    $stream = [System.IO.File]::OpenRead($Path)
+    try {
+        $sha256 = [System.Security.Cryptography.SHA256]::Create()
+        try {
+            return ([System.BitConverter]::ToString($sha256.ComputeHash($stream))).Replace('-', '')
+        } finally {
+            $sha256.Dispose()
+        }
+    } finally {
+        $stream.Dispose()
+    }
+}
+
 function Get-DirectorySnapshot {
     param(
         [Parameter(Mandatory)]
@@ -120,7 +139,7 @@ function Get-DirectorySnapshot {
             throw "snapshot path escaped its root: $fullPath"
         }
         $relative = $fullPath.Substring($rootPrefix.Length).Replace('\', '/')
-        $snapshot[$relative] = (Get-FileHash -LiteralPath $fullPath -Algorithm SHA256).Hash
+        $snapshot[$relative] = Get-FileSha256 -Path $fullPath
     }
     return $snapshot
 }

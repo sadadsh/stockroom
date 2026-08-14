@@ -399,7 +399,7 @@ describe("the provenance block does not repeat itself", () => {
   });
 });
 
-describe("the distributor offers table", () => {
+describe("the distributor offers ledger", () => {
   const offersDossier = makeDossier({
     distributorOffers: [
       makeOffer({
@@ -411,6 +411,9 @@ describe("the distributor offers table", () => {
         unitPrice: 0.42,
         moq: 10,
         leadTime: "12 weeks",
+        factoryLeadTime: "20 weeks",
+        lifecycle: "NRND",
+        staleness: "stale",
         priceBreaks: [
           { qty: 1, price: 0.42 },
           { qty: 100, price: 0.22 },
@@ -426,24 +429,32 @@ describe("the distributor offers table", () => {
     },
   });
 
-  it("names every column the buying decision actually needs", async () => {
+  it("shows every offer fact and every price break without a horizontal table", async () => {
     await open(offersDossier);
-    const table = screen.getByRole("table", { name: "Distributor offers" });
-    expect(
-      within(table)
-        .getAllByRole("columnheader")
-        .map((cell) => cell.textContent),
-    ).toEqual([
-      "Provider",
+    const ledger = screen.getByRole("list", { name: "Distributor offers" });
+    const offer = within(ledger).getByRole("listitem");
+
+    expect(ledger).not.toHaveClass("overflow-x-auto");
+    expect(ledger.querySelector("table")).toBeNull();
+    for (const label of [
       "Stock",
       "Unit Price",
-      "Price Break",
-      "Currency",
+      "Quote Code",
       "MOQ",
       "Lead Time",
+      "Manufacturer Lead Time",
+      "Product Status",
       "Last Checked",
-      "",
-    ]);
+      "Price Breaks",
+    ]) {
+      expect(within(offer).getByText(label)).toBeInTheDocument();
+    }
+    expect(within(offer).getByText("1,240")).toBeInTheDocument();
+    expect(within(offer).getByText("20 weeks")).toBeInTheDocument();
+    expect(within(offer).getByText("NRND")).toBeInTheDocument();
+    expect(within(offer).getByText(/Stale$/)).toBeInTheDocument();
+    expect(within(offer).getAllByText("USD0.42")).toHaveLength(2);
+    expect(within(offer).getByText("USD0.22")).toBeInTheDocument();
   });
 
   it("right-aligns the figures that are compared down a column", async () => {
@@ -452,8 +463,8 @@ describe("the distributor offers table", () => {
     // Stock, price, break and MOQ all opt into `.ui-numeric`, which is tabular figures plus
     // right alignment. A provider name does not, because names are read, not compared.
     expect(within(row).getByText("1,240")).toHaveClass("ui-numeric");
-    expect(within(row).getByText("USD0.42")).toHaveClass("ui-numeric");
-    expect(within(row).getByText("100 at USD0.22")).toHaveClass("ui-numeric");
+    expect(within(row).getAllByText("USD0.42").every((value) => value.classList.contains("ui-numeric"))).toBe(true);
+    expect(within(row).getByText("USD0.22")).toHaveClass("ui-numeric");
     expect(within(row).getByText("Mouser")).not.toHaveClass("ui-numeric");
   });
 
@@ -462,7 +473,7 @@ describe("the distributor offers table", () => {
     const row = region("component-browser.offer-row");
     // `ui-key-fact` is 11/600 primary; `ui-row-secondary` is 11/400 secondary. The engineering
     // datum outranks the brand, which is the whole point of a comparison table.
-    expect(within(row).getByText("USD0.42")).toHaveClass("ui-key-fact");
+    expect(within(row).getAllByText("USD0.42").every((value) => value.classList.contains("ui-key-fact"))).toBe(true);
     expect(within(row).getByText("Mouser")).toHaveClass("ui-row-secondary");
   });
 

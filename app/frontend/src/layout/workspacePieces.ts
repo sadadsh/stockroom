@@ -441,10 +441,9 @@ export const WORKSPACE_PIECES: readonly PieceManifest[] = [
     home: { regionId: WORKSPACE_REGION.sourcingBody, siblingGroup: GROUP.sourcingSections },
     source: SOURCING_SOURCE,
   },
-  // OffersSection.tsx. One of the two pieces in the workspace that own a scroll axis of their own
-  // (the other is the provenance ledger below): the offers table declares its column widths in a
-  // `<colgroup>` and scrolls SIDEWAYS inside the column rather than re-measuring the price column
-  // when a spinner appears.
+  // OffersSection.tsx. Each provider is a wrapping fact ledger with its complete price ladder.
+  // The Sourcing column owns vertical movement; this piece must never introduce a second,
+  // horizontal reading axis.
   {
     id: "workspace.sourcing-offers",
     nameCopyId: "component-browser.offers-title",
@@ -452,6 +451,7 @@ export const WORKSPACE_PIECES: readonly PieceManifest[] = [
       "component-browser.offers",
       "component-browser.offers-table",
       "component-browser.offer-row",
+      "component-browser.offer-price-ladder",
       "component-browser.offer-failures",
       "component-browser.offer-listing",
       "component-browser.refresh-offers",
@@ -461,7 +461,7 @@ export const WORKSPACE_PIECES: readonly PieceManifest[] = [
       "component-browser.refresh",
       "component-browser.open-offer-listing",
     ],
-    scroll: { owns: true, axis: "horizontal" },
+    scroll: { owns: false },
     home: { regionId: WORKSPACE_REGION.sourcingBody, siblingGroup: GROUP.sourcingSections },
     source: "components/component-workspace/OffersSection.tsx",
   },
