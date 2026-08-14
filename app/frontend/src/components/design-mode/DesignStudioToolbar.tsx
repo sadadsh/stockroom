@@ -92,7 +92,10 @@ export function DesignStudioToolbar({
     "Applied · {revision}",
   );
   const draftOnlyLabel = useText("design-studio.draft-only", "Draft");
+  const draftChangedLabel = useText("design-studio.draft-changed", "Uncommitted Changes");
+  const commitFailedLabel = useText("design-studio.commit-failed", "Commit Failed");
   const applyingLabel = useText("design-studio.applying", "Committing...");
+  const committedLabel = useText("design-studio.committed", "Committed");
   const presentationLabel = useText("design-studio.presentation", "Presentation");
   const closeLabel = useText("design-studio.close", "Exit");
 
@@ -164,18 +167,38 @@ export function DesignStudioToolbar({
         ) : null}
       </div>
 
-      <span aria-label={appliedStatusLabel} className="max-w-48 truncate text-xs text-t3">
-        {studio.appliedRevision
-          ? appliedLabel({ revision: studio.appliedRevision.slice(0, 8) })
-          : draftOnlyLabel}
+      <span
+        aria-label={appliedStatusLabel}
+        aria-live="polite"
+        className={
+          "max-w-48 truncate text-xs " +
+          (studio.appliedState === "error" ? "text-err" : "text-t3")
+        }
+      >
+        {studio.appliedState === "error"
+          ? commitFailedLabel
+          : studio.appliedMatchesDraft && studio.appliedRevision
+            ? appliedLabel({ revision: studio.appliedRevision.slice(0, 8) })
+            : studio.appliedRevision
+              ? draftChangedLabel
+              : draftOnlyLabel}
       </span>
       <Button
         variant="accent"
-        disabled={fixturePreview || studio.appliedState === "loading" || studio.appliedState === "applying"}
+        disabled={
+          fixturePreview
+          || studio.appliedState === "loading"
+          || studio.appliedState === "applying"
+          || studio.appliedMatchesDraft
+        }
         title={fixturePreview ? applyFixtureTitle : applyTitle}
         onClick={() => void studio.applyLocal()}
       >
-        {studio.appliedState === "applying" ? applyingLabel : applyLabel}
+        {studio.appliedState === "applying"
+          ? applyingLabel
+          : studio.appliedMatchesDraft
+            ? committedLabel
+            : applyLabel}
       </Button>
     </header>
   );

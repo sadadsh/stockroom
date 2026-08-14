@@ -34,6 +34,7 @@ import { useWorkspaceRender } from "../../layout/workspaceRenderContext";
 import { Button } from "../primitives";
 import { CadAssetModule } from "./CadAssetModule";
 import { REPRESENTATION_KINDS } from "./cadAssetSet";
+import { hasPreferredSourceInformation } from "./cadPreference";
 import { PreferredSourceControl } from "./PreferredSourceControl";
 import { CadWorkspaceTabs } from "./ManageModelsWorkspace";
 import {
@@ -176,28 +177,43 @@ export function CadPreferredSourcePart() {
   const state = useContext(CadColumnContext);
   if (!workspace || !state) return null;
   const { layout, onLayout } = workspace.cad;
+  const preference = workspace.dossier.cadAssets.preference;
+  const showPreference = hasPreferredSourceInformation(preference);
+  const showAll = layout !== "all";
+  // An empty “Preferred Source: None recorded” row communicates no provider fact and offers no
+  // action. Remove only that case; a refused option, mixed set or per-asset provider keeps the row.
+  if (!showPreference && !showAll) {
+    // Keep the registered piece addressable to the layout/Design Studio manifest without painting
+    // an empty toolbar row in the product.
+    return <div data-dev-id="component-browser.preferred-source" hidden aria-hidden />;
+  }
   return (
-    <div className="flex min-w-0 flex-none items-center gap-2 border-b border-line px-2 py-1">
-      <span className="flex min-w-0 flex-1 items-center">
-        <PreferredSourceControl
-          preference={workspace.dossier.cadAssets.preference}
-          busy={state.writing}
-          onChoose={state.choose}
-          onClear={state.clear}
-        />
-      </span>
+    <div
+      data-dev-id="component-browser.preferred-source"
+      className="flex min-w-0 flex-none items-center gap-2 border-b border-line px-2 py-1"
+    >
+      {showPreference ? (
+        <span className="flex min-w-0 flex-1 items-center">
+          <PreferredSourceControl
+            preference={preference}
+            busy={state.writing}
+            onChoose={state.choose}
+            onClear={state.clear}
+          />
+        </span>
+      ) : null}
       {/* The way back to the reading state. Offered only when one module is focused, because
           a control that puts the column into the state it is already in is a dead click. */}
-      {layout === "all" ? null : (
+      {showAll ? (
         <Button
           small
           data-dev-id="component-browser.show-all-assets"
           onClick={() => onLayout("all")}
-          className="flex-none"
+          className="ml-auto flex-none"
         >
           <Text id="component-browser.show-all-assets">Show All Three</Text>
         </Button>
-      )}
+      ) : null}
     </div>
   );
 }

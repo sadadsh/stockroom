@@ -4,6 +4,12 @@ import type { ProviderCoverageRow } from "../../api/dossierTypes";
 import { makeDossier } from "../../test/dossierFixture";
 import { ManageModelsWorkspace } from "./ManageModelsWorkspace";
 
+const captureMocks = vi.hoisted(() => ({ useOptionalCapture: vi.fn() }));
+vi.mock("../../lib/capture", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../lib/capture")>()),
+  useOptionalCapture: captureMocks.useOptionalCapture,
+}));
+
 function providerRow(id: string, complete: boolean): ProviderCoverageRow {
   return {
     id,
@@ -36,6 +42,7 @@ function providerRow(id: string, complete: boolean): ProviderCoverageRow {
 }
 
 describe("ManageModelsWorkspace", () => {
+  beforeEach(() => captureMocks.useOptionalCapture.mockReturnValue(null));
   it("shows every provider, places complete sets first, and waits for the person to open one", async () => {
     const user = userEvent.setup();
     const dossier = makeDossier();
@@ -122,6 +129,129 @@ describe("ManageModelsWorkspace", () => {
     expect(screen.queryByRole("dialog", { name: "SnapEDA Provider" })).toBeNull();
     expect(screen.getByTestId("manage-models-workspace")).toBeVisible();
     expect(onOpenProvider).toHaveBeenCalledTimes(1);
+  });
+
+  it("releases a closed route and lets the person open a different provider", async () => {
+    const user = userEvent.setup();
+    const dossier = makeDossier();
+    dossier.cadSourceCoverage.rows = [providerRow("partial", false), providerRow("complete", true)];
+    const closeProvider = vi.fn().mockResolvedValue(undefined);
+    let capture: Record<string, unknown> = {
+      active: {
+        partId: "part-1",
+        workflowItemId: "item-1",
+        partName: "Part One",
+        status: "window-open",
+        message: "Provider ready",
+        url: "https://complete.example",
+        routeToken: "route-1",
+        vendor: "complete",
+        needs: ["kicad_symbol"],
+        received: {},
+        backgrounded: false,
+        providerOutcomes: [],
+        completionEvidence: null,
+        completionEvidenceReported: false,
+      },
+      closeProvider,
+    };
+    captureMocks.useOptionalCapture.mockImplementation(() => capture);
+    const onOpenProvider = vi.fn().mockResolvedValue(undefined);
+    const rendered = render(
+      <ManageModelsWorkspace
+        componentId="part-1"
+        dossier={dossier}
+        onView={vi.fn()}
+        onOpenProvider={onOpenProvider}
+      />,
+    );
+
+    expect(screen.getByRole("dialog", { name: "SnapEDA Provider" })).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "Close Provider" }));
+    expect(closeProvider).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("dialog", { name: "SnapEDA Provider" })).toBeNull();
+
+    capture = {
+      ...capture,
+      active: {
+        ...(capture.active as Record<string, unknown>),
+        partId: null,
+        status: "idle",
+        url: null,
+        routeToken: null,
+        vendor: null,
+      },
+    };
+    rendered.rerender(
+      <ManageModelsWorkspace
+        componentId="part-1"
+        dossier={dossier}
+        onView={vi.fn()}
+        onOpenProvider={onOpenProvider}
+      />,
+    );
+    await user.click(screen.getByRole("radio", { name: /Ultra Librarian/ }));
+    expect(onOpenProvider).toHaveBeenCalledWith("partial", expect.any(Array));
+
+    capture = {
+      ...capture,
+      active: {
+        ...(capture.active as Record<string, unknown>),
+        partId: "part-1",
+        status: "window-open",
+        url: "https://partial.example",
+        routeToken: "route-2",
+        vendor: "partial",
+      },
+    };
+    rendered.rerender(
+      <ManageModelsWorkspace
+        componentId="part-1"
+        dossier={dossier}
+        onView={vi.fn()}
+        onOpenProvider={onOpenProvider}
+      />,
+    );
+    expect(screen.getByRole("dialog", { name: "Ultra Librarian Provider" })).toBeVisible();
+  });
+
+  it("reopens the current route when closing it fails", async () => {
+    const user = userEvent.setup();
+    const dossier = makeDossier();
+    dossier.cadSourceCoverage.rows = [providerRow("complete", true)];
+    const closeProvider = vi.fn().mockRejectedValue(new Error("Coordinator unavailable"));
+    captureMocks.useOptionalCapture.mockReturnValue({
+      active: {
+        partId: "part-1",
+        workflowItemId: "item-1",
+        partName: "Part One",
+        status: "window-open",
+        message: "Provider ready",
+        url: "https://complete.example",
+        routeToken: "route-1",
+        vendor: "complete",
+        needs: ["kicad_symbol"],
+        received: {},
+        backgrounded: false,
+        providerOutcomes: [],
+        completionEvidence: null,
+        completionEvidenceReported: false,
+      },
+      closeProvider,
+    });
+
+    render(
+      <ManageModelsWorkspace
+        componentId="part-1"
+        dossier={dossier}
+        onView={vi.fn()}
+        onOpenProvider={vi.fn()}
+      />,
+    );
+    await user.click(screen.getByRole("button", { name: "Close Provider" }));
+
+    expect(await screen.findByText("Coordinator unavailable")).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "SnapEDA Provider" })).toBeVisible();
   });
 
   it("starts the provider task with only the selected EDAs", async () => {

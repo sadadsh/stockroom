@@ -25,6 +25,7 @@ import type {
 } from "../../api/dossierTypes";
 import { CaptureProvider } from "../../lib/capture";
 import { componentRepresentationDevId, devIdSelector } from "../../lib/componentDevIds";
+import { runtimeDesignId } from "../../lib/designIdentity";
 import { ThemeProvider } from "../../lib/theme";
 import { ToastProvider } from "../../lib/toast";
 import {
@@ -166,6 +167,22 @@ function preference(over: Partial<CadPreferenceView> = {}): CadPreferenceView {
     ],
     ...over,
   };
+}
+
+function emptyPreference(over: Partial<CadPreferenceView> = {}): CadPreferenceView {
+  return preference({
+    provider: "",
+    label: "",
+    mixed: false,
+    pinned: false,
+    assets: {
+      symbol: { provider: "", label: "", origin: "" },
+      footprint: { provider: "", label: "", origin: "" },
+      model: { provider: "", label: "", origin: "" },
+    },
+    options: [],
+    ...over,
+  });
 }
 
 const SYMBOL_GEOMETRY = {
@@ -314,6 +331,26 @@ function module_(kind: string): HTMLElement {
 /* -------------------------------------------------------------- preferred source */
 
 describe("the preferred source is a control, not a caption", () => {
+  it("omits an empty None recorded row but keeps Show All Three when an asset is focused", async () => {
+    const column = await open(attached(emptyPreference()));
+    expect(within(column).queryByRole("combobox", { name: "Preferred Source" })).toBeNull();
+
+    const user = userEvent.setup();
+    await user.click(within(module_("symbol")).getByRole("button", { name: "Symbol" }));
+    const showAll = within(column).getByRole("button", { name: "Show All Three" });
+    expect(showAll).toBeInTheDocument();
+    await user.click(showAll);
+    expect(within(column).queryByRole("button", { name: "Show All Three" })).toBeNull();
+  });
+
+  it("keeps a provider fact even when there is no alternative choice", async () => {
+    const column = await open(
+      attached(emptyPreference({ provider: "snapmagic", label: "SnapMagic" })),
+    );
+    expect(within(column).getByRole("combobox", { name: "Preferred Source" })).toHaveValue("");
+    expect(within(column).getByRole("option", { name: "SnapMagic" })).toBeInTheDocument();
+  });
+
   it("offers every provider the backend allows, and says why a refused one is refused", async () => {
     const column = await open(attached());
     const control = within(column).getByRole("combobox", { name: "Preferred Source" });
@@ -742,11 +779,9 @@ describe("the previews are drawn from the file", () => {
     ).toBeNull();
   });
 
-  it("says nothing at all where no file is attached, because the status already said Missing", async () => {
-    // `No file is attached` was a second statement of the header's `Missing` two lines above it, once
-    // per absent asset - and the projection's own `issue` for a missing asset ("No file is attached
-    // yet.") is the same sentence again. On a component with no CAD at all the column said it six
-    // times down ~300px. The status word is the statement.
+  it("uses one accessible question mark where no file is attached without repeating Missing", async () => {
+    // The question mark is the visual statement. The exact Missing state remains screen-reader text,
+    // data-status and the module's accessible asset name; inert visibility controls do not render.
     await open(
       makeDossier({
         cadAssets: {
@@ -761,10 +796,26 @@ describe("the previews are drawn from the file", () => {
     );
     for (const kind of ["model", "footprint", "symbol"]) {
       const node = module_(kind);
-      await waitFor(() => expect(within(node).getByText("Missing")).toBeInTheDocument());
+      const status = await waitFor(() => within(node).getByText("Missing"));
+      expect(status).toHaveClass("sr-only");
+      expect(node).toHaveAttribute("data-status", "Missing");
+      expect(node).toHaveAccessibleName(kind === "model" ? "3D Model" : kind === "footprint" ? "Footprint" : "Symbol");
       expect(within(node).queryByText("No file is attached")).toBeNull();
       expect(within(node).queryByText("No file is attached yet.")).toBeNull();
       expect(node.querySelector('[data-dev-id="component-browser.asset-issue"]')).toBeNull();
+      expect(node.querySelector('[data-dev-id="component-browser.asset-control-strip"]')).toBeNull();
+      const art = node.querySelector<HTMLElement>(
+        '[data-dev-id="component-browser.asset-missing-art"]',
+      );
+      expect(art).toHaveAttribute("aria-hidden", "true");
+      const icon = art?.querySelector("svg");
+      expect(icon).toHaveAttribute(
+        "data-design-id",
+        runtimeDesignId("icon", "status.cad-missing"),
+      );
+      expect(icon).toHaveClass("opacity-40");
+      expect(icon).toHaveClass(kind === "model" ? "h-10" : "h-[55px]");
+      expect(icon).toHaveClass(kind === "model" ? "w-10" : "w-[55px]");
     }
   });
 
@@ -776,6 +827,15 @@ describe("the previews are drawn from the file", () => {
         within(module_("symbol")).getByText("This file could not be read on this machine"),
       ).toBeInTheDocument(),
     );
+    expect(
+      module_("symbol").querySelector('[data-dev-id="component-browser.asset-missing-art"]'),
+    ).toBeNull();
+    expect(
+      module_("symbol").querySelector('[data-dev-id="component-browser.asset-control-strip"]'),
+    ).toBeInTheDocument();
+    expect(
+      module_("symbol").querySelector('[data-dev-id="component-browser.cad-status"]'),
+    ).not.toHaveClass("sr-only");
   });
 });
 

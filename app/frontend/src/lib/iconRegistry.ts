@@ -73,6 +73,24 @@ export interface IconCatalogEntry {
   viewBox: string;
 }
 
+/**
+ * The owner-selected interface glyphs promoted from a laptop Design Studio document into product
+ * defaults. The application ids remain ours; only their artwork changes. Exact catalogue identity,
+ * pinned version and licence are recorded in assets/interface-icons/README.md.
+ */
+const OWNER_SELECTED_INTERFACE_BODIES = {
+  "action.external": '<g transform="translate(0 0) scale(1)" fill="currentColor" stroke="none"><path fill="currentColor" d="M17 3.34a10 10 0 1 1-14.995 8.984L2 12l.005-.324A10 10 0 0 1 17 3.34M15 8H9l-.117.007A1 1 0 0 0 8 9l.007.117A1 1 0 0 0 9 10h3.584l-4.291 4.293l-.083.094a1 1 0 0 0 1.497 1.32L14 11.414V15l.007.117A1 1 0 0 0 16 15V9l-.007-.117l-.029-.149l-.035-.105l-.054-.113l-.071-.111a1 1 0 0 0-.097-.112l-.09-.08l-.096-.067l-.098-.052l-.11-.044l-.112-.03l-.126-.017z"/></g>',
+  "brand.wordmark": '<g transform="translate(0 2.4000000000000004) scale(0.0375)" fill="currentColor" stroke="none"><path d="M560.3 237.2c10.4 11.8 28.3 14.4 41.8 5.5 14.7-9.8 18.7-29.7 8.9-44.4l-48-72c-2.8-4.2-6.6-7.7-11.1-10.2L351.4 4.7c-19.3-10.7-42.8-10.7-62.2 0L88.8 116c-5.4 3-9.7 7.4-12.6 12.8L27.7 218.7c-12.6 23.4-3.8 52.5 19.6 65.1l33 17.7 0 53.3c0 23 12.4 44.3 32.4 55.7l176 99.7c19.6 11.1 43.5 11.1 63.1 0l176-99.7c20.1-11.4 32.4-32.6 32.4-55.7l0-117.5zm-240-9.8L170.2 144 320.3 60.6 470.4 144 320.3 227.4zm-41.5 50.2l-21.3 46.2-165.8-88.8 25.4-47.2 161.7 89.8z"/></g>',
+  "nav.about": '<g transform="translate(0 0) scale(1)" fill="currentColor" stroke="none"><path fill="currentColor" d="M12.713 16.713Q13 16.425 13 16v-4q0-.425-.288-.712T12 11t-.712.288T11 12v4q0 .425.288.713T12 17t.713-.288m0-8Q13 8.425 13 8t-.288-.712T12 7t-.712.288T11 8t.288.713T12 9t.713-.288M12 22q-2.075 0-3.9-.788t-3.175-2.137T2.788 15.9T2 12t.788-3.9t2.137-3.175T8.1 2.788T12 2t3.9.788t3.175 2.137T21.213 8.1T22 12t-.788 3.9t-2.137 3.175t-3.175 2.138T12 22"/></g>',
+  "nav.board": '<g transform="translate(1.5 0) scale(0.046875)" fill="currentColor" stroke="none"><path d="M335.1 16c20.7 0 40.1 10 52.1 26.8l48.9 68.5c7.7 10.8 11.9 23.9 11.9 37.2L448 416c0 35.3-28.7 64-64 64l-320 0-6.5-.3C25.2 476.4 0 449.1 0 416L0 148.5c0-11.7 3.2-23.1 9.2-33l2.7-4.2 48.9-68.5c10.5-14.7 26.7-24.2 44.4-26.3l7.7-.5 222.1 0zM248 128l121.3 0-34.3-48-87.1 0 0 48zM78.7 128l121.3 0 0-48-87.1 0-34.3 48z"/></g>',
+  "nav.collapse-rail": '<g transform="translate(0 0) scale(1)" fill="currentColor" stroke="none"><path fill="currentColor" d="M12 2q-.327 0-.642.005l-.616.017l-.299.013l-.579.034l-.553.046c-4.785.464-6.732 2.411-7.196 7.196l-.046.553l-.034.579q-.008.147-.013.299l-.017.616l-.004.318L2 12q0 .327.005.642l.017.616l.013.299l.034.579l.046.553c.464 4.785 2.411 6.732 7.196 7.196l.553.046l.579.034q.147.008.299.013l.616.017L12 22l.642-.005l.616-.017l.299-.013l.579-.034l.553-.046c4.785-.464 6.732-2.411 7.196-7.196l.046-.553l.034-.579q.008-.147.013-.299l.017-.616L22 12l-.005-.642l-.017-.616l-.013-.299l-.034-.579l-.046-.553c-.464-4.785-2.411-6.732-7.196-7.196l-.553-.046l-.579-.034l-.299-.013l-.616-.017l-.318-.004zm-1.707 6.293a1 1 0 0 1 1.32-.083l.094.083l3 3a1 1 0 0 1 .083 1.32l-.083.094l-3 3a1 1 0 0 1-1.497-1.32l.083-.094L12.585 12l-2.292-2.293a1 1 0 0 1-.083-1.32z"/></g>',
+  "nav.components": '<g transform="translate(0 0) scale(1)" fill="currentColor" stroke="none"><path fill="currentColor" d="M7.5 22q-1.45 0-2.475-1.025T4 18.5v-13q0-1.45 1.025-2.475T7.5 2H18q.825 0 1.413.587T20 4v12.525q0 .2-.162.363t-.588.362q-.35.175-.55.5t-.2.75t.2.763t.55.487t.55.413t.2.562v.25q0 .425-.288.725T19 22zm2.213-7.288Q10 14.425 10 14V5q0-.425-.288-.712T9 4t-.712.288T8 5v9q0 .425.288.713T9 15t.713-.288M7.5 20h9.325q-.15-.35-.237-.712T16.5 18.5q0-.4.075-.775t.25-.725H7.5q-.65 0-1.075.438T6 18.5q0 .65.425 1.075T7.5 20"/></g>',
+  "nav.settings": '<g transform="translate(0 0) scale(0.09375)" fill="currentColor" stroke="none"><path fill="currentColor" d="M237.94 107.21a8 8 0 0 0-3.89-5.4l-29.83-17l-.12-33.62a8 8 0 0 0-2.83-6.08a111.9 111.9 0 0 0-36.72-20.67a8 8 0 0 0-6.46.59L128 41.85L97.88 25a8 8 0 0 0-6.47-.6a111.9 111.9 0 0 0-36.68 20.75a8 8 0 0 0-2.83 6.07l-.15 33.65l-29.83 17a8 8 0 0 0-3.89 5.4a106.5 106.5 0 0 0 0 41.56a8 8 0 0 0 3.89 5.4l29.83 17l.12 33.63a8 8 0 0 0 2.83 6.08a111.9 111.9 0 0 0 36.72 20.67a8 8 0 0 0 6.46-.59L128 214.15L158.12 231a7.9 7.9 0 0 0 3.9 1a8.1 8.1 0 0 0 2.57-.42a112.1 112.1 0 0 0 36.68-20.73a8 8 0 0 0 2.83-6.07l.15-33.65l29.83-17a8 8 0 0 0 3.89-5.4a106.5 106.5 0 0 0-.03-41.52M128 168a40 40 0 1 1 40-40a40 40 0 0 1-40 40"/></g>',
+  "nav.stm": '<g transform="translate(0 0) scale(0.046875)" fill="currentColor" stroke="none"><path d="M176 24c0-13.3-10.7-24-24-24s-24 10.7-24 24l0 40c-35.3 0-64 28.7-64 64l-40 0c-13.3 0-24 10.7-24 24s10.7 24 24 24l40 0 0 56-40 0c-13.3 0-24 10.7-24 24s10.7 24 24 24l40 0 0 56-40 0c-13.3 0-24 10.7-24 24s10.7 24 24 24l40 0c0 35.3 28.7 64 64 64l0 40c0 13.3 10.7 24 24 24s24-10.7 24-24l0-40 56 0 0 40c0 13.3 10.7 24 24 24s24-10.7 24-24l0-40 56 0 0 40c0 13.3 10.7 24 24 24s24-10.7 24-24l0-40c35.3 0 64-28.7 64-64l40 0c13.3 0 24-10.7 24-24s-10.7-24-24-24l-40 0 0-56 40 0c13.3 0 24-10.7 24-24s-10.7-24-24-24l-40 0 0-56 40 0c13.3 0 24-10.7 24-24s-10.7-24-24-24l-40 0c0-35.3-28.7-64-64-64l0-40c0-13.3-10.7-24-24-24s-24 10.7-24 24l0 40-56 0 0-40c0-13.3-10.7-24-24-24s-24 10.7-24 24l0 40-56 0 0-40zM160 128l192 0c17.7 0 32 14.3 32 32l0 192c0 17.7-14.3 32-32 32l-192 0c-17.7 0-32-14.3-32-32l0-192c0-17.7 14.3-32 32-32zm16 48l0 160 160 0 0-160-160 0z"/></g>',
+  "nav.theme": '<g transform="translate(0 0) scale(0.09375)" fill="currentColor" stroke="none"><path fill="currentColor" d="M235.54 150.21a104.84 104.84 0 0 1-37 52.91A104 104 0 0 1 32 120a103.1 103.1 0 0 1 20.88-62.52a104.84 104.84 0 0 1 52.91-37a8 8 0 0 1 10 10a88.08 88.08 0 0 0 109.8 109.8a8 8 0 0 1 10 10Z"/></g>',
+  "nav.update": '<g transform="translate(0 0) scale(1)" fill="currentColor" stroke="none"><path fill="currentColor" d="m9 5l-.117.007A1 1 0 0 0 8 6v4.999L5.414 11A2 2 0 0 0 4 14.414L10.586 21a2 2 0 0 0 2.828 0L20 14.414a2 2 0 0 0 .434-2.18l-.068-.145A2 2 0 0 0 18.586 11L16 10.999V6a1 1 0 0 0-1-1zm6-3a1 1 0 0 1 .117 1.993L15 4H9a1 1 0 0 1-.117-1.993L9 2z"/></g>',
+} as const;
+
 export const ICON_REGISTRY: IconEntry[] = [
   // ---- primary: the icons.tsx `Svg` helper set (viewBox 24, strokeWidth 1.9, class .ico) --------
   {
@@ -164,7 +182,7 @@ export const ICON_REGISTRY: IconEntry[] = [
     category: "primary",
     viewBox: "0 0 24 24",
     strokeWidth: 1.9,
-    body: '<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M11 9h4a2 2 0 0 0 2-2V3"/><circle cx="9" cy="9" r="2"/><path d="M7 21v-4a2 2 0 0 1 2-2h4"/><circle cx="15" cy="15" r="2"/>',
+    body: OWNER_SELECTED_INTERFACE_BODIES["nav.board"],
   },
 
   // ---- primary: the rail `svgProps` nav glyphs (viewBox 24, strokeWidth 2, class .ico) ----------
@@ -173,12 +191,7 @@ export const ICON_REGISTRY: IconEntry[] = [
     category: "primary",
     viewBox: "0 0 24 24",
     strokeWidth: 2,
-    body:
-      '<path d="M12 20v2"/><path d="M12 2v2"/><path d="M17 20v2"/><path d="M17 2v2"/>' +
-      '<path d="M2 12h2"/><path d="M2 17h2"/><path d="M2 7h2"/><path d="M20 12h2"/>' +
-      '<path d="M20 17h2"/><path d="M20 7h2"/><path d="M7 20v2"/><path d="M7 2v2"/>' +
-      '<rect x="4" y="4" width="16" height="16" rx="2"/>' +
-      '<rect x="8" y="8" width="8" height="8" rx="1"/>',
+    body: OWNER_SELECTED_INTERFACE_BODIES["nav.components"],
   },
   {
     // The STM Viewer rail glyph. Its siblings all carried an icon and it did not, which read as an
@@ -187,34 +200,28 @@ export const ICON_REGISTRY: IconEntry[] = [
     category: "primary",
     viewBox: "0 0 24 24",
     strokeWidth: 2,
-    body:
-      '<rect x="6" y="6" width="12" height="12" rx="1.5"/>' +
-      '<circle cx="9.5" cy="9.5" r="0.6" fill="currentColor"/>' +
-      '<path d="M9 6V3"/><path d="M15 6V3"/><path d="M9 21v-3"/><path d="M15 21v-3"/>' +
-      '<path d="M6 9H3"/><path d="M6 15H3"/><path d="M21 9h-3"/><path d="M21 15h-3"/>',
+    body: OWNER_SELECTED_INTERFACE_BODIES["nav.stm"],
   },
   {
     id: "nav.settings",
     category: "primary",
     viewBox: "0 0 24 24",
     strokeWidth: 2,
-    body:
-      '<path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"/>' +
-      '<circle cx="12" cy="12" r="3"/>',
+    body: OWNER_SELECTED_INTERFACE_BODIES["nav.settings"],
   },
   {
     id: "nav.about",
     category: "primary",
     viewBox: "0 0 24 24",
     strokeWidth: 2,
-    body: '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/>',
+    body: OWNER_SELECTED_INTERFACE_BODIES["nav.about"],
   },
   {
     id: "nav.update",
     category: "primary",
     viewBox: "0 0 24 24",
     strokeWidth: 2,
-    body: '<path d="M12 17V3"/><path d="m6 11 6 6 6-6"/><path d="M19 21H5"/>',
+    body: OWNER_SELECTED_INTERFACE_BODIES["nav.update"],
   },
   {
     // Collapse the rail. A PANEL glyph (the rail's own edge, plus a chevron moving toward it), not a
@@ -226,7 +233,7 @@ export const ICON_REGISTRY: IconEntry[] = [
     category: "primary",
     viewBox: "0 0 24 24",
     strokeWidth: 2,
-    body: '<path d="M4 5v14"/><path d="m15 8-4 4 4 4"/>',
+    body: OWNER_SELECTED_INTERFACE_BODIES["nav.collapse-rail"],
   },
   {
     // The idle "Up to Date" check. Its --c-ok tint is a call-site inline style (color), not glyph
@@ -331,12 +338,7 @@ export const ICON_REGISTRY: IconEntry[] = [
     category: "primary",
     viewBox: "0 0 24 24",
     strokeWidth: 2,
-    body:
-      '<circle cx="12" cy="12" r="4"/>' +
-      '<path d="M12 2v2"/><path d="M12 20v2"/>' +
-      '<path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/>' +
-      '<path d="M2 12h2"/><path d="M20 12h2"/>' +
-      '<path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>',
+    body: OWNER_SELECTED_INTERFACE_BODIES["nav.theme"],
   },
 
   // ---- bespoke: the icons.tsx one-off exports (each its own size + weight) ----------------------
@@ -375,6 +377,16 @@ export const ICON_REGISTRY: IconEntry[] = [
     strokeLinecap: "round",
     strokeLinejoin: "round",
     body: '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>',
+  },
+  {
+    // Font Awesome Free 7.3.1 `circle-question`, used only for a genuinely absent CAD asset.
+    // It is separate from art.symbol/footprint/model: unreadable attached files keep their own art.
+    id: "status.cad-missing",
+    category: "bespoke",
+    viewBox: "0 0 512 512",
+    fill: "currentColor",
+    stroke: "none",
+    body: '<path d="M256 512a256 256 0 1 0 0-512 256 256 0 1 0 0 512zm0-336c-17.7 0-32 14.3-32 32 0 13.3-10.7 24-24 24s-24-10.7-24-24c0-44.2 35.8-80 80-80s80 35.8 80 80c0 47.2-36 67.2-56 74.5l0 3.8c0 13.3-10.7 24-24 24s-24-10.7-24-24l0-8.1c0-20.5 14.8-35.2 30.1-40.2 6.4-2.1 13.2-5.5 18.2-10.3 4.3-4.2 7.7-10 7.7-19.6 0-17.7-14.3-32-32-32zM224 368a32 32 0 1 1 64 0 32 32 0 1 1 -64 0z"/>',
   },
   {
     id: "action.upload",
@@ -435,7 +447,7 @@ export const ICON_REGISTRY: IconEntry[] = [
     strokeWidth: 2,
     strokeLinecap: "round",
     strokeLinejoin: "round",
-    body: '<path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>',
+    body: OWNER_SELECTED_INTERFACE_BODIES["action.external"],
   },
 
   // ---- bespoke: SearchOverlay inline glyphs -----------------------------------------------------
@@ -700,9 +712,8 @@ export const ICON_REGISTRY: IconEntry[] = [
 
   // ---- brand: the wordmark + social fill marks --------------------------------------------------
   {
-    // The Stockroom shipping-box mark. Drawn like the primary set (svgProps: fill none, stroke
-    // currentColor, weight 2, round caps) and carries `.ico` at its call sites; kept in the brand
-    // category per the inventory.
+    // The owner-selected open-box brand mark. Its fitted body is solid, while the stable brand id
+    // and call-site `.ico` sizing token remain unchanged.
     id: "brand.wordmark",
     category: "brand",
     viewBox: "0 0 24 24",
@@ -711,11 +722,7 @@ export const ICON_REGISTRY: IconEntry[] = [
     strokeWidth: 2,
     strokeLinecap: "round",
     strokeLinejoin: "round",
-    body:
-      '<path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"/>' +
-      '<path d="M12 22V12"/>' +
-      '<polyline points="3.29 7 12 12 20.71 7"/>' +
-      '<path d="m7.5 4.27 9 5.15"/>',
+    body: OWNER_SELECTED_INTERFACE_BODIES["brand.wordmark"],
   },
   {
     id: "brand.linkedin",

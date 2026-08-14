@@ -20,6 +20,7 @@ import type { DesignDocument } from "./document";
 import { DesignStudioProvider, useDesignStudio } from "./DesignStudioProvider";
 import { registerScenarios, type ScenarioRegistry } from "./scenarioRegistry";
 import type { DesignScenario } from "./scenario";
+import { runtimeDesignId } from "../lib/designIdentity";
 
 vi.mock("../api/client", async (importActual) => {
   const actual = await importActual<typeof import("../api/client")>();
@@ -208,11 +209,14 @@ function Probe({
   return (
     <>
       <span data-testid="resolved-copy"><Text id="rail.components">Components</Text></span>
+      <span data-testid="resolved-missing"><Text id="component-browser.cad-missing">Missing</Text></span>
       <span data-testid="personal-state">{studio.personalState}</span>
       <span data-testid="active-variation">{studio.activeVariationId}</span>
       <span data-testid="active-scenario">{studio.activeScenario?.id ?? "real-data"}</span>
+      <span data-testid="applied-matches">{String(studio.appliedMatchesDraft)}</span>
       <output data-testid="studio-document">{JSON.stringify(studio.document)}</output>
       <output data-testid="studio-draft">{JSON.stringify(devMode.draft)}</output>
+      <output data-testid="resolved-cad">{JSON.stringify(studio.resolvedCadPresentation)}</output>
     </>
   );
 }
@@ -356,6 +360,48 @@ describe("DesignStudioProvider", () => {
     await studio.close();
     expect(screen.getByTestId("resolved-copy")).toHaveTextContent("Applied Components");
     expect(shipped.base.copy["rail.components"]).toBeUndefined();
+  });
+
+  it("commits mixed copy, icon, element, and CAD presentation edits as the normal-app design", async () => {
+    mockApi.designStudioGet.mockResolvedValue({ revision: "draft-r1", document: fixtureDocument() });
+    mockApi.designStudioAppliedGet.mockResolvedValue({ revision: null, document: null });
+    mockApi.designStudioApplyLocal.mockImplementation(async ({ document }) => ({
+      revision: "applied-mixed",
+      document,
+    }));
+    const studio = renderStudio({ startOpen: true });
+    await waitFor(() => expect(screen.getByTestId("personal-state")).toHaveTextContent("ready"));
+
+    const mixed = fixtureDocument();
+    mixed.base.copy["component-browser.cad-missing"] = "";
+    mixed.base.icons["art.symbol"] = { strokeWidth: 1.25, alignment: "middle" };
+    mixed.base.elements[runtimeDesignId("icon", "art.symbol")] = { width: "40px", height: "40px" };
+    mixed.base.elements[runtimeDesignId("copy", "component-browser.cad-missing")] = {
+      visibility: "hidden",
+    };
+    mixed.cadPresentation["cad.symbol"] = { symbol: { stroke: "#d8dde5", names: false } };
+    studio.replaceDocumentAtomically(mixed);
+    await waitFor(() => expect(screen.getByTestId("studio-document")).toHaveTextContent(runtimeDesignId("icon", "art.symbol")));
+    expect(screen.getByTestId("applied-matches")).toHaveTextContent("false");
+
+    await studio.applyLocal();
+    expect(mockApi.designStudioApplyLocal).toHaveBeenCalledWith({
+      document: expect.objectContaining({
+        base: expect.objectContaining({
+          copy: mixed.base.copy,
+          icons: mixed.base.icons,
+          elements: mixed.base.elements,
+        }),
+        cadPresentation: mixed.cadPresentation,
+      }),
+    });
+    expect(screen.getByTestId("applied-matches")).toHaveTextContent("true");
+    await studio.close();
+
+    expect(screen.getByTestId("studio-draft")).toHaveTextContent(runtimeDesignId("icon", "art.symbol"));
+    expect(screen.getByTestId("studio-draft")).toHaveTextContent("component-browser.cad-missing");
+    expect(screen.getByTestId("resolved-missing")).toHaveTextContent(/^$/);
+    expect(screen.getByTestId("resolved-cad")).toHaveTextContent("#d8dde5");
   });
 
   it("loads an existing applied design outside Studio and resets only that activation", async () => {

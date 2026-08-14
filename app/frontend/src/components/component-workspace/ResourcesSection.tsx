@@ -22,9 +22,10 @@
 import type { DocumentView, RelatedPart } from "../../api/dossierTypes";
 import { Text, useCopyFormatter, useText } from "../../lib/copy";
 import { formatTimestamp } from "../../lib/formatValue";
-import { ExternalIcon } from "../icons";
+import { Icon } from "../Icon";
+import { ExternalIcon, WarnIcon } from "../icons";
 import { Button, EmptyState, StatusText } from "../primitives";
-import { SourcingSection } from "./SourcingParts";
+import { SourcingDisclosure, SourcingSection } from "./SourcingParts";
 
 export function DocumentsSection({
   documents,
@@ -39,7 +40,12 @@ export function DocumentsSection({
   return (
     <SourcingSection
       devId="component-browser.documents"
-      title={<Text id="component-browser.documents-title">Documents</Text>}
+      title={(
+        <span className="flex items-center gap-1.5">
+          <Icon id="detail.datasheet-link" className="h-3.5 w-3.5 text-t3" />
+          <Text id="component-browser.documents-title">Documents</Text>
+        </span>
+      )}
     >
       {documents.length === 0 ? (
         <EmptyState dense id="component-browser.documents-empty">
@@ -85,6 +91,7 @@ export function DocumentsSection({
 function DocumentRow({ document, onOpen }: { document: DocumentView; onOpen: () => void }) {
   const openLabel = useCopyFormatter("component-browser.open-document", "Open {title}");
   const currentLabel = useText("component-browser.document-current", "Current");
+  const detailsLabel = useText("component-browser.document-details", "Document Details");
   const label = openLabel({ title: document.title });
   const stamp = document.retrievedAt ? formatTimestamp(document.retrievedAt) : null;
   // Revision, publisher and currency: what distinguishes this copy from another copy of the same
@@ -100,37 +107,49 @@ function DocumentRow({ document, onOpen }: { document: DocumentView; onOpen: () 
     .join(" · ");
   // Tertiary. The filename answers "which file is this", and only that.
   const filename = document.localPath.split("/").pop() ?? "";
+  const hasDetails = Boolean(detail || stamp || filename);
   return (
     <div
       data-dev-id="component-browser.document-row"
       data-document-type={document.documentType}
       data-document-preferred={document.isPreferred ? "true" : "false"}
-      className="flex min-h-[26px] items-baseline gap-2 border-b border-line/60 px-2 py-1 last:border-b-0"
+      className="border-b border-line/60 last:border-b-0"
     >
-      <span className="min-w-0 flex-1">
-        <span className="ui-row-secondary block break-words" title={document.title}>
+      <div className="flex min-h-[28px] items-start gap-2 px-2 py-1">
+        <span className="ui-row-secondary min-w-0 flex-1 break-words" title={document.title}>
           {document.title}
         </span>
-        {detail ? <span className="ui-component-metadata block break-words">{detail}</span> : null}
-        {stamp || filename ? (
-          <span className="ui-component-metadata block truncate" title={stamp?.title}>
-            {[stamp?.text, filename].filter(Boolean).join(" · ")}
-          </span>
+        <StatusText tone={documentTone(document)} className="flex-none">
+          <DocumentStatusLabel document={document} />
+        </StatusText>
+        {document.localPath || document.remoteUrl ? (
+          <Button
+            small
+            data-dev-id="component-browser.document-open"
+            aria-label={label}
+            title={label}
+            onClick={onOpen}
+          >
+            <ExternalIcon className="h-3.5 w-3.5" />
+            <Text id="component-browser.document-open">Open</Text>
+          </Button>
         ) : null}
-      </span>
-      <StatusText tone={documentTone(document)} className="flex-none">
-        <DocumentStatusLabel document={document} />
-      </StatusText>
-      {document.localPath || document.remoteUrl ? (
-        <Button
-          small
-          data-dev-id="component-browser.document-open"
-          aria-label={label}
-          title={label}
-          onClick={onOpen}
+      </div>
+      {hasDetails ? (
+        <SourcingDisclosure
+          devId="component-browser.document-details"
+          label={detailsLabel}
+          icon="detail.datasheet-link"
         >
-          <Text id="component-browser.document-open">Open</Text>
-        </Button>
+          <div className="px-2 pb-2 pt-1">
+            {detail ? <p className="ui-component-metadata break-words">{detail}</p> : null}
+            {stamp || filename ? (
+              <p className="ui-component-metadata break-words" title={stamp?.title}>
+                {[stamp?.text, filename].filter(Boolean).join(" · ")}
+              </p>
+            ) : null}
+          </div>
+        </SourcingDisclosure>
       ) : null}
     </div>
   );
@@ -157,7 +176,12 @@ export function RelatedPartsSection({ parts }: { parts: readonly RelatedPart[] }
   return (
     <SourcingSection
       devId="component-browser.related"
-      title={<Text id="component-browser.related-title">Related Parts</Text>}
+      title={(
+        <span className="flex items-center gap-1.5">
+          <Icon id="nav.components" className="h-3.5 w-3.5 text-t3" />
+          <Text id="component-browser.related-title">Related Parts</Text>
+        </span>
+      )}
     >
       {parts.length === 0 ? (
         <EmptyState dense id="component-browser.related-empty">
@@ -185,52 +209,59 @@ function RelatedPartRow({ part }: { part: RelatedPart }) {
     "Stockroom has not checked this for equivalence",
   );
   const openLabel = useCopyFormatter("component-browser.open-related", "Open {mpn}");
+  const detailsLabel = useText("component-browser.related-details", "Comparison Details");
   return (
     <div
       data-dev-id="component-browser.related-row"
       data-related-reason={part.reason}
       data-related-validated={part.validated ? "true" : "false"}
-      className="flex items-baseline gap-2 border-b border-line/60 px-2 py-1 last:border-b-0"
+      className="border-b border-line/60 last:border-b-0"
     >
-      <span className="min-w-0 flex-1">
-        <span className="ui-row-primary block truncate" title={part.mpn}>
-          {part.mpn || part.description}
-        </span>
-        <span className="ui-component-metadata block break-words">
-          {[part.reasonLabel, part.manufacturer, part.providerLabel].filter(Boolean).join(" · ")}
-        </span>
-        {part.evidence.length > 0 ? (
+      <div className="flex items-start gap-2 px-2 py-1">
+        <span className="min-w-0 flex-1">
+          <span className="ui-row-primary block truncate" title={part.mpn}>
+            {part.mpn || part.description}
+          </span>
+          <span className="ui-component-metadata block break-words">
+            {[part.reasonLabel, part.manufacturer, part.providerLabel].filter(Boolean).join(" · ")}
+          </span>
           <span
-            data-dev-id="component-browser.related-evidence"
-            className="ui-component-metadata block break-words"
+            data-dev-id="component-browser.related-not-validated"
+            className="ui-component-metadata mt-0.5 flex items-start gap-1 break-words text-t3"
           >
+            <WarnIcon className="mt-0.5 h-3 w-3 flex-none" />
+            {notValidated}
+          </span>
+        </span>
+        {part.url ? (
+          <a
+            href={part.url}
+            target="_blank"
+            rel="noreferrer"
+            aria-label={openLabel({ mpn: part.mpn })}
+            title={openLabel({ mpn: part.mpn })}
+            className={
+              "inline-flex flex-none items-center rounded-control p-0.5 text-t2 transition-colors " +
+              "hover:text-t1 focus-visible:outline focus-visible:outline-2 " +
+              "focus-visible:outline-offset-1 focus-visible:outline-focus"
+            }
+          >
+            <ExternalIcon className="h-3.5 w-3.5" />
+          </a>
+        ) : null}
+      </div>
+      {part.evidence.length > 0 ? (
+        <SourcingDisclosure
+          devId="component-browser.related-evidence"
+          label={detailsLabel}
+          icon="status.info"
+        >
+          <p className="ui-component-metadata break-words px-2 pb-2 pt-1">
             {part.evidence
               .map((item) => `${item.field}: ${item.ours} → ${item.theirs}`)
               .join(" · ")}
-          </span>
-        ) : null}
-        <span
-          data-dev-id="component-browser.related-not-validated"
-          className="ui-component-metadata block break-words text-t3"
-        >
-          {notValidated}
-        </span>
-      </span>
-      {part.url ? (
-        <a
-          href={part.url}
-          target="_blank"
-          rel="noreferrer"
-          aria-label={openLabel({ mpn: part.mpn })}
-          title={openLabel({ mpn: part.mpn })}
-          className={
-            "inline-flex flex-none items-center rounded-control p-0.5 text-t2 transition-colors " +
-            "hover:text-t1 focus-visible:outline focus-visible:outline-2 " +
-            "focus-visible:outline-offset-1 focus-visible:outline-focus"
-          }
-        >
-          <ExternalIcon className="h-3.5 w-3.5" />
-        </a>
+          </p>
+        </SourcingDisclosure>
       ) : null}
     </div>
   );

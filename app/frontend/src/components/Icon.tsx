@@ -19,6 +19,7 @@
  */
 import type { IconEntry } from "../lib/iconRegistry";
 import { useDevMode } from "../lib/devMode";
+import { runtimeDesignId } from "../lib/designIdentity";
 import { resolveIcon, sanitizeIconMarkup } from "./iconResolve";
 
 // -- component ----------------------------------------------------------------------------------
@@ -62,6 +63,9 @@ export function Icon({ id, className, title }: IconProps) {
   // on `enabled` exactly like <Text> only wraps in dev mode: OFF dev mode this is the empty object,
   // so the rendered DOM is byte-identical to today and every render-diff guard still holds.
   const devId = enabled ? { "data-icon-id": id } : {};
+  // Geometry edits target the icon itself, not its component-specific parent. Keep that semantic
+  // identity outside Studio too so a committed size/alignment override survives the editor closing.
+  const designId = runtimeDesignId("icon", id);
 
   if (entry.category === "primary") {
     // The shared line-icon preset: `.ico` routes stroke-width through --icon-stroke; the
@@ -78,6 +82,7 @@ export function Icon({ id, className, title }: IconProps) {
         strokeLinejoin="round"
         aria-hidden={accessibleTitle ? undefined : true}
         {...namedA11y}
+        data-design-id={designId}
         {...devId}
         dangerouslySetInnerHTML={{ __html: inner }}
       />
@@ -101,6 +106,7 @@ export function Icon({ id, className, title }: IconProps) {
       strokeLinejoin={entry.strokeLinejoin}
       style={{ ...entry.style, ...presentationStyle }}
       {...namedA11y}
+      data-design-id={designId}
       {...devId}
       dangerouslySetInnerHTML={{ __html: inner }}
     />

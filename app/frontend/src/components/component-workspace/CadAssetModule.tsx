@@ -24,6 +24,7 @@ import { useLandPattern, usePreviewGlb, useSymbolGeometry } from "../../api/quer
 import { componentRepresentationDevId } from "../../lib/componentDevIds";
 import { Text, useText } from "../../lib/copy";
 import { CubeArt, FootprintArt, SymbolArt } from "../icons";
+import { Icon } from "../Icon";
 import { Glb3DView } from "../Glb3DView";
 import { StatusText, WarnMark } from "../primitives";
 import {
@@ -65,6 +66,28 @@ function assetArt(kind: RepresentationKind) {
   if (kind === "symbol") return <SymbolArt />;
   if (kind === "footprint") return <FootprintArt />;
   return <CubeArt />;
+}
+
+/**
+ * One honest absence mark, sized from the owner's dark-theme design rather than by overriding the
+ * three asset-art ids globally. Attached files that are loading or unreadable keep their own art;
+ * a question mark means only that no file exists.
+ */
+function MissingAssetArt({ kind }: { kind: RepresentationKind }) {
+  return (
+    <span
+      data-dev-id="component-browser.asset-missing-art"
+      aria-hidden="true"
+      className="flex items-center justify-center"
+    >
+      <Icon
+        id="status.cad-missing"
+        className={
+          "opacity-40 " + (kind === "model" ? "h-10 w-10" : "h-[55px] w-[55px]")
+        }
+      />
+    </span>
+  );
 }
 
 /**
@@ -163,9 +186,21 @@ export function CadAssetModule({
         >
           <Text id={REPRESENTATION_COPY_ID[kind]}>{label}</Text>
         </button>
-        <StatusText tone={cadStatusTone(status)} className="flex-none">
-          <CadStatusLabel status={status} />
-        </StatusText>
+        {status === "Missing" ? (
+          // The centred question mark already says that this asset is absent. Keep the exact state
+          // for assistive technology without printing the same word beside every module heading.
+          <span data-dev-id="component-browser.cad-status" className="sr-only">
+            <CadStatusLabel status={status} />
+          </span>
+        ) : (
+          <StatusText
+            data-dev-id="component-browser.cad-status"
+            tone={cadStatusTone(status)}
+            className="flex-none"
+          >
+            <CadStatusLabel status={status} />
+          </StatusText>
+        )}
         {override ? (
           <span className="ui-component-metadata ml-auto min-w-0 truncate" title={override}>
             {override}
@@ -195,6 +230,7 @@ export function CadAssetModule({
             kind={kind}
             view={view}
             preview={preview}
+            missing={status === "Missing"}
             interactive
             onOpenFullPreview={onOpenFullPreview}
           />
@@ -211,13 +247,14 @@ export function CadAssetModule({
             kind={kind}
             view={view}
             preview={preview}
+            missing={status === "Missing"}
             interactive={false}
             onOpenFullPreview={onOpenFullPreview}
           />
         </button>
       )}
 
-      {expanded ? (
+      {expanded && attached ? (
         <AssetControls
           kind={kind}
           preview={preview}
@@ -347,12 +384,14 @@ function AssetPreview({
   kind,
   view,
   preview,
+  missing,
   interactive,
   onOpenFullPreview,
 }: {
   kind: RepresentationKind;
   view: RepresentationView;
   preview: PreviewData;
+  missing: boolean;
   interactive: boolean;
   /** Handed to the 3D viewer, which owns the only control strip a model module has. */
   onOpenFullPreview: () => void;
@@ -365,10 +404,10 @@ function AssetPreview({
 
   // NOTHING ATTACHED: the asset's own line art, and no sentence. `No file is attached` was a second
   // statement of the header's `Missing` two lines above it, one per absent asset, so a component with
-  // no CAD at all said the same thing four times down a ~300px column. The status word is the
-  // statement; the empty sheet is the illustration of it.
+  // no CAD at all said the same thing four times down a ~300px column. The decorative question
+  // mark is the visual statement; the exact status remains screen-reader text in the header.
   if (!view.tools.some((tool) => tool.present)) {
-    return <PreviewMessage kind={kind} message="" />;
+    return <PreviewMessage kind={kind} message="" missing={missing} />;
   }
   if (kind === "symbol") {
     if (preview.geometry.isError) return <PreviewMessage kind={kind} message={unreadable} />;
@@ -418,10 +457,18 @@ function AssetPreview({
   );
 }
 
-function PreviewMessage({ kind, message }: { kind: RepresentationKind; message: string }) {
+function PreviewMessage({
+  kind,
+  message,
+  missing = false,
+}: {
+  kind: RepresentationKind;
+  message: string;
+  missing?: boolean;
+}) {
   return (
     <span className="flex flex-col items-center gap-1 text-t3">
-      {assetArt(kind)}
+      {missing ? <MissingAssetArt kind={kind} /> : assetArt(kind)}
       {message ? <span className="ui-component-metadata">{message}</span> : null}
     </span>
   );

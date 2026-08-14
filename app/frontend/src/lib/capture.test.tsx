@@ -357,76 +357,85 @@ describe("CaptureProvider store", () => {
   });
 
   it.each(["blocked", "running"] as const)(
-    "keeps a %s exact provider route active and reopenable",
+    "keeps a %s exact provider route reopenable, then releases it on close",
     async (batchStatus) => {
-    mockSource(undefined, {
-      needs: ["kicad_symbol"],
-      completion_evidence: {
-        state: "unverified",
-        manifest_digest: null,
-        reason: "No complete shared CAD package was verified.",
-      },
-    });
-    vi.spyOn(api, "runCapture").mockResolvedValue({
-      workflow_batch_id: "batch-active-handoff",
-      workflow_item_id: "item-active-handoff",
-      event_cursor: 0,
-    });
-    vi.spyOn(api, "workflowEvents").mockResolvedValue({
-      schema_version: 1,
-      batch: {
-        id: "batch-active-handoff",
-        kind: "guided_capture",
-        status: batchStatus,
-        created_at: 1,
-        updated_at: 2,
-        total_items: 1,
-        item_counts: { [batchStatus]: 1 },
-        cancellation: null,
-        actions: {
-          can_pause: true,
-          can_resume: false,
-          can_retry: false,
-          can_cancel: true,
+      mockSource(undefined, {
+        needs: ["kicad_symbol"],
+        completion_evidence: {
+          state: "unverified",
+          manifest_digest: null,
+          reason: "No complete shared CAD package was verified.",
         },
-      },
-      events: [],
-      cursor: { after_sequence: 0, next_sequence: 1, limit: 200, has_more: false },
-    });
-    vi.spyOn(api, "captureWorkflow").mockResolvedValue({
-      workflow_batch_id: "batch-active-handoff",
-      workflow_item_id: "item-active-handoff",
-      part_id: "p1",
-      vendor: "ultralibrarian",
-      background: false,
-      active_route: {
+      });
+      vi.spyOn(api, "runCapture").mockResolvedValue({
+        workflow_batch_id: "batch-active-handoff",
+        workflow_item_id: "item-active-handoff",
+        event_cursor: 0,
+      });
+      let routeActive = true;
+      vi.spyOn(api, "workflowEvents").mockImplementation(async () => ({
+        schema_version: 1,
+        batch: {
+          id: "batch-active-handoff",
+          kind: "guided_capture",
+          status: routeActive ? batchStatus : "cancelled",
+          created_at: 1,
+          updated_at: 2,
+          total_items: 1,
+          item_counts: { [routeActive ? batchStatus : "cancelled"]: 1 },
+          cancellation: null,
+          actions: {
+            can_pause: true,
+            can_resume: false,
+            can_retry: false,
+            can_cancel: true,
+          },
+        },
+        events: [],
+        cursor: { after_sequence: 0, next_sequence: 1, limit: 200, has_more: false },
+      }));
+      vi.spyOn(api, "captureWorkflow").mockImplementation(async () => ({
+        workflow_batch_id: "batch-active-handoff",
+        workflow_item_id: "item-active-handoff",
+        part_id: "p1",
         vendor: "ultralibrarian",
-        detail_url: "https://app.ultralibrarian.com/x",
-        route_token: "route-active-handoff",
-      },
-      initial_needs: ["kicad_symbol"],
-      report: null,
-    });
-    const showProvider = vi.spyOn(api, "showCaptureProvider").mockResolvedValue({
-      workflow_batch_id: "batch-active-handoff",
-      part_id: "p1",
-      visible: true,
-    });
-    const { result } = renderHook(() => useCapture(), {
-      wrapper: wrap(new QueryClient()),
-    });
+        background: false,
+        active_route: routeActive
+          ? {
+              vendor: "ultralibrarian",
+              detail_url: "https://app.ultralibrarian.com/x",
+              route_token: "route-active-handoff",
+            }
+          : null,
+        initial_needs: ["kicad_symbol"],
+        report: null,
+      }));
+      const cancel = vi.spyOn(api, "workflowCancel").mockImplementation(async () => {
+        routeActive = false;
+        return {} as never;
+      });
+      const showProvider = vi.spyOn(api, "showCaptureProvider").mockResolvedValue({
+        workflow_batch_id: "batch-active-handoff",
+        part_id: "p1",
+        visible: true,
+      });
+      const { result } = renderHook(() => useCapture(), {
+        wrapper: wrap(new QueryClient()),
+      });
 
-    let running!: Promise<void>;
-    act(() => {
-      running = result.current.start("p1", "Part One", ["kicad_symbol"]);
-    });
-    await waitFor(() => expect(result.current.active.status).toBe("window-open"));
-    expect(result.current.active.routeToken).toBe("route-active-handoff");
-    await act(async () => result.current.showProvider());
-    expect(showProvider).toHaveBeenCalledWith("batch-active-handoff");
+      let running!: Promise<void>;
+      act(() => {
+        running = result.current.start("p1", "Part One", ["kicad_symbol"]);
+      });
+      await waitFor(() => expect(result.current.active.status).toBe("window-open"));
+      expect(result.current.active.routeToken).toBe("route-active-handoff");
+      await act(async () => result.current.showProvider());
+      expect(showProvider).toHaveBeenCalledWith("batch-active-handoff");
 
-    act(() => result.current.reset());
-    await act(async () => running);
+      await act(async () => result.current.closeProvider());
+      expect(cancel).toHaveBeenCalledWith("batch-active-handoff");
+      expect(result.current.active.status).toBe("idle");
+      await act(async () => running);
     },
   );
 

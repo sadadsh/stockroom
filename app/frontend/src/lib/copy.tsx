@@ -21,6 +21,7 @@
  * override can never show a person template syntax or delete the number a sentence exists to say.
  */
 import { useDevMode } from "./devMode";
+import { runtimeDesignId } from "./designIdentity";
 import {
   clearCopyDiagnostic,
   copyOverrideProblem,
@@ -67,17 +68,31 @@ export function Text({
   values?: CopyValues;
   children: string;
 }) {
-  const { enabled, studioMode, selectCopy, selectedCopyId, isCopyOverridden } = useDevMode();
+  const {
+    enabled,
+    studioMode,
+    selectCopy,
+    selectedCopyId,
+    isCopyOverridden,
+    elementOverridesFor,
+  } = useDevMode();
   const resolved = useResolvedCopy(id, children, values);
+  const designId = runtimeDesignId("copy", id);
 
-  if (!enabled) return <>{resolved}</>;
+  if (!enabled) {
+    // The normal app remains wrapper-free unless the owner committed geometry/visibility for this
+    // exact label. In that one case the stable span is the target the committed override requires.
+    return elementOverridesFor(designId)
+      ? <span data-design-id={designId}>{resolved}</span>
+      : <>{resolved}</>;
+  }
 
   // Preview is the real product, not an editor overlay. Keep the stable copy identity in the DOM
   // for Layers and target coverage, but add no underline, tab stop, tooltip, or event interception
   // until Edit is explicitly chosen.
   if (studioMode !== "edit") {
     return (
-      <span data-copy-id={id} data-copy-default={children}>
+      <span data-copy-id={id} data-copy-default={children} data-design-id={designId}>
         {resolved}
       </span>
     );
@@ -88,6 +103,7 @@ export function Text({
   return (
     <span
       data-copy-id={id}
+      data-design-id={designId}
       // The raw TEMPLATE, not the substituted text: the panel edits the sentence with its
       // placeholders in it, and reading the rendered text back would bake this render's values in.
       data-copy-default={children}

@@ -26,6 +26,10 @@ from stockroom.providers import provider_label
 # generous: a distributor's stock moves fast, its price ladder does not.
 STALENESS_THRESHOLDS: tuple[tuple[str, int], ...] = (("fresh", 2), ("aging", 14))
 STALENESS_STATES: tuple[str, ...] = ("fresh", "aging", "stale", "unknown")
+# The normalized dossier owns presentation order once. The frontend remains provider-neutral and
+# every surface consumes this same sequence: the preferred primary source first, its complement
+# second, then any additional distributors alphabetically.
+_PROVIDER_DISPLAY_ORDER: dict[str, int] = {"mouser": 0, "digikey": 1}
 
 # A source outcome that means this offer's numbers could not be refreshed. `success` is not
 # here: a source that answered has no failure to report.
@@ -318,6 +322,7 @@ def build_offers(record, *, now: str = "") -> list[dict[str, Any]]:
         )
     offers.sort(
         key=lambda item: (
+            _PROVIDER_DISPLAY_ORDER.get(str(item["provider"]).casefold(), 2),
             str(item["providerLabel"]).casefold(),
             str(item["provider"]),
             str(item["sku"]).casefold(),

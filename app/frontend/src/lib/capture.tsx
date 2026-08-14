@@ -302,6 +302,7 @@ export interface CaptureApi {
   reset: () => void;
   keepWorking: () => void;
   showProvider: () => Promise<void>;
+  closeProvider: () => Promise<void>;
   /**
    * Register the surface that owns opening a part, and get its unsubscribe back.
    *
@@ -843,6 +844,73 @@ export function CaptureProvider({
     [runStart],
   );
 
+  const closeProvider = useCallback(async () => {
+    const batchId = batchIdRef.current;
+    if (!batchId) return;
+    const pending = pendingStartRef.current;
+    await api.workflowCancel(batchId);
+    setState((current) => ({
+      ...current,
+      message: "Closing the provider page and releasing its capture route...",
+    }));
+
+    // Cancellation is cooperative: the control response acknowledges the request before the
+    // task-bound native lease necessarily leaves its context manager. Require BOTH an absent
+    // route and a terminal durable batch before advertising another provider; otherwise a click
+    // can race the one global provider surface after active_route clears but before lease teardown.
+    const deadline = Date.now() + 35_000;
+    let released = false;
+    while (Date.now() < deadline) {
+      let routeReleased = false;
+      let batchTerminal = false;
+      try {
+        const [session, page] = await Promise.all([
+          api.captureWorkflow(batchId),
+          api.workflowEvents(batchId, 0, 1),
+        ]);
+        routeReleased = !session.active_route;
+        batchTerminal = ["cancelled", "failed", "completed"].includes(page.batch.status);
+      } catch (error) {
+        if (error instanceof ApiError && [400, 404, 409].includes(error.status)) {
+          routeReleased = true;
+          batchTerminal = true;
+        } else {
+          throw error;
+        }
+      }
+      if (routeReleased && batchTerminal) {
+        released = true;
+        break;
+      }
+      await delay(100);
+    }
+    if (!released) {
+      setState((current) => ({
+        ...current,
+        status: "window-open",
+        message: "The provider page closed, but its capture route did not release. Try again.",
+      }));
+      throw new Error("The provider capture route did not release.");
+    }
+
+    followGenerationRef.current += 1;
+    if (pending) {
+      try {
+        await pending.promise;
+      } catch {
+        // The canceled run's own terminal report is superseded by the explicit close below.
+      }
+      if (pendingStartRef.current === pending) pendingStartRef.current = null;
+    }
+    clearWorkflow(batchId);
+    partIdRef.current = null;
+    needsRef.current = [];
+    batchIdRef.current = null;
+    itemIdRef.current = null;
+    retrySubmissionRef.current = null;
+    setState(IDLE);
+  }, []);
+
   const reset = useCallback(() => {
     followGenerationRef.current += 1;
     if (batchIdRef.current) clearWorkflow(batchIdRef.current);
@@ -943,11 +1011,22 @@ export function CaptureProvider({
       reset,
       keepWorking,
       showProvider,
+      closeProvider,
       onReopen,
       requestReopen,
       requestOpenFor,
     }),
-    [activeState, start, reset, keepWorking, showProvider, onReopen, requestReopen, requestOpenFor],
+    [
+      activeState,
+      start,
+      reset,
+      keepWorking,
+      showProvider,
+      closeProvider,
+      onReopen,
+      requestReopen,
+      requestOpenFor,
+    ],
   );
 
   return <CaptureContext.Provider value={captureApi}>{children}</CaptureContext.Provider>;

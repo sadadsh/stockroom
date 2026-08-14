@@ -6,6 +6,8 @@ import { ThemeProvider } from "../lib/theme";
 import { DevModeProvider, useDevMode } from "../lib/devMode";
 import { ICON_BY_ID } from "../lib/iconRegistry";
 import { ICON_OVERRIDES } from "../lib/icon.overrides";
+import { runtimeDesignId } from "../lib/designIdentity";
+import { applyElementOverrides } from "../lib/applyElementOverrides";
 
 // ICON_OVERRIDES is the live, committed override map that <Icon> reads at render time. Tests mutate
 // it to simulate a saved override, then clear it so cases stay isolated.
@@ -210,10 +212,19 @@ describe("Icon - context-driven overrides (dev mode v2)", () => {
     expect(svg()?.querySelector("path")?.getAttribute("d")).toBe(trashD);
   });
 
-  it("with no provider renders the registry default unchanged (byte-identical to today)", () => {
+  it("with no provider renders the registry default with its stable runtime design identity", () => {
     const svg = renderIcon({ id: "action.add" });
     expect(svg?.querySelector("path")?.getAttribute("d")).toBe("M12 5v14M5 12h14");
     expect(svg?.getAttribute("data-icon-id")).toBeNull();
+    expect(svg?.getAttribute("data-design-id")).toBe(runtimeDesignId("icon", "action.add"));
+  });
+
+  it("keeps a committed geometry override after Design Studio is absent", () => {
+    const svg = renderIcon({ id: "art.symbol" });
+    applyElementOverrides({
+      [runtimeDesignId("icon", "art.symbol")]: { width: "40px", height: "40px" },
+    });
+    expect(svg).toHaveStyle({ width: "40px", height: "40px" });
   });
 
   it("an entry with neither body nor swap in working-state resolves exactly as committed", () => {
@@ -226,8 +237,9 @@ describe("Icon - context-driven overrides (dev mode v2)", () => {
 describe("Icon - dev-mode identity (data-icon-id)", () => {
   it("emits data-icon-id equal to the id only while dev mode is enabled", () => {
     const { getByText, svg } = renderProvided("action.add");
-    // Dev mode off (provider mounted but not enabled): no data-icon-id, off-dev DOM untouched.
+    // Editing metadata remains gated; the design identity survives so committed geometry applies.
     expect(svg()?.getAttribute("data-icon-id")).toBeNull();
+    expect(svg()?.getAttribute("data-design-id")).toBe(runtimeDesignId("icon", "action.add"));
 
     fireEvent.click(getByText("toggle-dev"));
     expect(svg()?.getAttribute("data-icon-id")).toBe("action.add");

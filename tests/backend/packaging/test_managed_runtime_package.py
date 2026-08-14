@@ -133,12 +133,30 @@ def test_fixture_release_bundle_is_complete_valid_and_reproducible(
         b"MZcad-converter"
     ).hexdigest()
     support = first / "Initial Release" / "release-1.2.3.4" / "Support"
-    assert "OpenMcdf 3.1.4" in (support / "Third Party Notices.txt").read_text(
-        encoding="utf-8"
-    )
+    notices = (support / "Third Party Notices.txt").read_text(encoding="utf-8")
+    assert "OpenMcdf 3.1.4" in notices
+    assert "Font Awesome Free 7.3.1" in notices
+    assert "Tabler Icons 3.45.0" in notices
+    assert "Material Symbols" in notices
+    assert "Phosphor 2.1.1" in notices
     assert (support / "Licenses" / "AltiumSharp Apache-2.0.txt").read_text(
         encoding="utf-8"
     ).startswith("Apache License")
+    assert (support / "Licenses" / "Apache-2.0.txt").read_text(
+        encoding="utf-8"
+    ).startswith("Apache License")
+    font_awesome_license = (
+        support / "Licenses" / "Font Awesome Free License.txt"
+    ).read_text(encoding="utf-8")
+    assert "CC BY 4.0 License" in font_awesome_license
+    assert {
+        member.path
+        for member in manifest.members
+        if member.kind == "license"
+    } >= {
+        "Support/Licenses/Apache-2.0.txt",
+        "Support/Licenses/Font Awesome Free License.txt",
+    }
 
 
 def test_production_bundle_requires_a_valid_offline_root(tmp_path: Path) -> None:

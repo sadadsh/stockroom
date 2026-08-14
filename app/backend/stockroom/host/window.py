@@ -113,6 +113,91 @@ def _finite_number(value: object) -> TypeGuard[int | float]:
     return type(value) in (int, float) and math.isfinite(cast(int | float, value))
 
 
+def _place_provider_window_over_client(
+    app,
+    provider: _ProviderWindow,
+    x: float,
+    y: float,
+    width: float,
+    height: float,
+    *,
+    user32=None,
+) -> bool:
+    """Place an owned provider HWND in Stockroom client coordinates without activation.
+
+    React reports CSS pixels from the WebView client origin, while pywebview's public ``x``/``y``
+    are the outer-window origin. Adding those directly puts the provider under the Windows title
+    bar and over Stockroom's browser controls. An owned, no-activate HWND also stays above its app
+    while the person drags the React title bar instead of falling behind the owner window.
+    """
+
+    if not _is_windows():
+        return False
+    app_hwnd = _current_process_window_handle(app)
+    provider_hwnd = _current_process_window_handle(provider)
+    if app_hwnd is None or provider_hwnd is None:
+        return False
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        api = user32 or ctypes.windll.user32
+        point = wintypes.POINT(0, 0)
+        client_to_screen = api.ClientToScreen
+        set_owner = getattr(api, "SetWindowLongPtrW", None) or api.SetWindowLongW
+        set_window_pos = api.SetWindowPos
+        _set_signature(
+            client_to_screen,
+            [wintypes.HWND, ctypes.POINTER(wintypes.POINT)],
+            wintypes.BOOL,
+        )
+        _set_signature(
+            set_owner,
+            [wintypes.HWND, ctypes.c_int, wintypes.HANDLE],
+            wintypes.HANDLE,
+        )
+        _set_signature(
+            set_window_pos,
+            [
+                wintypes.HWND,
+                wintypes.HWND,
+                ctypes.c_int,
+                ctypes.c_int,
+                ctypes.c_int,
+                ctypes.c_int,
+                wintypes.UINT,
+            ],
+            wintypes.BOOL,
+        )
+        if not bool(client_to_screen(app_hwnd, ctypes.byref(point))):
+            return False
+        native = getattr(app, "native", None)
+        try:
+            scale = float(getattr(native, "_scale", 1.0) or 1.0)
+        except (TypeError, ValueError, OverflowError):
+            scale = 1.0
+        if not math.isfinite(scale) or scale <= 0:
+            scale = 1.0
+        # GWLP_HWNDPARENT makes this a true owned window, not a global top-most window.
+        set_owner(provider_hwnd, -8, app_hwnd)
+        # SWP_NOZORDER | SWP_NOACTIVATE | SWP_SHOWWINDOW. The provider receives focus only when the
+        # person clicks its page; geometry publication must never steal a drag from React.
+        return bool(
+            set_window_pos(
+                provider_hwnd,
+                0,
+                round(point.x + x * scale),
+                round(point.y + y * scale),
+                max(1, round(width * scale)),
+                max(1, round(height * scale)),
+                0x0004 | 0x0010 | 0x0040,
+            )
+        )
+    except Exception:  # noqa: BLE001 - older pywebview backends use the safe public fallback
+        _log.debug("native provider placement failed", exc_info=True)
+        return False
+
+
 @dataclass(slots=True)
 class InAppProviderDownloadEvent:
     sequence: int
@@ -195,17 +280,22 @@ class InAppProviderBrowserSurface:
         app_url: str,
         *,
         provider_window: Callable[[], _ProviderWindow] | None = None,
+        place_provider_window: Callable[
+            [object, _ProviderWindow, float, float, float, float], bool
+        ] | None = None,
     ) -> None:
         global _PROVIDER_SURFACE
         if not should_inject(app_url, app_url):
             raise ValueError("app_url must have a complete origin")
         self._app_url = app_url
         self._provider_window = provider_window or provider_window_surface
+        self._place_provider_window = place_provider_window or _place_provider_window_over_client
         self._lock = threading.RLock()
         self._active_show: Callable[[], None] | None = None
         self._active_provider_window: _ProviderWindow | None = None
         self._active_component_id: str | None = None
         self._last_provider_viewport: dict[str, object] | None = None
+        self._provider_visible = False
         _PROVIDER_SURFACE = self
 
     def set_provider_viewport(self, viewport: dict[str, object]) -> bool:
@@ -236,6 +326,11 @@ class InAppProviderBrowserSurface:
             self._last_provider_viewport = None
             if provider is not None:
                 provider.hide()
+            else:
+                # A measured modal can disappear before any native lease opens. Do not let that
+                # abandoned pre-lease component identity reject the next component's viewport.
+                self._active_component_id = None
+            self._provider_visible = False
             return True
         numeric_values = cast(tuple[int | float, int | float, int | float, int | float], values)
         x, y, width, height = (float(value) for value in numeric_values)
@@ -247,6 +342,7 @@ class InAppProviderBrowserSurface:
             self._last_provider_viewport = None
             if provider is not None:
                 provider.hide()
+            self._provider_visible = False
             return False
         self._last_provider_viewport = dict(viewport)
         # React often measures and publishes the modal before the durable capture worker has
@@ -254,13 +350,11 @@ class InAppProviderBrowserSurface:
         # lease's first show/navigation applies it once the provider WebView exists.
         if provider is None:
             return True
-        return self._apply_provider_viewport(viewport, focus=True)
+        return self._apply_provider_viewport(viewport)
 
     def _apply_provider_viewport(
         self,
         viewport: dict[str, object],
-        *,
-        focus: bool,
     ) -> bool:
         provider = self._active_provider_window
         app = active_window()
@@ -271,20 +365,24 @@ class InAppProviderBrowserSurface:
             return False
         numeric_values = cast(tuple[int | float, int | float, int | float, int | float], values)
         x, y, width, height = (float(value) for value in numeric_values)
-        app_x = int(getattr(app, "x", 0) or 0)
-        app_y = int(getattr(app, "y", 0) or 0)
-        provider.move(round(app_x + x), round(app_y + y))
-        provider.resize(round(width), round(height))
-        provider.show()
-        if focus:
-            provider.focus()
+        placed = self._place_provider_window(app, provider, x, y, width, height)
+        if not placed:
+            # Compatibility fallback for a pywebview backend without verifiable HWNDs. Native
+            # Windows acceptance exercises the owned-HWND path above.
+            app_x = int(getattr(app, "x", 0) or 0)
+            app_y = int(getattr(app, "y", 0) or 0)
+            provider.move(round(app_x + x), round(app_y + y))
+            provider.resize(round(width), round(height))
+            if not self._provider_visible:
+                provider.show()
+        self._provider_visible = True
         return True
 
     def reapply_provider_viewport(self) -> bool:
         """Follow a moved or resized Stockroom window without stealing focus."""
 
         viewport = self._last_provider_viewport
-        return bool(viewport and self._apply_provider_viewport(viewport, focus=False))
+        return bool(viewport and self._apply_provider_viewport(viewport))
 
     def provider_command(self, request: dict[str, object]) -> bool:
         """Apply one allowlisted browser command to the active provider document."""
@@ -313,6 +411,7 @@ class InAppProviderBrowserSurface:
             return False
         if command_name == "close":
             provider.hide()
+            self._provider_visible = False
             return True
         if command_name == "navigate":
             target = request["url"]
@@ -376,6 +475,7 @@ class InAppProviderBrowserSurface:
                     chrome.provider_hidden()
                 try:
                     window.hide()
+                    self._provider_visible = False
                 except Exception:  # noqa: BLE001 - a navigating WebView retries from its tab
                     _log.exception("could not hide the provider browser")
 
@@ -515,6 +615,7 @@ class InAppProviderBrowserSurface:
                 self._active_provider_window = None
                 self._active_component_id = None
                 self._last_provider_viewport = None
+                self._provider_visible = False
                 _end_native_webview_download_lease(lease_token)
                 if chrome is not None:
                     chrome.close_provider_route()

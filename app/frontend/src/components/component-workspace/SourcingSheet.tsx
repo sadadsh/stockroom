@@ -48,7 +48,6 @@ export function SourcingSheet({
     "component-browser.related-not-validated",
     "Stockroom has not checked this for equivalence",
   );
-
   return (
     <div data-dev-id="component-browser.sourcing-sheet" className="flex flex-col gap-4">
       <Section

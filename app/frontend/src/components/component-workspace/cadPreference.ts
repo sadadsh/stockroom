@@ -42,6 +42,13 @@ export function chosenOption(preference: CadPreferenceView): CadPreferenceOption
   return preference.options.find((option) => option.set.current) ?? null;
 }
 
+/** Whether the source row has a fact or choice to show rather than only “None recorded”. */
+export function hasPreferredSourceInformation(preference: CadPreferenceView): boolean {
+  if (preference.provider || preference.label || preference.mixed || preference.pinned) return true;
+  if (preferenceOptions(preference).length > 0 || chosenOption(preference) !== null) return true;
+  return Object.values(preference.assets).some((asset) => Boolean(asset.provider || asset.label));
+}
+
 /**
  * Whether one asset's source differs from the set's, which is the ONLY case a module states it.
  *

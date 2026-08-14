@@ -112,6 +112,24 @@ public sealed class ProviderBrowserContractTests
     }
 
     [Fact]
+    public void FirstValidRendererViewportRestoresAProviderHiddenByEarlyShow()
+    {
+        var source = File.ReadAllText(
+            Path.Combine(
+                FindProjectDirectory(),
+                "WebViewWindowHost.cs")).Replace("\r\n", "\n", StringComparison.Ordinal);
+
+        Assert.Contains(
+            "else\n                {\n                    // A provider-show can arrive before React has committed measurable bounds.",
+            source,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "_webView.Visibility = Visibility.Visible;\n                    _providerSurface.Visibility = Visibility.Visible;\n                    _tabStrip.SelectProvider();\n                    UpdateProviderChrome();",
+            source,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ProductionSourceStagesEveryProviderDownloadAndNeverFallsBackToDownloads()
     {
         var source = File.ReadAllText(

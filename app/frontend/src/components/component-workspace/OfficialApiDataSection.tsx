@@ -90,7 +90,7 @@ function EndpointDisclosure({
                 onClick={() => setPage((current) => Math.max(0, current - 1))}
                 className="ui-component-metadata disabled:opacity-40"
               >
-                Previous
+                <Text id="component-browser.official-api-previous">Previous</Text>
               </button>
               <span className="ui-component-metadata ui-numeric">
                 {visiblePage + 1} / {pageCount}
@@ -101,7 +101,7 @@ function EndpointDisclosure({
                 onClick={() => setPage((current) => Math.min(pageCount - 1, current + 1))}
                 className="ui-component-metadata disabled:opacity-40"
               >
-                Next
+                <Text id="component-browser.official-api-next">Next</Text>
               </button>
             </div>
           ) : null}

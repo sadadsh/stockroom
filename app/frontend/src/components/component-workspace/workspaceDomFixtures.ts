@@ -149,7 +149,7 @@ export function populatedDossier(): ComponentDossier {
     supplySummary: {
       ...dossier.supplySummary,
       offerCount: 2,
-      providersInStock: ["digikey", "mouser"],
+      providersInStock: ["mouser", "digikey"],
       totalStock: 1512,
       bestUnitPrice: 0.38,
       bestUnitPriceCurrency: "$",
@@ -202,7 +202,6 @@ export function populatedDossier(): ComponentDossier {
       ],
     },
     distributorOffers: [
-      makeOffer(),
       makeOffer({
         provider: "mouser",
         providerLabel: "Mouser",
@@ -214,6 +213,7 @@ export function populatedDossier(): ComponentDossier {
           { qty: 100, price: 0.31 },
         ],
       }),
+      makeOffer(),
     ],
     relatedParts: [makeRelatedPart()],
     provenance: {

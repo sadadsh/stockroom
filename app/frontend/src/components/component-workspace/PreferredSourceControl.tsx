@@ -93,7 +93,7 @@ export function PreferredSourceControl({
     <span className="flex min-w-0 items-center gap-1.5">
       <PropertyLabel className="flex-none">{label}</PropertyLabel>
       <select
-        data-dev-id="component-browser.preferred-source"
+        data-dev-id="component-browser.preferred-source-control"
         aria-label={label}
         // A mixed set has no single answer to show, so the control shows the word rather than
         // silently displaying one of the two providers as though it governed all three.

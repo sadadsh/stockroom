@@ -1,4 +1,29 @@
-Stockroom Native CAD Converter - Third-Party Notices
+Stockroom - Third-Party Notices
+
+Interface icon artwork
+
+Stockroom embeds selected SVG artwork under stable application-owned semantic
+IDs. The source artwork is fitted into Stockroom view boxes and inherits the
+application's current colour; these transformations do not change its meaning.
+
+- Font Awesome Free 7.3.1: box-open, box, microchip, and circle-question.
+  Copyright (c) 2026 Fonticons, Inc. License: CC BY 4.0. Source:
+  https://fontawesome.com/. The official Font Awesome Free notice is included
+  in Support/Licenses/Font Awesome Free License.txt.
+- Tabler Icons 3.45.0, bundled by @iconify-json/tabler 1.2.38:
+  circle-arrow-up-right-filled, square-rounded-chevron-right-filled, and
+  arrow-big-down-line-filled. Copyright Pawel Kuna and contributors. License:
+  MIT. Source: https://github.com/tabler/tabler-icons. The MIT terms printed
+  below apply.
+- Material Symbols, bundled by @iconify-json/material-symbols 1.2.88:
+  info-rounded and book-2-rounded. Copyright Google LLC. License: Apache
+  License 2.0. Source: https://github.com/google/material-design-icons. A full
+  copy is included in Support/Licenses/Apache-2.0.txt.
+- Phosphor 2.1.1, bundled by @iconify-json/ph 1.2.2: gear-six-fill and moon-fill.
+  Copyright Phosphor Icons contributors. License: MIT. Source:
+  https://github.com/phosphor-icons/core. The MIT terms printed below apply.
+
+Native CAD converter
 
 The native CAD converter is built from source and distributed as a separate
 attested sidecar. Stockroom does not redistribute Altium Designer or any

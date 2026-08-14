@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { createRef, useState } from "react";
 import { installPreviewEffectGuard } from "../../design-studio/previewEffects";
@@ -23,6 +23,76 @@ describe("ProviderBrowserModal", () => {
         height: 800,
       }),
     ).toEqual({ x: 128, y: 80, width: 1128, height: 696 });
+  });
+
+  it("republishes native viewport coordinates throughout a titlebar drag", async () => {
+    const setProviderViewport = vi.fn();
+    Object.defineProperty(window, "__STOCKROOM_HOST__", {
+      configurable: true,
+      value: { setProviderViewport },
+    });
+    const bounds = vi
+      .spyOn(HTMLElement.prototype, "getBoundingClientRect")
+      .mockImplementation(function (this: HTMLElement) {
+        if (this.getAttribute("data-dev-id") !== "component-browser.provider-viewport") {
+          return { x: 0, y: 0, width: 0, height: 0 } as DOMRect;
+        }
+        const dialog = this.closest<HTMLElement>("[role=dialog]")!;
+        const x = Number.parseFloat(dialog.style.left) + 4;
+        const y = Number.parseFloat(dialog.style.top) + 70;
+        const width = Number.parseFloat(dialog.style.width) - 8;
+        const height = Number.parseFloat(dialog.style.height) - 74;
+        return { x, y, width, height, top: y, left: x, right: x + width, bottom: y + height } as DOMRect;
+      });
+
+    try {
+      render(
+        <ProviderBrowserModal
+          open
+          componentId="part-1"
+          providerLabel="DigiKey"
+          url="https://www.digikey.com/en/products/detail/example"
+          onClose={vi.fn()}
+        />,
+      );
+      const first = setProviderViewport.mock.calls[setProviderViewport.mock.calls.length - 1]?.[0] as {
+        x: number;
+        y: number;
+        width: number;
+        height: number;
+      };
+      const titlebar = document.querySelector<HTMLElement>(
+        '[data-dev-id="component-browser.provider-dialog-titlebar"]',
+      )!;
+      fireEvent(titlebar, new MouseEvent("pointerdown", {
+        bubbles: true,
+        clientX: 200,
+        clientY: 120,
+      }));
+      fireEvent(titlebar, new MouseEvent("pointermove", {
+        bubbles: true,
+        clientX: 260,
+        clientY: 165,
+      }));
+      fireEvent(titlebar, new MouseEvent("pointerup", {
+        bubbles: true,
+        clientX: 260,
+        clientY: 165,
+      }));
+
+      await waitFor(() => {
+        const last = setProviderViewport.mock.calls[
+          setProviderViewport.mock.calls.length - 1
+        ]?.[0];
+        expect(last.x).toBe(first.x + 60);
+        expect(last.y).toBe(first.y + 45);
+        expect(last.width).toBe(first.width);
+        expect(last.height).toBe(first.height);
+      });
+    } finally {
+      bounds.mockRestore();
+      Reflect.deleteProperty(window, "__STOCKROOM_HOST__");
+    }
   });
 
   it("closes with its visible control and returns focus to the launcher", async () => {

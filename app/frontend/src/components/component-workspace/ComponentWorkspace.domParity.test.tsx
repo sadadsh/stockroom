@@ -1,33 +1,24 @@
 /**
- * PHASE 1 PIXEL-IDENTITY GATE: the opened component's DOM, byte for byte.
+ * CURRENT SHIPPED-DOM LOCK: the opened component's approved DOM, byte for byte.
  *
- * WHY THIS FILE EXISTS. Phase 1 of the Design Mode plan turns the workspace's hardcoded JSX
- * composition into a LAYOUT DOCUMENT the app renders. The plan's gate for that step is "uishot
- * diffs against the Phase 0 baseline show no visual change"; this is the stronger and much cheaper
- * form of the same claim, run on every commit rather than on a screenshot day: THE DOM MUST NOT
- * CHANGE. A markup tree that is identical cannot paint differently, so a green run here is a
- * sufficient condition for the screenshot gate rather than a proxy for it.
+ * WHY THIS FILE EXISTS. The component workspace is composed through a layout document, and a broad
+ * tree snapshot catches accidental movement, removal, identity loss and control duplication much
+ * more cheaply than a screenshot. A matching tree is a strong paint precondition; native screenshots
+ * remain the authority for colour, spacing and WebView behavior.
  *
- * The trees under `__dom-parity__/` were captured from the arrangement AS IT SHIPPED, before a line
- * of the renderer existed, and committed. They are not snapshots of the current implementation and
- * they are not regenerated to make a change pass.
- *
- * THAT PROVENANCE WAS VERIFIED RATHER THAN ASSERTED, because "a fixture captured from the new
- * renderer, compared against the new renderer" is precisely the vacuous shape this gate would be
- * worthless in. The seven workspace modules were restored to their pre-refactor state with
- * `git checkout --`, this file was run against that pristine tree, and all seven trees passed with
- * no snapshot rewritten - then the refactor was restored and the run repeated with the fixture bytes
- * unchanged (verified by checksum). The same bytes and the same digests therefore describe BOTH
- * renderers, which is the claim.
+ * PROVENANCE. These fixtures began as the verified pre-renderer Phase 0 trees: the old and new
+ * renderers produced identical bytes. They were deliberately rebaselined after later owner-approved
+ * product changes, most recently for the compact sourcing disclosures and the laptop Design Studio
+ * promotion (semantic icons, missing-CAD presentation, and conditional empty source row). They now
+ * lock the current shipped arrangement rather than claim historical Phase 0 identity.
  *
  * WHY EACH TREE IS ALSO CHECKED AGAINST A DIGEST WRITTEN OUT IN THIS FILE. A file snapshot alone is
- * rewritten by `vitest -u`, which is exactly the move this gate has to survive: an implementer whose
- * refactor moved an element must not be able to make the failure go away with a flag. The digests
- * below are source, not snapshot - re-capturing a tree is therefore a two-part EDIT that shows up in
- * a diff and has to be argued for, which is the point.
+ * rewritten by `vitest -u`, which is exactly the move this gate has to survive: an accidental change
+ * must not disappear under a flag. The digests below are source, not snapshot, so re-capturing a tree
+ * is a two-part edit that shows up in review.
  *
- * TO RE-CAPTURE DELIBERATELY (Phase 3, when the owner's committed layout stops being the shipped
- * JSX): run this file with `-u`, read the diff, then paste the digests the failures print.
+ * TO RE-CAPTURE DELIBERATELY after an approved product change: run only this file with `-u`, inspect
+ * all four fixture diffs, then paste the digests printed by the preceding non-update run.
  *
  * PROVEN NON-VACUOUS BY MUTATION, and the mutation reverted: changing the column title strip's
  * height class from `h-[24px]` to `h-[25px]` - one character, in one shared primitive - turned four
@@ -245,7 +236,7 @@ describe("the opened component renders the same DOM it shipped with", () => {
     await expectTree(
       "populated",
       await renderWorkspace(populatedDossier()),
-      "73482-7dfc829e-58c19373",
+      "85065-1c94d193-fc21203f",
     );
   });
 
@@ -254,12 +245,12 @@ describe("the opened component renders the same DOM it shipped with", () => {
     await expectTree(
       "populated-developer",
       await renderWorkspace(populatedDossier()),
-      "87698-b921f8ef-5a56090a",
+      "100282-d130fc2a-9bc2062f",
     );
   });
 
   it("draws a component nobody has sourced identically", async () => {
-    await expectTree("sparse", await renderWorkspace(sparseDossier()), "27383-f5f30290-194df1fb");
+    await expectTree("sparse", await renderWorkspace(sparseDossier()), "27060-783cd85e-44ad0a0e");
   });
 
   it("draws a component nobody has sourced identically in developer mode", async () => {
@@ -269,7 +260,7 @@ describe("the opened component renders the same DOM it shipped with", () => {
     await expectTree(
       "sparse-developer",
       await renderWorkspace(sparseDossier()),
-      "36538-69f5613d-e9943d63",
+      "36242-59af3f4b-853028a7",
     );
   });
 

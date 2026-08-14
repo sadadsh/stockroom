@@ -11,6 +11,7 @@
  * floating panels with padding between them.
  */
 import type { ReactNode } from "react";
+import { Icon } from "../Icon";
 
 /**
  * A 21px heading ROW directly above its rows, with at most one action pinned to its right.
@@ -73,6 +74,33 @@ export function SourcingSubSection({
       </header>
       <div>{children}</div>
     </section>
+  );
+}
+
+/** Compact secondary facts without removing them from the column's accessible reading order. */
+export function SourcingDisclosure({
+  devId,
+  label,
+  icon = "status.info",
+  children,
+}: {
+  devId: string;
+  label: ReactNode;
+  icon?: string;
+  children: ReactNode;
+}) {
+  return (
+    <details data-dev-id={devId} className="group border-t border-line/60">
+      <summary className="flex min-h-[24px] cursor-pointer list-none items-center gap-1.5 px-2 py-1 text-xs font-medium text-t2 hover:bg-[var(--c-hover)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-focus">
+        <Icon id={icon} className="h-3.5 w-3.5 flex-none text-t3" />
+        <span>{label}</span>
+        <Icon
+          id="detail.chevron-right"
+          className="ml-auto h-3 w-3 flex-none text-t3 transition-transform group-open:rotate-90"
+        />
+      </summary>
+      <div>{children}</div>
+    </details>
   );
 }
 

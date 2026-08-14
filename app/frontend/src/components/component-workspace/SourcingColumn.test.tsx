@@ -422,32 +422,59 @@ describe("the distributor offers ledger", () => {
     },
   });
 
-  it("shows every offer fact and every price break without a horizontal table", async () => {
-    await open(offersDossier);
+  it("shows every price break immediately and discloses repetitive offer facts on demand", async () => {
+    const { user } = await open(offersDossier);
     const ledger = screen.getByRole("list", { name: "Distributor offers" });
     const offer = within(ledger).getByRole("listitem");
 
     expect(ledger).not.toHaveClass("overflow-x-auto");
     expect(ledger.querySelector("table")).toBeNull();
+    for (const label of ["Stock", "Unit Price", "Price Breaks"]) {
+      expect(within(offer).getByText(label)).toBeVisible();
+    }
+    expect(within(offer).getByText("1,240")).toBeVisible();
+    const details = within(offer).getByText("Offer Details").closest("details")!;
+    expect(details).not.toHaveAttribute("open");
+    expect(within(offer).getByText("20 weeks")).not.toBeVisible();
+    await user.click(within(offer).getByText("Offer Details"));
+    expect(details).toHaveAttribute("open");
     for (const label of [
-      "Stock",
-      "Unit Price",
       "Quote Code",
       "MOQ",
       "Lead Time",
       "Manufacturer Lead Time",
       "Product Status",
       "Last Checked",
-      "Price Breaks",
     ]) {
-      expect(within(offer).getByText(label)).toBeInTheDocument();
+      expect(within(offer).getByText(label)).toBeVisible();
     }
-    expect(within(offer).getByText("1,240")).toBeInTheDocument();
-    expect(within(offer).getByText("20 weeks")).toBeInTheDocument();
-    expect(within(offer).getByText("NRND")).toBeInTheDocument();
-    expect(within(offer).getByText(/Stale$/)).toBeInTheDocument();
+    expect(within(offer).getByText("20 weeks")).toBeVisible();
+    expect(within(offer).getByText("NRND")).toBeVisible();
+    expect(within(offer).getByText(/Stale$/)).toBeVisible();
     expect(within(offer).getAllByText("USD0.42")).toHaveLength(2);
     expect(within(offer).getByText("USD0.22")).toBeInTheDocument();
+  });
+
+  it("renders the normalized provider priority without locally reordering package variants", () => {
+    const normalized = [
+      makeOffer({ provider: "mouser", sku: "MOUSER-1" }),
+      makeOffer({ provider: "mouser", sku: "MOUSER-2" }),
+      makeOffer({ provider: "digikey", sku: "DK-1" }),
+      makeOffer({ provider: "digikey", sku: "DK-2" }),
+    ];
+    provide(
+      <OffersSection
+        offers={normalized}
+        failures={[]}
+        onRefresh={() => {}}
+        onViewAll={() => {}}
+        refreshing={false}
+      />,
+    );
+
+    expect([...document.querySelectorAll<HTMLElement>("[data-offer-provider]")].map(
+      (row) => within(row).getByTitle(/^(MOUSER|DK)-/).textContent,
+    )).toEqual(["MOUSER-1", "MOUSER-2", "DK-1", "DK-2"]);
   });
 
   it("right-aligns the figures that are compared down a column", async () => {
@@ -574,8 +601,8 @@ describe("a sourcing refresh", () => {
 });
 
 describe("the documents section", () => {
-  it("leads with the title and keeps the filename tertiary", async () => {
-    await open(
+  it("leads with the title and discloses tertiary file metadata", async () => {
+    const { user } = await open(
       makeDossier({
         documents: {
           items: [
@@ -594,8 +621,11 @@ describe("the documents section", () => {
     const title = within(row).getByText("LM358 Dual Operational Amplifier");
     expect(title).toHaveClass("ui-row-secondary");
     // The filename is a fact about our disk, not about the part. It stays, one tier down.
+    expect(within(row).getByText(/lm358\.pdf/)).not.toBeVisible();
+    await user.click(within(row).getByText("Document Details"));
+    expect(within(row).getByText(/lm358\.pdf/)).toBeVisible();
     expect(within(row).getByText(/lm358\.pdf/)).toHaveClass("ui-component-metadata");
-    expect(within(row).getByText(/Rev H/)).toBeInTheDocument();
+    expect(within(row).getByText(/Rev H/)).toBeVisible();
   });
 
   it("never uses a raw URL as a document's name", async () => {
@@ -622,8 +652,8 @@ describe("the documents section", () => {
 });
 
 describe("the related parts section", () => {
-  it("states the reason, the evidence behind it, and that nothing has been validated", async () => {
-    await open(
+  it("states the reason and warning immediately, then discloses comparison evidence", async () => {
+    const { user } = await open(
       makeDossier({
         relatedParts: [
           makeRelatedPart({
@@ -638,12 +668,14 @@ describe("the related parts section", () => {
     const row = region("component-browser.related-row");
     expect(row.dataset.relatedValidated).toBe("false");
     expect(row).toHaveTextContent("Same function, different package");
-    expect(region("component-browser.related-evidence")).toHaveTextContent(
-      "package: sot23 → sc70",
-    );
+    const evidence = region("component-browser.related-evidence");
+    expect(evidence).toHaveTextContent("package: sot23 → sc70");
+    expect(within(evidence).getByText("package: sot23 → sc70")).not.toBeVisible();
     expect(region("component-browser.related-not-validated")).toHaveTextContent(
       "Stockroom has not checked this for equivalence",
     );
+    await user.click(within(row).getByText("Comparison Details"));
+    expect(within(evidence).getByText("package: sot23 → sc70")).toBeVisible();
   });
 });
 

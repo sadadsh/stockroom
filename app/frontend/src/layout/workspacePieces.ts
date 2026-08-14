@@ -424,6 +424,7 @@ export const WORKSPACE_PIECES: readonly PieceManifest[] = [
     nameCopyId: "component-browser.lifecycle-title",
     devIds: [
       "component-browser.lifecycle",
+      "component-browser.lifecycle-details",
       "component-browser.manufacturer-status",
       "component-browser.total-stock",
     ],
@@ -452,6 +453,7 @@ export const WORKSPACE_PIECES: readonly PieceManifest[] = [
       "component-browser.offers-table",
       "component-browser.offer-row",
       "component-browser.offer-price-ladder",
+      "component-browser.offer-details",
       "component-browser.offer-failures",
       "component-browser.offer-listing",
       "component-browser.refresh-offers",
@@ -488,6 +490,7 @@ export const WORKSPACE_PIECES: readonly PieceManifest[] = [
       "component-browser.documents",
       "component-browser.preferred-datasheet-reason",
       "component-browser.document-row",
+      "component-browser.document-details",
       "component-browser.document-open",
     ],
     dataNeeds: ["dossier.documents.items", "dossier.documents.preferredDatasheetReason"],

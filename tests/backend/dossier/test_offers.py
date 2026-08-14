@@ -65,6 +65,13 @@ def test_an_offer_carries_every_declared_field():
     }
 
 
+def test_normalized_offer_order_puts_mouser_before_digikey():
+    assert [item["provider"] for item in build_offers(_sourced_record(), now=_NOW)] == [
+        "mouser",
+        "digikey",
+    ]
+
+
 def test_the_price_ladder_is_sorted_and_the_unit_price_is_its_first_break():
     offers = {item["provider"]: item for item in build_offers(_sourced_record(), now=_NOW)}
     assert offers["mouser"]["priceBreaks"] == [
@@ -229,7 +236,7 @@ def test_a_part_with_no_offers_reports_an_empty_supply_rather_than_absent():
 
 def test_the_dossier_serves_the_offers_already_normalized():
     dossier = component_dossier(_sourced_record(), now=_NOW)
-    assert [item["provider"] for item in dossier["distributorOffers"]] == ["digikey", "mouser"]
+    assert [item["provider"] for item in dossier["distributorOffers"]] == ["mouser", "digikey"]
     assert dossier["supplySummary"]["staleness"] == "stale"
 
 

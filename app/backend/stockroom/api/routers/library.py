@@ -2060,6 +2060,8 @@ def library_router(require_token) -> APIRouter:
         item = items[0]
         projection = _capture_item_projection(item)
         route = active_person_capture(item.id, part_id=projection["part_id"])
+        if route is None:
+            raise ApiError(409, "This capture has no active provider page to show.")
 
         surface = getattr(ctx, "provider_browser_surface", None)
         owner = getattr(surface, "__self__", surface)
@@ -2074,7 +2076,7 @@ def library_router(require_token) -> APIRouter:
             "workflow_batch_id": batch_id,
             "part_id": projection["part_id"],
             "visible": True,
-            "active_route": route is not None,
+            "active_route": True,
         }
 
     @r.get("/capture/batches/{batch_id}/worklist")

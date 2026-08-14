@@ -369,7 +369,10 @@ function DatasheetToolbar({
         >
           <Text id="component-browser.datasheet-previous-short">Back</Text>
         </Button>
-        <span className="ui-property-value ui-numeric flex items-baseline gap-1">
+        <span
+          data-dev-id="component-browser.datasheet-page-cluster"
+          className="ui-property-value ui-numeric flex translate-y-1 items-baseline gap-1"
+        >
           <span className="ui-property-label">{pageLabel}</span>
           <span data-dev-id="component-browser.datasheet-page-number">{page}</span>
           <span className="ui-component-metadata">{ofPages({ count: pageCount || 1 })}</span>
@@ -395,7 +398,7 @@ function DatasheetToolbar({
         </Button>
         <span
           data-dev-id="component-browser.datasheet-zoom"
-          className="ui-component-metadata ui-numeric"
+          className="ui-component-metadata ui-numeric translate-y-1"
         >
           {`${Math.round(zoom * 100)}%`}
         </span>

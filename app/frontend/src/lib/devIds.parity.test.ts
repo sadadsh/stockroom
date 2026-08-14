@@ -203,6 +203,12 @@ const KNOWN_PROP_PASSED: readonly string[] = [
   "component-browser.provenance-intake",
   "component-browser.provenance-revisions",
   "component-browser.provenance-diagnostics",
+  // component-workspace/SourcingParts.tsx SourcingDisclosure: compact secondary facts share one
+  // native details shell while every exact id stays source-spelled at its call site.
+  "component-browser.lifecycle-details",
+  "component-browser.offer-details",
+  "component-browser.document-details",
+  "component-browser.related-evidence",
   // component-workspace/SheetParts.tsx: the exhaustive sourcing sheet shares one section and one
   // table shell, so a section's or a table's id arrives as a `devId` string prop. Spelled out in
   // full at each call site for the same reason as the regions above.

@@ -284,6 +284,18 @@ describe("the datasheet viewer", () => {
     expect(mockApi.documentFile).toHaveBeenCalledWith(ID, remote.id);
   });
 
+  it("aligns the page cluster and zoom readout together without moving the toolbar", async () => {
+    const user = userEvent.setup();
+    await open(withDocuments(makeDocument({ isPreferred: true })));
+    await user.click(node("component-browser.header-datasheet"));
+    await screen.findByTestId("pdf-page");
+
+    expect(node("component-browser.datasheet-page-cluster")).toHaveClass("translate-y-1");
+    expect(node("component-browser.datasheet-zoom")).toHaveClass("translate-y-1");
+    expect(node("component-browser.datasheet-toolbar")).not.toHaveClass("translate-y-1");
+    expect(node("component-browser.datasheet-page-number")).not.toHaveClass("translate-y-1");
+  });
+
   it("navigates by page, by the document's own outline, and zooms and rotates", async () => {
     const user = userEvent.setup();
     await open(withDocuments(makeDocument({ isPreferred: true })));

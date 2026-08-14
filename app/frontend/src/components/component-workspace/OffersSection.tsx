@@ -13,9 +13,10 @@ import { useEffect, useRef, type ReactNode } from "react";
 import type { DistributorOffer } from "../../api/dossierTypes";
 import { Text, useCopyFormatter, useText } from "../../lib/copy";
 import { formatCount, formatPrice, formatTimestamp } from "../../lib/formatValue";
+import { Icon } from "../Icon";
 import { ExternalIcon } from "../icons";
 import { Button, EmptyState } from "../primitives";
-import { SourcingSection } from "./SourcingParts";
+import { SourcingDisclosure, SourcingSection } from "./SourcingParts";
 import { useSupplyFailureText } from "./provenanceText";
 
 /**
@@ -64,11 +65,17 @@ export function OffersSection({
   return (
     <SourcingSection
       devId="component-browser.offers"
-      title={<Text id="component-browser.offers-title">Distributor Offers</Text>}
+      title={(
+        <span className="flex items-center gap-1.5">
+          <Icon id="action.enrich" className="h-3.5 w-3.5 text-t3" />
+          <Text id="component-browser.offers-title">Distributor Offers</Text>
+        </span>
+      )}
       action={
         <span className="flex items-center gap-1">
           {shown.length > 0 ? (
             <Button small data-dev-id="component-browser.offers-all" onClick={onViewAll}>
+              <Icon id="action.view" className="h-3.5 w-3.5" />
               {fullRecordLabel}
             </Button>
           ) : null}
@@ -87,7 +94,7 @@ export function OffersSection({
               "focus-visible:outline-offset-1 focus-visible:outline-focus"
             }
           >
-            {refreshing ? <Spinner /> : <RefreshGlyph />}
+            {refreshing ? <Spinner /> : <Icon id="action.refresh" className="h-3.5 w-3.5" />}
           </button>
         </span>
       }
@@ -127,6 +134,14 @@ function OfferRow({ offer }: { offer: DistributorOffer }) {
   const stamp = offer.lastCheckedAt ? formatTimestamp(offer.lastCheckedAt) : null;
   const reportedBreaks = offer.priceBreaks.filter(
     (entry): entry is { qty: number; price: number } => entry.qty !== null && entry.price !== null,
+  );
+  const hasDetails = Boolean(
+    offer.currency
+      || offer.moq !== null
+      || offer.leadTime
+      || offer.factoryLeadTime
+      || offer.lifecycle
+      || stamp,
   );
 
   return (
@@ -191,51 +206,65 @@ function OfferRow({ offer }: { offer: DistributorOffer }) {
         )}
       </div>
 
-      <dl className="mt-2 grid min-w-0 grid-cols-2 gap-x-3 gap-y-2">
-        {offer.stock !== null ? (
-          <OfferFact label={<Text id="component-browser.offer-col-stock">Stock</Text>} numeric>
-            {formatCount(offer.stock)}
-          </OfferFact>
-        ) : null}
-        {offer.unitPrice !== null ? (
-          <OfferFact label={<Text id="component-browser.offer-col-price">Unit Price</Text>} numeric emphasis>
-            {formatPrice(offer.unitPrice, offer.currency)}
-          </OfferFact>
-        ) : null}
-        {offer.currency ? (
-          <OfferFact label={<Text id="component-browser.offer-col-currency">Quote Code</Text>}>
-            {offer.currency}
-          </OfferFact>
-        ) : null}
-        {offer.moq !== null ? (
-          <OfferFact label={<Text id="component-browser.offer-col-moq">MOQ</Text>} numeric>
-            {formatCount(offer.moq)}
-          </OfferFact>
-        ) : null}
-        {offer.leadTime ? (
-          <OfferFact label={<Text id="component-browser.offer-col-lead">Lead Time</Text>}>
-            {offer.leadTime}
-          </OfferFact>
-        ) : null}
-        {offer.factoryLeadTime ? (
-          <OfferFact label={<Text id="component-browser.factory-lead-time">Manufacturer Lead Time</Text>}>
-            {offer.factoryLeadTime}
-          </OfferFact>
-        ) : null}
-        {offer.lifecycle ? (
-          <OfferFact label={<Text id="component-browser.lifecycle-state">Product Status</Text>}>
-            {offer.lifecycle}
-          </OfferFact>
-        ) : null}
-        {stamp ? (
-          <OfferFact label={<Text id="component-browser.offer-col-checked">Last Checked</Text>}>
-            <span title={stamp.title}>
-              {stamp.text}
-              {offer.staleness === "unknown" ? null : <> · <StalenessLabel staleness={offer.staleness} /></>}
-            </span>
-          </OfferFact>
-        ) : null}
-      </dl>
+      {offer.stock !== null || offer.unitPrice !== null ? (
+        <dl className="mt-2 grid min-w-0 grid-cols-2 gap-x-3 gap-y-2">
+          {offer.stock !== null ? (
+            <OfferFact label={<Text id="component-browser.offer-col-stock">Stock</Text>} numeric>
+              {formatCount(offer.stock)}
+            </OfferFact>
+          ) : null}
+          {offer.unitPrice !== null ? (
+            <OfferFact label={<Text id="component-browser.offer-col-price">Unit Price</Text>} numeric emphasis>
+              {formatPrice(offer.unitPrice, offer.currency)}
+            </OfferFact>
+          ) : null}
+        </dl>
+      ) : null}
+
+      {hasDetails ? (
+        <div className="mt-2 -mx-2 -mb-2">
+          <SourcingDisclosure
+            devId="component-browser.offer-details"
+            label={<Text id="component-browser.offer-details">Offer Details</Text>}
+          >
+            <dl className="grid min-w-0 grid-cols-2 gap-x-3 gap-y-2 px-2 pb-2 pt-1">
+              {offer.currency ? (
+                <OfferFact label={<Text id="component-browser.offer-col-currency">Quote Code</Text>}>
+                  {offer.currency}
+                </OfferFact>
+              ) : null}
+              {offer.moq !== null ? (
+                <OfferFact label={<Text id="component-browser.offer-col-moq">MOQ</Text>} numeric>
+                  {formatCount(offer.moq)}
+                </OfferFact>
+              ) : null}
+              {offer.leadTime ? (
+                <OfferFact label={<Text id="component-browser.offer-col-lead">Lead Time</Text>}>
+                  {offer.leadTime}
+                </OfferFact>
+              ) : null}
+              {offer.factoryLeadTime ? (
+                <OfferFact label={<Text id="component-browser.factory-lead-time">Manufacturer Lead Time</Text>}>
+                  {offer.factoryLeadTime}
+                </OfferFact>
+              ) : null}
+              {offer.lifecycle ? (
+                <OfferFact label={<Text id="component-browser.lifecycle-state">Product Status</Text>}>
+                  {offer.lifecycle}
+                </OfferFact>
+              ) : null}
+              {stamp ? (
+                <OfferFact label={<Text id="component-browser.offer-col-checked">Last Checked</Text>}>
+                  <span title={stamp.title}>
+                    {stamp.text}
+                    {offer.staleness === "unknown" ? null : <> · <StalenessLabel staleness={offer.staleness} /></>}
+                  </span>
+                </OfferFact>
+              ) : null}
+            </dl>
+          </SourcingDisclosure>
+        </div>
+      ) : null}
     </li>
   );
 }
@@ -297,25 +326,6 @@ function SupplyFailures({
         </li>
       ))}
     </ul>
-  );
-}
-
-/** A circular arrow: refresh, and one of the few glyphs that needs no label beside it. */
-function RefreshGlyph(): ReactNode {
-  return (
-    <svg
-      viewBox="0 0 16 16"
-      aria-hidden
-      className="h-3.5 w-3.5"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M13.5 8a5.5 5.5 0 1 1-1.9-4.2" />
-      <path d="M13.5 2v3h-3" />
-    </svg>
   );
 }
 

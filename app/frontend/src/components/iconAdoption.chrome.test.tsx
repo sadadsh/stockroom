@@ -2,17 +2,16 @@ import { render } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { Icon } from "./Icon";
 
-// Render-diff guard for the chrome + list icon adoption (Rail / SearchOverlay / PartsList). The
-// hand-written inline svgs at those call sites are now <Icon id> draws; each must still emit the
-// exact svg its source did. We canonicalise the rendered DOM (attrs sorted + names lowered, the
-// theme-var `style` attribute excluded because jsdom's CSSOM mangles var()) and compare to the
-// pre-adoption markup parsed the same way. A match proves adoption changed no icon's output.
+// Render-diff guard for registry-backed chrome and list icons (Rail / SearchOverlay / PartsList).
+// Literal fixtures lock the current owner-approved output, including later Design Studio artwork
+// promotions. We canonicalise the rendered DOM (attrs sorted + names lowered, the theme-var `style`
+// attribute excluded because jsdom's CSSOM mangles var()) and compare exact framed SVG output.
 //
 // Two nuances, both non-visual:
 //  - The shared primary preset draws every primary glyph aria-hidden (decorative), which the rail's
 //    bare svgProps glyphs did not spell out. aria-hidden is an a11y attribute, not geometry, so the
 //    primary literals below include it; every drawing attribute is otherwise byte-identical, and the
-//    geometry-equivalence assertions compare children against the raw pre-adoption bodies.
+//    geometry-equivalence assertions compare children against the approved catalogue bodies.
 //  - The two sizeless rail nav glyphs (nav.components / nav.about) intentionally moved from a
 //    parent-sized 17px box to h-full w-full, so they are asserted appearance-equivalent (same
 //    viewBox + same child geometry), not byte-identical on the class string.
@@ -49,7 +48,7 @@ function original(markup: string): Element {
   return svg;
 }
 
-// --- byte-identical cases: the adopted render must equal the pre-adoption svg exactly ------------
+// --- byte-identical cases: the registry render must equal the approved svg exactly ----------------
 // One primary rail glyph with an explicit size, the brand wordmark (asserting the `ico` token),
 // and a bespoke SearchOverlay glyph.
 const IDENTICAL: Array<{ name: string; el: React.ReactElement; svg: string }> = [
@@ -58,21 +57,14 @@ const IDENTICAL: Array<{ name: string; el: React.ReactElement; svg: string }> = 
     el: <Icon id="nav.theme" className="h-4 w-4 flex-none" />,
     svg:
       '<svg class="ico h-4 w-4 flex-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
-      '<circle cx="12" cy="12" r="4"/>' +
-      '<path d="M12 2v2"/><path d="M12 20v2"/>' +
-      '<path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/>' +
-      '<path d="M2 12h2"/><path d="M20 12h2"/>' +
-      '<path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>',
+      '<g transform="translate(0 0) scale(0.09375)" fill="currentColor" stroke="none"><path fill="currentColor" d="M235.54 150.21a104.84 104.84 0 0 1-37 52.91A104 104 0 0 1 32 120a103.1 103.1 0 0 1 20.88-62.52a104.84 104.84 0 0 1 52.91-37a8 8 0 0 1 10 10a88.08 88.08 0 0 0 109.8 109.8a8 8 0 0 1 10 10Z"/></g></svg>',
   },
   {
     name: "brand.wordmark (brand, keeps the ico token)",
     el: <Icon id="brand.wordmark" className="ico h-5 w-5 flex-none text-t1" />,
     svg:
       '<svg class="ico h-5 w-5 flex-none text-t1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
-      '<path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"/>' +
-      '<path d="M12 22V12"/>' +
-      '<polyline points="3.29 7 12 12 20.71 7"/>' +
-      '<path d="m7.5 4.27 9 5.15"/></svg>',
+      '<g transform="translate(0 2.4000000000000004) scale(0.0375)" fill="currentColor" stroke="none"><path d="M560.3 237.2c10.4 11.8 28.3 14.4 41.8 5.5 14.7-9.8 18.7-29.7 8.9-44.4l-48-72c-2.8-4.2-6.6-7.7-11.1-10.2L351.4 4.7c-19.3-10.7-42.8-10.7-62.2 0L88.8 116c-5.4 3-9.7 7.4-12.6 12.8L27.7 218.7c-12.6 23.4-3.8 52.5 19.6 65.1l33 17.7 0 53.3c0 23 12.4 44.3 32.4 55.7l176 99.7c19.6 11.1 43.5 11.1 63.1 0l176-99.7c20.1-11.4 32.4-32.6 32.4-55.7l0-117.5zm-240-9.8L170.2 144 320.3 60.6 470.4 144 320.3 227.4zm-41.5 50.2l-21.3 46.2-165.8-88.8 25.4-47.2 161.7 89.8z"/></g></svg>',
   },
   {
     name: "overlay.chevron (SearchOverlay bespoke)",
@@ -85,7 +77,7 @@ const IDENTICAL: Array<{ name: string; el: React.ReactElement; svg: string }> = 
 
 describe("chrome/list icon adoption - render-diff (byte-identical)", () => {
   for (const { name, el, svg } of IDENTICAL) {
-    it(`matches the pre-adoption svg: ${name}`, () => {
+    it(`matches the approved svg: ${name}`, () => {
       expect(canonical(rendered(el))).toBe(canonical(original(svg)));
     });
   }
@@ -106,18 +98,13 @@ const SIZELESS: Array<{ name: string; el: React.ReactElement; body: string; view
     el: <Icon id="nav.components" className="h-full w-full" />,
     viewBox: "0 0 24 24",
     body:
-      '<svg>' +
-      '<path d="M12 20v2"/><path d="M12 2v2"/><path d="M17 20v2"/><path d="M17 2v2"/>' +
-      '<path d="M2 12h2"/><path d="M2 17h2"/><path d="M2 7h2"/><path d="M20 12h2"/>' +
-      '<path d="M20 17h2"/><path d="M20 7h2"/><path d="M7 20v2"/><path d="M7 2v2"/>' +
-      '<rect x="4" y="4" width="16" height="16" rx="2"/>' +
-      '<rect x="8" y="8" width="8" height="8" rx="1"/></svg>',
+      '<svg><g transform="translate(0 0) scale(1)" fill="currentColor" stroke="none"><path fill="currentColor" d="M7.5 22q-1.45 0-2.475-1.025T4 18.5v-13q0-1.45 1.025-2.475T7.5 2H18q.825 0 1.413.587T20 4v12.525q0 .2-.162.363t-.588.362q-.35.175-.55.5t-.2.75t.2.763t.55.487t.55.413t.2.562v.25q0 .425-.288.725T19 22zm2.213-7.288Q10 14.425 10 14V5q0-.425-.288-.712T9 4t-.712.288T8 5v9q0 .425.288.713T9 15t.713-.288M7.5 20h9.325q-.15-.35-.237-.712T16.5 18.5q0-.4.075-.775t.25-.725H7.5q-.65 0-1.075.438T6 18.5q0 .65.425 1.075T7.5 20"/></g></svg>',
   },
   {
     name: "nav.about",
     el: <Icon id="nav.about" className="h-full w-full" />,
     viewBox: "0 0 24 24",
-    body: '<svg><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>',
+    body: '<svg><g transform="translate(0 0) scale(1)" fill="currentColor" stroke="none"><path fill="currentColor" d="M12.713 16.713Q13 16.425 13 16v-4q0-.425-.288-.712T12 11t-.712.288T11 12v4q0 .425.288.713T12 17t.713-.288m0-8Q13 8.425 13 8t-.288-.712T12 7t-.712.288T11 8t.288.713T12 9t.713-.288M12 22q-2.075 0-3.9-.788t-3.175-2.137T2.788 15.9T2 12t.788-3.9t2.137-3.175T8.1 2.788T12 2t3.9.788t3.175 2.137T21.213 8.1T22 12t-.788 3.9t-2.137 3.175t-3.175 2.138T12 22"/></g></svg>',
   },
 ];
 

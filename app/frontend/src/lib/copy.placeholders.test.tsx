@@ -12,6 +12,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Text, useCopyFormatter, useText } from "./copy";
 import { DevModeProvider, useDevMode } from "./devMode";
 import { ThemeProvider } from "./theme";
+import { ELEMENT_OVERRIDES } from "./element.overrides";
+import { runtimeDesignId } from "./designIdentity";
+import { applyElementOverrides } from "./applyElementOverrides";
 import {
   copyDiagnosticFor,
   resetCopyDeclarations,
@@ -31,10 +34,24 @@ beforeEach(() => {
 
 afterEach(() => {
   for (const key of Object.keys(MOCK_COPY)) delete MOCK_COPY[key];
+  for (const key of Object.keys(ELEMENT_OVERRIDES)) delete ELEMENT_OVERRIDES[key];
 });
 
 const ID = "provider.downloaded";
 const DEFAULT_TEXT = "Downloaded {count} of {total} files";
+
+it("keeps an exact label target in the normal app when committed visibility needs it", () => {
+  const designId = runtimeDesignId("copy", "component-browser.cad-missing");
+  ELEMENT_OVERRIDES[designId] = { visibility: "hidden" };
+  const { container } = render(
+    <Text id="component-browser.cad-missing">Missing</Text>,
+  );
+  applyElementOverrides(ELEMENT_OVERRIDES);
+
+  const target = container.querySelector<HTMLElement>(`[data-design-id="${designId}"]`);
+  expect(target).not.toBeNull();
+  expect(target).toHaveStyle({ visibility: "hidden" });
+});
 
 function Downloaded() {
   return (

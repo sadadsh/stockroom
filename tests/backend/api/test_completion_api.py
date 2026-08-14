@@ -645,6 +645,41 @@ def test_active_capture_can_reveal_its_retained_provider_surface(
     assert surface.shown == 1
 
 
+def test_provider_show_refuses_a_batch_without_its_own_active_route(
+    client,
+    app_ctx,
+    tmp_path,
+    monkeypatch,
+):
+    _mount_completion_authority(app_ctx, tmp_path)
+    monkeypatch.setenv("STOCKROOM_CAPTURE_DIR", str(tmp_path / "Capture State"))
+
+    class Surface:
+        shown = 0
+
+        def show_active_provider_browser(self) -> None:
+            self.shown += 1
+
+    surface = Surface()
+    monkeypatch.setattr(app_ctx, "provider_browser_surface", surface, raising=False)
+    reference = client.post(
+        "/api/library/capture/run",
+        json={
+            "part_ids": ["tps62130"],
+            "mode": "assisted",
+            "vendor": "ultralibrarian",
+        },
+    ).json()
+
+    response = client.post(
+        f"/api/library/capture/batches/{reference['workflow_batch_id']}/provider/show"
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == "This capture has no active provider page to show."
+    assert surface.shown == 0
+
+
 def test_durable_capture_projection_returns_the_retained_terminal_report(
     client,
     app_ctx,

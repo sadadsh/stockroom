@@ -42,6 +42,7 @@ import { formatCount, formatTimestamp } from "../../lib/formatValue";
 import { LayoutRuntimeScope, type RegionChromeProps } from "../../layout/LayoutRenderer";
 import { WORKSPACE_CONDITION } from "../../layout/defaultWorkspaceLayout";
 import { useWorkspaceRender } from "../../layout/workspaceRenderContext";
+import { Icon } from "../Icon";
 import { Button, StatusText } from "../primitives";
 import {
   WorkspaceColumnFrame,
@@ -53,7 +54,7 @@ import { OffersSection } from "./OffersSection";
 import { OfficialApiDataSection } from "./OfficialApiDataSection";
 import { ProvenanceHistory } from "./ProvenanceHistory";
 import { DocumentsSection, RelatedPartsSection } from "./ResourcesSection";
-import { PropertyRow, SourcingSection } from "./SourcingParts";
+import { PropertyRow, SourcingDisclosure, SourcingSection } from "./SourcingParts";
 import {
   emptySourcingSections,
   readShowEmptySections,
@@ -268,7 +269,12 @@ export function SourcingLifecyclePart() {
   return (
     <SourcingSection
       devId="component-browser.lifecycle"
-      title={<Text id="component-browser.lifecycle-title">Product Status and Stock</Text>}
+      title={(
+        <span className="flex items-center gap-1.5">
+          <Icon id="status.info" className="h-3.5 w-3.5 text-t3" />
+          <Text id="component-browser.lifecycle-title">Product Status and Stock</Text>
+        </span>
+      )}
     >
       {lifecycle ? (
         <PropertyRow label={<Text id="component-browser.lifecycle-state">Product Status</Text>}>
@@ -297,24 +303,31 @@ export function SourcingLifecyclePart() {
           </span>
         </PropertyRow>
       ) : null}
-      {supplySummary.leadTime ? (
-        <PropertyRow label={<Text id="component-browser.lead-time">Lead Time</Text>}>
-          <span className="ui-property-value">{supplySummary.leadTime}</span>
-        </PropertyRow>
-      ) : null}
-      {checkedStamp ? (
-        <PropertyRow label={<Text id="component-browser.last-checked">Last Checked</Text>}>
-          <span className="flex items-baseline gap-1.5">
-            <span className="ui-component-metadata" title={checkedStamp.title}>
-              {checkedStamp.text}
-            </span>
-            {supplySummary.staleness === "unknown" ? null : (
-              <StatusText tone={STALENESS_TONE[supplySummary.staleness]} className="flex-none">
-                <StalenessLabel staleness={supplySummary.staleness} />
-              </StatusText>
-            )}
-          </span>
-        </PropertyRow>
+      {supplySummary.leadTime || checkedStamp ? (
+        <SourcingDisclosure
+          devId="component-browser.lifecycle-details"
+          label={<Text id="component-browser.lifecycle-details">Stock Details</Text>}
+        >
+          {supplySummary.leadTime ? (
+            <PropertyRow label={<Text id="component-browser.lead-time">Lead Time</Text>}>
+              <span className="ui-property-value">{supplySummary.leadTime}</span>
+            </PropertyRow>
+          ) : null}
+          {checkedStamp ? (
+            <PropertyRow label={<Text id="component-browser.last-checked">Last Checked</Text>}>
+              <span className="flex items-baseline gap-1.5">
+                <span className="ui-component-metadata" title={checkedStamp.title}>
+                  {checkedStamp.text}
+                </span>
+                {supplySummary.staleness === "unknown" ? null : (
+                  <StatusText tone={STALENESS_TONE[supplySummary.staleness]} className="flex-none">
+                    <StalenessLabel staleness={supplySummary.staleness} />
+                  </StatusText>
+                )}
+              </span>
+            </PropertyRow>
+          ) : null}
+        </SourcingDisclosure>
       ) : null}
     </SourcingSection>
   );

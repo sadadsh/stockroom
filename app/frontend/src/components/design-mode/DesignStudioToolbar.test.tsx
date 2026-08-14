@@ -9,6 +9,7 @@ const studio = {
   activeScenarioId: null as string | null,
   appliedRevision: null as string | null,
   appliedState: "ready" as "loading" | "ready" | "applying" | "error",
+  appliedMatchesDraft: false,
   applyLocal,
 };
 
@@ -59,6 +60,7 @@ describe("DesignStudioToolbar local Commit", () => {
     studio.activeScenarioId = null;
     studio.appliedRevision = null;
     studio.appliedState = "ready";
+    studio.appliedMatchesDraft = false;
   });
 
   it("shows Draft Only before a design is explicitly committed", () => {
@@ -96,10 +98,42 @@ describe("DesignStudioToolbar local Commit", () => {
     expect(screen.queryByRole("button", { name: "Close Design Studio" })).not.toBeInTheDocument();
   });
 
-  it("shows the active machine revision after Commit", () => {
+  it("distinguishes the committed revision from later draft changes", () => {
     studio.appliedRevision = "1234567890abcdef";
-    renderToolbar();
+    studio.appliedMatchesDraft = true;
+    const { rerender } = renderToolbar();
     expect(screen.getByText("Applied · 12345678")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Committed" })).toBeDisabled();
+
+    studio.appliedMatchesDraft = false;
+    rerender(<DesignStudioToolbar
+      mode="preview"
+      onModeChange={vi.fn()}
+      presentation={false}
+      onPresentationChange={vi.fn()}
+      viewport="desktop-1366"
+      onViewportChange={vi.fn()}
+      customViewportWidth={1366}
+      onCustomViewportWidthChange={vi.fn()}
+      zoom={100}
+      onZoomChange={vi.fn()}
+      grid={false}
+      onGridChange={vi.fn()}
+      gridSize={8}
+      onGridSizeChange={vi.fn()}
+      snap
+      onSnapChange={vi.fn()}
+      onClose={vi.fn()}
+    />);
+    expect(screen.getByText("Uncommitted Changes")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Commit" })).toBeEnabled();
+  });
+
+  it("reports a failed Commit instead of leaving an old applied revision looking current", () => {
+    studio.appliedRevision = "1234567890abcdef";
+    studio.appliedState = "error";
+    renderToolbar();
+    expect(screen.getByText("Commit Failed")).toBeVisible();
   });
 
   it("never applies a fixture-backed preview", async () => {

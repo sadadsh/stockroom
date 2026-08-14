@@ -196,7 +196,8 @@ import { DEV_IDS, DEV_ID_AREAS, DEV_ID_BY_ID } from "./devIds";
 // 500 after Design Studio simplification removed four obsolete drawer/compare targets while
 // keeping the component-scoped Manage Models tab, EDA selection, modal browser, navigation,
 // and status. 501 exposes each opened component's inline offer price ladder for direct editing.
-const EXPECTED_ENTRIES = 505;
+// Missing CAD art/status and the authored datasheet page cluster replace generated identities.
+const EXPECTED_ENTRIES = 512;
 
 describe("devIds catalogue", () => {
   // The count is asserted from a single constant so bumping it is one edit, and so the test NAME can

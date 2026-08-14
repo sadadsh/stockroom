@@ -95,6 +95,7 @@ export function ManageModelsWorkspace({
   const openProvider = useCallback(
     async (providerId: string) => {
       setActivityMessage(null);
+      setDismissedCaptureKey(null);
       const needs = captureRequirementsForEdas(selectedEdas);
       setSelectionLocked(true);
       try {
@@ -110,8 +111,9 @@ export function ManageModelsWorkspace({
           );
         }
       } catch (error) {
-        setSelectionLocked(false);
         setActivityMessage(error instanceof Error ? error.message : "Could not open provider");
+      } finally {
+        setSelectionLocked(false);
       }
     },
     [capture, componentId, dossier.identity.displayName, onOpenProvider, selectedEdas],
@@ -135,11 +137,14 @@ export function ManageModelsWorkspace({
       && capture.active.routeToken
       && capture.active.url,
   );
+  const activeRouteKey = activeNativeRoute
+    ? `${componentId}:${capture!.active.workflowItemId}:${capture!.active.routeToken}`
+    : null;
   const browserOpen = Boolean(
     selectedProviderKey
       && (scenarioProviderState || (
         activeNativeRoute
-        && dismissedCaptureKey !== captureProviderKey
+        && dismissedCaptureKey !== activeRouteKey
       )),
   );
   const captureBusy = Boolean(ownsCapture && capture && captureInFlight(capture.active));
@@ -318,7 +323,21 @@ export function ManageModelsWorkspace({
               : selectedProvider.row.url
           }
           onClose={() => {
-            if (captureProviderKey) setDismissedCaptureKey(captureProviderKey);
+            if (activeRouteKey) setDismissedCaptureKey(activeRouteKey);
+            if (!activeNativeRoute || !capture) return;
+            setActivityMessage("Closing provider page...");
+            void capture.closeProvider().then(
+              () => {
+                setSelectionLocked(false);
+                setActivityMessage("Provider closed. Select another provider when ready.");
+              },
+              (error: unknown) => {
+                setDismissedCaptureKey(null);
+                setActivityMessage(
+                  error instanceof Error ? error.message : "Could not close provider",
+                );
+              },
+            );
           }}
         />
       ) : null}

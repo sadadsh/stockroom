@@ -362,6 +362,77 @@ describe("DevInspector", () => {
     expect(target.style.height).toBe("");
   });
 
+  it("abandons a lost resize before selecting another element", () => {
+    render(<Harness />);
+    on("toggle-dev");
+    on("toggle-inspect");
+    const target = screen.getByRole("button", { name: "Complete Part" });
+    Object.defineProperty(target, "offsetWidth", { configurable: true, value: 100 });
+    Object.defineProperty(target, "offsetHeight", { configurable: true, value: 40 });
+    fireEvent.click(target);
+
+    const resize = screen.getByRole("button", { name: "Resize Complete Part East" });
+    fireEvent(resize, new MouseEvent("pointerdown", { bubbles: true, clientX: 100, clientY: 20 }));
+    fireEvent(window, new MouseEvent("pointermove", { bubbles: true, clientX: 116, clientY: 20 }));
+    expect(target).toHaveStyle({ width: "120px" });
+
+    // The native release is deliberately absent. A new press must restore the old preview before
+    // capture-phase selection moves to a different target, and later pointer motion owns nothing.
+    fireEvent(screen.getByTestId("ico"), new MouseEvent("pointerdown", { bubbles: true, button: 0 }));
+    fireEvent(window, new MouseEvent("pointermove", { bubbles: true, clientX: 240, clientY: 20 }));
+
+    expect(screen.getByTestId("selected").textContent).toMatch(/^auto\.dom-svg\./);
+    expect(target.style.width).toBe("");
+    expect(screen.getByTestId("element-overrides")).toHaveTextContent("{}");
+  });
+
+  it("cancels a captured resize on pointer cancellation", () => {
+    render(<Harness />);
+    on("toggle-dev");
+    on("toggle-inspect");
+    const target = screen.getByRole("button", { name: "Complete Part" });
+    Object.defineProperty(target, "offsetWidth", { configurable: true, value: 100 });
+    Object.defineProperty(target, "offsetHeight", { configurable: true, value: 40 });
+    fireEvent.click(target);
+
+    const resize = screen.getByRole("button", { name: "Resize Complete Part Southeast" });
+    fireEvent(resize, new MouseEvent("pointerdown", { bubbles: true, clientX: 100, clientY: 40 }));
+    fireEvent(window, new MouseEvent("pointermove", { bubbles: true, clientX: 116, clientY: 56 }));
+    fireEvent(window, new MouseEvent("pointercancel", { bubbles: true, clientX: 116, clientY: 56 }));
+
+    expect(target.style.width).toBe("");
+    expect(target.style.height).toBe("");
+    expect(screen.getByTestId("element-overrides")).toHaveTextContent("{}");
+  });
+
+  it("keeps the left edge fixed when an end-aligned target is resized east", () => {
+    render(<Harness />);
+    on("toggle-dev");
+    on("toggle-inspect");
+    const target = screen.getByRole("button", { name: "Complete Part" });
+    Object.defineProperty(target, "offsetWidth", { configurable: true, value: 100 });
+    Object.defineProperty(target, "offsetHeight", { configurable: true, value: 40 });
+    vi.spyOn(target, "getBoundingClientRect").mockImplementation(() => {
+      const width = Number.parseFloat(target.style.width) || 100;
+      const leftOffset = Number.parseFloat(target.style.left) || 0;
+      const left = 300 - width + leftOffset;
+      return {
+        x: left, y: 30, left, top: 30, right: left + width, bottom: 70, width, height: 40,
+        toJSON: () => ({}),
+      };
+    });
+    fireEvent.click(target);
+
+    const resize = screen.getByRole("button", { name: "Resize Complete Part East" });
+    fireEvent(resize, new MouseEvent("pointerdown", { bubbles: true, clientX: 300, clientY: 50 }));
+    fireEvent(window, new MouseEvent("pointermove", { bubbles: true, clientX: 316, clientY: 50 }));
+    fireEvent(window, new MouseEvent("pointerup", { bubbles: true, clientX: 316, clientY: 50 }));
+
+    expect(target).toHaveStyle({ position: "relative", left: "20px", width: "120px" });
+    expect(target.getBoundingClientRect().left).toBe(200);
+    expect(target.getBoundingClientRect().right).toBe(320);
+  });
+
   it("does not write or move anything when the Move grip is only clicked", () => {
     render(<Harness />);
     on("toggle-dev");

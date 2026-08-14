@@ -70,6 +70,7 @@ export interface DesignStudioContextValue {
   promotePersonalDesign: (message: string) => Promise<PromotionResult>;
   appliedRevision: string | null;
   appliedState: "loading" | "ready" | "applying" | "error";
+  appliedMatchesDraft: boolean;
   applyLocal: () => Promise<boolean>;
   resetAppliedLocal: () => Promise<boolean>;
   resolvedCadPresentation: Record<string, CadPresentationOverride>;
@@ -441,6 +442,12 @@ function DesignStudioBridge({
     [activeScenario, devMode.theme, snapshot.document],
   );
 
+  const appliedMatchesDraft = useMemo(() => {
+    if (!appliedDocument) return false;
+    const current = withWorkingDraft(snapshot.document, devMode.draft);
+    return JSON.stringify(appliedDocument) === JSON.stringify(current);
+  }, [appliedDocument, devMode.draft, snapshot.document]);
+
   const applyLocal = useCallback(async (): Promise<boolean> => {
     if (activeScenario) return false;
     setAppliedState("applying");
@@ -584,6 +591,7 @@ function DesignStudioBridge({
       promotePersonalDesign,
       appliedRevision,
       appliedState,
+      appliedMatchesDraft,
       applyLocal,
       resetAppliedLocal,
       resolvedCadPresentation: resolved.cadPresentation,
@@ -608,6 +616,7 @@ function DesignStudioBridge({
       promotePersonalDesign,
       appliedRevision,
       appliedState,
+      appliedMatchesDraft,
       applyLocal,
       resetAppliedLocal,
       resolved.cadPresentation,

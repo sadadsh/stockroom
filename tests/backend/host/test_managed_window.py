@@ -146,6 +146,7 @@ def test_in_app_provider_surface_applies_modal_viewport_and_commands(monkeypatch
         )
         assert provider_window.move_calls == [(228, 174)]
         assert provider_window.resize_calls == [(1024, 570)]
+        assert provider_window.focus_calls == 0, "layout updates must not steal a React drag"
         app_window.x = 300
         app_window.y = 180
         assert surface.reapply_provider_viewport() is True
@@ -184,6 +185,78 @@ def test_in_app_provider_surface_applies_modal_viewport_and_commands(monkeypatch
             is False
         )
         assert provider_window.hidden_calls == 2
+
+
+def test_native_provider_placement_uses_client_origin_dpi_and_no_activation(monkeypatch) -> None:
+    import ctypes
+    from ctypes import wintypes
+
+    app = SimpleNamespace(native=SimpleNamespace(_scale=1.5))
+    provider = SimpleNamespace()
+    monkeypatch.setattr(W, "_is_windows", lambda: True)
+    monkeypatch.setattr(
+        W,
+        "_current_process_window_handle",
+        lambda window: 101 if window is app else 202,
+    )
+
+    class _User32:
+        def __init__(self) -> None:
+            self.owner_calls: list[tuple[int, int, int]] = []
+            self.position_calls: list[tuple[int, int, int, int, int, int, int]] = []
+
+        def ClientToScreen(self, hwnd, pointer) -> int:
+            assert hwnd == 101
+            point = ctypes.cast(pointer, ctypes.POINTER(wintypes.POINT)).contents
+            point.x = 150
+            point.y = 90
+            return 1
+
+        def SetWindowLongPtrW(self, hwnd, index, owner) -> int:
+            self.owner_calls.append((hwnd, index, owner))
+            return 0
+
+        def SetWindowPos(self, hwnd, after, x, y, width, height, flags) -> int:
+            self.position_calls.append((hwnd, after, x, y, width, height, flags))
+            return 1
+
+    user32 = _User32()
+    assert W._place_provider_window_over_client(
+        app,
+        provider,
+        100,
+        80,
+        900,
+        560,
+        user32=user32,
+    )
+    assert user32.owner_calls == [(202, -8, 101)]
+    assert user32.position_calls == [
+        (202, 0, 300, 210, 1350, 840, 0x0004 | 0x0010 | 0x0040)
+    ]
+
+
+def test_hidden_prelease_viewport_releases_component_identity(monkeypatch) -> None:
+    app_window = _Window("http://127.0.0.1:8123/components")
+    provider_window = _Window("about:blank#stockroom-provider-proof")
+    monkeypatch.setattr(W, "_ACTIVE_WINDOW", app_window)
+    surface = W.InAppProviderBrowserSurface(
+        "http://127.0.0.1:8123",
+        provider_window=lambda: provider_window,
+    )
+    first = {
+        "componentId": "part-1",
+        "visible": True,
+        "x": 100,
+        "y": 80,
+        "width": 900,
+        "height": 560,
+    }
+    assert surface.set_provider_viewport(first) is True
+    assert surface.set_provider_viewport(
+        {**first, "visible": False, "x": 0, "y": 0, "width": 0, "height": 0}
+    ) is True
+    assert surface.set_provider_viewport({**first, "componentId": "part-2"}) is True
 
 
 def test_in_app_provider_surface_retains_modal_viewport_until_lease_is_ready(monkeypatch) -> None:

@@ -67,10 +67,15 @@ interface GesturePreview {
   baseWidth: number;
   baseHeight: number;
   baseRotation: number;
+  renderedLeft: number;
+  renderedTop: number;
+  renderedRight: number;
+  renderedBottom: number;
 }
 
 interface Gesture {
   pointerId: number;
+  captureTarget: HTMLButtonElement;
   kind: GestureKind;
   startX: number;
   startY: number;
@@ -115,6 +120,11 @@ function snap(value: number, grid: number): number {
 function rotationOf(value: string | undefined): number {
   const match = /^rotate\((-?(?:\d+|\d*\.\d+))deg\)$/.exec(value?.trim() ?? "");
   return match ? Number(match[1]) : 0;
+}
+
+function roundedCssPixel(value: number): string {
+  const normalized = Math.round(value * 1000) / 1000;
+  return `${Object.is(normalized, -0) ? 0 : normalized}px`;
 }
 
 function rotationValue(value: number): string {
@@ -343,6 +353,21 @@ export function DevInspector() {
     }
   }, []);
 
+  const abandonGesture = useCallback(() => {
+    const gesture = gestureRef.current;
+    if (!gesture) return;
+    gestureRef.current = null;
+    restoreGesturePreview(gesture);
+    try {
+      if (gesture.captureTarget.hasPointerCapture?.(gesture.pointerId)) {
+        gesture.captureTarget.releasePointerCapture(gesture.pointerId);
+      }
+    } catch {
+      // A lost native capture already ended ownership; restoring the preview is still sufficient.
+    }
+    measureSelection();
+  }, [measureSelection, restoreGesturePreview]);
+
   useEffect(() => {
     function onPointerMove(event: PointerEvent) {
       const gesture = gestureRef.current;
@@ -385,13 +410,26 @@ export function DevInspector() {
         if (north || south) {
           element.style.height = `${Math.max(1, snap(preview.baseHeight + (south ? deltaY : -deltaY), gesture.grid))}px`;
         }
-        if (west) {
-          element.style.position = activeOverride?.position ?? "relative";
-          element.style.left = `${snap(preview.baseLeft + deltaX, gesture.grid)}px`;
+
+        // Width/height alone are not directional in flex/grid layouts: a centered or end-aligned
+        // child can grow through the opposite edge. Measure the browser's actual result, then offset
+        // only enough to keep the edge opposite the dragged handle fixed.
+        const resized = element.getBoundingClientRect();
+        if (east || west) {
+          const desiredLeft = west ? preview.renderedRight - resized.width : preview.renderedLeft;
+          const correction = (desiredLeft - resized.left) / gesture.scale;
+          if (west || Math.abs(correction) > 0.01 || activeOverride?.left) {
+            element.style.position = activeOverride?.position ?? "relative";
+            element.style.left = roundedCssPixel(preview.baseLeft + correction);
+          }
         }
-        if (north) {
-          element.style.position = activeOverride?.position ?? "relative";
-          element.style.top = `${snap(preview.baseTop + deltaY, gesture.grid)}px`;
+        if (north || south) {
+          const desiredTop = north ? preview.renderedBottom - resized.height : preview.renderedTop;
+          const correction = (desiredTop - resized.top) / gesture.scale;
+          if (north || Math.abs(correction) > 0.01 || activeOverride?.top) {
+            element.style.position = activeOverride?.position ?? "relative";
+            element.style.top = roundedCssPixel(preview.baseTop + correction);
+          }
         }
       }
       measureSelection();
@@ -400,8 +438,8 @@ export function DevInspector() {
     function finishGesture(event: PointerEvent) {
       const gesture = gestureRef.current;
       if (!gesture || event.pointerId !== gesture.pointerId) return;
+      gestureRef.current = null;
       if (!gesture.changed) {
-        gestureRef.current = null;
         measureSelection();
         return;
       }
@@ -420,27 +458,43 @@ export function DevInspector() {
         changes.set(preview.target.id, props);
       }
       restoreGesturePreview(gesture);
-      gestureRef.current = null;
       commitChanges(changes);
     }
 
-    function cancelGesture(event: KeyboardEvent) {
+    function cancelByKey(event: KeyboardEvent) {
       if (event.key !== "Escape" || !gestureRef.current) return;
       event.preventDefault();
-      restoreGesturePreview(gestureRef.current);
-      gestureRef.current = null;
-      measureSelection();
+      abandonGesture();
+    }
+    function cancelByPointer(event: PointerEvent) {
+      const gesture = gestureRef.current;
+      if (!gesture || event.pointerId !== gesture.pointerId) return;
+      abandonGesture();
+    }
+    function cancelStaleGesture() {
+      // A new press cannot belong to an older still-active pointer sequence. If the native release
+      // was lost, end the stale preview before the capture-phase inspector selects another target.
+      abandonGesture();
     }
 
     window.addEventListener("pointermove", onPointerMove);
     window.addEventListener("pointerup", finishGesture);
-    window.addEventListener("keydown", cancelGesture, true);
+    window.addEventListener("pointercancel", cancelByPointer);
+    window.addEventListener("lostpointercapture", cancelByPointer);
+    window.addEventListener("pointerdown", cancelStaleGesture, true);
+    window.addEventListener("blur", abandonGesture);
+    window.addEventListener("keydown", cancelByKey, true);
     return () => {
       window.removeEventListener("pointermove", onPointerMove);
       window.removeEventListener("pointerup", finishGesture);
-      window.removeEventListener("keydown", cancelGesture, true);
+      window.removeEventListener("pointercancel", cancelByPointer);
+      window.removeEventListener("lostpointercapture", cancelByPointer);
+      window.removeEventListener("pointerdown", cancelStaleGesture, true);
+      window.removeEventListener("blur", abandonGesture);
+      window.removeEventListener("keydown", cancelByKey, true);
+      abandonGesture();
     };
-  }, [commitChanges, measureSelection, restoreGesturePreview]);
+  }, [abandonGesture, commitChanges, measureSelection, restoreGesturePreview]);
 
   useEffect(() => {
     function cycleTarget(event: KeyboardEvent) {
@@ -474,12 +528,18 @@ export function DevInspector() {
     event.stopPropagation();
     const primary = selection[selection.length - 1];
     if (!primary) return;
+    try {
+      event.currentTarget.setPointerCapture?.(event.pointerId);
+    } catch {
+      // Global fenced listeners remain the compatibility path on older embedded browsers.
+    }
     const grid = gridFor(primary.element);
     const rect = primary.element.getBoundingClientRect();
     const width = primary.element instanceof HTMLElement ? primary.element.offsetWidth : 0;
     const scale = width > 0 && rect.width > 0 ? rect.width / width : 1;
     gestureRef.current = {
       pointerId: event.pointerId,
+      captureTarget: event.currentTarget,
       kind,
       startX: event.clientX,
       startY: event.clientY,
@@ -513,6 +573,10 @@ export function DevInspector() {
           baseWidth: px(overrides.width) || targetWidth,
           baseHeight: px(overrides.height) || targetHeight,
           baseRotation: rotationOf(overrides.transform),
+          renderedLeft: targetRect.left,
+          renderedTop: targetRect.top,
+          renderedRight: targetRect.right,
+          renderedBottom: targetRect.bottom,
         };
       }),
     };

@@ -393,6 +393,25 @@ describe("the full sourcing sheet", () => {
     expect(within(ladder).getByText("USD0.22")).toBeInTheDocument();
   });
 
+  it("uses the normalized Mouser-first order in the exhaustive record too", async () => {
+    const orderedDossier = makeDossier({
+      distributorOffers: [
+        makeOffer({ provider: "mouser", providerLabel: "Mouser", sku: "MOUSER-1" }),
+        makeOffer({ provider: "digikey", providerLabel: "DigiKey", sku: "DK-1" }),
+      ],
+      supplySummary: { offerCount: 2 },
+    });
+    const { dialog } = await openSheet(
+      orderedDossier,
+      "View Full Sourcing Record",
+      "Full Sourcing Record",
+    );
+    const labels = [...dialog.querySelectorAll<HTMLElement>(
+      '[data-dev-id="component-browser.offer"]',
+    )].map((offer) => offer.getAttribute("aria-label"));
+    expect(labels).toEqual(["Mouser MOUSER-1", "DigiKey DK-1"]);
+  });
+
   it("labels distributor relationships as unvalidated suggestions, in prose", async () => {
     const { dialog } = await openSheet(dossier, "View Full Sourcing Record", "Full Sourcing Record");
     const related = within(dialog).getByLabelText("Related Parts");

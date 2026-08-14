@@ -1872,9 +1872,15 @@ internal sealed class WebViewWindowHost : IDisposable
                     _providerSurface.Visibility = Visibility.Collapsed;
                     _webView.Visibility = Visibility.Visible;
                 }
-                else if (_providerSurface.Visibility == Visibility.Visible)
+                else
                 {
+                    // A provider-show can arrive before React has committed measurable bounds.
+                    // Publishing the first valid visible viewport is therefore the visibility
+                    // commit, not merely a geometry update for an already-visible surface.
                     _webView.Visibility = Visibility.Visible;
+                    _providerSurface.Visibility = Visibility.Visible;
+                    _tabStrip.SelectProvider();
+                    UpdateProviderChrome();
                 }
                 return;
             }

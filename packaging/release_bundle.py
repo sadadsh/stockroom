@@ -33,6 +33,7 @@ _HOST_VERSION_PATTERN = re.compile(
 )
 _REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 _CAD_THIRD_PARTY_NOTICE = Path(__file__).with_name("Third Party Notices.txt")
+_FONT_AWESOME_LICENSE = Path(__file__).with_name("Font Awesome Free License.txt")
 _ALTIUMSHARP_LICENSE = _REPOSITORY_ROOT / "vendor" / "AltiumSharp" / "LICENSE"
 
 
@@ -462,6 +463,13 @@ def build_release_bundle(
     license_path = release_root / "Support" / "Licenses" / "AltiumSharp Apache-2.0.txt"
     license_path.parent.mkdir(parents=True)
     license_path.write_bytes(license_bytes)
+    apache_license_path = release_root / "Support" / "Licenses" / "Apache-2.0.txt"
+    apache_license_path.write_bytes(license_bytes)
+    font_awesome_license_bytes = _FONT_AWESOME_LICENSE.read_bytes()
+    font_awesome_license_path = (
+        release_root / "Support" / "Licenses" / "Font Awesome Free License.txt"
+    )
+    font_awesome_license_path.write_bytes(font_awesome_license_bytes)
     # MSIX/App Installer own the native WPF host. TUF release sets own only
     # rolling worker payloads, tools, and support evidence; downloading another
     # self-contained WPF runtime could not update the already-running host.
@@ -485,6 +493,18 @@ def build_release_bundle(
             "path": "Support/Licenses/AltiumSharp Apache-2.0.txt",
             "sha256": _sha256(license_bytes),
             "size": len(license_bytes),
+        },
+        {
+            "kind": "license",
+            "path": "Support/Licenses/Apache-2.0.txt",
+            "sha256": _sha256(license_bytes),
+            "size": len(license_bytes),
+        },
+        {
+            "kind": "license",
+            "path": "Support/Licenses/Font Awesome Free License.txt",
+            "sha256": _sha256(font_awesome_license_bytes),
+            "size": len(font_awesome_license_bytes),
         },
     ]
     manifest_document = {
