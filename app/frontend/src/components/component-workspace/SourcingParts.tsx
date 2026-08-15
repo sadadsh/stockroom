@@ -14,31 +14,51 @@ import type { ReactNode } from "react";
 import { Icon } from "../Icon";
 
 /**
- * A 21px heading ROW directly above its rows, with at most one action pinned to its right.
- *
- * A RULE, not a filled band. The fill was the same treatment repeated once per section, and with
- * six sections here plus a group header per specification family it appeared about fifteen times on
- * one screen - which is most of what the owner was reading as convoluted. A desktop panel header is
- * a label and a hairline; the weight of the label and the line under it are already two signals,
- * and a third (a coloured field behind them) only competes with the data below.
+ * A quiet heading row with at most one action. Primary content can keep its rows open; secondary
+ * evidence uses the same heading as a native disclosure summary. A rule and label are enough—filled
+ * bands repeated across every category were the visual noise this surface is removing.
  */
 export function SourcingSection({
   devId,
   title,
   action,
+  collapsed = false,
   children,
 }: {
   devId: string;
   title: ReactNode;
   /** The section's own toolbar. A refresh or a "view everything" control, never a status. */
   action?: ReactNode;
+  /** Keep secondary evidence to one quiet row until somebody asks for it. */
+  collapsed?: boolean;
   children: ReactNode;
 }) {
+  const heading = (
+    <>
+      <h3 className="ui-section-title min-w-0 flex-1 truncate">{title}</h3>
+      {action ? <span className="ml-auto flex-none">{action}</span> : null}
+    </>
+  );
+  if (collapsed) {
+    return (
+      <section data-dev-id={devId} className="border-b border-line last:border-b-0">
+        <details className="group">
+          <summary className="flex min-h-[28px] cursor-pointer list-none items-center gap-2 px-2 py-1 hover:bg-[var(--c-hover)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-focus">
+            {heading}
+            <Icon
+              id="detail.chevron-right"
+              className="h-3 w-3 flex-none text-t3 transition-transform group-open:rotate-90"
+            />
+          </summary>
+          <div className="border-t border-line">{children}</div>
+        </details>
+      </section>
+    );
+  }
   return (
     <section data-dev-id={devId} className="border-b border-line last:border-b-0">
       <header className="flex min-h-[21px] items-center gap-2 border-b border-line px-2 py-0.5">
-        <h3 className="ui-section-title min-w-0 truncate">{title}</h3>
-        {action ? <span className="ml-auto flex-none">{action}</span> : null}
+        {heading}
       </header>
       <div>{children}</div>
     </section>
@@ -86,13 +106,13 @@ export function SourcingDisclosure({
 }: {
   devId: string;
   label: ReactNode;
-  icon?: string;
+  icon?: string | null;
   children: ReactNode;
 }) {
   return (
     <details data-dev-id={devId} className="group border-t border-line/60">
       <summary className="flex min-h-[24px] cursor-pointer list-none items-center gap-1.5 px-2 py-1 text-xs font-medium text-t2 hover:bg-[var(--c-hover)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-focus">
-        <Icon id={icon} className="h-3.5 w-3.5 flex-none text-t3" />
+        {icon ? <Icon id={icon} className="h-3.5 w-3.5 flex-none text-t3" /> : null}
         <span>{label}</span>
         <Icon
           id="detail.chevron-right"

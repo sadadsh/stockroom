@@ -13,11 +13,8 @@
  * part. The filename stays, one tier down, where it answers "which file is this".
  *
  * RELATED PARTS each state WHY. `Same function, different package` is information; an unexplained
- * "related" row asks the reader to work out for themselves whether it is the same die in another
- * body, a faster logic family, a reel instead of a cut tape, or a cross-sell - and those have
- * completely different consequences for a board. Every row also states that Stockroom has checked
- * nothing about electrical or mechanical equivalence, because a suggestion that reads as an
- * endorsement is how a wrong part reaches a fabricator.
+ * "related" row asks the reader to infer the risk. The equivalence warning is stated once for the
+ * whole disclosed group instead of repeated under every suggestion.
  */
 import type { DocumentView, RelatedPart } from "../../api/dossierTypes";
 import { Text, useCopyFormatter, useText } from "../../lib/copy";
@@ -25,7 +22,7 @@ import { formatTimestamp } from "../../lib/formatValue";
 import { Icon } from "../Icon";
 import { ExternalIcon, WarnIcon } from "../icons";
 import { Button, EmptyState, StatusText } from "../primitives";
-import { SourcingDisclosure, SourcingSection } from "./SourcingParts";
+import { SourcingSection } from "./SourcingParts";
 
 export function DocumentsSection({
   documents,
@@ -46,6 +43,7 @@ export function DocumentsSection({
           <Text id="component-browser.documents-title">Documents</Text>
         </span>
       )}
+      collapsed
     >
       {documents.length === 0 ? (
         <EmptyState dense id="component-browser.documents-empty">
@@ -85,26 +83,24 @@ export function DocumentsSection({
 /**
  * One document.
  *
- * The title is what the document IS; the revision and the source describe it; the retrieval
- * metadata and the filename sit behind both. Three tiers, in that order, every row.
+ * The title is what the document IS; revision and source describe it; retrieval metadata and the
+ * filename trail both. The whole Documents category is already a disclosure, so rows stay flat
+ * rather than repeating a second `Document Details` disclosure after every title.
  */
 function DocumentRow({ document, onOpen }: { document: DocumentView; onOpen: () => void }) {
   const openLabel = useCopyFormatter("component-browser.open-document", "Open {title}");
   const currentLabel = useText("component-browser.document-current", "Current");
-  const detailsLabel = useText("component-browser.document-details", "Document Details");
   const label = openLabel({ title: document.title });
   const stamp = document.retrievedAt ? formatTimestamp(document.retrievedAt) : null;
   // Revision, publisher and currency: what distinguishes this copy from another copy of the same
   // document. The type label leads because it is what the reader is scanning for.
-  const detail = [
+  const detail = [...new Set([
     document.documentTypeLabel,
     document.revision,
     document.manufacturer,
     document.sourceLabel,
     document.isCurrent ? currentLabel : "",
-  ]
-    .filter(Boolean)
-    .join(" · ");
+  ].filter(Boolean))].join(" · ");
   // Tertiary. The filename answers "which file is this", and only that.
   const filename = document.localPath.split("/").pop() ?? "";
   const hasDetails = Boolean(detail || stamp || filename);
@@ -136,20 +132,14 @@ function DocumentRow({ document, onOpen }: { document: DocumentView; onOpen: () 
         ) : null}
       </div>
       {hasDetails ? (
-        <SourcingDisclosure
-          devId="component-browser.document-details"
-          label={detailsLabel}
-          icon="detail.datasheet-link"
-        >
-          <div className="px-2 pb-2 pt-1">
-            {detail ? <p className="ui-component-metadata break-words">{detail}</p> : null}
-            {stamp || filename ? (
-              <p className="ui-component-metadata break-words" title={stamp?.title}>
-                {[stamp?.text, filename].filter(Boolean).join(" · ")}
-              </p>
-            ) : null}
-          </div>
-        </SourcingDisclosure>
+        <div data-dev-id="component-browser.document-details" className="px-2 pb-1.5">
+          {detail ? <p className="ui-component-metadata break-words">{detail}</p> : null}
+          {stamp || filename ? (
+            <p className="ui-component-metadata break-words" title={stamp?.title}>
+              {[stamp?.text, filename].filter(Boolean).join(" · ")}
+            </p>
+          ) : null}
+        </div>
       ) : null}
     </div>
   );
@@ -173,24 +163,38 @@ function DocumentStatusLabel({ document }: { document: DocumentView }) {
 }
 
 export function RelatedPartsSection({ parts }: { parts: readonly RelatedPart[] }) {
+  const notValidated = useText(
+    "component-browser.related-not-validated",
+    "These suggestions are not verified replacements. Check pinout, package, ratings, and circuit behavior.",
+  );
   return (
     <SourcingSection
       devId="component-browser.related"
       title={(
         <span className="flex items-center gap-1.5">
           <Icon id="nav.components" className="h-3.5 w-3.5 text-t3" />
-          <Text id="component-browser.related-title">Related Parts</Text>
+          <Text id="component-browser.related-title">Alternatives</Text>
         </span>
       )}
+      collapsed
     >
       {parts.length === 0 ? (
         <EmptyState dense id="component-browser.related-empty">
           No distributor has suggested a related part.
         </EmptyState>
       ) : (
-        parts.map((part) => (
-          <RelatedPartRow key={`${part.provider}:${part.relation}:${part.mpn}`} part={part} />
-        ))
+        <>
+          <p
+            data-dev-id="component-browser.related-not-validated"
+            className="ui-component-metadata flex items-start gap-1 border-b border-line/60 px-2 py-1.5 text-t3"
+          >
+            <WarnIcon className="mt-0.5 h-3 w-3 flex-none" />
+            {notValidated}
+          </p>
+          {parts.map((part) => (
+            <RelatedPartRow key={`${part.provider}:${part.relation}:${part.mpn}`} part={part} />
+          ))}
+        </>
       )}
     </SourcingSection>
   );
@@ -204,12 +208,7 @@ export function RelatedPartsSection({ parts }: { parts: readonly RelatedPart[] }
  * is always false and is always said out loud.
  */
 function RelatedPartRow({ part }: { part: RelatedPart }) {
-  const notValidated = useText(
-    "component-browser.related-not-validated",
-    "Stockroom has not checked this for equivalence",
-  );
   const openLabel = useCopyFormatter("component-browser.open-related", "Open {mpn}");
-  const detailsLabel = useText("component-browser.related-details", "Comparison Details");
   return (
     <div
       data-dev-id="component-browser.related-row"
@@ -224,13 +223,6 @@ function RelatedPartRow({ part }: { part: RelatedPart }) {
           </span>
           <span className="ui-component-metadata block break-words">
             {[part.reasonLabel, part.manufacturer, part.providerLabel].filter(Boolean).join(" · ")}
-          </span>
-          <span
-            data-dev-id="component-browser.related-not-validated"
-            className="ui-component-metadata mt-0.5 flex items-start gap-1 break-words text-t3"
-          >
-            <WarnIcon className="mt-0.5 h-3 w-3 flex-none" />
-            {notValidated}
           </span>
         </span>
         {part.url ? (
@@ -251,17 +243,14 @@ function RelatedPartRow({ part }: { part: RelatedPart }) {
         ) : null}
       </div>
       {part.evidence.length > 0 ? (
-        <SourcingDisclosure
-          devId="component-browser.related-evidence"
-          label={detailsLabel}
-          icon="status.info"
+        <p
+          data-dev-id="component-browser.related-evidence"
+          className="ui-component-metadata break-words px-2 pb-1.5"
         >
-          <p className="ui-component-metadata break-words px-2 pb-2 pt-1">
-            {part.evidence
-              .map((item) => `${item.field}: ${item.ours} → ${item.theirs}`)
-              .join(" · ")}
-          </p>
-        </SourcingDisclosure>
+          {part.evidence
+            .map((item) => `${item.field}: ${item.ours} → ${item.theirs}`)
+            .join(" · ")}
+        </p>
       ) : null}
     </div>
   );

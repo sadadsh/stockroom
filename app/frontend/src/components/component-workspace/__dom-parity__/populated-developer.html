@@ -439,8 +439,8 @@
 </header>
 <div data-workspace-scroll="sourcing" class="min-h-0 flex-1 overflow-y-auto overflow-x-hidden" data-design-id="auto.workspace-columns.0m0xc36">
 <section data-dev-id="component-browser.offers" class="border-b border-line last:border-b-0">
-<header class="flex min-h-[21px] items-center gap-2 border-b border-line px-2 py-0.5" data-design-id="auto.sourcing-parts.0x26wza">
-<h3 class="ui-section-title min-w-0 truncate" data-design-id="auto.sourcing-parts.0cq1ub8">
+<header class="flex min-h-[21px] items-center gap-2 border-b border-line px-2 py-0.5" data-design-id="auto.sourcing-parts.12dnw0o">
+<h3 class="ui-section-title min-w-0 flex-1 truncate" data-design-id="auto.sourcing-parts.19n7nud">
 <span class="flex items-center gap-1.5" data-design-id="auto.offers-section.15193ro">
 <svg class="ico h-3.5 w-3.5 text-t3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" data-design-id="auto.icon.074vuqd" data-icon-id="action.enrich">
 <path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z">
@@ -452,10 +452,10 @@
 <circle cx="4" cy="20" r="2">
 </circle>
 </svg>
-<span data-copy-id="component-browser.offers-title" data-copy-default="Distributor Offers" data-design-id="auto.copy.1pnyy0c">Distributor Offers</span>
+<span data-copy-id="component-browser.price-breaks-title" data-copy-default="Price Breaks" data-design-id="auto.copy.0etatrj">Price Breaks</span>
 </span>
 </h3>
-<span class="ml-auto flex-none" data-design-id="auto.sourcing-parts.0ka1869">
+<span class="ml-auto flex-none" data-design-id="auto.sourcing-parts.0mhbja6">
 <span class="flex items-center gap-0.5" data-design-id="auto.offers-section.12epmyt">
 <button type="button" data-dev-id="component-browser.offers-all" aria-label="View Full Sourcing Record" title="View Full Sourcing Record" class="flex h-[20px] w-[20px] flex-none items-center justify-center rounded-control text-t3 hover:bg-control-hover hover:text-t1 disabled:text-t5 disabled:hover:bg-transparent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus">
 <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-design-id="auto.icon.1h0wakp" data-icon-id="action.view">
@@ -480,7 +480,7 @@
 </span>
 </span>
 </header>
-<div data-design-id="auto.sourcing-parts.1tavmqf">
+<div data-design-id="auto.sourcing-parts.0qxwy7t">
 <ul data-dev-id="component-browser.offers-table" aria-label="Distributor offers" class="min-w-0">
 <li data-sourcing-provider="mouser" class="border-b border-line last:border-b-0" data-design-id="auto.offers-section.1xgir31">
 <div class="flex min-h-[26px] items-center gap-2 bg-row-alt/45 px-2 py-1" data-design-id="auto.offers-section.1othet0">
@@ -488,32 +488,84 @@
 <span class="ui-component-metadata flex-none tabular-nums" data-design-id="auto.offers-section.0fmwhfl">1 offer</span>
 </div>
 <ul class="divide-y divide-line/60" data-design-id="auto.offers-section.04pejv7">
-<li data-design-id="auto.offers-section.1vy1vq1">
-<details data-dev-id="component-browser.offer-row" data-offer-provider="mouser" class="group min-w-0">
-<summary aria-label="595-LM358DR, 2 price breaks" class="flex min-h-[48px] cursor-pointer list-none items-center gap-2 px-2 py-1.5 hover:bg-[var(--c-hover)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-focus" data-design-id="auto.offers-section.10dluvq">
-<span class="min-w-0 flex-1" data-design-id="auto.offers-section.060cct4">
-<span class="ui-row-primary block truncate" title="595-LM358DR" data-design-id="auto.offers-section.1tkrfmb">595-LM358DR</span>
-<span class="mt-0.5 flex min-w-0 items-baseline gap-2" data-design-id="auto.offers-section.1lixjky">
-<span class="ui-component-metadata min-w-0 truncate" data-design-id="auto.offers-section.1htxfu9">
-<span data-copy-id="component-browser.offer-col-stock" data-copy-default="Stock" data-design-id="auto.copy.1w1xklu">Stock</span> <span class="ui-numeric text-t2" data-design-id="auto.offers-section.15061wh">1,000</span>
+<li data-dev-id="component-browser.offer-row" data-offer-provider="mouser" class="min-w-0 px-2 py-1.5">
+<div class="flex min-h-[20px] items-center gap-2" data-design-id="auto.offers-section.15l731i">
+<span class="ui-row-primary min-w-0 flex-1 truncate" title="595-LM358DR" data-design-id="auto.offers-section.0vf8rn7">595-LM358DR</span>
+</div>
+<div data-dev-id="component-browser.offer-price-ladder" class="mt-1">
+<dl class="grid min-w-0 grid-cols-2 gap-x-3" aria-label="Mouser Price Breaks" data-design-id="auto.offers-section.0lu5sak">
+<div class="contents" data-design-id="auto.offers-section.16f77b6">
+<dt class="ui-property-label border-b border-line/60 py-0.5" data-design-id="auto.offers-section.1mferrm">
+<span data-copy-id="component-browser.price-col-qty" data-copy-default="Count" data-design-id="auto.copy.0gy86un">Count</span>
+</dt>
+<dd class="ui-property-label border-b border-line/60 py-0.5 text-right" data-design-id="auto.offers-section.1l8st6f">
+<span data-copy-id="component-browser.price-col-price" data-copy-default="Unit Price" data-design-id="auto.copy.00c71ba">Unit Price</span>
+</dd>
+</div>
+<div class="contents" data-design-id="auto.offers-section.1vd3fls">
+<dt class="ui-component-metadata border-b border-line/40 py-0.5" data-design-id="auto.offers-section.1bhttzy">1</dt>
+<dd class="ui-key-fact ui-numeric border-b border-line/40 py-0.5 text-right" data-design-id="auto.offers-section.0oim50t">$0.38</dd>
+</div>
+<div class="contents" data-design-id="auto.offers-section.1vd3fls">
+<dt class="ui-component-metadata border-b border-line/40 py-0.5" data-design-id="auto.offers-section.1bhttzy">100</dt>
+<dd class="ui-key-fact ui-numeric border-b border-line/40 py-0.5 text-right" data-design-id="auto.offers-section.0oim50t">$0.31</dd>
+</div>
+</dl>
+</div>
+<details data-dev-id="component-browser.offer-details" class="group border-t border-line/60">
+<summary class="flex min-h-[24px] cursor-pointer list-none items-center gap-1.5 px-2 py-1 text-xs font-medium text-t2 hover:bg-[var(--c-hover)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-focus" data-design-id="auto.sourcing-parts.1euz83b">
+<span data-design-id="auto.sourcing-parts.0m4ycrp">
+<span data-copy-id="component-browser.offer-details" data-copy-default="Details" data-design-id="auto.copy.1dx6yql">Details</span>
 </span>
-<span class="ui-component-metadata ml-auto flex-none" data-design-id="auto.offers-section.0q2llto">
-<span data-copy-id="component-browser.offer-col-price" data-copy-default="Unit Price" data-design-id="auto.copy.1do2jll">Unit Price</span> <span class="ui-key-fact ui-numeric" data-design-id="auto.offers-section.1khomeo">$0.38</span>
-</span>
-</span>
-</span>
-<svg class="h-3 w-3 flex-none text-t3 transition-transform group-open:rotate-90" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" data-design-id="auto.icon.1dj0jcf" data-icon-id="detail.chevron-right">
+<svg class="ml-auto h-3 w-3 flex-none text-t3 transition-transform group-open:rotate-90" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" data-design-id="auto.icon.1dj0jcf" data-icon-id="detail.chevron-right">
 <path d="m9 18 6-6-6-6">
 </path>
 </svg>
 </summary>
-<div data-dev-id="component-browser.offer-details" class="border-t border-line/40 bg-field/25 px-2 pb-2 pt-1.5">
-<div class="flex items-center gap-2" data-design-id="auto.offers-section.1kw0dzn">
-<h4 class="ui-property-label min-w-0 flex-1" data-design-id="auto.offers-section.1rjwnpj">
-<span data-copy-id="component-browser.price-breaks" data-copy-default="Price Breaks" data-design-id="auto.copy.1clv8hc">Price Breaks</span> <span class="font-normal text-t4" data-design-id="auto.offers-section.0lfdb1b">2</span>
-</h4>
-<a data-dev-id="component-browser.offer-listing" href="https://example.invalid/p" target="_blank" rel="noreferrer" aria-label="Open Mouser Listing" title="Open Mouser Listing" class="inline-flex flex-none rounded-control p-0.5 text-t2 hover:text-t1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus">
-<svg class="h-3.5 w-3.5" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-design-id="auto.icon.1te4cyn" data-icon-id="action.external">
+<div data-design-id="auto.sourcing-parts.1hus8i1">
+<div class="bg-field/25 px-2 pb-2 pt-1.5" data-design-id="auto.offers-section.0omw3ix">
+<dl class="grid min-w-0 grid-cols-2 gap-x-3 gap-y-1" data-design-id="auto.offers-section.1sop4za">
+<div class="min-w-0" data-design-id="auto.offers-section.0wggx2w">
+<dt class="ui-property-label break-words" data-design-id="auto.offers-section.148ooqi">
+<span data-copy-id="component-browser.offer-col-stock" data-copy-default="Stock" data-design-id="auto.copy.1w1xklu">Stock</span>
+</dt>
+<dd class="ui-property-value min-w-0 break-words ui-numeric" data-design-id="auto.offers-section.06hzc1h">1,000</dd>
+</div>
+<div class="min-w-0" data-design-id="auto.offers-section.0wggx2w">
+<dt class="ui-property-label break-words" data-design-id="auto.offers-section.148ooqi">
+<span data-copy-id="component-browser.offer-col-price" data-copy-default="Unit Price" data-design-id="auto.copy.1do2jll">Unit Price</span>
+</dt>
+<dd class="ui-property-value min-w-0 break-words ui-numeric" data-design-id="auto.offers-section.06hzc1h">$0.38</dd>
+</div>
+<div class="min-w-0" data-design-id="auto.offers-section.0wggx2w">
+<dt class="ui-property-label break-words" data-design-id="auto.offers-section.148ooqi">
+<span data-copy-id="component-browser.offer-col-currency" data-copy-default="Quote Code" data-design-id="auto.copy.0s5irm7">Quote Code</span>
+</dt>
+<dd class="ui-property-value min-w-0 break-words " data-design-id="auto.offers-section.06hzc1h">$</dd>
+</div>
+<div class="min-w-0" data-design-id="auto.offers-section.0wggx2w">
+<dt class="ui-property-label break-words" data-design-id="auto.offers-section.148ooqi">
+<span data-copy-id="component-browser.offer-col-moq" data-copy-default="MOQ" data-design-id="auto.copy.08yg8f3">MOQ</span>
+</dt>
+<dd class="ui-property-value min-w-0 break-words ui-numeric" data-design-id="auto.offers-section.06hzc1h">1</dd>
+</div>
+<div class="min-w-0" data-design-id="auto.offers-section.0wggx2w">
+<dt class="ui-property-label break-words" data-design-id="auto.offers-section.148ooqi">
+<span data-copy-id="component-browser.lifecycle-state" data-copy-default="Product Status" data-design-id="auto.copy.15ouklk">Product Status</span>
+</dt>
+<dd class="ui-property-value min-w-0 break-words " data-design-id="auto.offers-section.06hzc1h">Active</dd>
+</div>
+<div class="min-w-0" data-design-id="auto.offers-section.0wggx2w">
+<dt class="ui-property-label break-words" data-design-id="auto.offers-section.148ooqi">
+<span data-copy-id="component-browser.offer-col-checked" data-copy-default="Last Checked" data-design-id="auto.copy.0e0zo9h">Last Checked</span>
+</dt>
+<dd class="ui-property-value min-w-0 break-words " data-design-id="auto.offers-section.06hzc1h">
+<span title="Jul 31, 2026, 8:00 PM" data-design-id="auto.offers-section.0nr6ix8">2&nbsp;d ago · <span data-copy-id="component-browser.staleness-fresh" data-copy-default="Fresh" data-design-id="auto.copy.1gd3f0j">Fresh</span>
+</span>
+</dd>
+</div>
+</dl>
+<a data-dev-id="component-browser.offer-listing" href="https://example.invalid/p" target="_blank" rel="noreferrer" aria-label="Open Mouser Listing" title="Open Mouser Listing" class="mt-2 inline-flex items-center gap-1 text-xs font-medium text-t2 hover:text-t1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus">Open Mouser Listing<svg class="h-3.5 w-3.5" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-design-id="auto.icon.1te4cyn" data-icon-id="action.external">
 <g transform="translate(0 0) scale(1)" fill="currentColor" stroke="none">
 <path fill="currentColor" d="M17 3.34a10 10 0 1 1-14.995 8.984L2 12l.005-.324A10 10 0 0 1 17 3.34M15 8H9l-.117.007A1 1 0 0 0 8 9l.007.117A1 1 0 0 0 9 10h3.584l-4.291 4.293l-.083.094a1 1 0 0 0 1.497 1.32L14 11.414V15l.007.117A1 1 0 0 0 16 15V9l-.007-.117l-.029-.149l-.035-.105l-.054-.113l-.071-.111a1 1 0 0 0-.097-.112l-.09-.08l-.096-.067l-.098-.052l-.11-.044l-.112-.03l-.126-.017z">
 </path>
@@ -521,47 +573,6 @@
 </svg>
 </a>
 </div>
-<div data-dev-id="component-browser.offer-price-ladder" class="mt-1">
-<dl class="grid min-w-0 grid-cols-2 gap-x-3" data-design-id="auto.offers-section.0dbvz4o">
-<div class="flex min-w-0 items-baseline justify-between gap-2 border-b border-line/40 py-0.5" data-design-id="auto.offers-section.03e22q1">
-<dt class="ui-component-metadata min-w-0 break-words" data-design-id="auto.offers-section.0g90vld">1</dt>
-<dd class="ui-key-fact ui-numeric min-w-0 break-words text-right" data-design-id="auto.offers-section.0smgba6">$0.38</dd>
-</div>
-<div class="flex min-w-0 items-baseline justify-between gap-2 border-b border-line/40 py-0.5" data-design-id="auto.offers-section.03e22q1">
-<dt class="ui-component-metadata min-w-0 break-words" data-design-id="auto.offers-section.0g90vld">100</dt>
-<dd class="ui-key-fact ui-numeric min-w-0 break-words text-right" data-design-id="auto.offers-section.0smgba6">$0.31</dd>
-</div>
-</dl>
-</div>
-<dl class="mt-2 grid min-w-0 grid-cols-2 gap-x-3 gap-y-1 border-t border-line/40 pt-1.5" data-design-id="auto.offers-section.0duh0ik">
-<div class="min-w-0" data-design-id="auto.offers-section.1a1bb16">
-<dt class="ui-property-label break-words" data-design-id="auto.offers-section.1i12ezm">
-<span data-copy-id="component-browser.offer-col-currency" data-copy-default="Quote Code" data-design-id="auto.copy.0s5irm7">Quote Code</span>
-</dt>
-<dd class="ui-property-value min-w-0 break-words " data-design-id="auto.offers-section.079k5or">$</dd>
-</div>
-<div class="min-w-0" data-design-id="auto.offers-section.1a1bb16">
-<dt class="ui-property-label break-words" data-design-id="auto.offers-section.1i12ezm">
-<span data-copy-id="component-browser.offer-col-moq" data-copy-default="MOQ" data-design-id="auto.copy.08yg8f3">MOQ</span>
-</dt>
-<dd class="ui-property-value min-w-0 break-words ui-numeric" data-design-id="auto.offers-section.079k5or">1</dd>
-</div>
-<div class="min-w-0" data-design-id="auto.offers-section.1a1bb16">
-<dt class="ui-property-label break-words" data-design-id="auto.offers-section.1i12ezm">
-<span data-copy-id="component-browser.lifecycle-state" data-copy-default="Product Status" data-design-id="auto.copy.15ouklk">Product Status</span>
-</dt>
-<dd class="ui-property-value min-w-0 break-words " data-design-id="auto.offers-section.079k5or">Active</dd>
-</div>
-<div class="min-w-0" data-design-id="auto.offers-section.1a1bb16">
-<dt class="ui-property-label break-words" data-design-id="auto.offers-section.1i12ezm">
-<span data-copy-id="component-browser.offer-col-checked" data-copy-default="Last Checked" data-design-id="auto.copy.0e0zo9h">Last Checked</span>
-</dt>
-<dd class="ui-property-value min-w-0 break-words " data-design-id="auto.offers-section.079k5or">
-<span title="Jul 31, 2026, 8:00 PM" data-design-id="auto.offers-section.0do1f91">2&nbsp;d ago · <span data-copy-id="component-browser.staleness-fresh" data-copy-default="Fresh" data-design-id="auto.copy.1gd3f0j">Fresh</span>
-</span>
-</dd>
-</div>
-</dl>
 </div>
 </details>
 </li>
@@ -573,32 +584,80 @@
 <span class="ui-component-metadata flex-none tabular-nums" data-design-id="auto.offers-section.0fmwhfl">1 offer</span>
 </div>
 <ul class="divide-y divide-line/60" data-design-id="auto.offers-section.04pejv7">
-<li data-design-id="auto.offers-section.1vy1vq1">
-<details data-dev-id="component-browser.offer-row" data-offer-provider="digikey" class="group min-w-0">
-<summary aria-label="296-1234-1-ND, 1 price break" class="flex min-h-[48px] cursor-pointer list-none items-center gap-2 px-2 py-1.5 hover:bg-[var(--c-hover)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-focus" data-design-id="auto.offers-section.10dluvq">
-<span class="min-w-0 flex-1" data-design-id="auto.offers-section.060cct4">
-<span class="ui-row-primary block truncate" title="296-1234-1-ND" data-design-id="auto.offers-section.1tkrfmb">296-1234-1-ND</span>
-<span class="mt-0.5 flex min-w-0 items-baseline gap-2" data-design-id="auto.offers-section.1lixjky">
-<span class="ui-component-metadata min-w-0 truncate" data-design-id="auto.offers-section.1htxfu9">
-<span data-copy-id="component-browser.offer-col-stock" data-copy-default="Stock" data-design-id="auto.copy.1w1xklu">Stock</span> <span class="ui-numeric text-t2" data-design-id="auto.offers-section.15061wh">512</span>
+<li data-dev-id="component-browser.offer-row" data-offer-provider="digikey" class="min-w-0 px-2 py-1.5">
+<div class="flex min-h-[20px] items-center gap-2" data-design-id="auto.offers-section.15l731i">
+<span class="ui-row-primary min-w-0 flex-1 truncate" title="296-1234-1-ND" data-design-id="auto.offers-section.0vf8rn7">296-1234-1-ND</span>
+</div>
+<div data-dev-id="component-browser.offer-price-ladder" class="mt-1">
+<dl class="grid min-w-0 grid-cols-2 gap-x-3" aria-label="DigiKey Price Breaks" data-design-id="auto.offers-section.0lu5sak">
+<div class="contents" data-design-id="auto.offers-section.16f77b6">
+<dt class="ui-property-label border-b border-line/60 py-0.5" data-design-id="auto.offers-section.1mferrm">
+<span data-copy-id="component-browser.price-col-qty" data-copy-default="Count" data-design-id="auto.copy.0gy86un">Count</span>
+</dt>
+<dd class="ui-property-label border-b border-line/60 py-0.5 text-right" data-design-id="auto.offers-section.1l8st6f">
+<span data-copy-id="component-browser.price-col-price" data-copy-default="Unit Price" data-design-id="auto.copy.00c71ba">Unit Price</span>
+</dd>
+</div>
+<div class="contents" data-design-id="auto.offers-section.1vd3fls">
+<dt class="ui-component-metadata border-b border-line/40 py-0.5" data-design-id="auto.offers-section.1bhttzy">1</dt>
+<dd class="ui-key-fact ui-numeric border-b border-line/40 py-0.5 text-right" data-design-id="auto.offers-section.0oim50t">$0.42</dd>
+</div>
+</dl>
+</div>
+<details data-dev-id="component-browser.offer-details" class="group border-t border-line/60">
+<summary class="flex min-h-[24px] cursor-pointer list-none items-center gap-1.5 px-2 py-1 text-xs font-medium text-t2 hover:bg-[var(--c-hover)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-focus" data-design-id="auto.sourcing-parts.1euz83b">
+<span data-design-id="auto.sourcing-parts.0m4ycrp">
+<span data-copy-id="component-browser.offer-details" data-copy-default="Details" data-design-id="auto.copy.1dx6yql">Details</span>
 </span>
-<span class="ui-component-metadata ml-auto flex-none" data-design-id="auto.offers-section.0q2llto">
-<span data-copy-id="component-browser.offer-col-price" data-copy-default="Unit Price" data-design-id="auto.copy.1do2jll">Unit Price</span> <span class="ui-key-fact ui-numeric" data-design-id="auto.offers-section.1khomeo">$0.42</span>
-</span>
-</span>
-</span>
-<svg class="h-3 w-3 flex-none text-t3 transition-transform group-open:rotate-90" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" data-design-id="auto.icon.1dj0jcf" data-icon-id="detail.chevron-right">
+<svg class="ml-auto h-3 w-3 flex-none text-t3 transition-transform group-open:rotate-90" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" data-design-id="auto.icon.1dj0jcf" data-icon-id="detail.chevron-right">
 <path d="m9 18 6-6-6-6">
 </path>
 </svg>
 </summary>
-<div data-dev-id="component-browser.offer-details" class="border-t border-line/40 bg-field/25 px-2 pb-2 pt-1.5">
-<div class="flex items-center gap-2" data-design-id="auto.offers-section.1kw0dzn">
-<h4 class="ui-property-label min-w-0 flex-1" data-design-id="auto.offers-section.1rjwnpj">
-<span data-copy-id="component-browser.price-breaks" data-copy-default="Price Breaks" data-design-id="auto.copy.1clv8hc">Price Breaks</span> <span class="font-normal text-t4" data-design-id="auto.offers-section.0lfdb1b">1</span>
-</h4>
-<a data-dev-id="component-browser.offer-listing" href="https://example.invalid/p" target="_blank" rel="noreferrer" aria-label="Open DigiKey Listing" title="Open DigiKey Listing" class="inline-flex flex-none rounded-control p-0.5 text-t2 hover:text-t1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus">
-<svg class="h-3.5 w-3.5" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-design-id="auto.icon.1te4cyn" data-icon-id="action.external">
+<div data-design-id="auto.sourcing-parts.1hus8i1">
+<div class="bg-field/25 px-2 pb-2 pt-1.5" data-design-id="auto.offers-section.0omw3ix">
+<dl class="grid min-w-0 grid-cols-2 gap-x-3 gap-y-1" data-design-id="auto.offers-section.1sop4za">
+<div class="min-w-0" data-design-id="auto.offers-section.0wggx2w">
+<dt class="ui-property-label break-words" data-design-id="auto.offers-section.148ooqi">
+<span data-copy-id="component-browser.offer-col-stock" data-copy-default="Stock" data-design-id="auto.copy.1w1xklu">Stock</span>
+</dt>
+<dd class="ui-property-value min-w-0 break-words ui-numeric" data-design-id="auto.offers-section.06hzc1h">512</dd>
+</div>
+<div class="min-w-0" data-design-id="auto.offers-section.0wggx2w">
+<dt class="ui-property-label break-words" data-design-id="auto.offers-section.148ooqi">
+<span data-copy-id="component-browser.offer-col-price" data-copy-default="Unit Price" data-design-id="auto.copy.1do2jll">Unit Price</span>
+</dt>
+<dd class="ui-property-value min-w-0 break-words ui-numeric" data-design-id="auto.offers-section.06hzc1h">$0.42</dd>
+</div>
+<div class="min-w-0" data-design-id="auto.offers-section.0wggx2w">
+<dt class="ui-property-label break-words" data-design-id="auto.offers-section.148ooqi">
+<span data-copy-id="component-browser.offer-col-currency" data-copy-default="Quote Code" data-design-id="auto.copy.0s5irm7">Quote Code</span>
+</dt>
+<dd class="ui-property-value min-w-0 break-words " data-design-id="auto.offers-section.06hzc1h">$</dd>
+</div>
+<div class="min-w-0" data-design-id="auto.offers-section.0wggx2w">
+<dt class="ui-property-label break-words" data-design-id="auto.offers-section.148ooqi">
+<span data-copy-id="component-browser.offer-col-moq" data-copy-default="MOQ" data-design-id="auto.copy.08yg8f3">MOQ</span>
+</dt>
+<dd class="ui-property-value min-w-0 break-words ui-numeric" data-design-id="auto.offers-section.06hzc1h">1</dd>
+</div>
+<div class="min-w-0" data-design-id="auto.offers-section.0wggx2w">
+<dt class="ui-property-label break-words" data-design-id="auto.offers-section.148ooqi">
+<span data-copy-id="component-browser.lifecycle-state" data-copy-default="Product Status" data-design-id="auto.copy.15ouklk">Product Status</span>
+</dt>
+<dd class="ui-property-value min-w-0 break-words " data-design-id="auto.offers-section.06hzc1h">Active</dd>
+</div>
+<div class="min-w-0" data-design-id="auto.offers-section.0wggx2w">
+<dt class="ui-property-label break-words" data-design-id="auto.offers-section.148ooqi">
+<span data-copy-id="component-browser.offer-col-checked" data-copy-default="Last Checked" data-design-id="auto.copy.0e0zo9h">Last Checked</span>
+</dt>
+<dd class="ui-property-value min-w-0 break-words " data-design-id="auto.offers-section.06hzc1h">
+<span title="Jul 31, 2026, 8:00 PM" data-design-id="auto.offers-section.0nr6ix8">2&nbsp;d ago · <span data-copy-id="component-browser.staleness-fresh" data-copy-default="Fresh" data-design-id="auto.copy.1gd3f0j">Fresh</span>
+</span>
+</dd>
+</div>
+</dl>
+<a data-dev-id="component-browser.offer-listing" href="https://example.invalid/p" target="_blank" rel="noreferrer" aria-label="Open DigiKey Listing" title="Open DigiKey Listing" class="mt-2 inline-flex items-center gap-1 text-xs font-medium text-t2 hover:text-t1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus">Open DigiKey Listing<svg class="h-3.5 w-3.5" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-design-id="auto.icon.1te4cyn" data-icon-id="action.external">
 <g transform="translate(0 0) scale(1)" fill="currentColor" stroke="none">
 <path fill="currentColor" d="M17 3.34a10 10 0 1 1-14.995 8.984L2 12l.005-.324A10 10 0 0 1 17 3.34M15 8H9l-.117.007A1 1 0 0 0 8 9l.007.117A1 1 0 0 0 9 10h3.584l-4.291 4.293l-.083.094a1 1 0 0 0 1.497 1.32L14 11.414V15l.007.117A1 1 0 0 0 16 15V9l-.007-.117l-.029-.149l-.035-.105l-.054-.113l-.071-.111a1 1 0 0 0-.097-.112l-.09-.08l-.096-.067l-.098-.052l-.11-.044l-.112-.03l-.126-.017z">
 </path>
@@ -606,43 +665,6 @@
 </svg>
 </a>
 </div>
-<div data-dev-id="component-browser.offer-price-ladder" class="mt-1">
-<dl class="grid min-w-0 grid-cols-2 gap-x-3" data-design-id="auto.offers-section.0dbvz4o">
-<div class="flex min-w-0 items-baseline justify-between gap-2 border-b border-line/40 py-0.5" data-design-id="auto.offers-section.03e22q1">
-<dt class="ui-component-metadata min-w-0 break-words" data-design-id="auto.offers-section.0g90vld">1</dt>
-<dd class="ui-key-fact ui-numeric min-w-0 break-words text-right" data-design-id="auto.offers-section.0smgba6">$0.42</dd>
-</div>
-</dl>
-</div>
-<dl class="mt-2 grid min-w-0 grid-cols-2 gap-x-3 gap-y-1 border-t border-line/40 pt-1.5" data-design-id="auto.offers-section.0duh0ik">
-<div class="min-w-0" data-design-id="auto.offers-section.1a1bb16">
-<dt class="ui-property-label break-words" data-design-id="auto.offers-section.1i12ezm">
-<span data-copy-id="component-browser.offer-col-currency" data-copy-default="Quote Code" data-design-id="auto.copy.0s5irm7">Quote Code</span>
-</dt>
-<dd class="ui-property-value min-w-0 break-words " data-design-id="auto.offers-section.079k5or">$</dd>
-</div>
-<div class="min-w-0" data-design-id="auto.offers-section.1a1bb16">
-<dt class="ui-property-label break-words" data-design-id="auto.offers-section.1i12ezm">
-<span data-copy-id="component-browser.offer-col-moq" data-copy-default="MOQ" data-design-id="auto.copy.08yg8f3">MOQ</span>
-</dt>
-<dd class="ui-property-value min-w-0 break-words ui-numeric" data-design-id="auto.offers-section.079k5or">1</dd>
-</div>
-<div class="min-w-0" data-design-id="auto.offers-section.1a1bb16">
-<dt class="ui-property-label break-words" data-design-id="auto.offers-section.1i12ezm">
-<span data-copy-id="component-browser.lifecycle-state" data-copy-default="Product Status" data-design-id="auto.copy.15ouklk">Product Status</span>
-</dt>
-<dd class="ui-property-value min-w-0 break-words " data-design-id="auto.offers-section.079k5or">Active</dd>
-</div>
-<div class="min-w-0" data-design-id="auto.offers-section.1a1bb16">
-<dt class="ui-property-label break-words" data-design-id="auto.offers-section.1i12ezm">
-<span data-copy-id="component-browser.offer-col-checked" data-copy-default="Last Checked" data-design-id="auto.copy.0e0zo9h">Last Checked</span>
-</dt>
-<dd class="ui-property-value min-w-0 break-words " data-design-id="auto.offers-section.079k5or">
-<span title="Jul 31, 2026, 8:00 PM" data-design-id="auto.offers-section.0do1f91">2&nbsp;d ago · <span data-copy-id="component-browser.staleness-fresh" data-copy-default="Fresh" data-design-id="auto.copy.1gd3f0j">Fresh</span>
-</span>
-</dd>
-</div>
-</dl>
 </div>
 </details>
 </li>
@@ -652,9 +674,10 @@
 </div>
 </section>
 <section data-dev-id="component-browser.lifecycle" class="border-b border-line last:border-b-0">
-<header class="flex min-h-[21px] items-center gap-2 border-b border-line px-2 py-0.5" data-design-id="auto.sourcing-parts.0x26wza">
-<h3 class="ui-section-title min-w-0 truncate" data-design-id="auto.sourcing-parts.0cq1ub8">
-<span class="flex items-center gap-1.5" data-design-id="auto.sourcing-column.064pqb7">
+<details class="group" data-design-id="auto.sourcing-parts.0m6ke5s">
+<summary class="flex min-h-[28px] cursor-pointer list-none items-center gap-2 px-2 py-1 hover:bg-[var(--c-hover)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-focus" data-design-id="auto.sourcing-parts.0bgvj6s">
+<h3 class="ui-section-title min-w-0 flex-1 truncate" data-design-id="auto.sourcing-parts.19n7nud">
+<span class="flex items-center gap-1.5" data-design-id="auto.sourcing-column.0jwpl7f">
 <svg class="h-3.5 w-3.5 text-t3" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-design-id="auto.icon.09ge218" data-icon-id="status.info">
 <circle cx="12" cy="12" r="10">
 </circle>
@@ -663,71 +686,57 @@
 <path d="M12 8h.01">
 </path>
 </svg>
-<span data-copy-id="component-browser.lifecycle-title" data-copy-default="Product Status and Stock" data-design-id="auto.copy.0wqr1ov">Product Status and Stock</span>
+<span data-copy-id="component-browser.lifecycle-title" data-copy-default="Stock and Status" data-design-id="auto.copy.0wqr1ov">Stock and Status</span>
 </span>
 </h3>
-</header>
-<div data-design-id="auto.sourcing-parts.1tavmqf">
-<div class="flex min-h-[24px] items-baseline gap-2 px-2 py-1.5 hover:bg-[var(--c-hover)]" data-design-id="auto.sourcing-parts.0f59t60">
-<span class="ui-property-label w-[7.5rem] flex-none" data-design-id="auto.sourcing-parts.1r256o8">
+<svg class="h-3 w-3 flex-none text-t3 transition-transform group-open:rotate-90" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" data-design-id="auto.icon.1dj0jcf" data-icon-id="detail.chevron-right">
+<path d="m9 18 6-6-6-6">
+</path>
+</svg>
+</summary>
+<div class="border-t border-line" data-design-id="auto.sourcing-parts.0wltn3d">
+<div class="flex min-h-[24px] items-baseline gap-2 px-2 py-1.5 hover:bg-[var(--c-hover)]" data-design-id="auto.sourcing-parts.06qubgi">
+<span class="ui-property-label w-[7.5rem] flex-none" data-design-id="auto.sourcing-parts.14fwku6">
 <span data-copy-id="component-browser.lifecycle-state" data-copy-default="Product Status" data-design-id="auto.copy.15ouklk">Product Status</span>
 </span>
-<span class="min-w-0 flex-1" data-design-id="auto.sourcing-parts.0153dgl">
+<span class="min-w-0 flex-1" data-design-id="auto.sourcing-parts.1aejoxz">
 <span class="ui-status-text text-ok-text" data-design-id="auto.typography-roles.0zqwpcz">Active</span>
 </span>
 </div>
-<div class="flex min-h-[24px] items-baseline gap-2 px-2 py-1.5 hover:bg-[var(--c-hover)]" data-design-id="auto.sourcing-parts.0f59t60">
-<span class="ui-property-label w-[7.5rem] flex-none" data-design-id="auto.sourcing-parts.1r256o8">
+<div class="flex min-h-[24px] items-baseline gap-2 px-2 py-1.5 hover:bg-[var(--c-hover)]" data-design-id="auto.sourcing-parts.06qubgi">
+<span class="ui-property-label w-[7.5rem] flex-none" data-design-id="auto.sourcing-parts.14fwku6">
 <span data-copy-id="component-browser.manufacturer-status" data-copy-default="Manufacturer Status" data-design-id="auto.copy.1bywzyy">Manufacturer Status</span>
 </span>
-<span class="min-w-0 flex-1" data-design-id="auto.sourcing-parts.0153dgl">
+<span class="min-w-0 flex-1" data-design-id="auto.sourcing-parts.1aejoxz">
 <span data-dev-id="component-browser.manufacturer-status">
 <span class="ui-status-text text-ok-text" data-design-id="auto.typography-roles.0zqwpcz">Active</span>
 </span>
 </span>
 </div>
-<div class="flex min-h-[24px] items-baseline gap-2 px-2 py-1.5 hover:bg-[var(--c-hover)]" data-design-id="auto.sourcing-parts.0f59t60">
-<span class="ui-property-label w-[7.5rem] flex-none" data-design-id="auto.sourcing-parts.1r256o8">
+<div class="flex min-h-[24px] items-baseline gap-2 px-2 py-1.5 hover:bg-[var(--c-hover)]" data-design-id="auto.sourcing-parts.06qubgi">
+<span class="ui-property-label w-[7.5rem] flex-none" data-design-id="auto.sourcing-parts.14fwku6">
 <span data-copy-id="component-browser.total-stock" data-copy-default="Total Stock" data-design-id="auto.copy.1idxrih">Total Stock</span>
 </span>
-<span class="min-w-0 flex-1" data-design-id="auto.sourcing-parts.0153dgl">
+<span class="min-w-0 flex-1" data-design-id="auto.sourcing-parts.1aejoxz">
 <span data-dev-id="component-browser.total-stock" data-stock-known="true" class="ui-property-value ui-numeric">1,512</span>
 </span>
 </div>
-<details data-dev-id="component-browser.lifecycle-details" class="group border-t border-line/60">
-<summary class="flex min-h-[24px] cursor-pointer list-none items-center gap-1.5 px-2 py-1 text-xs font-medium text-t2 hover:bg-[var(--c-hover)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-focus" data-design-id="auto.sourcing-parts.10pj96y">
-<svg class="h-3.5 w-3.5 flex-none text-t3" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-design-id="auto.icon.09ge218" data-icon-id="status.info">
-<circle cx="12" cy="12" r="10">
-</circle>
-<path d="M12 16v-4">
-</path>
-<path d="M12 8h.01">
-</path>
-</svg>
-<span data-design-id="auto.sourcing-parts.1lg9oqk">
-<span data-copy-id="component-browser.lifecycle-details" data-copy-default="Stock Details" data-design-id="auto.copy.1b00t73">Stock Details</span>
-</span>
-<svg class="ml-auto h-3 w-3 flex-none text-t3 transition-transform group-open:rotate-90" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" data-design-id="auto.icon.1dj0jcf" data-icon-id="detail.chevron-right">
-<path d="m9 18 6-6-6-6">
-</path>
-</svg>
-</summary>
-<div data-design-id="auto.sourcing-parts.19dhx1n">
-<div class="flex min-h-[24px] items-baseline gap-2 px-2 py-1.5 hover:bg-[var(--c-hover)]" data-design-id="auto.sourcing-parts.0f59t60">
-<span class="ui-property-label w-[7.5rem] flex-none" data-design-id="auto.sourcing-parts.1r256o8">
+<div data-dev-id="component-browser.lifecycle-details">
+<div class="flex min-h-[24px] items-baseline gap-2 px-2 py-1.5 hover:bg-[var(--c-hover)]" data-design-id="auto.sourcing-parts.06qubgi">
+<span class="ui-property-label w-[7.5rem] flex-none" data-design-id="auto.sourcing-parts.14fwku6">
 <span data-copy-id="component-browser.lead-time" data-copy-default="Lead Time" data-design-id="auto.copy.0rahw5o">Lead Time</span>
 </span>
-<span class="min-w-0 flex-1" data-design-id="auto.sourcing-parts.0153dgl">
-<span class="ui-property-value" data-design-id="auto.sourcing-column.09y0owj">In stock</span>
+<span class="min-w-0 flex-1" data-design-id="auto.sourcing-parts.1aejoxz">
+<span class="ui-property-value" data-design-id="auto.sourcing-column.03xk4c5">In stock</span>
 </span>
 </div>
-<div class="flex min-h-[24px] items-baseline gap-2 px-2 py-1.5 hover:bg-[var(--c-hover)]" data-design-id="auto.sourcing-parts.0f59t60">
-<span class="ui-property-label w-[7.5rem] flex-none" data-design-id="auto.sourcing-parts.1r256o8">
+<div class="flex min-h-[24px] items-baseline gap-2 px-2 py-1.5 hover:bg-[var(--c-hover)]" data-design-id="auto.sourcing-parts.06qubgi">
+<span class="ui-property-label w-[7.5rem] flex-none" data-design-id="auto.sourcing-parts.14fwku6">
 <span data-copy-id="component-browser.last-checked" data-copy-default="Last Checked" data-design-id="auto.copy.0nc6u44">Last Checked</span>
 </span>
-<span class="min-w-0 flex-1" data-design-id="auto.sourcing-parts.0153dgl">
-<span class="flex items-baseline gap-1.5" data-design-id="auto.sourcing-column.01gk2pc">
-<span class="ui-component-metadata" title="Jul 31, 2026, 8:00 PM" data-design-id="auto.sourcing-column.1xwmfpn">2&nbsp;d ago</span>
+<span class="min-w-0 flex-1" data-design-id="auto.sourcing-parts.1aejoxz">
+<span class="flex items-baseline gap-1.5" data-design-id="auto.sourcing-column.1rkz1y8">
+<span class="ui-component-metadata" title="Jul 31, 2026, 8:00 PM" data-design-id="auto.sourcing-column.0njc5b1">2&nbsp;d ago</span>
 <span class="ui-status-text text-ok-text flex-none" data-design-id="auto.typography-roles.0zqwpcz">
 <span data-copy-id="component-browser.staleness-fresh" data-copy-default="Fresh" data-design-id="auto.copy.1gd3f0j">Fresh</span>
 </span>
@@ -735,20 +744,22 @@
 </span>
 </div>
 </div>
-</details>
 </div>
+</details>
 </section>
 <section data-dev-id="component-browser.official-api-data" class="border-b border-line last:border-b-0">
-<header class="flex min-h-[21px] items-center gap-2 border-b border-line px-2 py-0.5" data-design-id="auto.sourcing-parts.0x26wza">
-<h3 class="ui-section-title min-w-0 truncate" data-design-id="auto.sourcing-parts.0cq1ub8">
-<span data-copy-id="component-browser.official-api-data-title" data-copy-default="Official API Data" data-design-id="auto.copy.1esvzsg">Official API Data</span>
+<details class="group" data-design-id="auto.sourcing-parts.0m6ke5s">
+<summary class="flex min-h-[28px] cursor-pointer list-none items-center gap-2 px-2 py-1 hover:bg-[var(--c-hover)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-focus" data-design-id="auto.sourcing-parts.0bgvj6s">
+<h3 class="ui-section-title min-w-0 flex-1 truncate" data-design-id="auto.sourcing-parts.19n7nud">
+<span data-copy-id="component-browser.official-api-data-title" data-copy-default="Official Data" data-design-id="auto.copy.1esvzsg">Official Data</span>
 </h3>
-<span class="ml-auto flex-none" data-design-id="auto.sourcing-parts.0ka1869">
-<span class="ui-component-metadata ui-numeric" data-design-id="auto.official-api-data-section.1vets7z">2</span>
-</span>
-</header>
-<div data-design-id="auto.sourcing-parts.1tavmqf">
-<div class="border-b border-line px-2 py-1" data-design-id="auto.official-api-data-section.1d1steu">
+<svg class="h-3 w-3 flex-none text-t3 transition-transform group-open:rotate-90" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" data-design-id="auto.icon.1dj0jcf" data-icon-id="detail.chevron-right">
+<path d="m9 18 6-6-6-6">
+</path>
+</svg>
+</summary>
+<div class="border-t border-line" data-design-id="auto.sourcing-parts.0wltn3d">
+<div class="border-b border-line px-2 py-1" data-design-id="auto.official-api-data-section.0cbnukt">
 <input type="search" data-dev-id="component-browser.official-api-search" aria-label="Search official API data" placeholder="Search official API data…" class="ui-property-value h-[22px] w-full rounded-control border border-line bg-field px-1.5 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-focus" value="">
 </div>
 <details data-dev-id="component-browser.official-api-provider" data-provider="digikey" class="border-b border-line/70 last:border-b-0">
@@ -766,11 +777,13 @@
 </summary>
 </details>
 </div>
+</details>
 </section>
 <section data-dev-id="component-browser.documents" class="border-b border-line last:border-b-0">
-<header class="flex min-h-[21px] items-center gap-2 border-b border-line px-2 py-0.5" data-design-id="auto.sourcing-parts.0x26wza">
-<h3 class="ui-section-title min-w-0 truncate" data-design-id="auto.sourcing-parts.0cq1ub8">
-<span class="flex items-center gap-1.5" data-design-id="auto.resources-section.0fz8gm1">
+<details class="group" data-design-id="auto.sourcing-parts.0m6ke5s">
+<summary class="flex min-h-[28px] cursor-pointer list-none items-center gap-2 px-2 py-1 hover:bg-[var(--c-hover)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-focus" data-design-id="auto.sourcing-parts.0bgvj6s">
+<h3 class="ui-section-title min-w-0 flex-1 truncate" data-design-id="auto.sourcing-parts.19n7nud">
+<span class="flex items-center gap-1.5" data-design-id="auto.resources-section.17yumrm">
 <svg class="h-3.5 w-3.5 text-t3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-design-id="auto.icon.1ujrqzz" data-icon-id="detail.datasheet-link">
 <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z">
 </path>
@@ -784,14 +797,18 @@
 <span data-copy-id="component-browser.documents-title" data-copy-default="Documents" data-design-id="auto.copy.1gvquv5">Documents</span>
 </span>
 </h3>
-</header>
-<div data-design-id="auto.sourcing-parts.1tavmqf">
+<svg class="h-3 w-3 flex-none text-t3 transition-transform group-open:rotate-90" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" data-design-id="auto.icon.1dj0jcf" data-icon-id="detail.chevron-right">
+<path d="m9 18 6-6-6-6">
+</path>
+</svg>
+</summary>
+<div class="border-t border-line" data-design-id="auto.sourcing-parts.0wltn3d">
 <p data-dev-id="component-browser.preferred-datasheet-reason" class="ui-component-metadata px-2 py-1">
 <span data-copy-id="component-browser.preferred-datasheet-reason" data-copy-default="Opening the {reason}" data-design-id="auto.copy.1krqc1m">Opening the official manufacturer PDF URL</span>
 </p>
 <div data-dev-id="component-browser.document-row" data-document-type="datasheet" data-document-preferred="true" class="border-b border-line/60 last:border-b-0">
-<div class="flex min-h-[28px] items-start gap-2 px-2 py-1" data-design-id="auto.resources-section.0ak7iza">
-<span class="ui-row-secondary min-w-0 flex-1 break-words" title="Datasheet" data-design-id="auto.resources-section.1614dge">Datasheet</span>
+<div class="flex min-h-[28px] items-start gap-2 px-2 py-1" data-design-id="auto.resources-section.0ml9xu2">
+<span class="ui-row-secondary min-w-0 flex-1 break-words" title="Datasheet" data-design-id="auto.resources-section.0157agi">Datasheet</span>
 <span class="ui-status-text text-t3 flex-none" data-design-id="auto.typography-roles.0zqwpcz">
 <span data-copy-id="component-browser.document-stored" data-copy-default="Stored" data-design-id="auto.copy.0fniz07">Stored</span>
 </span>
@@ -805,35 +822,14 @@
 <span data-copy-id="component-browser.document-open" data-copy-default="Open" data-design-id="auto.copy.0xf3ru8">Open</span>
 </button>
 </div>
-<details data-dev-id="component-browser.document-details" class="group border-t border-line/60">
-<summary class="flex min-h-[24px] cursor-pointer list-none items-center gap-1.5 px-2 py-1 text-xs font-medium text-t2 hover:bg-[var(--c-hover)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-focus" data-design-id="auto.sourcing-parts.10pj96y">
-<svg class="h-3.5 w-3.5 flex-none text-t3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-design-id="auto.icon.1ujrqzz" data-icon-id="detail.datasheet-link">
-<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z">
-</path>
-<path d="M14 2v5h6">
-</path>
-<path d="M8 13h8">
-</path>
-<path d="M8 17h5">
-</path>
-</svg>
-<span data-design-id="auto.sourcing-parts.1lg9oqk">Document Details</span>
-<svg class="ml-auto h-3 w-3 flex-none text-t3 transition-transform group-open:rotate-90" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" data-design-id="auto.icon.1dj0jcf" data-icon-id="detail.chevron-right">
-<path d="m9 18 6-6-6-6">
-</path>
-</svg>
-</summary>
-<div data-design-id="auto.sourcing-parts.19dhx1n">
-<div class="px-2 pb-2 pt-1" data-design-id="auto.resources-section.16l9num">
-<p class="ui-component-metadata break-words" data-design-id="auto.resources-section.0g8wx27">Datasheet · Texas Instruments · Datasheet · Current</p>
-<p class="ui-component-metadata break-words" title="Jul 31, 2026, 8:00 PM" data-design-id="auto.resources-section.0qpa634">2&nbsp;d ago · lm358.pdf</p>
+<div data-dev-id="component-browser.document-details" class="px-2 pb-1.5">
+<p class="ui-component-metadata break-words" data-design-id="auto.resources-section.04ujp6n">Datasheet · Texas Instruments · Current</p>
+<p class="ui-component-metadata break-words" title="Jul 31, 2026, 8:00 PM" data-design-id="auto.resources-section.1l5ixis">2&nbsp;d ago · lm358.pdf</p>
 </div>
-</div>
-</details>
 </div>
 <div data-dev-id="component-browser.document-row" data-document-type="application_note" data-document-preferred="false" class="border-b border-line/60 last:border-b-0">
-<div class="flex min-h-[28px] items-start gap-2 px-2 py-1" data-design-id="auto.resources-section.0ak7iza">
-<span class="ui-row-secondary min-w-0 flex-1 break-words" title="Single-Supply Operation" data-design-id="auto.resources-section.1614dge">Single-Supply Operation</span>
+<div class="flex min-h-[28px] items-start gap-2 px-2 py-1" data-design-id="auto.resources-section.0ml9xu2">
+<span class="ui-row-secondary min-w-0 flex-1 break-words" title="Single-Supply Operation" data-design-id="auto.resources-section.0157agi">Single-Supply Operation</span>
 <span class="ui-status-text text-t3 flex-none" data-design-id="auto.typography-roles.0zqwpcz">
 <span data-copy-id="component-browser.document-referenced" data-copy-default="Referenced" data-design-id="auto.copy.1kgknir">Referenced</span>
 </span>
@@ -847,55 +843,35 @@
 <span data-copy-id="component-browser.document-open" data-copy-default="Open" data-design-id="auto.copy.0xf3ru8">Open</span>
 </button>
 </div>
-<details data-dev-id="component-browser.document-details" class="group border-t border-line/60">
-<summary class="flex min-h-[24px] cursor-pointer list-none items-center gap-1.5 px-2 py-1 text-xs font-medium text-t2 hover:bg-[var(--c-hover)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-focus" data-design-id="auto.sourcing-parts.10pj96y">
-<svg class="h-3.5 w-3.5 flex-none text-t3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-design-id="auto.icon.1ujrqzz" data-icon-id="detail.datasheet-link">
-<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z">
-</path>
-<path d="M14 2v5h6">
-</path>
-<path d="M8 13h8">
-</path>
-<path d="M8 17h5">
-</path>
-</svg>
-<span data-design-id="auto.sourcing-parts.1lg9oqk">Document Details</span>
-<svg class="ml-auto h-3 w-3 flex-none text-t3 transition-transform group-open:rotate-90" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" data-design-id="auto.icon.1dj0jcf" data-icon-id="detail.chevron-right">
-<path d="m9 18 6-6-6-6">
-</path>
-</svg>
-</summary>
-<div data-design-id="auto.sourcing-parts.19dhx1n">
-<div class="px-2 pb-2 pt-1" data-design-id="auto.resources-section.16l9num">
-<p class="ui-component-metadata break-words" data-design-id="auto.resources-section.0g8wx27">Application Note · Texas Instruments · Datasheet · Current</p>
-<p class="ui-component-metadata break-words" title="Jul 31, 2026, 8:00 PM" data-design-id="auto.resources-section.0qpa634">2&nbsp;d ago</p>
+<div data-dev-id="component-browser.document-details" class="px-2 pb-1.5">
+<p class="ui-component-metadata break-words" data-design-id="auto.resources-section.04ujp6n">Application Note · Texas Instruments · Datasheet · Current</p>
+<p class="ui-component-metadata break-words" title="Jul 31, 2026, 8:00 PM" data-design-id="auto.resources-section.1l5ixis">2&nbsp;d ago</p>
+</div>
 </div>
 </div>
 </details>
-</div>
-</div>
 </section>
 <section data-dev-id="component-browser.related" class="border-b border-line last:border-b-0">
-<header class="flex min-h-[21px] items-center gap-2 border-b border-line px-2 py-0.5" data-design-id="auto.sourcing-parts.0x26wza">
-<h3 class="ui-section-title min-w-0 truncate" data-design-id="auto.sourcing-parts.0cq1ub8">
-<span class="flex items-center gap-1.5" data-design-id="auto.resources-section.1uwyh2o">
+<details class="group" data-design-id="auto.sourcing-parts.0m6ke5s">
+<summary class="flex min-h-[28px] cursor-pointer list-none items-center gap-2 px-2 py-1 hover:bg-[var(--c-hover)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-focus" data-design-id="auto.sourcing-parts.0bgvj6s">
+<h3 class="ui-section-title min-w-0 flex-1 truncate" data-design-id="auto.sourcing-parts.19n7nud">
+<span class="flex items-center gap-1.5" data-design-id="auto.resources-section.08t5yar">
 <svg class="ico h-3.5 w-3.5 text-t3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" data-design-id="auto.icon.0i5w1kx" data-icon-id="nav.components">
 <g transform="translate(0 0) scale(1)" fill="currentColor" stroke="none">
 <path fill="currentColor" d="M7.5 22q-1.45 0-2.475-1.025T4 18.5v-13q0-1.45 1.025-2.475T7.5 2H18q.825 0 1.413.587T20 4v12.525q0 .2-.162.363t-.588.362q-.35.175-.55.5t-.2.75t.2.763t.55.487t.55.413t.2.562v.25q0 .425-.288.725T19 22zm2.213-7.288Q10 14.425 10 14V5q0-.425-.288-.712T9 4t-.712.288T8 5v9q0 .425.288.713T9 15t.713-.288M7.5 20h9.325q-.15-.35-.237-.712T16.5 18.5q0-.4.075-.775t.25-.725H7.5q-.65 0-1.075.438T6 18.5q0 .65.425 1.075T7.5 20">
 </path>
 </g>
 </svg>
-<span data-copy-id="component-browser.related-title" data-copy-default="Related Parts" data-design-id="auto.copy.0agt0b4">Related Parts</span>
+<span data-copy-id="component-browser.related-title" data-copy-default="Alternatives" data-design-id="auto.copy.0agt0b4">Alternatives</span>
 </span>
 </h3>
-</header>
-<div data-design-id="auto.sourcing-parts.1tavmqf">
-<div data-dev-id="component-browser.related-row" data-related-reason="substitution" data-related-validated="false" class="border-b border-line/60 last:border-b-0">
-<div class="flex items-start gap-2 px-2 py-1" data-design-id="auto.resources-section.0mnqw5g">
-<span class="min-w-0 flex-1" data-design-id="auto.resources-section.1ehd0yg">
-<span class="ui-row-primary block truncate" title="LM358ADR" data-design-id="auto.resources-section.047uc4q">LM358ADR</span>
-<span class="ui-component-metadata block break-words" data-design-id="auto.resources-section.1qhnb31">Offered as a substitution · Texas Instruments · DigiKey</span>
-<span data-dev-id="component-browser.related-not-validated" class="ui-component-metadata mt-0.5 flex items-start gap-1 break-words text-t3">
+<svg class="h-3 w-3 flex-none text-t3 transition-transform group-open:rotate-90" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" data-design-id="auto.icon.1dj0jcf" data-icon-id="detail.chevron-right">
+<path d="m9 18 6-6-6-6">
+</path>
+</svg>
+</summary>
+<div class="border-t border-line" data-design-id="auto.sourcing-parts.0wltn3d">
+<p data-dev-id="component-browser.related-not-validated" class="ui-component-metadata flex items-start gap-1 border-b border-line/60 px-2 py-1.5 text-t3">
 <svg class="mt-0.5 h-3 w-3 flex-none" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-design-id="auto.icon.1nr45q4" data-icon-id="status.warn">
 <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3">
 </path>
@@ -903,9 +879,14 @@
 </path>
 <path d="M12 17h.01">
 </path>
-</svg>Stockroom has not checked this for equivalence</span>
+</svg>These suggestions are not verified replacements. Check pinout, package, ratings, and circuit behavior.</p>
+<div data-dev-id="component-browser.related-row" data-related-reason="substitution" data-related-validated="false" class="border-b border-line/60 last:border-b-0">
+<div class="flex items-start gap-2 px-2 py-1" data-design-id="auto.resources-section.0c165ww">
+<span class="min-w-0 flex-1" data-design-id="auto.resources-section.0a4wu1f">
+<span class="ui-row-primary block truncate" title="LM358ADR" data-design-id="auto.resources-section.11tllw9">LM358ADR</span>
+<span class="ui-component-metadata block break-words" data-design-id="auto.resources-section.0t06vh8">Offered as a substitution · Texas Instruments · DigiKey</span>
 </span>
-<a href="https://example.invalid/lm358adr" target="_blank" rel="noreferrer" aria-label="Open LM358ADR" title="Open LM358ADR" class="inline-flex flex-none items-center rounded-control p-0.5 text-t2 transition-colors hover:text-t1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus" data-design-id="auto.resources-section.168ee17">
+<a href="https://example.invalid/lm358adr" target="_blank" rel="noreferrer" aria-label="Open LM358ADR" title="Open LM358ADR" class="inline-flex flex-none items-center rounded-control p-0.5 text-t2 transition-colors hover:text-t1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus" data-design-id="auto.resources-section.0bs3m8y">
 <svg class="h-3.5 w-3.5" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-design-id="auto.icon.1te4cyn" data-icon-id="action.external">
 <g transform="translate(0 0) scale(1)" fill="currentColor" stroke="none">
 <path fill="currentColor" d="M17 3.34a10 10 0 1 1-14.995 8.984L2 12l.005-.324A10 10 0 0 1 17 3.34M15 8H9l-.117.007A1 1 0 0 0 8 9l.007.117A1 1 0 0 0 9 10h3.584l-4.291 4.293l-.083.094a1 1 0 0 0 1.497 1.32L14 11.414V15l.007.117A1 1 0 0 0 16 15V9l-.007-.117l-.029-.149l-.035-.105l-.054-.113l-.071-.111a1 1 0 0 0-.097-.112l-.09-.08l-.096-.067l-.098-.052l-.11-.044l-.112-.03l-.126-.017z">
@@ -916,68 +897,74 @@
 </div>
 </div>
 </div>
+</details>
 </section>
 <section data-dev-id="component-browser.provenance" class="border-b border-line last:border-b-0">
-<header class="flex min-h-[21px] items-center gap-2 border-b border-line px-2 py-0.5" data-design-id="auto.sourcing-parts.0x26wza">
-<h3 class="ui-section-title min-w-0 truncate" data-design-id="auto.sourcing-parts.0cq1ub8">
-<span data-copy-id="component-browser.provenance-title" data-copy-default="Data Provenance and Timeline" data-design-id="auto.copy.0t40k8o">Data Provenance and Timeline</span>
+<details class="group" data-design-id="auto.sourcing-parts.0m6ke5s">
+<summary class="flex min-h-[28px] cursor-pointer list-none items-center gap-2 px-2 py-1 hover:bg-[var(--c-hover)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-focus" data-design-id="auto.sourcing-parts.0bgvj6s">
+<h3 class="ui-section-title min-w-0 flex-1 truncate" data-design-id="auto.sourcing-parts.19n7nud">
+<span data-copy-id="component-browser.provenance-title" data-copy-default="Sources and Timeline" data-design-id="auto.copy.0t40k8o">Sources and Timeline</span>
 </h3>
-</header>
-<div data-design-id="auto.sourcing-parts.1tavmqf">
+<svg class="h-3 w-3 flex-none text-t3 transition-transform group-open:rotate-90" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" data-design-id="auto.icon.1dj0jcf" data-icon-id="detail.chevron-right">
+<path d="m9 18 6-6-6-6">
+</path>
+</svg>
+</summary>
+<div class="border-t border-line" data-design-id="auto.sourcing-parts.0wltn3d">
 <section data-dev-id="component-browser.provenance-sources" class="border-b border-line/60 last:border-b-0">
-<header class="flex min-h-[20px] items-baseline gap-2 px-2 pt-1" data-design-id="auto.sourcing-parts.1llh683">
-<h4 class="ui-property-label min-w-0 truncate" data-design-id="auto.sourcing-parts.1a7onl4">
+<header class="flex min-h-[20px] items-baseline gap-2 px-2 pt-1" data-design-id="auto.sourcing-parts.0l7o4xt">
+<h4 class="ui-property-label min-w-0 truncate" data-design-id="auto.sourcing-parts.0s4j3hi">
 <span data-copy-id="component-browser.sources-title" data-copy-default="Data Sources" data-design-id="auto.copy.1e98wvx">Data Sources</span>
 </h4>
-<span class="ui-component-metadata flex-none" data-design-id="auto.sourcing-parts.1w0uux7">2</span>
+<span class="ui-component-metadata flex-none" data-design-id="auto.sourcing-parts.1ry6xjl">2</span>
 </header>
-<div data-design-id="auto.sourcing-parts.0lhc3b2">
-<div class="overflow-x-auto" data-design-id="auto.provenance-history.1vwt4bm">
-<table class="w-full border-collapse" aria-label="Data sources" data-design-id="auto.provenance-history.092986k">
-<thead data-design-id="auto.provenance-history.06kqufu">
-<tr class="border-b border-line-dark [&amp;>th]:border-r [&amp;>th]:border-line/50 [&amp;>th:last-child]:border-r-0" data-design-id="auto.provenance-history.1yo3yc3">
-<th scope="col" class="ui-table-header px-2 py-1 text-left" data-design-id="auto.provenance-history.07iizok">
+<div data-design-id="auto.sourcing-parts.01xscn8">
+<div class="overflow-x-auto" data-design-id="auto.provenance-history.0w06ki5">
+<table class="w-full border-collapse" aria-label="Data sources" data-design-id="auto.provenance-history.16f7cjl">
+<thead data-design-id="auto.provenance-history.0u5pj2n">
+<tr class="border-b border-line-dark [&amp;>th]:border-r [&amp;>th]:border-line/50 [&amp;>th:last-child]:border-r-0" data-design-id="auto.provenance-history.1ng1e94">
+<th scope="col" class="ui-table-header px-2 py-1 text-left" data-design-id="auto.provenance-history.0shiy29">
 <span data-copy-id="component-browser.source-col-source" data-copy-default="Source" data-design-id="auto.copy.0w4230s">Source</span>
 </th>
-<th scope="col" class="ui-table-header px-2 py-1 text-right" data-design-id="auto.provenance-history.1fikqo7">
+<th scope="col" class="ui-table-header px-2 py-1 text-right" data-design-id="auto.provenance-history.0kgk3tt">
 <span data-copy-id="component-browser.source-col-fields" data-copy-default="Fields Used" data-design-id="auto.copy.0azv6xk">Fields Used</span>
 </th>
-<th scope="col" class="ui-table-header px-2 py-1 text-left" data-design-id="auto.provenance-history.0wqcadn">
+<th scope="col" class="ui-table-header px-2 py-1 text-left" data-design-id="auto.provenance-history.0zvd6qe">
 <span data-copy-id="component-browser.source-col-retrieved" data-copy-default="Retrieved" data-design-id="auto.copy.0i6hdvf">Retrieved</span>
 </th>
-<th scope="col" class="ui-table-header px-2 py-1 text-left" data-design-id="auto.provenance-history.09z28m0">
+<th scope="col" class="ui-table-header px-2 py-1 text-left" data-design-id="auto.provenance-history.134eau7">
 <span data-copy-id="component-browser.source-col-state" data-copy-default="State" data-design-id="auto.copy.1j8u3ky">State</span>
 </th>
 </tr>
 </thead>
-<tbody data-design-id="auto.provenance-history.06xiapi">
+<tbody data-design-id="auto.provenance-history.13e49jf">
 <tr data-dev-id="component-browser.source-state" class="border-b border-line/60 last:border-b-0 even:bg-row-alt [&amp;>td]:border-r [&amp;>td]:border-line/50 [&amp;>td:last-child]:border-r-0">
-<td class="px-2 py-1 align-baseline" data-design-id="auto.provenance-history.04jtobr">
-<span class="ui-row-secondary block truncate" data-design-id="auto.provenance-history.07aq1fq">DigiKey</span>
+<td class="px-2 py-1 align-baseline" data-design-id="auto.provenance-history.1dtk9fg">
+<span class="ui-row-secondary block truncate" data-design-id="auto.provenance-history.0mm2d83">DigiKey</span>
 </td>
-<td class="px-2 py-1 align-baseline" data-design-id="auto.provenance-history.030h9xu">
-<span class="ui-property-value ui-numeric block" data-design-id="auto.provenance-history.0jnxgt1">1</span>
+<td class="px-2 py-1 align-baseline" data-design-id="auto.provenance-history.17w6fmr">
+<span class="ui-property-value ui-numeric block" data-design-id="auto.provenance-history.12n3rpm">1</span>
 </td>
-<td class="px-2 py-1 align-baseline" data-design-id="auto.provenance-history.1ryoi7z">
-<span class="ui-component-metadata block truncate" title="Jul 31, 2026, 8:00 PM" data-design-id="auto.provenance-history.1hagwqt">2&nbsp;d ago</span>
+<td class="px-2 py-1 align-baseline" data-design-id="auto.provenance-history.1xw7xyb">
+<span class="ui-component-metadata block truncate" title="Jul 31, 2026, 8:00 PM" data-design-id="auto.provenance-history.0bdxaa0">2&nbsp;d ago</span>
 </td>
-<td class="px-2 py-1 align-baseline" data-design-id="auto.provenance-history.04shprw">
+<td class="px-2 py-1 align-baseline" data-design-id="auto.provenance-history.0vn0va3">
 <span class="ui-status-text text-ok-text" data-design-id="auto.typography-roles.0zqwpcz">
 <span data-copy-id="component-browser.source-supplied" data-copy-default="Supplied" data-design-id="auto.copy.1uyk63q">Supplied</span>
 </span>
 </td>
 </tr>
 <tr data-dev-id="component-browser.source-state" class="border-b border-line/60 last:border-b-0 even:bg-row-alt [&amp;>td]:border-r [&amp;>td]:border-line/50 [&amp;>td:last-child]:border-r-0">
-<td class="px-2 py-1 align-baseline" data-design-id="auto.provenance-history.04jtobr">
-<span class="ui-row-secondary block truncate" data-design-id="auto.provenance-history.07aq1fq">Mouser</span>
+<td class="px-2 py-1 align-baseline" data-design-id="auto.provenance-history.1dtk9fg">
+<span class="ui-row-secondary block truncate" data-design-id="auto.provenance-history.0mm2d83">Mouser</span>
 </td>
-<td class="px-2 py-1 align-baseline" data-design-id="auto.provenance-history.030h9xu">
-<span class="ui-property-value ui-numeric block" data-design-id="auto.provenance-history.0jnxgt1">1</span>
+<td class="px-2 py-1 align-baseline" data-design-id="auto.provenance-history.17w6fmr">
+<span class="ui-property-value ui-numeric block" data-design-id="auto.provenance-history.12n3rpm">1</span>
 </td>
-<td class="px-2 py-1 align-baseline" data-design-id="auto.provenance-history.1ryoi7z">
-<span class="ui-component-metadata block truncate" title="Jul 31, 2026, 8:00 PM" data-design-id="auto.provenance-history.1hagwqt">2&nbsp;d ago</span>
+<td class="px-2 py-1 align-baseline" data-design-id="auto.provenance-history.1xw7xyb">
+<span class="ui-component-metadata block truncate" title="Jul 31, 2026, 8:00 PM" data-design-id="auto.provenance-history.0bdxaa0">2&nbsp;d ago</span>
 </td>
-<td class="px-2 py-1 align-baseline" data-design-id="auto.provenance-history.04shprw">
+<td class="px-2 py-1 align-baseline" data-design-id="auto.provenance-history.0vn0va3">
 <span class="ui-status-text text-ok-text" data-design-id="auto.typography-roles.0zqwpcz">
 <span data-copy-id="component-browser.source-supplied" data-copy-default="Supplied" data-design-id="auto.copy.1uyk63q">Supplied</span>
 </span>
@@ -989,120 +976,121 @@
 </div>
 </section>
 <section data-dev-id="component-browser.provenance-conflicts" class="border-b border-line/60 last:border-b-0">
-<header class="flex min-h-[20px] items-baseline gap-2 px-2 pt-1" data-design-id="auto.sourcing-parts.1llh683">
-<h4 class="ui-property-label min-w-0 truncate" data-design-id="auto.sourcing-parts.1a7onl4">
+<header class="flex min-h-[20px] items-baseline gap-2 px-2 pt-1" data-design-id="auto.sourcing-parts.0l7o4xt">
+<h4 class="ui-property-label min-w-0 truncate" data-design-id="auto.sourcing-parts.0s4j3hi">
 <span data-copy-id="component-browser.conflicts-title" data-copy-default="Field Conflicts" data-design-id="auto.copy.1dvrq08">Field Conflicts</span>
 </h4>
-<span class="ui-component-metadata flex-none" data-design-id="auto.sourcing-parts.1w0uux7">1</span>
+<span class="ui-component-metadata flex-none" data-design-id="auto.sourcing-parts.1ry6xjl">1</span>
 </header>
-<div data-design-id="auto.sourcing-parts.0lhc3b2">
+<div data-design-id="auto.sourcing-parts.01xscn8">
 <div data-dev-id="component-browser.conflict-row" data-conflict-field="tolerance" class="border-b border-line/60 px-2 py-1 last:border-b-0">
-<span class="ui-row-secondary block truncate" data-design-id="auto.provenance-history.0q2eh73">Tolerance</span>
-<ul class="flex flex-col" data-design-id="auto.provenance-history.0j13omd">
-<li class="flex items-baseline gap-1.5" data-design-id="auto.provenance-history.1lf8nua">
-<span class="ui-property-value min-w-0 flex-1 break-words" data-design-id="auto.provenance-history.0hu8b19">1 %</span>
-<span class="ui-component-metadata flex-none truncate" data-design-id="auto.provenance-history.1b16psg">Mouser</span>
+<span class="ui-row-secondary block truncate" data-design-id="auto.provenance-history.02hfska">Tolerance</span>
+<ul class="flex flex-col" data-design-id="auto.provenance-history.1ps4251">
+<li class="flex items-baseline gap-1.5" data-design-id="auto.provenance-history.160fkxp">
+<span class="ui-property-value min-w-0 flex-1 break-words" data-design-id="auto.provenance-history.0ht0jce">1 %</span>
+<span class="ui-component-metadata flex-none truncate" data-design-id="auto.provenance-history.14kal41">Mouser</span>
 <span class="ui-status-text text-ok-text flex-none" data-design-id="auto.typography-roles.0zqwpcz">In force</span>
 </li>
-<li class="flex items-baseline gap-1.5" data-design-id="auto.provenance-history.1lf8nua">
-<span class="ui-property-value min-w-0 flex-1 break-words" data-design-id="auto.provenance-history.0hu8b19">0.5 %</span>
-<span class="ui-component-metadata flex-none truncate" data-design-id="auto.provenance-history.1b16psg">DigiKey</span>
+<li class="flex items-baseline gap-1.5" data-design-id="auto.provenance-history.160fkxp">
+<span class="ui-property-value min-w-0 flex-1 break-words" data-design-id="auto.provenance-history.0ht0jce">0.5 %</span>
+<span class="ui-component-metadata flex-none truncate" data-design-id="auto.provenance-history.14kal41">DigiKey</span>
 </li>
 </ul>
 </div>
 </div>
 </section>
 <section data-dev-id="component-browser.provenance-overrides" class="border-b border-line/60 last:border-b-0">
-<header class="flex min-h-[20px] items-baseline gap-2 px-2 pt-1" data-design-id="auto.sourcing-parts.1llh683">
-<h4 class="ui-property-label min-w-0 truncate" data-design-id="auto.sourcing-parts.1a7onl4">
+<header class="flex min-h-[20px] items-baseline gap-2 px-2 pt-1" data-design-id="auto.sourcing-parts.0l7o4xt">
+<h4 class="ui-property-label min-w-0 truncate" data-design-id="auto.sourcing-parts.0s4j3hi">
 <span data-copy-id="component-browser.overrides-title" data-copy-default="Manual Overrides" data-design-id="auto.copy.1mlefqe">Manual Overrides</span>
 </h4>
-<span class="ui-component-metadata flex-none" data-design-id="auto.sourcing-parts.1w0uux7">1</span>
+<span class="ui-component-metadata flex-none" data-design-id="auto.sourcing-parts.1ry6xjl">1</span>
 </header>
-<div data-design-id="auto.sourcing-parts.0lhc3b2">
+<div data-design-id="auto.sourcing-parts.01xscn8">
 <div data-dev-id="component-browser.override-row" data-override-field="tolerance" class="border-b border-line/60 px-2 py-1 last:border-b-0">
-<span class="ui-row-secondary block truncate" data-design-id="auto.provenance-history.0q9k4p9">tolerance</span>
-<span class="ui-property-value block break-words" data-design-id="auto.provenance-history.0wdxazl">0.5 %</span>
-<span class="ui-component-metadata block break-words" title="Jul 31, 2026, 8:00 PM" data-design-id="auto.provenance-history.09mn97y">Replaced 1 % from Mouser · Reviewer owner · 2&nbsp;d ago · Read off the datasheet</span>
+<span class="ui-row-secondary block truncate" data-design-id="auto.provenance-history.0wdxazl">tolerance</span>
+<span class="ui-property-value block break-words" data-design-id="auto.provenance-history.0yezskg">0.5 %</span>
+<span class="ui-component-metadata block break-words" title="Jul 31, 2026, 8:00 PM" data-design-id="auto.provenance-history.1kday3d">Replaced 1 % from Mouser · Reviewer owner · 2&nbsp;d ago · Read off the datasheet</span>
 </div>
 </div>
 </section>
 <section data-dev-id="component-browser.provenance-intake" class="border-b border-line/60 last:border-b-0">
-<header class="flex min-h-[20px] items-baseline gap-2 px-2 pt-1" data-design-id="auto.sourcing-parts.1llh683">
-<h4 class="ui-property-label min-w-0 truncate" data-design-id="auto.sourcing-parts.1a7onl4">
+<header class="flex min-h-[20px] items-baseline gap-2 px-2 pt-1" data-design-id="auto.sourcing-parts.0l7o4xt">
+<h4 class="ui-property-label min-w-0 truncate" data-design-id="auto.sourcing-parts.0s4j3hi">
 <span data-copy-id="component-browser.intake-title" data-copy-default="Import and Enrichment Timeline" data-design-id="auto.copy.0pi1bkn">Import and Enrichment Timeline</span>
 </h4>
-<span class="ui-component-metadata flex-none" data-design-id="auto.sourcing-parts.1w0uux7">1</span>
+<span class="ui-component-metadata flex-none" data-design-id="auto.sourcing-parts.1ry6xjl">1</span>
 </header>
-<div data-design-id="auto.sourcing-parts.0lhc3b2">
-<ul class="flex flex-col" data-design-id="auto.provenance-history.020pjeq">
+<div data-design-id="auto.sourcing-parts.01xscn8">
+<ul class="flex flex-col" data-design-id="auto.provenance-history.116d7c3">
 <li data-dev-id="component-browser.history-event" data-event-kind="source_fetched" class="flex items-baseline gap-2 border-b border-line/60 px-2 py-1 last:border-b-0">
-<span class="ui-property-value min-w-0 flex-1 break-words" data-design-id="auto.provenance-history.1afgi7f">DigiKey supplied data</span>
-<span class="ui-component-metadata flex-none truncate" title="Jul 31, 2026, 8:00 PM" data-design-id="auto.provenance-history.0vc1478">2&nbsp;d ago</span>
+<span class="ui-property-value min-w-0 flex-1 break-words" data-design-id="auto.provenance-history.1bkid5c">DigiKey supplied data</span>
+<span class="ui-component-metadata flex-none truncate" title="Jul 31, 2026, 8:00 PM" data-design-id="auto.provenance-history.0gsfxsh">2&nbsp;d ago</span>
 </li>
 </ul>
 </div>
 </section>
 <p data-dev-id="component-browser.provenance-nothing" class="ui-component-metadata border-b border-line/60 px-2 py-1">Nothing recorded: Revision Timeline</p>
 <section data-dev-id="component-browser.provenance-diagnostics" class="border-b border-line/60 last:border-b-0">
-<header class="flex min-h-[20px] items-baseline gap-2 px-2 pt-1" data-design-id="auto.sourcing-parts.1llh683">
-<h4 class="ui-property-label min-w-0 truncate" data-design-id="auto.sourcing-parts.1a7onl4">
+<header class="flex min-h-[20px] items-baseline gap-2 px-2 pt-1" data-design-id="auto.sourcing-parts.0l7o4xt">
+<h4 class="ui-property-label min-w-0 truncate" data-design-id="auto.sourcing-parts.0s4j3hi">
 <span data-copy-id="component-browser.diagnostics-title" data-copy-default="Technical Diagnostics" data-design-id="auto.copy.1q0ee87">Technical Diagnostics</span>
 </h4>
 </header>
-<div data-design-id="auto.sourcing-parts.0lhc3b2">
-<dl class="flex flex-col" data-design-id="auto.provenance-history.0f7iseg">
-<div class="flex items-baseline gap-2 border-b border-line/60 px-2 py-1 last:border-b-0" data-design-id="auto.provenance-history.1wq1ykr">
-<dt class="ui-property-label w-[7.5rem] flex-none" data-design-id="auto.provenance-history.0oarjku">
+<div data-design-id="auto.sourcing-parts.01xscn8">
+<dl class="flex flex-col" data-design-id="auto.provenance-history.0u7pboe">
+<div class="flex items-baseline gap-2 border-b border-line/60 px-2 py-1 last:border-b-0" data-design-id="auto.provenance-history.0d3qzi8">
+<dt class="ui-property-label w-[7.5rem] flex-none" data-design-id="auto.provenance-history.000b6h5">
 <span data-copy-id="component-browser.diag-record-schema" data-copy-default="Record schema" data-design-id="auto.copy.1pg36nd">Record schema</span>
 </dt>
-<dd class="ui-machine-text min-w-0 flex-1 truncate" title="4" data-design-id="auto.provenance-history.0twkxwf">4</dd>
+<dd class="ui-machine-text min-w-0 flex-1 truncate" title="4" data-design-id="auto.provenance-history.06nztnu">4</dd>
 </div>
-<div class="flex items-baseline gap-2 border-b border-line/60 px-2 py-1 last:border-b-0" data-design-id="auto.provenance-history.1wq1ykr">
-<dt class="ui-property-label w-[7.5rem] flex-none" data-design-id="auto.provenance-history.0oarjku">
+<div class="flex items-baseline gap-2 border-b border-line/60 px-2 py-1 last:border-b-0" data-design-id="auto.provenance-history.0d3qzi8">
+<dt class="ui-property-label w-[7.5rem] flex-none" data-design-id="auto.provenance-history.000b6h5">
 <span data-copy-id="component-browser.diag-derived-by" data-copy-default="Derivation" data-design-id="auto.copy.1mqwe3b">Derivation</span>
 </dt>
-<dd class="ui-machine-text min-w-0 flex-1 truncate" title="rules@1" data-design-id="auto.provenance-history.0twkxwf">rules@1</dd>
+<dd class="ui-machine-text min-w-0 flex-1 truncate" title="rules@1" data-design-id="auto.provenance-history.06nztnu">rules@1</dd>
 </div>
-<div class="flex items-baseline gap-2 border-b border-line/60 px-2 py-1 last:border-b-0" data-design-id="auto.provenance-history.1wq1ykr">
-<dt class="ui-property-label w-[7.5rem] flex-none" data-design-id="auto.provenance-history.0oarjku">
+<div class="flex items-baseline gap-2 border-b border-line/60 px-2 py-1 last:border-b-0" data-design-id="auto.provenance-history.0d3qzi8">
+<dt class="ui-property-label w-[7.5rem] flex-none" data-design-id="auto.provenance-history.000b6h5">
 <span data-copy-id="component-browser.diag-category" data-copy-default="Category schema" data-design-id="auto.copy.1dx49fu">Category schema</span>
 </dt>
-<dd class="ui-machine-text min-w-0 flex-1 truncate" title="ics" data-design-id="auto.provenance-history.0twkxwf">ics</dd>
+<dd class="ui-machine-text min-w-0 flex-1 truncate" title="ics" data-design-id="auto.provenance-history.06nztnu">ics</dd>
 </div>
-<div class="flex items-baseline gap-2 border-b border-line/60 px-2 py-1 last:border-b-0" data-design-id="auto.provenance-history.1wq1ykr">
-<dt class="ui-property-label w-[7.5rem] flex-none" data-design-id="auto.provenance-history.0oarjku">
+<div class="flex items-baseline gap-2 border-b border-line/60 px-2 py-1 last:border-b-0" data-design-id="auto.provenance-history.0d3qzi8">
+<dt class="ui-property-label w-[7.5rem] flex-none" data-design-id="auto.provenance-history.000b6h5">
 <span data-copy-id="component-browser.diag-symbol-hash" data-copy-default="Symbol hash" data-design-id="auto.copy.1mk0oh5">Symbol hash</span>
 </dt>
-<dd class="ui-machine-text min-w-0 flex-1 truncate" title="None" data-design-id="auto.provenance-history.0twkxwf">None</dd>
+<dd class="ui-machine-text min-w-0 flex-1 truncate" title="None" data-design-id="auto.provenance-history.06nztnu">None</dd>
 </div>
-<div class="flex items-baseline gap-2 border-b border-line/60 px-2 py-1 last:border-b-0" data-design-id="auto.provenance-history.1wq1ykr">
-<dt class="ui-property-label w-[7.5rem] flex-none" data-design-id="auto.provenance-history.0oarjku">
+<div class="flex items-baseline gap-2 border-b border-line/60 px-2 py-1 last:border-b-0" data-design-id="auto.provenance-history.0d3qzi8">
+<dt class="ui-property-label w-[7.5rem] flex-none" data-design-id="auto.provenance-history.000b6h5">
 <span data-copy-id="component-browser.diag-footprint-hash" data-copy-default="Footprint hash" data-design-id="auto.copy.1m3xfjc">Footprint hash</span>
 </dt>
-<dd class="ui-machine-text min-w-0 flex-1 truncate" title="None" data-design-id="auto.provenance-history.0twkxwf">None</dd>
+<dd class="ui-machine-text min-w-0 flex-1 truncate" title="None" data-design-id="auto.provenance-history.06nztnu">None</dd>
 </div>
-<div class="flex items-baseline gap-2 border-b border-line/60 px-2 py-1 last:border-b-0" data-design-id="auto.provenance-history.1wq1ykr">
-<dt class="ui-property-label w-[7.5rem] flex-none" data-design-id="auto.provenance-history.0oarjku">
+<div class="flex items-baseline gap-2 border-b border-line/60 px-2 py-1 last:border-b-0" data-design-id="auto.provenance-history.0d3qzi8">
+<dt class="ui-property-label w-[7.5rem] flex-none" data-design-id="auto.provenance-history.000b6h5">
 <span data-copy-id="component-browser.diag-model-hash" data-copy-default="Model hash" data-design-id="auto.copy.0jkheq2">Model hash</span>
 </dt>
-<dd class="ui-machine-text min-w-0 flex-1 truncate" title="None" data-design-id="auto.provenance-history.0twkxwf">None</dd>
+<dd class="ui-machine-text min-w-0 flex-1 truncate" title="None" data-design-id="auto.provenance-history.06nztnu">None</dd>
 </div>
-<div class="flex items-baseline gap-2 border-b border-line/60 px-2 py-1 last:border-b-0" data-design-id="auto.provenance-history.1wq1ykr">
-<dt class="ui-property-label w-[7.5rem] flex-none" data-design-id="auto.provenance-history.0oarjku">
+<div class="flex items-baseline gap-2 border-b border-line/60 px-2 py-1 last:border-b-0" data-design-id="auto.provenance-history.0d3qzi8">
+<dt class="ui-property-label w-[7.5rem] flex-none" data-design-id="auto.provenance-history.000b6h5">
 <span data-copy-id="component-browser.diag-unknown-keys" data-copy-default="Keys this build does not read" data-design-id="auto.copy.12t9pzr">Keys this build does not read</span>
 </dt>
-<dd class="ui-machine-text min-w-0 flex-1 truncate" title="None" data-design-id="auto.provenance-history.0twkxwf">None</dd>
+<dd class="ui-machine-text min-w-0 flex-1 truncate" title="None" data-design-id="auto.provenance-history.06nztnu">None</dd>
 </div>
 </dl>
 </div>
 </section>
-<div class="px-2 py-1" data-design-id="auto.provenance-history.1brttgd">
+<div class="px-2 py-1" data-design-id="auto.provenance-history.0cncbaq">
 <button class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-control transition-[color,background-color,border-color] duration-100 ease-out ui-control-label disabled:cursor-not-allowed disabled:bg-control-pressed disabled:text-t5 disabled:hover:brightness-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus h-[22px] px-2 text-xs bg-control-bottom text-t1 hover:bg-control-hover active:bg-control-pressed" data-dev-id="component-browser.provenance-all" data-design-id="auto.primitives-kit.1dylkrc">
 <span data-copy-id="component-browser.provenance-all" data-copy-default="View Data Provenance" data-design-id="auto.copy.0qskip9">View Data Provenance</span>
 </button>
 </div>
 </div>
+</details>
 </section>
 </div>
 </section>

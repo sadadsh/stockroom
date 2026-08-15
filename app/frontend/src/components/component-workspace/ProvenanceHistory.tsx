@@ -76,8 +76,9 @@ export function ProvenanceHistory({
     <SourcingSection
       devId="component-browser.provenance"
       title={
-        <Text id="component-browser.provenance-title">Data Provenance and Timeline</Text>
+        <Text id="component-browser.provenance-title">Sources and Timeline</Text>
       }
+      collapsed
     >
       <CompatibilityBanner compatibility={provenance.compatibility} />
       {provenance.sources.length > 0 ? <DataSources sources={provenance.sources} /> : null}

@@ -102,6 +102,25 @@ vi.mock("../../lib/threeScene", () => ({
 const mockApi = vi.mocked(api);
 const mockCadVariantApi = vi.mocked(cadVariantApi);
 const ID = "lm358";
+const OFFICIAL_API_DATA: ComponentDossier["officialApiData"] = {
+  providerCount: 1,
+  fieldCount: 1,
+  providers: [{
+    provider: "mouser",
+    providerLabel: "Mouser",
+    state: "success",
+    fetchedAt: "2026-08-14T12:00:00Z",
+    payloadRef: "sourced/id/mouser.json",
+    fieldCount: 1,
+    rows: [{
+      path: "/stock",
+      endpoint: "SearchResults",
+      kind: "number",
+      value: 512,
+      displayValue: "512",
+    }],
+  }],
+};
 
 beforeEach(() => {
   window.localStorage.clear();
@@ -203,6 +222,34 @@ describe("the column's shape", () => {
   // dropped: the ORDER assertions the reveal test below makes are now made against the document's own
   // order, which is strictly more than this test asserted.
 
+  it("opens with prices only and keeps every secondary category closed", async () => {
+    await open(
+      makeDossier({
+        distributorOffers: [makeOffer({ priceBreaks: [{ qty: 1, price: 0.42 }] })],
+        supplySummary: { offerCount: 1, totalStock: 512 },
+        documents: { items: [makeDocument()], count: 1 },
+        relatedParts: [makeRelatedPart()],
+        officialApiData: OFFICIAL_API_DATA,
+        provenance: { sources: [makeSourceLedgerEntry()] },
+      }),
+    );
+
+    expect(region("component-browser.offer-price-ladder")).toBeVisible();
+    for (const id of [
+      "component-browser.lifecycle",
+      "component-browser.official-api-data",
+      "component-browser.documents",
+      "component-browser.related",
+      "component-browser.provenance",
+    ]) {
+      const disclosure = region(id).querySelector("details");
+      expect(disclosure).not.toBeNull();
+      expect(disclosure).not.toHaveAttribute("open");
+    }
+    expect(within(region("component-browser.lifecycle")).getByText("512")).not.toBeVisible();
+    expect(within(region("component-browser.documents")).getByText(makeDocument().title)).not.toBeVisible();
+  });
+
   it("keeps the manufacturer's own status apart from the library's lifecycle", async () => {
     await open(
       makeDossier({
@@ -275,10 +322,11 @@ describe("the empty sections", () => {
     }
   });
 
-  it("says how many sections are silent, and reveals them in the column's own order", async () => {
+  it("keeps blank-section recovery in developer mode without cluttering the normal column", async () => {
     const { user } = await open(bare);
-    // The count is the answer as well as the action: five conditional sections are silent.
-    const toggle = screen.getByRole("button", { name: "Show 5 Blank Sections" });
+    expect(screen.queryByRole("button", { name: /Blank Sections/ })).toBeNull();
+    await user.keyboard("{Control>}{Shift>}D{/Shift}{/Control}");
+    const toggle = screen.getByRole("button", { name: /Show \d+ Blank Sections/ });
     expect(toggle).toHaveAttribute("aria-expanded", "false");
 
     await user.click(toggle);
@@ -290,13 +338,14 @@ describe("the empty sections", () => {
     // Revealed, the sentences are back: the information was hidden, never removed.
     expect(screen.getByText(/No distributor has quoted/)).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "Hide 5 Blank Sections" }),
+      screen.getByRole("button", { name: /Hide \d+ Blank Sections/ }),
     ).toHaveAttribute("aria-expanded", "true");
   });
 
-  it("remembers the choice for this machine, in the storage the splitters already use", async () => {
+  it("remembers the developer's blank-section choice in the existing machine preference", async () => {
     const { user } = await open(bare);
-    await user.click(screen.getByRole("button", { name: "Show 5 Blank Sections" }));
+    await user.keyboard("{Control>}{Shift>}D{/Shift}{/Control}");
+    await user.click(screen.getByRole("button", { name: /Show \d+ Blank Sections/ }));
     expect(
       window.localStorage.getItem("stockroom.component-workspace.sourcing-empty.v1"),
     ).toBe("true");
@@ -321,11 +370,13 @@ describe("the empty sections", () => {
         supplySummary: { offerCount: 1, totalStock: 512, factoryLeadTime: "12 weeks" },
         documents: { items: [makeDocument()], count: 1 },
         relatedParts: [makeRelatedPart()],
+        officialApiData: OFFICIAL_API_DATA,
         provenance: { sources: [makeSourceLedgerEntry()] },
       }),
     );
-    // A control that would reveal zero sections is a dead click path.
-    expect(screen.queryByRole("button", { name: /Empty Sections/ })).toBeNull();
+    await userEvent.setup().keyboard("{Control>}{Shift>}D{/Shift}{/Control}");
+    // A control that would reveal zero sections is a dead click path even for a developer.
+    expect(screen.queryByRole("button", { name: /Blank Sections/ })).toBeNull();
   });
 
   it("counts a named source failure as content, not as an empty offers section", async () => {
@@ -353,7 +404,8 @@ describe("the empty sections", () => {
 describe("the provenance block does not repeat itself", () => {
   it("names the silent questions on one line instead of five stacked sections", async () => {
     const { user } = await open(makeDossier());
-    await user.click(screen.getByRole("button", { name: "Show 5 Blank Sections" }));
+    await user.keyboard("{Control>}{Shift>}D{/Shift}{/Control}");
+    await user.click(screen.getByRole("button", { name: /Show \d+ Blank Sections/ }));
 
     const provenance = region("component-browser.provenance");
     // Not one of the five sub-sections is mounted...
@@ -422,25 +474,26 @@ describe("the distributor offers ledger", () => {
     },
   });
 
-  it("shows one compact offer summary and reveals its complete ladder and metadata together", async () => {
+  it("keeps every price break visible and puts every secondary offer fact in one disclosure", async () => {
     const { user } = await open(offersDossier);
     const ledger = screen.getByRole("list", { name: "Distributor offers" });
     const offer = region("component-browser.offer-row");
+    const ladder = region("component-browser.offer-price-ladder");
 
     expect(ledger).not.toHaveClass("overflow-x-auto");
     expect(ledger.querySelector("table")).toBeNull();
-    expect(offer).not.toHaveAttribute("open");
-    expect(within(offer).getByText("Stock")).toBeVisible();
-    expect(within(offer).getByText("Unit Price")).toBeVisible();
-    expect(within(offer).getByText("1,240")).toBeVisible();
-    expect(within(offer).getByText("Price Breaks")).not.toBeVisible();
+    expect(within(ladder).getByText("Count")).toBeVisible();
+    expect(within(ladder).getByText("Unit Price")).toBeVisible();
+    expect(within(ladder).getByText("USD0.42")).toBeVisible();
+    expect(within(ladder).getByText("USD0.22")).toBeVisible();
+    expect(within(offer).getByText("Stock")).not.toBeVisible();
+    expect(within(offer).getByText("1,240")).not.toBeVisible();
     expect(within(offer).getByText("20 weeks")).not.toBeVisible();
 
-    await user.click(within(offer).getByTitle("511-LM358"));
+    await user.click(within(offer).getByText("Details"));
 
-    expect(offer).toHaveAttribute("open");
-    expect(within(offer).getByText("Price Breaks")).toBeVisible();
     for (const label of [
+      "Stock",
       "Quote Code",
       "MOQ",
       "Lead Time",
@@ -453,8 +506,6 @@ describe("the distributor offers ledger", () => {
     expect(within(offer).getByText("20 weeks")).toBeVisible();
     expect(within(offer).getByText("NRND")).toBeVisible();
     expect(within(offer).getByText(/Stale$/)).toBeVisible();
-    expect(within(offer).getAllByText("USD0.42")).toHaveLength(2);
-    expect(within(offer).getByText("USD0.22")).toBeVisible();
   });
 
   it("renders the normalized provider priority without locally reordering package variants", () => {
@@ -493,10 +544,9 @@ describe("the distributor offers ledger", () => {
 
   it("keeps the provider name quieter than the price it is quoting", async () => {
     await open(offersDossier);
-    const row = region("component-browser.offer-row");
     // `ui-key-fact` is 11/600 primary; `ui-row-secondary` is 11/400 secondary. The engineering
     // datum outranks the brand, which is the whole point of a comparison table.
-    expect(within(row).getAllByText("USD0.42").every((value) => value.classList.contains("ui-key-fact"))).toBe(true);
+    expect(within(region("component-browser.offer-price-ladder")).getByText("USD0.42")).toHaveClass("ui-key-fact");
     const provider = document.querySelector<HTMLElement>('[data-sourcing-provider="mouser"]')!;
     expect(within(provider).getByText("Mouser")).toHaveClass("ui-row-secondary");
   });
@@ -605,7 +655,7 @@ describe("a sourcing refresh", () => {
 });
 
 describe("the documents section", () => {
-  it("leads with the title and discloses tertiary file metadata", async () => {
+  it("uses one section disclosure and no repeated per-document disclosure", async () => {
     const { user } = await open(
       makeDossier({
         documents: {
@@ -624,12 +674,14 @@ describe("the documents section", () => {
     const row = region("component-browser.document-row");
     const title = within(row).getByText("LM358 Dual Operational Amplifier");
     expect(title).toHaveClass("ui-row-secondary");
-    // The filename is a fact about our disk, not about the part. It stays, one tier down.
+    // The entire resource group is closed by default; one click reveals every document and its
+    // quiet metadata without repeating a `Document Details` row after every title.
     expect(within(row).getByText(/lm358\.pdf/)).not.toBeVisible();
-    await user.click(within(row).getByText("Document Details"));
+    await user.click(within(region("component-browser.documents")).getByText("Documents"));
     expect(within(row).getByText(/lm358\.pdf/)).toBeVisible();
     expect(within(row).getByText(/lm358\.pdf/)).toHaveClass("ui-component-metadata");
     expect(within(row).getByText(/Rev H/)).toBeVisible();
+    expect(within(row).queryByText("Document Details")).toBeNull();
   });
 
   it("never uses a raw URL as a document's name", async () => {
@@ -656,7 +708,7 @@ describe("the documents section", () => {
 });
 
 describe("the related parts section", () => {
-  it("states the reason and warning immediately, then discloses comparison evidence", async () => {
+  it("uses one alternatives disclosure and states the warning once", async () => {
     const { user } = await open(
       makeDossier({
         relatedParts: [
@@ -671,15 +723,15 @@ describe("the related parts section", () => {
     );
     const row = region("component-browser.related-row");
     expect(row.dataset.relatedValidated).toBe("false");
-    expect(row).toHaveTextContent("Same function, different package");
     const evidence = region("component-browser.related-evidence");
-    expect(evidence).toHaveTextContent("package: sot23 → sc70");
     expect(within(evidence).getByText("package: sot23 → sc70")).not.toBeVisible();
     expect(region("component-browser.related-not-validated")).toHaveTextContent(
-      "Stockroom has not checked this for equivalence",
+      "These suggestions are not verified replacements",
     );
-    await user.click(within(row).getByText("Comparison Details"));
+    await user.click(within(region("component-browser.related")).getByText("Alternatives"));
+    expect(within(row).getByText(/Same function, different package/)).toBeVisible();
     expect(within(evidence).getByText("package: sot23 → sc70")).toBeVisible();
+    expect(within(row).queryByText("Comparison Details")).toBeNull();
   });
 });
 

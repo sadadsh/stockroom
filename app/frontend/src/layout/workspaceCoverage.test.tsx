@@ -278,7 +278,7 @@ describe("every registered piece and region is something that appears", () => {
     // one that does not. Neither workspace alone can show every piece; between them they must.
     developerMode = true;
     const populated = sectionIdentitiesAndEverything(await openWorkspace(populatedDossier()));
-    developerMode = false;
+    // Blank-section recovery is intentionally developer-only; keep that mode for the sparse pass.
     const sparse = sectionIdentitiesAndEverything(await openWorkspace(sparseDossier()));
     const seen = new Set([...populated, ...sparse]);
 

@@ -64,6 +64,7 @@ describe("complete official API data", () => {
   it("keeps both providers, exact paths, explicit nulls, and empty containers", async () => {
     const user = userEvent.setup();
     render(<OfficialApiDataSection data={DATA} />);
+    await user.click(screen.getByText("Official Data"));
     await user.click(screen.getByText("Mouser"));
     await user.click(screen.getByText("SearchResults"));
     expect(screen.getByText("/SearchResults/Parts/0/FactoryStock")).toBeInTheDocument();
@@ -102,6 +103,7 @@ describe("complete official API data", () => {
     };
 
     render(<OfficialApiDataSection data={data} />);
+    await user.click(screen.getByText("Official Data"));
     await user.click(screen.getByText("DigiKey"));
     await user.click(screen.getByText("Products"));
     expect(document.querySelectorAll('[data-dev-id="component-browser.official-api-row"]')).toHaveLength(100);
@@ -117,6 +119,7 @@ describe("complete official API data", () => {
   it("searches every provider path and value without changing the retained total", async () => {
     const user = userEvent.setup();
     render(<OfficialApiDataSection data={DATA} />);
+    await user.click(screen.getByText("Official Data"));
     await user.type(screen.getByRole("searchbox", { name: "Search official API data" }), "Bandwidth");
 
     const section = document.querySelector<HTMLElement>(
@@ -124,6 +127,6 @@ describe("complete official API data", () => {
     )!;
     expect(within(section).getByText("Bandwidth")).toBeInTheDocument();
     expect(within(section).queryByText("$1.23")).toBeNull();
-    expect(within(section).getByText("4")).toBeInTheDocument();
+    expect(within(section.querySelector("summary")!).queryByText("4")).toBeNull();
   });
 });

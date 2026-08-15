@@ -1,18 +1,13 @@
 /**
  * The right column: Sourcing and Resources.
  *
- * SIX SECTIONS, IN ONE FIXED ORDER, and the order is the order a person asks the questions in:
+ * Price breaks are the one open reading path. Provider and offer identity remain visible because a
+ * tier without its seller and SKU is ambiguous; stock, lifecycle, offer metadata, official payloads,
+ * documents, alternatives, and provenance each begin as one closed category row. This keeps the
+ * everyday comparison direct while preserving every retained fact on request.
  *
- *   1 Product Status and Stock     can I still purchase this part, and is there some of it
- *   2 Distributor Offers           who has it, how many, and for how much
- *   3 Pricing and Lead Time        what does it cost at quantity, and how long is the wait
- *   4 Documents                    what has been written about it
- *   5 Related Parts                what else would do the job, and why
- *   6 Data Provenance and Timeline where each of those answers came from
- *
- * Backend source records are never first. "DigiKey supplied data, Mouser is not connected" is an
- * explanation, and an explanation is only wanted once the thing it explains has been read - so the
- * ledger is at the bottom, under everything it accounts for.
+ * The fixed order is: Price Breaks, Stock and Status, Official Data, Documents, Alternatives, then
+ * Sources and Timeline. Backend records remain last because they explain the decisions above them.
  *
  * Every number here is the projection's, not a re-derivation. `supplySummary.totalStock` is `null`
  * when NOBODY reported a count, and that renders as Unknown rather than as zero: "no stock" and
@@ -54,7 +49,7 @@ import { OffersSection } from "./OffersSection";
 import { OfficialApiDataSection } from "./OfficialApiDataSection";
 import { ProvenanceHistory } from "./ProvenanceHistory";
 import { DocumentsSection, RelatedPartsSection } from "./ResourcesSection";
-import { PropertyRow, SourcingDisclosure, SourcingSection } from "./SourcingParts";
+import { PropertyRow, SourcingSection } from "./SourcingParts";
 import {
   emptySourcingSections,
   readShowEmptySections,
@@ -199,16 +194,9 @@ export function SourcingProvenancePart() {
 }
 
 /**
- * The one control that reveals the sections with nothing in them.
- *
- * It states the COUNT, so it is an answer as well as an action: `Show 5 Empty Sections` on a part
- * nobody has sourced says exactly how much of the column is silent, which is the direct form the
- * quality vocabulary uses everywhere else ("3 Required Values Missing", never "3 / 8").
- *
- * LAST, under everything it accounts for, and absent when there is nothing to reveal: a control
- * that would show zero sections is a dead click path. When the reveal is off, the provenance
- * section it hides takes `View Data Provenance` with it - which is why that action also has a
- * permanent home in Manage > View Data Provenance...
+ * Developer recovery for sections with no content. Normal use omits blank categories entirely;
+ * Design Studio can still reveal them to inspect and arrange every registered piece. The control
+ * remains last and disappears when there is nothing to reveal.
  */
 export function SourcingEmptySectionsPart() {
   const workspace = useWorkspaceRender();
@@ -223,6 +211,9 @@ export function SourcingEmptySectionsPart() {
     "Hide {count} Blank Sections",
   );
   if (!workspace) return null;
+  if (!developerMode) {
+    return <div data-dev-id="component-browser.empty-sections" hidden />;
+  }
   const hidden = emptySourcingSections(
     sourcingSectionFill(workspace.dossier, developerMode),
   ).length;
@@ -272,9 +263,10 @@ export function SourcingLifecyclePart() {
       title={(
         <span className="flex items-center gap-1.5">
           <Icon id="status.info" className="h-3.5 w-3.5 text-t3" />
-          <Text id="component-browser.lifecycle-title">Product Status and Stock</Text>
+          <Text id="component-browser.lifecycle-title">Stock and Status</Text>
         </span>
       )}
+      collapsed
     >
       {lifecycle ? (
         <PropertyRow label={<Text id="component-browser.lifecycle-state">Product Status</Text>}>
@@ -304,10 +296,7 @@ export function SourcingLifecyclePart() {
         </PropertyRow>
       ) : null}
       {supplySummary.leadTime || checkedStamp ? (
-        <SourcingDisclosure
-          devId="component-browser.lifecycle-details"
-          label={<Text id="component-browser.lifecycle-details">Stock Details</Text>}
-        >
+        <div data-dev-id="component-browser.lifecycle-details">
           {supplySummary.leadTime ? (
             <PropertyRow label={<Text id="component-browser.lead-time">Lead Time</Text>}>
               <span className="ui-property-value">{supplySummary.leadTime}</span>
@@ -327,7 +316,7 @@ export function SourcingLifecyclePart() {
               </span>
             </PropertyRow>
           ) : null}
-        </SourcingDisclosure>
+        </div>
       ) : null}
     </SourcingSection>
   );

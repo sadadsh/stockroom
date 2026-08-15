@@ -1064,7 +1064,7 @@ describe("the sourcing column", () => {
       "logic_family: LVC → AHC",
     );
     expect(node("component-browser.related-not-validated")).toHaveTextContent(
-      "Stockroom has not checked this for equivalence",
+      "These suggestions are not verified replacements",
     );
   });
 

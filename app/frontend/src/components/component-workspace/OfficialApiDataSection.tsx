@@ -180,12 +180,8 @@ export function OfficialApiDataSection({ data }: { data: OfficialApiDataView }) 
   return (
     <SourcingSection
       devId="component-browser.official-api-data"
-      title={<Text id="component-browser.official-api-data-title">Official API Data</Text>}
-      action={
-        data.fieldCount > 0 ? (
-          <span className="ui-component-metadata ui-numeric">{formatCount(data.fieldCount)}</span>
-        ) : undefined
-      }
+      title={<Text id="component-browser.official-api-data-title">Official Data</Text>}
+      collapsed
     >
       <div className="border-b border-line px-2 py-1">
         <input

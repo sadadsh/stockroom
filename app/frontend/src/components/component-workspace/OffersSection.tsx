@@ -5,7 +5,7 @@ import { formatCount, formatPrice, formatTimestamp } from "../../lib/formatValue
 import { Icon } from "../Icon";
 import { ExternalIcon } from "../icons";
 import { EmptyState } from "../primitives";
-import { SourcingSection } from "./SourcingParts";
+import { SourcingDisclosure, SourcingSection } from "./SourcingParts";
 import { groupOffersByProvider, type OfferGroup } from "./offerFacts";
 import { useSupplyFailureText } from "./provenanceText";
 
@@ -48,7 +48,7 @@ export function OffersSection({
       title={(
         <span className="flex items-center gap-1.5">
           <Icon id="action.enrich" className="h-3.5 w-3.5 text-t3" />
-          <Text id="component-browser.offers-title">Distributor Offers</Text>
+          <Text id="component-browser.price-breaks-title">Price Breaks</Text>
         </span>
       )}
       action={(
@@ -119,104 +119,81 @@ function ProviderGroup({ group }: { group: OfferGroup }) {
       </div>
       <ul className="divide-y divide-line/60">
         {group.offers.map((offer) => (
-          <OfferDisclosure key={`${offer.provider}:${offer.sku}`} offer={offer} />
+          <OfferPriceLadder key={`${offer.provider}:${offer.sku}`} offer={offer} />
         ))}
       </ul>
     </li>
   );
 }
 
-function OfferDisclosure({ offer }: { offer: DistributorOffer }) {
+/** Price tiers are the one sourcing fact kept open. Everything else is one compact disclosure. */
+function OfferPriceLadder({ offer }: { offer: DistributorOffer }) {
+  const noPriceBreaks = useText("component-browser.no-price-breaks", "No quoted price breaks");
   const noPrice = useText("component-browser.no-price", "No price");
   const stockUnknown = useText("component-browser.stock-unknown", "Not reported");
   const emptyValue = useText("component-browser.no-value", "None");
   const listing = useCopyFormatter("component-browser.open-listing", "Open {provider} Listing");
+  const priceLadderLabel = useCopyFormatter(
+    "component-browser.price-ladder-provider",
+    "{provider} Price Breaks",
+  );
   const label = listing({ provider: offer.providerLabel });
   const stamp = offer.lastCheckedAt ? formatTimestamp(offer.lastCheckedAt) : null;
-  const count = offer.priceBreaks.length;
-  const detailsLabel = `${offer.sku || offer.providerLabel}, ${formatCount(count)} ${count === 1 ? "price break" : "price breaks"}`;
 
   return (
-    <li>
-      <details
-        data-dev-id="component-browser.offer-row"
-        data-offer-provider={offer.provider}
-        className="group min-w-0"
-      >
-        <summary
-          aria-label={detailsLabel}
-          className="flex min-h-[48px] cursor-pointer list-none items-center gap-2 px-2 py-1.5 hover:bg-[var(--c-hover)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-focus"
+    <li
+      data-dev-id="component-browser.offer-row"
+      data-offer-provider={offer.provider}
+      className="min-w-0 px-2 py-1.5"
+    >
+      <div className="flex min-h-[20px] items-center gap-2">
+        <span className="ui-row-primary min-w-0 flex-1 truncate" title={offer.sku || undefined}>
+          {offer.sku || emptyValue}
+        </span>
+      </div>
+      <div data-dev-id="component-browser.offer-price-ladder" className="mt-1">
+        {offer.priceBreaks.length === 0 ? (
+          <p className="ui-component-metadata py-0.5">{noPriceBreaks}</p>
+        ) : (
+          <dl
+            className="grid min-w-0 grid-cols-2 gap-x-3"
+            aria-label={priceLadderLabel({ provider: offer.providerLabel })}
+          >
+            <div className="contents">
+              <dt className="ui-property-label border-b border-line/60 py-0.5">
+                <Text id="component-browser.price-col-qty">Count</Text>
+              </dt>
+              <dd className="ui-property-label border-b border-line/60 py-0.5 text-right">
+                <Text id="component-browser.price-col-price">Unit Price</Text>
+              </dd>
+            </div>
+            {offer.priceBreaks.map((entry, index) => (
+              <div key={`${entry.qty}:${entry.price}:${index}`} className="contents">
+                <dt className="ui-component-metadata border-b border-line/40 py-0.5">
+                  {entry.qty === null ? emptyValue : formatCount(entry.qty)}
+                </dt>
+                <dd className="ui-key-fact ui-numeric border-b border-line/40 py-0.5 text-right">
+                  {entry.price === null ? emptyValue : formatPrice(entry.price, offer.currency)}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        )}
+      </div>
+      {hasOfferMetadata(offer, stamp) || offer.offerUrl ? (
+        <SourcingDisclosure
+          devId="component-browser.offer-details"
+          label={<Text id="component-browser.offer-details">Details</Text>}
+          icon={null}
         >
-          <span className="min-w-0 flex-1">
-            <span className="ui-row-primary block truncate" title={offer.sku || undefined}>
-              {offer.sku || emptyValue}
-            </span>
-            <span className="mt-0.5 flex min-w-0 items-baseline gap-2">
-              <span className="ui-component-metadata min-w-0 truncate">
-                <Text id="component-browser.offer-col-stock">Stock</Text>{" "}
-                <span className="ui-numeric text-t2">
-                  {offer.stock === null ? stockUnknown : formatCount(offer.stock)}
-                </span>
-              </span>
-              <span className="ui-component-metadata ml-auto flex-none">
-                <Text id="component-browser.offer-col-price">Unit Price</Text>{" "}
-                <span className="ui-key-fact ui-numeric">
-                  {offer.unitPrice === null ? noPrice : formatPrice(offer.unitPrice, offer.currency)}
-                </span>
-              </span>
-            </span>
-          </span>
-          <Icon
-            id="detail.chevron-right"
-            className="h-3 w-3 flex-none text-t3 transition-transform group-open:rotate-90"
-          />
-        </summary>
-
-        <div data-dev-id="component-browser.offer-details" className="border-t border-line/40 bg-field/25 px-2 pb-2 pt-1.5">
-          <div className="flex items-center gap-2">
-            <h4 className="ui-property-label min-w-0 flex-1">
-              <Text id="component-browser.price-breaks">Price Breaks</Text>{" "}
-              <span className="font-normal text-t4">{formatCount(count)}</span>
-            </h4>
-            {offer.offerUrl ? (
-              <a
-                data-dev-id="component-browser.offer-listing"
-                href={offer.offerUrl}
-                target="_blank"
-                rel="noreferrer"
-                aria-label={label}
-                title={label}
-                className="inline-flex flex-none rounded-control p-0.5 text-t2 hover:text-t1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus"
-              >
-                <ExternalIcon className="h-3.5 w-3.5" />
-              </a>
-            ) : null}
-          </div>
-
-          <div data-dev-id="component-browser.offer-price-ladder" className="mt-1">
-            {offer.priceBreaks.length === 0 ? (
-              <p className="ui-component-metadata">{noPrice}</p>
-            ) : (
-              <dl className="grid min-w-0 grid-cols-2 gap-x-3">
-                {offer.priceBreaks.map((entry, index) => (
-                  <div
-                    key={`${entry.qty}:${entry.price}:${index}`}
-                    className="flex min-w-0 items-baseline justify-between gap-2 border-b border-line/40 py-0.5"
-                  >
-                    <dt className="ui-component-metadata min-w-0 break-words">
-                      {entry.qty === null ? emptyValue : formatCount(entry.qty)}
-                    </dt>
-                    <dd className="ui-key-fact ui-numeric min-w-0 break-words text-right">
-                      {entry.price === null ? emptyValue : formatPrice(entry.price, offer.currency)}
-                    </dd>
-                  </div>
-                ))}
-              </dl>
-            )}
-          </div>
-
-          {hasOfferMetadata(offer, stamp) ? (
-            <dl className="mt-2 grid min-w-0 grid-cols-2 gap-x-3 gap-y-1 border-t border-line/40 pt-1.5">
+          <div className="bg-field/25 px-2 pb-2 pt-1.5">
+            <dl className="grid min-w-0 grid-cols-2 gap-x-3 gap-y-1">
+              <OfferFact label={<Text id="component-browser.offer-col-stock">Stock</Text>} numeric>
+                {offer.stock === null ? stockUnknown : formatCount(offer.stock)}
+              </OfferFact>
+              <OfferFact label={<Text id="component-browser.offer-col-price">Unit Price</Text>} numeric>
+                {offer.unitPrice === null ? noPrice : formatPrice(offer.unitPrice, offer.currency)}
+              </OfferFact>
               {offer.currency ? <OfferFact label={<Text id="component-browser.offer-col-currency">Quote Code</Text>}>{offer.currency}</OfferFact> : null}
               {offer.moq !== null ? <OfferFact label={<Text id="component-browser.offer-col-moq">MOQ</Text>} numeric>{formatCount(offer.moq)}</OfferFact> : null}
               {offer.leadTime ? <OfferFact label={<Text id="component-browser.offer-col-lead">Lead Time</Text>}>{offer.leadTime}</OfferFact> : null}
@@ -231,16 +208,32 @@ function OfferDisclosure({ offer }: { offer: DistributorOffer }) {
                 </OfferFact>
               ) : null}
             </dl>
-          ) : null}
-        </div>
-      </details>
+            {offer.offerUrl ? (
+              <a
+                data-dev-id="component-browser.offer-listing"
+                href={offer.offerUrl}
+                target="_blank"
+                rel="noreferrer"
+                aria-label={label}
+                title={label}
+                className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-t2 hover:text-t1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus"
+              >
+                {label}
+                <ExternalIcon className="h-3.5 w-3.5" />
+              </a>
+            ) : null}
+          </div>
+        </SourcingDisclosure>
+      ) : null}
     </li>
   );
 }
 
 function hasOfferMetadata(offer: DistributorOffer, stamp: ReturnType<typeof formatTimestamp> | null): boolean {
   return Boolean(
-    offer.currency
+    offer.stock !== null
+      || offer.unitPrice !== null
+      || offer.currency
       || offer.moq !== null
       || offer.leadTime
       || offer.factoryLeadTime
@@ -282,13 +275,19 @@ function SupplyFailures({
 }) {
   const failureText = useSupplyFailureText();
   return (
-    <ul data-dev-id="component-browser.offer-failures" className="flex flex-col">
-      {failures.map((failure) => (
-        <li key={failure.provider} className="ui-component-metadata border-b border-line/60 px-2 py-1 text-warn">
-          {failureText(failure)}
-        </li>
-      ))}
-    </ul>
+    <SourcingDisclosure
+      devId="component-browser.offer-failures"
+      label={<><Text id="component-browser.provider-issues">Provider Issues</Text> <span className="ui-component-metadata">{formatCount(failures.length)}</span></>}
+      icon="status.info"
+    >
+      <ul className="flex flex-col">
+        {failures.map((failure) => (
+          <li key={failure.provider} className="ui-component-metadata border-b border-line/60 px-2 py-1 text-warn last:border-b-0">
+            {failureText(failure)}
+          </li>
+        ))}
+      </ul>
+    </SourcingDisclosure>
   );
 }
 

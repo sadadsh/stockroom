@@ -21,6 +21,26 @@ and `P2` meaningful fit, finish, or clarity debt.
 
 ## Acceptance Captures
 
+### 2026-08-14 — Price-First Sourcing Information Architecture
+
+- Capture layer: current source in the real Windows pywebview/WebView2 Development host with the
+  live `ADG714BRUZ-REEL` dossier and all 19 retained price breaks.
+- Evidence: `work/Sourcing IA Dark Final.png`, 1,400 × 900, SHA-256 `cce8bf23001f`;
+  `work/Sourcing IA Light Final.png`, 1,400 × 900, SHA-256 `c723da7185d3`;
+  `work/Sourcing IA Disclosures Dark Final.png`, 1,400 × 900, SHA-256 `053e11920fd0`; and
+  `work/Sourcing IA Disclosures Light Final.png`, 1,400 × 900, SHA-256 `51ef95582a5b`.
+- Intended claim: provider and offer identity plus every price tier are the only sourcing facts open
+  by default. Stock, lifecycle, offer metadata, official payloads, documents, alternatives, and
+  provenance remain complete but begin behind concise category disclosures. Blank-section recovery
+  appears only in Design Studio.
+- Acceptance result: pass. Mouser and three distinct DigiKey package offers retain all 19 tiers in
+  normalized provider order. Each offer has one quiet **Details** disclosure; Stock and Status,
+  Official Data, Documents, Alternatives when present, and Sources and Timeline each occupy one
+  closed row. The repeated per-document `Document Details` rows and per-alternative equivalence
+  warnings are gone; document metadata is flat inside the one Documents disclosure and the
+  alternatives warning is stated once for the group. Both themes preserve the same density,
+  alignment, scroll ownership, and exhaustive Full Sourcing Record path.
+
 ### 2026-08-14 — Navigation Rail State And Alignment
 
 - Capture layer: current source in the real Windows pywebview/WebView2 Development host with the
