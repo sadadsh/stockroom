@@ -1,7 +1,7 @@
 import { useCallback, useLayoutEffect, useRef, useState } from "react";
 import { sendProviderCommand, setProviderViewport } from "../../lib/hostProviderViewport";
 import { Text, useCopyFormatter, useText } from "../../lib/copy";
-import { Button } from "../primitives";
+import { Button, StatusText } from "../primitives";
 
 export function ProviderBrowserFrame({
   componentId,
@@ -141,9 +141,9 @@ export function ProviderBrowserFrame({
           />
         </form>
         {address.startsWith("https://") ? (
-          <span className="text-xs text-positive">
+          <StatusText tone="ok" className="text-xs">
             <Text id="component-browser.manage-models-secure">Secure</Text>
-          </span>
+          </StatusText>
         ) : null}
         {onClose ? (
           <Button

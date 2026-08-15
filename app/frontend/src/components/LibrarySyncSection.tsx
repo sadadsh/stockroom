@@ -35,7 +35,7 @@ import {
 } from "../api/queries";
 import { useToast } from "../lib/toast";
 import { Text, useCopyFormatter, useText } from "../lib/copy";
-import { Badge, Button, Dot, Eyebrow } from "./primitives";
+import { Badge, Button, Dot, ErrorState, Eyebrow, LoadingState } from "./primitives";
 
 function errMsg(err: unknown, fallback: string): string {
   return err instanceof ApiError ? err.message : fallback;
@@ -83,11 +83,13 @@ function BinaryStorage() {
         <Text id="library.sync.binary-storage-heading">Large File Storage</Text>
       </Eyebrow>
       {q.isLoading ? (
-        <p className="text-sm text-t3">
-          <Text id="library.sync.binary-storage-loading">Checking how binaries are stored...</Text>
-        </p>
+        <LoadingState dense id="library.sync.binary-storage-loading">
+          Checking how binaries are stored...
+        </LoadingState>
       ) : q.isError ? (
-        <p className="text-sm text-err-text">{errMsg(q.error, "Could not check binary storage.")}</p>
+        <ErrorState dense id="library.sync.binary-storage-failed" onRetry={() => q.refetch()}>
+          {errMsg(q.error, "Could not check binary storage.")}
+        </ErrorState>
       ) : !data ? null : (
         <div className="rounded-card border border-line2">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-2">
@@ -194,11 +196,13 @@ function LibraryHygiene() {
         <Text id="library.sync.shared-files-heading">Shared Files</Text>
       </Eyebrow>
       {q.isLoading ? (
-        <p className="text-sm text-t3">
-          <Text id="library.sync.hygiene-loading">Checking what the catalog shares...</Text>
-        </p>
+        <LoadingState dense id="library.sync.hygiene-loading">
+          Checking what the catalog shares...
+        </LoadingState>
       ) : q.isError ? (
-        <p className="text-sm text-err-text">{errMsg(q.error, "Could not check the library.")}</p>
+        <ErrorState dense id="library.sync.hygiene-failed" onRetry={() => q.refetch()}>
+          {errMsg(q.error, "Could not check the library.")}
+        </ErrorState>
       ) : !data ? null : pending === 0 ? (
         <p className="text-xs text-ok-text" data-testid="library-hygiene-clean">
           <Text id="library.sync.hygiene-clean">

@@ -1,4 +1,4 @@
-import { cleanup, screen } from "@testing-library/react";
+import { cleanup, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { settingsScenarios } from "./settings";
 import { mountScenario } from "./testHarness";
@@ -89,6 +89,23 @@ describe("Settings Design Studio scenarios", () => {
     expect(document.querySelector(`[data-dev-id="${target}"]`)).toBeVisible();
     expect(screen.getAllByText("Settings").length).toBeGreaterThan(0);
     expect(mounted.liveRequest).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["settings.altium.setup-dialog", "Altium Setup"],
+    ["settings.altium.dblib-dialog", "Altium Database Catalog"],
+  ] as const)("lets Preview dismiss %s without changing scenarios", async (id, name) => {
+    const mounted = await mountScenario(id);
+    const dialog = screen.getByRole("dialog", { name });
+    await mounted.user.click(within(dialog).getByRole("button", { name: "Close" }));
+    expect(screen.queryByRole("dialog", { name })).toBeNull();
+  });
+
+  it("lets Preview cancel the reset confirmation", async () => {
+    const mounted = await mountScenario("settings.reset-cad.confirmation");
+    const dialog = screen.getByRole("dialog", { name: "Remove All CAD Files" });
+    await mounted.user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByRole("dialog", { name: "Remove All CAD Files" })).toBeNull();
   });
 
   it("keeps Reset Applied Design visible in Appearance", async () => {

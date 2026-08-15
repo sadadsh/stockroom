@@ -203,6 +203,8 @@
     --c-ok-text: #78c08c;
     --c-warn-text: #c3c8ce;
     --c-err-text: #ec9a97;
+    --c-danger-on: #111214;
+    --c-scrim: rgba(0, 0, 0, 0.55);
 
     /* --- Category hues (color-is-data, NOT chrome) ------------------------
        A per-family tint on the parts list' fallback thumbnails, so component
@@ -393,6 +395,8 @@
     --c-ok-text: #266840;
     --c-warn-text: #3a3e43;
     --c-err-text: #9c3633;
+    --c-danger-on: #ffffff;
+    --c-scrim: rgba(0, 0, 0, 0.55);
 
     /* Category hues darkened so each clears >=3:1 on the light tile. */
     --cat-resistor: #b6710f;
@@ -743,7 +747,7 @@
 }
 
 [data-design-preview-state="focus"] {
-  outline: 2px solid var(--c-acc) !important;
+  outline: 2px solid var(--c-focus) !important;
   outline-offset: 2px !important;
 }
 

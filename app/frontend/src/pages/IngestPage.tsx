@@ -436,7 +436,7 @@ function LookupHero({
           }}
           placeholder={inputPlaceholder}
           disabled={looking}
-          className="h-[34px] min-w-0 flex-1 rounded-control border border-line2 bg-field px-3 text-sm text-t1 outline-none transition-colors focus:border-acc disabled:opacity-50"
+          className="h-[34px] min-w-0 flex-1 rounded-control border border-line2 bg-field px-3 text-sm text-t1 outline-none transition-colors focus:border-focus disabled:opacity-50"
         />
         <Button
           data-dev-id="ingest.lookup"
@@ -836,7 +836,7 @@ function PulledSpecTable({ result }: { result: EnrichmentResult }) {
                 href={datasheet}
                 target="_blank"
                 rel="noreferrer"
-                className="truncate text-acc outline-none hover:underline focus-visible:ring-2 focus-visible:ring-acc"
+                className="truncate text-acc outline-none hover:underline focus-visible:ring-2 focus-visible:ring-focus"
               >
                 {datasheet}
               </a>

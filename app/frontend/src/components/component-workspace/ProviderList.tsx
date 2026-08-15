@@ -1,4 +1,5 @@
 import { Text, useText } from "../../lib/copy";
+import { Badge } from "../primitives";
 import type { ManageModelsProvider } from "./manageModelsModel";
 
 const ARTIFACT_LABELS = {
@@ -63,7 +64,7 @@ export function ProviderList({
             className={
               "w-full rounded-control border px-2.5 py-2 text-left " +
               (provider.row.id === selectedId
-                ? "border-accent bg-control-pressed"
+                ? "border-acc bg-control-pressed"
                 : "border-transparent hover:bg-control-hover")
             }
             onClick={() => onSelect(provider.row.id)}
@@ -71,9 +72,9 @@ export function ProviderList({
             <span className="flex items-center justify-between gap-2">
               <span className="truncate text-sm font-medium text-t1">{provider.row.label}</span>
               {provider.complete ? (
-                <span className="rounded-full bg-positive/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-positive">
+                <Badge tone="ok">
                   <Text id="component-browser.manage-models-complete">Complete Set</Text>
-                </span>
+                </Badge>
               ) : null}
             </span>
             <span className="mt-1 block text-xs text-t3">

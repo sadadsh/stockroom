@@ -1,55 +1,73 @@
 /**
- * The map from a Tailwind utility class to the design-token CSS variable it consumes. Dev mode's inspect
- * surface reads an element's className, looks each class up here, and reports the tokens that element uses
- * so the panel can jump straight to editing them. Sourced from the DEV_TOKENS registry + tailwind.config.js:
- * Tailwind emits `bg-*`, `text-*`, and `border-*` from one colour token, so all three map to the same
- * cssVar. Only DEV_TOKENS-backed classes are here (structural greys are intentionally excluded, matching
- * what the panel exposes). NOTE: `--icon-stroke` has no class (it is an SVG stroke-width via `.ico`), so
- * icon usage is detected by element type in the inspector, not through this map.
+ * Tailwind utilities to the design-token CSS variables they consume.
+ *
+ * Design Studio reads the selected element's complete className, including variant and opacity
+ * modifiers, so the resolver normalizes those before lookup. Every editable color token exposes
+ * the same background, text, border, outline, ring, and SVG-stroke vocabulary; non-color roles are
+ * listed once below.
  */
-export const CLASS_TO_VAR: Readonly<Record<string, string>> = {
-  "bg-acc": "--c-acc",
-  "text-acc": "--c-acc",
-  "border-acc": "--c-acc",
-  "bg-canvas": "--c-canvas",
-  "text-canvas": "--c-canvas",
-  "border-canvas": "--c-canvas",
-  "bg-raise": "--c-raise",
-  "text-raise": "--c-raise",
-  "border-raise": "--c-raise",
-  "bg-field": "--c-field",
-  "text-field": "--c-field",
-  "border-field": "--c-field",
-  "bg-line": "--c-line",
-  "text-line": "--c-line",
-  "border-line": "--c-line",
-  "bg-t1": "--c-t1",
-  "text-t1": "--c-t1",
-  "border-t1": "--c-t1",
-  "bg-t2": "--c-t2",
-  "text-t2": "--c-t2",
-  "border-t2": "--c-t2",
-  "bg-t3": "--c-t3",
-  "text-t3": "--c-t3",
-  "border-t3": "--c-t3",
-  "bg-ok": "--c-ok",
-  "text-ok": "--c-ok",
-  "border-ok": "--c-ok",
-  "bg-warn": "--c-warn",
-  "text-warn": "--c-warn",
-  "border-warn": "--c-warn",
-  "bg-err": "--c-err",
-  "text-err": "--c-err",
-  "border-err": "--c-err",
-  "bg-ok-text": "--c-ok-text",
-  "text-ok-text": "--c-ok-text",
-  "border-ok-text": "--c-ok-text",
-  "bg-warn-text": "--c-warn-text",
-  "text-warn-text": "--c-warn-text",
-  "border-warn-text": "--c-warn-text",
-  "bg-err-text": "--c-err-text",
-  "text-err-text": "--c-err-text",
-  "border-err-text": "--c-err-text",
+export const TOKEN_COLOR_CLASSES: Readonly<Record<string, string>> = {
+  app: "--c-app",
+  canvas: "--c-canvas",
+  rail: "--c-rail",
+  surface: "--c-surface",
+  raise: "--c-raise",
+  raise2: "--c-raise2",
+  section: "--c-section",
+  active: "--c-active",
+  stage: "--c-stage",
+  field: "--c-field",
+  popover: "--c-popover",
+  band: "--c-band",
+  technical: "--c-technical",
+  "technical-wash": "--c-technical-wash",
+  "technical-ink": "--c-technical-ink",
+  "technical-note": "--c-technical-note",
+  "layer-copper": "--c-layer-copper",
+  "layer-mask": "--c-layer-mask",
+  "layer-paste": "--c-layer-paste",
+  "layer-silk": "--c-layer-silk",
+  "layer-fab": "--c-layer-fab",
+  "layer-courtyard": "--c-layer-courtyard",
+  "control-top": "--c-control-top",
+  "control-bottom": "--c-control-bottom",
+  "control-hover": "--c-control-hover",
+  "control-pressed": "--c-control-pressed",
+  selected: "--c-selected",
+  "selected-hover": "--c-selected-hover",
+  "selected-edge": "--c-selected-edge",
+  "row-alt": "--c-row-alt",
+  "line-dark": "--c-line-dark",
+  line: "--c-line",
+  line2: "--c-line2",
+  edge: "--c-edge",
+  t1: "--c-t1",
+  t2: "--c-t2",
+  t3: "--c-t3",
+  t4: "--c-t4",
+  t5: "--c-t5",
+  ok: "--c-ok",
+  warn: "--c-warn",
+  err: "--c-err",
+  "ok-text": "--c-ok-text",
+  "warn-text": "--c-warn-text",
+  "err-text": "--c-err-text",
+  "danger-on": "--c-danger-on",
+  scrim: "--c-scrim",
+  acc: "--c-acc",
+  "acc-on": "--c-acc-on",
+  "acc-strong": "--c-acc-strong",
+  "acc-soft": "--c-acc-soft",
+  focus: "--c-focus",
+};
+
+const COLOR_ROLES = ["bg", "text", "border", "outline", "ring", "stroke"] as const;
+const colorEntries = Object.entries(TOKEN_COLOR_CLASSES).flatMap(([name, cssVar]) =>
+  COLOR_ROLES.map((role) => [`${role}-${name}`, cssVar] as const),
+);
+
+export const CLASS_TO_VAR: Readonly<Record<string, string>> = Object.freeze({
+  ...Object.fromEntries(colorEntries),
   "text-ui-meta": "--fs-ui-meta",
   "text-ui-caption": "--fs-ui-caption",
   "text-ui-body": "--fs-ui-body",
@@ -70,14 +88,18 @@ export const CLASS_TO_VAR: Readonly<Record<string, string>> = {
   "shadow-raise": "--shadow-raise",
   "shadow-pop": "--shadow-pop",
   "shadow-file": "--shadow-file",
-};
+});
 
-// The design-token cssVars an element's className references, deduped and in first-seen order. Unknown
-// classes are ignored, so passing a full className string returns only the DEV_TOKENS-backed tokens.
+function baseUtility(cls: string): string {
+  const afterVariant = cls.slice(cls.lastIndexOf(":") + 1);
+  return afterVariant.replace(/\/[^/]+$/, "");
+}
+
+// The design-token cssVars an element's className references, deduped in first-seen order.
 export function varsForClassName(className: string): string[] {
   const out: string[] = [];
   for (const cls of className.split(/\s+/)) {
-    const cssVar = CLASS_TO_VAR[cls];
+    const cssVar = CLASS_TO_VAR[baseUtility(cls)];
     if (cssVar && !out.includes(cssVar)) out.push(cssVar);
   }
   return out;

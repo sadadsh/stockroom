@@ -26,7 +26,7 @@ const MODES: { key: Mode; label: string; blurb: string }[] = [
 
 const INPUT =
   "w-full rounded-control border border-line2 bg-field px-3 py-2 text-base text-t1 " +
-  "outline-none focus:border-acc disabled:opacity-50";
+  "outline-none focus:border-focus disabled:opacity-50";
 
 export function OnboardingGate({ status }: { status: OnboardingStatus }) {
   const scenarioUi = useScenarioUiState();

@@ -413,7 +413,7 @@ function MatrixHeaderRow({
                 onTouchStart={header.getResizeHandler()}
                 onDoubleClick={() => header.column.resetSize()}
                 onKeyDown={(event) => resizeByKey(event, header.column)}
-                className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize select-none border-r border-line outline-none hover:border-acc focus-visible:border-acc focus-visible:ring-1 focus-visible:ring-[var(--c-line2)]"
+                className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize select-none border-r border-line outline-none hover:border-acc focus-visible:border-focus focus-visible:ring-1 focus-visible:ring-[var(--c-line2)]"
               />
             </div>
           );

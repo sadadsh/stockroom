@@ -8,8 +8,8 @@ import { useState } from "react";
 import { useStmPinout } from "../../api/stmQueries";
 import { ApiError } from "../../api/client";
 import { useModalDismiss } from "../../lib/useModalDismiss";
-import { Button } from "../primitives";
-import { Text, useText } from "../../lib/copy";
+import { ErrorState, LoadingState, ModalHeader } from "../primitives";
+import { useText } from "../../lib/copy";
 import { PinoutTable } from "./PinoutTable";
 
 export function BenchPartModal({ part, onClose }: { part: string; onClose: () => void }) {
@@ -23,7 +23,7 @@ export function BenchPartModal({ part, onClose }: { part: string; onClose: () =>
   return (
     <div
       style={{ zIndex: modalZ }}
-      className="fixed inset-0 flex items-center justify-center bg-black/50 p-6"
+      className="fixed inset-0 flex items-center justify-center bg-scrim p-6"
       data-testid="bench-part-modal"
       // role="presentation", matching the shared modal frame in components/modalParts: the scrim
       // is a surface, not a control. The press-to-dismiss is a POINTER convenience whose keyboard
@@ -39,32 +39,29 @@ export function BenchPartModal({ part, onClose }: { part: string; onClose: () =>
         aria-label={dialogLabel}
         tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
-        className="flex h-[88vh] w-full max-w-[880px] flex-col overflow-hidden rounded-card border border-line2 bg-popover p-4 shadow-pop outline-none"
+        className="flex h-[88vh] w-full max-w-[880px] flex-col overflow-hidden rounded-card border border-line2 bg-popover shadow-pop outline-none"
       >
-        <div className="mb-3 flex flex-none items-center justify-between gap-3">
-          <div className="flex items-baseline gap-2">
-            <span className="font-mono text-sm font-semibold text-t1">
-              {pinout.data?.mpn_example || part}
-            </span>
-            {pinout.data ? (
-              <span className="font-mono text-xs text-t3">{pinout.data.package}</span>
-            ) : null}
-          </div>
-          <Button type="button" small onClick={onClose}>
-            <Text id="stm.bench.close">Close</Text>
-          </Button>
-        </div>
-        <div className="flex min-h-0 flex-1 flex-col">
+        <ModalHeader
+          title={<span className="font-mono">{pinout.data?.mpn_example || part}</span>}
+          onClose={onClose}
+        >
+          {pinout.data ? (
+            <span className="font-mono text-xs text-t3">{pinout.data.package}</span>
+          ) : null}
+        </ModalHeader>
+        <div className="flex min-h-0 flex-1 flex-col p-4">
           {pinout.isLoading ? (
-            <p className="py-16 text-center text-sm text-t3">
-              <Text id="stm.bench.loading">Loading the pinout...</Text>
-            </p>
+            <LoadingState dense id="stm.bench.loading">Loading the pinout...</LoadingState>
           ) : pinout.error ? (
-            <p className="py-16 text-center text-sm text-err-text">
+            <ErrorState
+              dense
+              id="stm.bench.failed"
+              onRetry={pinout.error instanceof ApiError && pinout.error.status === 409 ? undefined : () => pinout.refetch()}
+            >
               {pinout.error instanceof ApiError && pinout.error.status === 409
                 ? notBuiltLabel
                 : failedLabel}
-            </p>
+            </ErrorState>
           ) : pinout.data ? (
             <PinoutTable
               pinout={pinout.data}

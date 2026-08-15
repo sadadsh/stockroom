@@ -59,6 +59,17 @@ describe("AddPartModal", () => {
     await user.keyboard("{Escape}");
     expect(screen.queryByRole("dialog")).toBeNull();
   });
+
+  it("traps keyboard focus inside the shared modal layer", async () => {
+    wrap();
+    const user = userEvent.setup();
+    const dialog = await openModal(user);
+    const close = within(dialog).getByRole("button", { name: "Close" });
+    close.focus();
+    await user.tab();
+    expect(close).toHaveFocus();
+    expect(screen.getByRole("button", { name: "trigger" })).not.toHaveFocus();
+  });
 });
 
 // The copy/icon shell, exercised under ThemeProvider + DevModeProvider so dev mode can toggle.

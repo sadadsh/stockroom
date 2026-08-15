@@ -161,7 +161,7 @@ const STATUS_TONE: Record<StatusTone, string> = {
  * registry (and so a status can never wait on one). `aria-hidden`, because the word beside it is the
  * accessible name and a screen reader announcing "warning warning" is worse than either alone.
  */
-export function WarnMark() {
+export function WarnMark({ className }: { className?: string } = {}) {
   return (
     <svg
       aria-hidden
@@ -169,7 +169,7 @@ export function WarnMark() {
       width="9"
       height="9"
       focusable="false"
-      className="mr-0.5 inline-block flex-none align-[-0.5px]"
+      className={cx("mr-0.5 inline-block flex-none align-[-0.5px]", className)}
     >
       <path
         d="M5 0.9 9.3 8.6H0.7Z"

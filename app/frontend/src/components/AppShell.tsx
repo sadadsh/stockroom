@@ -15,6 +15,7 @@ import { RunningVersionIndicator } from "./RunningVersionIndicator";
 import { useScenarioUiState } from "../design-studio/scenarioState";
 import { useEffect } from "react";
 import { useTheme } from "../lib/theme";
+import { StatusText } from "./primitives";
 
 export function AppShell({ children }: { children: ReactNode }) {
   const scenario = useScenarioUiState();
@@ -92,11 +93,11 @@ function ShellStatusBar() {
             <>
               <span className="text-line2">|</span>
               {/* the number worth ACTING on, so it earns the warn tone rather than a quiet grey */}
-              <span className="tnum text-warn">
+              <StatusText tone="warn" className="tnum">
                 <Text id="shell.status.incomplete" values={{ count: incomplete }}>
                   {"{count} Missing Data"}
                 </Text>
-              </span>
+              </StatusText>
             </>
           ) : null}
         </>

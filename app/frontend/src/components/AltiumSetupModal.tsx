@@ -2,11 +2,10 @@
  * Live Altium integration guide. Stockroom never launches a licensed editor merely because the
  * app opened; installation and fresh-session verification begin from the explicit Settings action.
  */
-import * as m from "motion/react-m";
 import { useAltiumStatus, useOdbcStatus } from "../api/queries";
 import { useModalDismiss } from "../lib/useModalDismiss";
 import { useToast } from "../lib/toast";
-import { Button, Dot } from "./primitives";
+import { Button, Dot, ModalHeader } from "./primitives";
 import { DownloadIcon, DuplicateIcon } from "./icons";
 import { Text, useText } from "../lib/copy";
 
@@ -47,7 +46,7 @@ export function AltiumSetupModal({ open, onClose }: { open: boolean; onClose: ()
   return (
     <div
       style={{ zIndex: modalZ }}
-      className="fixed inset-0 flex items-start justify-center bg-black/60 p-4 pt-[7vh]"
+      className="fixed inset-0 flex items-start justify-center bg-scrim p-4 pt-[7vh]"
       // role="presentation", matching the shared modal frame in components/modalParts: the scrim
       // is a surface, not a control. The press-to-dismiss below is a POINTER convenience whose
       // keyboard equivalent is Escape on the top layer, which useModalDismiss already answers, so
@@ -57,33 +56,24 @@ export function AltiumSetupModal({ open, onClose }: { open: boolean; onClose: ()
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <m.div
+      <div
         ref={dialogRef}
         tabIndex={-1}
-        initial={{ opacity: 0, y: 8, scale: 0.99 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        transition={{ type: "spring", stiffness: 420, damping: 32 }}
         role="dialog"
         aria-modal="true"
         aria-label={dialogLabel}
         data-dev-id="altiumdb.setup-modal"
         className="flex max-h-[82vh] w-full max-w-[560px] flex-col overflow-hidden rounded-card border border-line2 bg-popover shadow-pop"
       >
-        <div className="flex flex-none items-center justify-between gap-3 border-b border-line px-5 py-3.5">
-          <div>
-            <div className="text-base font-semibold text-t1">
-              <Text id="altiumdb.setup.title">Altium Setup</Text>
-            </div>
-            <p className="mt-0.5 text-xs text-t3">
-              <Text id="altiumdb.setup.subtitle">Stockroom prepares the active DbLib without opening Altium until the setup action is chosen.</Text>
-            </p>
-          </div>
-          <Button small onClick={onClose}>
-            <Text id="altiumdb.setup.close">Close</Text>
-          </Button>
-        </div>
+        <ModalHeader
+          title={<Text id="altiumdb.setup.title">Altium Setup</Text>}
+          onClose={onClose}
+        />
 
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+          <p className="mb-4 text-xs leading-relaxed text-t3">
+            <Text id="altiumdb.setup.subtitle">Stockroom prepares the active DbLib without opening Altium until the setup action is chosen.</Text>
+          </p>
           <ol className="flex flex-col gap-4">
             <Step
               n={1}
@@ -132,7 +122,7 @@ export function AltiumSetupModal({ open, onClose }: { open: boolean; onClose: ()
                     href={odbc.data?.download_url}
                     target="_blank"
                     rel="noreferrer"
-                    className="inline-flex h-[27px] flex-none items-center gap-1.5 whitespace-nowrap rounded-control border border-line bg-raise px-2.5 text-xs font-medium text-t2 transition hover:bg-raise2 hover:text-t1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc"
+                    className="inline-flex h-[27px] flex-none items-center gap-1.5 whitespace-nowrap rounded-control border border-line bg-raise px-2.5 text-xs font-medium text-t2 transition hover:bg-raise2 hover:text-t1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
                   >
                     <DownloadIcon className="h-3.5 w-3.5" />
                     <Text id="altiumdb.setup.step1-download">Download Driver</Text>
@@ -191,7 +181,7 @@ export function AltiumSetupModal({ open, onClose }: { open: boolean; onClose: ()
             </Step>
           </ol>
         </div>
-      </m.div>
+      </div>
     </div>
   );
 }

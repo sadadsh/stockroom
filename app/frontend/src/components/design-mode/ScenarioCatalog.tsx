@@ -41,7 +41,7 @@ export function ScenarioCatalog() {
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           placeholder={searchLabel}
-          className="mb-2 h-8 w-full rounded-control bg-field px-2 text-xs text-t1 outline-none focus:ring-1 focus:ring-acc"
+          className="mb-2 h-8 w-full rounded-control bg-field px-2 text-xs text-t1 outline-none focus:ring-1 focus:ring-focus"
         />
         <div className="space-y-1">
           {groups.map(([group, items]) => {

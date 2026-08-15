@@ -146,7 +146,7 @@ export function AdaptiveChoice({
             }
           }}
           placeholder={searchHint({ field: label })}
-          className="h-8 w-full rounded-control border border-line bg-field px-2 text-xs text-t1 outline-none focus:border-acc disabled:opacity-50"
+          className="h-8 w-full rounded-control border border-line bg-field px-2 text-xs text-t1 outline-none focus:border-focus disabled:opacity-50"
         />
         <datalist id={listId}>
           {/* One pass over the options, in their given order: the same entries the
@@ -169,7 +169,7 @@ export function AdaptiveChoice({
       onChange={(event) => onChange(event.target.value)}
       className={
         `min-w-0 rounded-control border border-line bg-field px-2 text-xs text-t1 outline-none ` +
-        `focus:border-acc disabled:opacity-50 ${className}`
+        `focus:border-focus disabled:opacity-50 ${className}`
       }
     >
       {options.map((option) => (

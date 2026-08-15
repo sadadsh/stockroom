@@ -18,7 +18,7 @@ export interface ScenarioUiState {
   search?: { open?: boolean; query?: string; category?: string | null };
   service?: { error?: string };
   settings?: {
-    group?: "general" | "library" | "eda" | "sources" | "maintenance";
+    section?: string;
     altiumDialog?: "setup" | "dblib";
     confirmResetCad?: boolean;
     picker?: "kicad" | "cubemx";

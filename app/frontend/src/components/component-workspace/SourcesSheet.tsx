@@ -201,7 +201,7 @@ function FieldSourcesPanel({
                           disabled={applying}
                           aria-label={`${applyLabel} ${alternate.displayValue} ${field.label}`}
                           onClick={() => onApplyAlternate(field.key, alternate.value)}
-                          className="rounded-control px-1 font-medium text-acc transition-colors hover:brightness-125 disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc"
+                          className="rounded-control px-1 font-medium text-acc transition-colors hover:brightness-125 disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
                         >
                           {applyLabel}
                         </button>
@@ -388,7 +388,7 @@ function ChangesPanel({ componentId, componentName }: { componentId: string; com
                 data-dev-id="component-browser.change-entry"
                 aria-expanded={active}
                 onClick={() => setSelected(active ? null : commit.sha)}
-                className="flex w-full items-start gap-3 px-3 py-1.5 text-left transition-colors hover:bg-raise2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc"
+                className="flex w-full items-start gap-3 px-3 py-1.5 text-left transition-colors hover:bg-raise2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
               >
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-2xs text-t1">{commit.subject}</span>

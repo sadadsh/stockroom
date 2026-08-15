@@ -831,7 +831,7 @@ function PieceMenu({ state }: { state: ArrangeMenuState }) {
             movePlacementIntoRegion(surface.layout, state.placementId, event.target.value),
           );
         }}
-        className="rounded-control border border-line bg-field px-1.5 py-1 font-mono text-2xs text-t1 outline-none focus:border-acc"
+        className="rounded-control border border-line bg-field px-1.5 py-1 font-mono text-2xs text-t1 outline-none focus:border-focus"
       >
         {regions.map((choice) => (
           <option key={choice.id} value={choice.id}>
@@ -927,7 +927,7 @@ function PieceMenu({ state }: { state: ArrangeMenuState }) {
           aria-label={roleLabel}
           value={role}
           onChange={(event) => setRole(event.target.value)}
-          className="min-w-0 flex-1 rounded-control border border-line bg-field px-1.5 py-1 font-mono text-2xs text-t1 outline-none focus:border-acc"
+          className="min-w-0 flex-1 rounded-control border border-line bg-field px-1.5 py-1 font-mono text-2xs text-t1 outline-none focus:border-focus"
         >
           {STYLE_ROLE_NAMES.map((name) => (
             <option key={name} value={name}>
@@ -951,7 +951,7 @@ function PieceMenu({ state }: { state: ArrangeMenuState }) {
               ),
             );
           }}
-          className="min-w-0 flex-1 rounded-control border border-line bg-field px-1.5 py-1 font-mono text-2xs text-t1 outline-none focus:border-acc"
+          className="min-w-0 flex-1 rounded-control border border-line bg-field px-1.5 py-1 font-mono text-2xs text-t1 outline-none focus:border-focus"
         >
           <option value="">{roleNoneLabel}</option>
           {STYLE_ROLE_NAMES.map((name) => (

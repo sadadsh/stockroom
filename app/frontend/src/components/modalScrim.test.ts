@@ -99,6 +99,17 @@ describe("the modal scrim convention", () => {
     expect(/role="presentation"/.test(withoutComments(documented))).toBe(false);
   });
 
+  it("uses one shared scrim token instead of per-modal black opacities", () => {
+    const drift = SOURCE.flatMap(([path, raw]) => {
+      const source = withoutComments(raw);
+      return [...source.matchAll(/bg-black\/(?:40|50|55|60|70)/g)].map((match) => {
+        const line = source.slice(0, match.index).split("\n").length;
+        return `${path}:${line}:${match[0]}`;
+      });
+    });
+    expect(drift).toEqual([]);
+  });
+
   it("keeps every pressable full-viewport overlay out of the accessibility tree", () => {
     const exposed: string[] = [];
     for (const [path, raw] of SOURCE) {

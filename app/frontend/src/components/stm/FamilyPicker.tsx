@@ -13,7 +13,7 @@ import { useStmFamilies } from "../../api/stmQueries";
 import type { FamilyDTO } from "../../api/types";
 import type { StmScope } from "../../pages/StmViewerPage";
 import { instanceDevId } from "../../lib/componentDevIds";
-import { Badge, Eyebrow } from "../primitives";
+import { Badge, EmptyState, ErrorState, Eyebrow, LoadingState } from "../primitives";
 import { Text, useCopyFormatter, useText } from "../../lib/copy";
 
 // A small disclosure chevron (no shared icon for it); rotates 90deg when the family is expanded.
@@ -60,17 +60,13 @@ export function FamilyPicker({ scope, onScopeChange }: Props) {
       </div>
 
       {families.isLoading ? (
-        <p className="px-2 py-3 text-xs text-t3">
-          <Text id="stm.family.loading">Loading series...</Text>
-        </p>
+        <LoadingState dense id="stm.family.loading">Loading series...</LoadingState>
       ) : families.isError ? (
-        <p className="px-2 py-3 text-xs text-err-text">
-          <Text id="stm.family.failed">Could not load series.</Text>
-        </p>
+        <ErrorState dense id="stm.family.failed" onRetry={() => families.refetch()}>
+          Could not load series.
+        </ErrorState>
       ) : rows.length === 0 ? (
-        <p className="px-2 py-3 text-xs text-t3">
-          <Text id="stm.family.empty">No series in the index.</Text>
-        </p>
+        <EmptyState dense id="stm.family.empty">No series in the index.</EmptyState>
       ) : (
         <div className="-mx-1 min-h-0 flex-1 overflow-y-auto px-1">
           <ScopeRow

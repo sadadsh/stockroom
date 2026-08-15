@@ -84,7 +84,7 @@ const BUTTON_VARIANTS: Record<ButtonVariant, string> = {
   accent:
     "bg-acc text-acc-on hover:brightness-110 active:brightness-95 font-semibold",
   danger:
-    "bg-err text-white hover:brightness-110 active:brightness-95 font-semibold",
+    "bg-err text-danger-on hover:brightness-110 active:brightness-95 font-semibold",
   // A quiet destructive TRIGGER (north-star restraint): a danger-tinted outline, not a solid
   // fill, so a page-level Remove/Delete/Clear reads as available without shouting. The loud
   // solid `danger` is reserved for the final in-modal confirm (the committed action). The err
@@ -400,8 +400,15 @@ const DOT_TONES: Record<BadgeTone, string> = {
   neutral: "bg-t3",
 };
 
-// The small colored status dot.
+// The small status mark. Warning stays a triangle because its token is deliberately neutral.
 export function Dot({ tone }: { tone: BadgeTone }) {
+  if (tone === "warn") {
+    return (
+      <span className="inline-flex h-[7px] w-[7px] flex-none items-center justify-center text-warn">
+        <WarnMark className="!m-0 !h-[7px] !w-[7px]" />
+      </span>
+    );
+  }
   return (
     <span
       className={cx("inline-block h-[7px] w-[7px] flex-none rounded-full", DOT_TONES[tone])}

@@ -6,11 +6,9 @@
  * a second local-file or Altium-only activation lane.
  */
 import { useMemo, useState } from "react";
-import * as m from "motion/react-m";
 import { useAltiumStatus } from "../api/queries";
 import { useModalDismiss } from "../lib/useModalDismiss";
-import { Badge, Dot, SegmentedControl } from "./primitives";
-import { Icon } from "./Icon";
+import { Badge, Dot, ErrorState, LoadingState, ModalHeader, SegmentedControl } from "./primitives";
 import { Text, useText } from "../lib/copy";
 
 type Filter = "all" | "ready" | "needs";
@@ -41,7 +39,6 @@ export function AltiumDbLibModal({ open, onClose }: { open: boolean; onClose: ()
   const filterReady = useText("modal.altium.filter-ready", "Prepared");
   const filterNeeds = useText("modal.altium.filter-needs", "Needs Files");
   const dialogLabel = useText("modal.altium.title", "Altium Database Catalog");
-  const closeLabel = useText("modal.altium.close", "Close");
   const filterLabel = useText("modal.altium.filter", "Filter parts");
 
   if (!open) return null;
@@ -49,7 +46,7 @@ export function AltiumDbLibModal({ open, onClose }: { open: boolean; onClose: ()
   return (
     <div
       style={{ zIndex: modalZ }}
-      className="fixed inset-0 flex items-start justify-center bg-black/60 p-4 pt-[7vh]"
+      className="fixed inset-0 flex items-start justify-center bg-scrim p-4 pt-[7vh]"
       // role="presentation", matching the shared modal frame in components/modalParts: the scrim
       // is a surface, not a control. The press-to-dismiss below is a POINTER convenience whose
       // keyboard equivalent is Escape on the top layer, which useModalDismiss already answers, so
@@ -59,37 +56,21 @@ export function AltiumDbLibModal({ open, onClose }: { open: boolean; onClose: ()
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <m.div
+      <div
         ref={dialogRef}
         tabIndex={-1}
-        initial={{ opacity: 0, y: 8, scale: 0.99 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        transition={{ type: "spring", stiffness: 420, damping: 32 }}
         role="dialog"
         aria-modal="true"
         aria-label={dialogLabel}
         data-dev-id="altiumdb.modal"
         className="flex max-h-[86vh] w-full max-w-[960px] flex-col overflow-hidden rounded-card border border-line bg-raise shadow-raise focus:outline-none"
       >
-        <div className="flex h-[38px] flex-none items-center justify-between gap-4 border-b border-line bg-band px-4">
-          <div className="flex items-baseline gap-2.5">
-            <h2 className="text-sm font-semibold text-t1">
-              <Text id="modal.altium.title">Altium Database Catalog</Text>
-            </h2>
-            <span className="text-xs text-t3">
-              {readyCount} of {rows.length} mapped
-              {status.data ? ` · Library ${status.data.profile}` : ""}
-            </span>
-          </div>
-          <button
-            type="button"
-            aria-label={closeLabel}
-            onClick={onClose}
-            className="flex h-[26px] w-[26px] flex-none items-center justify-center rounded-control text-t3 hover:bg-raise2 hover:text-t1"
-          >
-            <Icon id="action.close" className="h-4 w-4" />
-          </button>
-        </div>
+        <ModalHeader title={<Text id="modal.altium.title">Altium Database Catalog</Text>} onClose={onClose}>
+          <span className="text-xs text-t3">
+            {readyCount} of {rows.length} mapped
+            {status.data ? ` · Library ${status.data.profile}` : ""}
+          </span>
+        </ModalHeader>
 
         <div className="flex items-center px-5 py-3" data-dev-id="altiumdb.modal-filter">
           <SegmentedControl<Filter>
@@ -107,13 +88,11 @@ export function AltiumDbLibModal({ open, onClose }: { open: boolean; onClose: ()
 
         <div className="min-h-0 flex-1 overflow-auto px-5 pb-5">
           {status.isLoading ? (
-            <p className="py-6 text-center text-sm text-t3">
-              <Text id="modal.altium.loading">Reading the catalog...</Text>
-            </p>
+            <LoadingState id="modal.altium.loading">Reading the catalog...</LoadingState>
           ) : status.isError ? (
-            <p className="py-6 text-center text-sm text-err-text">
-              <Text id="modal.altium.error">Could not read the Altium catalog.</Text>
-            </p>
+            <ErrorState id="modal.altium.error" onRetry={() => status.refetch()}>
+              Could not read the Altium catalog.
+            </ErrorState>
           ) : shown.length === 0 ? (
             <div className="flex items-center justify-center gap-2.5 py-10">
               <Dot tone="neutral" />
@@ -187,7 +166,7 @@ export function AltiumDbLibModal({ open, onClose }: { open: boolean; onClose: ()
             </table>
           )}
         </div>
-      </m.div>
+      </div>
     </div>
   );
 }

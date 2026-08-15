@@ -202,7 +202,7 @@ export function ArrangeSection({
                 maxLength={LAYOUT_DRAFT_NAME_MAX}
                 value={name}
                 onChange={(event) => setName(event.target.value)}
-                className="min-w-0 flex-1 rounded-control border border-line bg-field px-2 py-1 text-2xs text-t1 outline-none focus:border-acc"
+                className="min-w-0 flex-1 rounded-control border border-line bg-field px-2 py-1 text-2xs text-t1 outline-none focus:border-focus"
               />
               <button
                 type="button"

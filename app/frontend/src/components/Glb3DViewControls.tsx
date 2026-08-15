@@ -279,7 +279,7 @@ function ModelControlStrip({
             title={settingsHint}
             onClick={() => onSettingsOpen(!settingsOpen)}
             className={
-              "flex h-[30px] w-[30px] items-center justify-center rounded-control border border-line2 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-acc " +
+              "flex h-[30px] w-[30px] items-center justify-center rounded-control border border-line2 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus " +
               (settingsOpen
                 ? "bg-raise2 text-t1 shadow-card"
                 : "bg-field text-t2 hover:bg-raise hover:text-t1")
@@ -302,7 +302,7 @@ function ModelControlStrip({
                 type="button"
                 onClick={controls.fit}
                 title={fitHint}
-                className="inline-flex min-h-[32px] items-center rounded-control border border-line2 bg-field px-2.5 text-xs font-semibold text-t2 transition-[background-color,color] hover:bg-raise hover:text-t1 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-acc"
+                className="inline-flex min-h-[32px] items-center rounded-control border border-line2 bg-field px-2.5 text-xs font-semibold text-t2 transition-[background-color,color] hover:bg-raise hover:text-t1 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus"
               >
                 <Text id="model3d.fit">Fit</Text>
               </button>
@@ -440,7 +440,7 @@ function ModelSettingsPanel({
             onClick={controls.fit}
             aria-label={fitModelLabel}
             title={fitHint}
-            className="flex h-[32px] min-w-[42px] items-center justify-center rounded-control border border-line2 bg-field px-2 text-xs font-semibold text-t2 hover:bg-raise hover:text-t1 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-acc"
+            className="flex h-[32px] min-w-[42px] items-center justify-center rounded-control border border-line2 bg-field px-2 text-xs font-semibold text-t2 hover:bg-raise hover:text-t1 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus"
           >
             <Text id="model3d.fit">Fit</Text>
           </button>
@@ -584,7 +584,7 @@ function PlacementControls({
               onClick={() => onPick(item.mode)}
               className={
                 "inline-flex min-h-[32px] items-center gap-1.5 rounded-control px-2.5 text-xs font-semibold transition-[background-color,color] " +
-                "focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-acc " +
+                "focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus " +
                 (active === item.mode
                   ? "bg-raise2 text-t1 shadow-card"
                   : "text-t2 hover:bg-raise hover:text-t1")
@@ -675,7 +675,7 @@ function LayerToggle({
       }}
       className={
         "rounded-control font-semibold transition-[background-color,color] duration-100 ease-out " +
-        "focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-acc " +
+        "focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus " +
         (iconOnly
           ? "flex h-[30px] w-[30px] items-center justify-center "
           : "inline-flex min-h-[32px] items-center gap-1.5 px-2.5 text-xs ") +
@@ -758,7 +758,7 @@ function ViewControls({
             // 160ms ease-out + a 0.97 press: a control with no press feedback does not feel like
             // it heard the click. transform/opacity only, so it stays off the layout path.
             "rounded-control font-semibold transition-[background-color,color] duration-100 ease-out " +
-            "focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-acc " +
+            "focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus " +
             (compact
               ? "flex h-[30px] w-[30px] items-center justify-center "
               : "inline-flex min-h-[32px] items-center gap-1.5 px-2.5 text-xs ") +

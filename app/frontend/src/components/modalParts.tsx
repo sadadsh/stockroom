@@ -25,15 +25,17 @@ import { CloseIcon } from "./icons";
  * Every size is capped against the viewport rather than a fixed pixel height, so the frame holds
  * at 960x640 instead of assuming the 1600px window it was designed on.
  */
-export type ModalSize = "sheet" | "stage" | "full";
+export type ModalSize = "compact" | "sheet" | "stage" | "full";
 
 const FRAME: Record<ModalSize, string> = {
+  compact: "max-h-[calc(100vh-32px)] w-[min(380px,calc(100vw-32px))]",
   sheet: "max-h-[calc(100vh-32px)] w-[min(1100px,calc(100vw-32px))]",
   stage: "h-[min(80vh,680px)] w-[min(860px,calc(100vw-32px))]",
   full: "h-[calc(100vh-24px)] max-h-[1100px] w-[calc(100vw-24px)] max-w-[1600px]",
 };
 
 const BODY: Record<ModalSize, string> = {
+  compact: "min-h-0 flex-1 overflow-y-auto p-4",
   // The one place a scrollbar is welcome: an overlay is not the page.
   sheet: "min-h-0 flex-1 overflow-y-auto p-4",
   stage: "relative min-h-0 flex-1 bg-field",
@@ -48,7 +50,7 @@ export function ModalHeader({
   devId,
   children,
 }: {
-  title: string;
+  title: ReactNode;
   onClose: () => void;
   closeDevId?: string;
   devId?: string;
@@ -72,7 +74,7 @@ export function ModalHeader({
         aria-label={closeLabel}
         title={closeLabel}
         onClick={onClose}
-        className="flex-none rounded-control p-1 text-t3 transition-colors hover:text-t1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc"
+        className="flex-none rounded-control p-1 text-t3 transition-colors hover:text-t1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
       >
         <CloseIcon />
       </button>
@@ -120,6 +122,7 @@ export function ModalShell({
   onClose,
   size = "sheet",
   devId,
+  scrimDevId,
   closeDevId,
   headerDevId,
   bodyDevId,
@@ -134,6 +137,7 @@ export function ModalShell({
   onClose: () => void;
   size?: ModalSize;
   devId?: string;
+  scrimDevId?: string;
   closeDevId?: string;
   headerDevId?: string;
   /** The body IS the stage for a `stage` or `full` window, so it takes that window's id. */
@@ -152,7 +156,8 @@ export function ModalShell({
       // An inline z-index, not a Tailwind class: an arbitrary value built from a template literal
       // produces a class name with no CSS behind it, which would silently delete the stacking.
       style={{ zIndex }}
-      className="fixed inset-0 flex items-center justify-center bg-black/50 p-4"
+      data-dev-id={scrimDevId}
+      className="fixed inset-0 flex items-center justify-center bg-scrim p-4"
       role="presentation"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) onClose();

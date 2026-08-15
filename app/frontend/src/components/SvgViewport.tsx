@@ -83,7 +83,7 @@ export function SvgViewport({
               }
         }
         className={
-          "absolute inset-0 overflow-hidden outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-acc " +
+          "absolute inset-0 overflow-hidden outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus " +
           (compact ? "cursor-default" : "cursor-grab active:cursor-grabbing")
         }
         {...(compact ? {} : handlers)}

@@ -151,9 +151,15 @@ export function Finder({
               data-dev-id="components.filter-complete"
               className="flex cursor-pointer select-none items-center gap-2 text-sm text-t1"
             >
+              <input
+                type="checkbox"
+                className="peer sr-only"
+                checked={completeOnly}
+                onChange={(e) => onCompleteOnly(e.target.checked)}
+              />
               <span
                 className={
-                  "flex h-[17px] w-[17px] flex-none items-center justify-center rounded-control border-[1.5px] text-xs " +
+                  "flex h-[17px] w-[17px] flex-none items-center justify-center rounded-control border-[1.5px] text-xs peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-focus " +
                   (completeOnly
                     ? "border-acc bg-acc text-acc-on"
                     : "border-line2 text-transparent")
@@ -161,12 +167,6 @@ export function Finder({
               >
                 {"✓"}
               </span>
-              <input
-                type="checkbox"
-                className="sr-only"
-                checked={completeOnly}
-                onChange={(e) => onCompleteOnly(e.target.checked)}
-              />
               <Text id="components.filter-complete-label">Just Complete</Text>
             </label>
           </div>
@@ -177,9 +177,15 @@ export function Finder({
                 data-dev-id="components.filter-duplicates"
                 className="flex cursor-pointer select-none items-center gap-2 text-sm text-t1"
               >
+                <input
+                  type="checkbox"
+                  className="peer sr-only"
+                  checked={duplicatesOnly}
+                  onChange={(e) => onDuplicatesOnly(e.target.checked)}
+                />
                 <span
                   className={
-                    "flex h-[17px] w-[17px] flex-none items-center justify-center rounded-control border-[1.5px] text-xs " +
+                    "flex h-[17px] w-[17px] flex-none items-center justify-center rounded-control border-[1.5px] text-xs peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-focus " +
                     (duplicatesOnly
                       ? "border-acc bg-acc text-acc-on"
                       : "border-line2 text-transparent")
@@ -187,12 +193,6 @@ export function Finder({
                 >
                   {"✓"}
                 </span>
-                <input
-                  type="checkbox"
-                  className="sr-only"
-                  checked={duplicatesOnly}
-                  onChange={(e) => onDuplicatesOnly(e.target.checked)}
-                />
                 Duplicates ({duplicateCount})
               </label>
             </div>

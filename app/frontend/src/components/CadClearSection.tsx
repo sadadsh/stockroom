@@ -23,7 +23,7 @@
  * "type the word DELETE" gate was rejected: it is friction theatre next to a git-backed library
  * where the previous state is one revert away, and it is not a pattern this app uses anywhere.
  */
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { api } from "../api/client";
 import { useCadInventory } from "../api/queries";
 import type { CadInventory } from "../api/types";
@@ -40,7 +40,12 @@ export function CadClearSection() {
   const job = useJob<CadInventory>();
   const { toast } = useToast();
   const [confirming, setConfirming] = useState(false);
+  const [dismissedScenarioConfirm, setDismissedScenarioConfirm] = useState(false);
   const [report, setReport] = useState<CadInventory | null>(null);
+
+  useEffect(() => {
+    setDismissedScenarioConfirm(false);
+  }, [scenarioConfirming]);
   // Resolved up here, above the two early returns below, because a toast and a dialog prop both
   // take a plain string and neither can hold a copy element. One id per number agreement: the
   // count and its noun have to move together when the sentence is reworded.
@@ -66,6 +71,7 @@ export function CadClearSection() {
 
   const onClear = useCallback(async () => {
     setConfirming(false);
+    setDismissedScenarioConfirm(true);
     setReport(null);
     let ref: { job_id: string };
     try {
@@ -242,7 +248,7 @@ export function CadClearSection() {
       ) : null}
 
       <ConfirmDialog
-        open={confirming || scenarioConfirming}
+        open={confirming || (scenarioConfirming && !dismissedScenarioConfirm)}
         danger
         title={confirmTitle}
         confirmLabel="Remove Them"
@@ -259,7 +265,10 @@ export function CadClearSection() {
           </>
         }
         onConfirm={onClear}
-        onCancel={() => setConfirming(false)}
+        onCancel={() => {
+          setConfirming(false);
+          setDismissedScenarioConfirm(true);
+        }}
       />
     </div>
   );

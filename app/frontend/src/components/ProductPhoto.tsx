@@ -116,7 +116,7 @@ export function PhotoTrigger({
               ? viewManyName({ count, part: partName || thisPart })
               : viewOneName({ part: partName || thisPart })
           }
-          className="group flex h-8 w-full items-center gap-2 rounded-control border border-line bg-field px-3 text-xs font-medium text-t1 transition-colors hover:border-line2 hover:bg-raise2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc"
+          className="group flex h-8 w-full items-center gap-2 rounded-control border border-line bg-field px-3 text-xs font-medium text-t1 transition-colors hover:border-line2 hover:bg-raise2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
         >
           {/* Anatomy DELIBERATELY matched to the CAD row directly beneath it: glyph and label on the
               left, affordance on the right. Measured on the first cut, which centred its content and
@@ -150,7 +150,7 @@ export function PhotoTrigger({
         data-dev-id={devId}
         onClick={() => setOpen(true)}
         aria-label={viewOneName({ part: partName || thisPart })}
-        className="inline-flex flex-none items-center gap-1.5 rounded-control border border-line bg-raise px-2 py-1 text-2xs font-medium text-t2 transition-colors hover:border-line2 hover:text-t1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc"
+        className="inline-flex flex-none items-center gap-1.5 rounded-control border border-line bg-raise px-2 py-1 text-2xs font-medium text-t2 transition-colors hover:border-line2 hover:text-t1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
       >
         <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
           <rect x="3" y="5" width="18" height="14" rx="2" />
@@ -289,7 +289,7 @@ function PhotoStage({
             type="button"
             onClick={onClose}
             aria-label={closeLabel}
-            className="flex h-7 w-7 flex-none items-center justify-center rounded-control text-t3 transition-colors hover:bg-raise2 hover:text-t1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-acc"
+            className="flex h-7 w-7 flex-none items-center justify-center rounded-control text-t3 transition-colors hover:bg-raise2 hover:text-t1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-focus"
           >
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
               <path d="M18 6 6 18M6 6l12 12" />
@@ -362,7 +362,7 @@ function CarouselArrow({
       className={
         "absolute top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-control " +
         "border border-line bg-popover text-t2 shadow-pop transition-colors hover:text-t1 " +
-        "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc " +
+        "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus " +
         (side === "left" ? "left-2" : "right-2")
       }
     >

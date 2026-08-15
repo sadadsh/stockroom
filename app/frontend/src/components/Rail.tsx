@@ -230,7 +230,7 @@ export function Rail() {
               "flex h-[24px] w-[24px] flex-none items-center justify-center rounded-control " +
               "text-t2 transition hover:bg-[var(--c-hover)] hover:text-t1 " +
               "focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 " +
-              "focus-visible:outline-acc " +
+              "focus-visible:outline-focus " +
               (collapsed ? "" : "ml-auto -mr-1")
             }
           >
@@ -438,7 +438,7 @@ function AboutModal({
     <div
       data-dev-id="about.scrim"
       style={{ zIndex: modalZ }}
-      className="fixed inset-0 flex items-center justify-center bg-black/55 p-4"
+      className="fixed inset-0 flex items-center justify-center bg-scrim p-4"
       role="presentation"
       onClick={onClose}
     >
@@ -460,7 +460,7 @@ function AboutModal({
           onClick={onClose}
           aria-label={closeAboutLabel}
           title={closeAboutLabel}
-          className="absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-control text-t3 transition-colors hover:bg-[var(--c-hover)] hover:text-t1 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-acc"
+          className="absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-control text-t3 transition-colors hover:bg-[var(--c-hover)] hover:text-t1 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus"
         >
           <svg width="11" height="11" viewBox="0 0 11 11" fill="none" aria-hidden>
             <path d="M1 1l9 9M10 1l-9 9" stroke="currentColor" strokeWidth="1.5"

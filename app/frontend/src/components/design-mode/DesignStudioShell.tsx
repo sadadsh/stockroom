@@ -111,7 +111,7 @@ function PanelResizer({
         event.preventDefault();
         resize(event.key === "ArrowRight" ? 16 : -16);
       }}
-      className="design-studio-resizer w-1.5 flex-none cursor-col-resize bg-line/40 hover:bg-acc focus-visible:outline focus-visible:outline-2 focus-visible:outline-acc"
+      className="design-studio-resizer w-1.5 flex-none cursor-col-resize bg-line/40 hover:bg-acc focus-visible:outline focus-visible:outline-2 focus-visible:outline-focus"
     >
       <span className="sr-only">{resizeLabel}</span>
     </button>

@@ -95,7 +95,7 @@ export function ProjectDesignWorkbench({
                 className={
                   "relative flex w-full items-center gap-2.5 border-b border-line px-2.5 py-2.5 text-left " +
                   "transition-colors focus-visible:z-10 focus-visible:outline focus-visible:outline-2 " +
-                  "focus-visible:-outline-offset-2 focus-visible:outline-acc " +
+                  "focus-visible:-outline-offset-2 focus-visible:outline-focus " +
                   (selected ? "bg-raise2" : "hover:bg-raise")
                 }
               >

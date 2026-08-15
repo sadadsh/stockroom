@@ -21,6 +21,7 @@ import {
   EmptyState,
   ErrorState,
   LoadingState,
+  StatusText,
   TabPanel,
   TabStrip,
   type TabItem,
@@ -201,9 +202,13 @@ function SelectedProject({
               </span>
             </span>
           ) : (
-            <span data-dev-id="projects.no-repository" className="whitespace-nowrap text-2xs text-warn">
+            <StatusText
+              tone="warn"
+              data-dev-id="projects.no-repository"
+              className="whitespace-nowrap text-2xs"
+            >
               <Text id="projects.no-repository">No Git checkout</Text>
-            </span>
+            </StatusText>
           )}
           {session ? (
             <span className="min-w-0 truncate text-2xs text-ok-text">

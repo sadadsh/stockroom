@@ -7,7 +7,7 @@
  * Placement: Settings, the natural sibling of Procurement Rescan and Library Health, which host
  * the other library-wide maintenance surfaces in this same status + action shape.
  */
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   useAltiumEmbedCapability,
   useAltiumEmbedModels,
@@ -21,7 +21,7 @@ import { useToast } from "../lib/toast";
 import { Text, useCopyFormatter, useText } from "../lib/copy";
 import { AltiumDbLibModal } from "./AltiumDbLibModal";
 import { AltiumSetupModal } from "./AltiumSetupModal";
-import { Button, Dot } from "./primitives";
+import { Button, Dot, ErrorState, LoadingState } from "./primitives";
 import { RefreshIcon, LibraryIcon, DownloadIcon, ExternalIcon, DuplicateIcon } from "./icons";
 import { Icon } from "./Icon";
 import { useScenarioUiState } from "../design-studio/scenarioState";
@@ -34,6 +34,11 @@ export function AltiumDbLibSection() {
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
   const [setupOpen, setSetupOpen] = useState(false);
+  const [dismissedScenarioDialog, setDismissedScenarioDialog] = useState<string | null>(null);
+
+  useEffect(() => {
+    setDismissedScenarioDialog(null);
+  }, [scenarioDialog]);
   // The glyph carries the verb, so the label carries the object alone. The full action still has
   // to be readable and announceable, which is what this string is for.
   const copyPathAction = useText(
@@ -117,13 +122,11 @@ export function AltiumDbLibSection() {
   return (
     <>
       {status.isLoading ? (
-        <p className="py-1 text-sm text-t3">
-          <Text id="altiumdb.section.loading">Reading the catalog...</Text>
-        </p>
+        <LoadingState dense id="altiumdb.section.loading">Reading the catalog...</LoadingState>
       ) : status.isError ? (
-        <p className="py-1 text-sm text-err-text">
-          <Text id="altiumdb.section.error">Could not read the Altium catalog.</Text>
-        </p>
+        <ErrorState dense id="altiumdb.section.error" onRetry={() => status.refetch()}>
+          Could not read the Altium catalog.
+        </ErrorState>
       ) : data ? (
         <div className="flex flex-col gap-3">
           <div className="flex items-baseline justify-between gap-4">
@@ -217,8 +220,20 @@ export function AltiumDbLibSection() {
         </Button>
       </div>
 
-      <AltiumDbLibModal open={open || scenarioDialog === "dblib"} onClose={() => setOpen(false)} />
-      <AltiumSetupModal open={setupOpen || scenarioDialog === "setup"} onClose={() => setSetupOpen(false)} />
+      <AltiumDbLibModal
+        open={open || (scenarioDialog === "dblib" && dismissedScenarioDialog !== "dblib")}
+        onClose={() => {
+          setOpen(false);
+          if (scenarioDialog === "dblib") setDismissedScenarioDialog("dblib");
+        }}
+      />
+      <AltiumSetupModal
+        open={setupOpen || (scenarioDialog === "setup" && dismissedScenarioDialog !== "setup")}
+        onClose={() => {
+          setSetupOpen(false);
+          if (scenarioDialog === "setup") setDismissedScenarioDialog("setup");
+        }}
+      />
     </>
   );
 }
@@ -356,7 +371,7 @@ function OdbcDriverRow() {
           href={odbc.data?.download_url}
           target="_blank"
           rel="noreferrer"
-          className="inline-flex h-[27px] flex-none items-center gap-1.5 whitespace-nowrap rounded-control border border-line bg-raise px-2.5 text-xs font-medium text-t2 transition hover:bg-raise2 hover:text-t1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc"
+          className="inline-flex h-[27px] flex-none items-center gap-1.5 whitespace-nowrap rounded-control border border-line bg-raise px-2.5 text-xs font-medium text-t2 transition hover:bg-raise2 hover:text-t1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
         >
           <DownloadIcon className="h-3.5 w-3.5" />
           <Text id="altiumdb.odbc.download">Download Driver</Text>

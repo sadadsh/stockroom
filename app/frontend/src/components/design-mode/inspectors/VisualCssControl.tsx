@@ -124,7 +124,7 @@ export function VisualCssControl({ property, ariaLabel, value, onCommit }: Visua
         aria-label={ariaLabel}
         value={selected}
         onChange={(event) => onCommit(event.currentTarget.value)}
-        className="w-full rounded-control border border-line bg-field px-1.5 py-1 text-2xs text-t1 outline-none focus:border-acc"
+        className="w-full rounded-control border border-line bg-field px-1.5 py-1 text-2xs text-t1 outline-none focus:border-focus"
       >
         {options.map((option) => <option key={option} value={option}>{visualOptionLabel(option)}</option>)}
       </select>

@@ -70,9 +70,16 @@ function errMsg(err: unknown): string {
   return err instanceof ApiError ? err.message : "Something went wrong.";
 }
 
+function revealSettings(target: string, focus: boolean) {
+  const section = document.querySelector<HTMLElement>(`[data-dev-id="${target}"]`);
+  if (!section) return;
+  section.scrollIntoView?.({ block: "start", behavior: "smooth" });
+  if (focus) section.focus({ preventScroll: true });
+}
+
 const INPUT_CLS =
   "h-[29px] min-w-0 flex-1 rounded-control border border-line2 bg-field px-3 " +
-  "text-sm text-t1 outline-none focus:border-acc disabled:opacity-50";
+  "text-sm text-t1 outline-none focus:border-focus disabled:opacity-50";
 
 function StatusRow({
   label,
@@ -93,49 +100,7 @@ function StatusRow({
   );
 }
 
-// Five scopes a person can reason about. Automatic behavior is separate from library sharing;
-// both EDA projections live together; destructive and repair work is isolated in Maintenance.
-type GroupId = "general" | "library" | "eda" | "sources" | "maintenance";
-
-const SETTINGS_GROUPS: {
-  id: GroupId;
-  label: string;
-  description: string;
-  icon: string;
-}[] = [
-  {
-    id: "general",
-    label: "General",
-    description: "Application appearance, delivery, and the exact behavior of updates.",
-    icon: "action.settings",
-  },
-  {
-    id: "library",
-    label: "Library",
-    description: "Which component collection is active and how its changes reach collaborators.",
-    icon: "nav.library",
-  },
-  {
-    id: "eda",
-    label: "EDA Tools",
-    description: "Machine integration for KiCad and Altium, with automatic state shown first.",
-    icon: "nav.board",
-  },
-  {
-    id: "sources",
-    label: "Data Sources",
-    description: "Optional provider access and controlled refresh of commercial evidence.",
-    icon: "action.download",
-  },
-  {
-    id: "maintenance",
-    label: "Maintenance",
-    description: "Repair, rebuild, storage, and destructive recovery kept away from daily setup.",
-    icon: "action.doctor",
-  },
-];
-
-// One unmet setup step surfaced by Machine Readiness; clicking it jumps to the owning category.
+// One unmet setup step surfaced by Machine Readiness; clicking it jumps to the exact owning card.
 interface SetupStep {
   id: string;
   // The imperative shown while unmet ("Wire KiCad") and the achieved state shown
@@ -145,7 +110,7 @@ interface SetupStep {
   metLabel: string;
   metLabelId: string;
   met: boolean;
-  group: GroupId;
+  target: string;
 }
 
 export function SettingsPage() {
@@ -157,9 +122,6 @@ export function SettingsPage() {
   const odbc = useOdbcStatus();
   const syncQ = useSyncStatus();
   const { query: updateQ, view: updateStanding } = useUpdateStanding();
-  const coverageQ = useLibraryCoverage();
-  const doctorQ = useDoctorScan();
-  const navAria = useText("settings.nav.aria", "Settings Sections");
   // A toast takes a resolved string, so every sentence one of them says is read here. The paths and
   // credential names inside the holes are values off the machine and are not ours to reword.
   const devCredsLoaded = useCopyFormatter(
@@ -171,16 +133,11 @@ export function SettingsPage() {
     "No dev-creds.json at {path}. Place it there from another machine to load credentials in one stroke.",
   );
 
-  const [group, setGroup] = useState<GroupId>("general");
   const settingsContentRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    if (settingsContentRef.current) settingsContentRef.current.scrollTop = 0;
-  }, [group]);
-
-  useEffect(() => {
-    if (scenarioSettings?.group) setGroup(scenarioSettings.group);
-  }, [scenarioSettings?.group]);
+    if (scenarioSettings?.section) revealSettings(scenarioSettings.section, false);
+  }, [scenarioSettings?.section]);
 
   // Hidden dev combo (Ctrl+Alt+K): load API keys / logins from the per-machine
   // dev-creds.json so live validation is not blocked on retyping them. It lives at
@@ -229,11 +186,7 @@ export function SettingsPage() {
   const githubConnected = githubAccounts.length > 0 || Boolean(s?.github_token_set);
 
   function jump(step: SetupStep) {
-    setGroup(step.group);
-  }
-
-  function selectGroup(g: GroupId) {
-    setGroup(g);
+    revealSettings(step.target, true);
   }
 
   // -- the Machine Setup verdict: is THIS machine fully set up? ---------------
@@ -246,7 +199,7 @@ export function SettingsPage() {
       metLabel: "KiCad Wired",
       metLabelId: "settings.machine.step-kicad-met",
       met: s.kicad_wired,
-      group: "eda",
+      target: "settings.kicad",
     });
     if (odbcInstalled !== null && odbcInstalled !== undefined) {
       steps.push({
@@ -256,7 +209,7 @@ export function SettingsPage() {
         metLabel: "ODBC Driver Installed",
         metLabelId: "settings.machine.step-odbc-met",
         met: odbcInstalled,
-        group: "eda",
+        target: "settings.altium",
       });
     }
     steps.push({
@@ -266,7 +219,7 @@ export function SettingsPage() {
       metLabel: "Distributor Credential Saved",
       metLabelId: "settings.machine.step-key-met",
       met: s.mouser_api_key_set || s.digikey_client_secret_set,
-      group: "sources",
+      target: "settings.distributor",
     });
     steps.push({
       id: "github",
@@ -275,7 +228,7 @@ export function SettingsPage() {
       metLabel: "GitHub Connected",
       metLabelId: "settings.machine.step-github-met",
       met: githubConnected,
-      group: "library",
+      target: "settings.github",
     });
   }
   const unmet = steps.filter((st) => !st.met);
@@ -284,40 +237,20 @@ export function SettingsPage() {
   });
   const headerReady = useText("settings.machine.header-ready", "Machine prepared");
 
-  // -- per-group attention dots (mirror the unmet steps + an available update) --
-  const groupAttention: Record<GroupId, "warn" | "neutral" | null> = {
-    general:
-      updateStanding.standing === "available"
-        ? "neutral"
-        : ["retrying", "blocked", "restart_required", "unknown"].includes(
-              updateStanding.standing,
-            )
-          ? "warn"
-          : null,
-    library: unmet.some((st) => st.group === "library") ? "warn" : null,
-    eda: unmet.some((st) => st.group === "eda") ? "warn" : null,
-    sources: unmet.some((st) => st.group === "sources") ? "warn" : null,
-    maintenance:
-      (coverageQ.data && coverageQ.data.complete < coverageQ.data.total) ||
-      (doctorQ.data &&
-        doctorQ.data.fixable.length + doctorQ.data.manual.length + doctorQ.data.uncommitted.length >
-          0)
-        ? "warn"
-        : null,
-  };
-
-
-  const activeMeta = SETTINGS_GROUPS.find((item) => item.id === group) ?? SETTINGS_GROUPS[0];
-
   return (
     <div className="flex min-h-0 flex-1 flex-col" data-dev-id="settings.root">
       <RouteHeader
+        heading
         data-dev-id="settings.title"
         right={unmet.length > 0 ? headerAttention : headerReady}
       >
         <Text id="settings.title">Settings</Text>
       </RouteHeader>
-      <div className="@container flex min-h-0 flex-1 flex-col overflow-hidden px-5 pb-4 pt-4">
+      <div
+        ref={settingsContentRef}
+        data-dev-id="settings.content"
+        className="@container min-h-0 flex-1 overflow-y-auto px-5 pb-4 pt-4"
+      >
         <MachineSetupBand
           loading={!s}
           steps={steps}
@@ -325,128 +258,18 @@ export function SettingsPage() {
           updateStanding={updateStanding.standing}
           updateBehind={updateQ.data?.behind ?? 0}
           updateState={updateQ.data?.state}
-          onOpenUpdates={() => setGroup("general")}
+          onOpenUpdates={() => revealSettings("settings.update", true)}
         />
 
-        <nav
-          aria-label={navAria}
-          className="mt-3 flex flex-none items-center gap-1 overflow-x-auto rounded-card border border-line bg-band p-1"
-          data-dev-id="settings.nav"
-        >
-          <GroupNavButton
-            id="general"
-            label="General"
-            labelId="settings.nav.general"
-            active={group}
-            onSelect={selectGroup}
-            attention={groupAttention.general}
-            data-dev-id="settings.nav-general"
-          />
-          <GroupNavButton
-            id="library"
-            label="Catalog"
-            labelId="settings.nav.library"
-            active={group}
-            onSelect={selectGroup}
-            attention={groupAttention.library}
-            data-dev-id="settings.nav-library"
-          />
-          <GroupNavButton
-            id="eda"
-            label="EDA Tools"
-            labelId="settings.nav.eda"
-            active={group}
-            onSelect={selectGroup}
-            attention={groupAttention.eda}
-            data-dev-id="settings.nav-eda"
-          />
-          <GroupNavButton
-            id="sources"
-            label="Data Sources"
-            labelId="settings.nav.sources"
-            active={group}
-            onSelect={selectGroup}
-            attention={groupAttention.sources}
-            data-dev-id="settings.nav-sources"
-          />
-          <GroupNavButton
-            id="maintenance"
-            label="Maintenance"
-            labelId="settings.nav.maintenance"
-            active={group}
-            onSelect={selectGroup}
-            attention={groupAttention.maintenance}
-            data-dev-id="settings.nav-maintenance"
-          />
-        </nav>
-
-        <section className="mt-3 flex min-h-0 flex-1 flex-col overflow-hidden rounded-card border border-line bg-canvas">
-          <div className="flex flex-none items-start gap-4 border-b border-line bg-band px-4 py-3">
-            <Icon id={activeMeta.icon} className="mt-0.5 h-4 w-4 flex-none text-t2" />
-            <div className="min-w-0">
-              <h1 className="text-base font-semibold text-t1">{activeMeta.label}</h1>
-              <p className="mt-0.5 text-xs text-t3">{activeMeta.description}</p>
-            </div>
-          </div>
-          <div
-            ref={settingsContentRef}
-            data-dev-id="settings.content"
-            className="grid min-h-0 flex-1 auto-rows-max grid-cols-1 gap-3 overflow-y-auto p-3 @3xl:grid-cols-2"
-          >
-            {group === "general" ? (
-              <GeneralGroup />
-            ) : group === "library" ? (
-              <LibraryGroup />
-            ) : group === "eda" ? (
-              <EdaGroup />
-            ) : group === "sources" ? (
-              <SourcesGroup />
-            ) : (
-              <MaintenanceGroup />
-            )}
-          </div>
-        </section>
+        <div className="mt-3 grid auto-rows-max grid-cols-1 gap-3 @3xl:grid-cols-2">
+          <GeneralGroup />
+          <LibraryGroup />
+          <EdaGroup />
+          <SourcesGroup />
+          <MaintenanceGroup />
+        </div>
       </div>
     </div>
-  );
-}
-
-function GroupNavButton({
-  id,
-  label,
-  labelId,
-  active,
-  onSelect,
-  attention,
-  "data-dev-id": devId,
-}: {
-  id: GroupId;
-  label: string;
-  labelId: string;
-  active: GroupId;
-  onSelect: (g: GroupId) => void;
-  attention: "warn" | "neutral" | null;
-  "data-dev-id"?: string;
-}) {
-  const selected = active === id;
-  return (
-    <button
-      type="button"
-      onClick={() => onSelect(id)}
-      aria-current={selected ? "true" : undefined}
-      data-dev-id={devId}
-      className={cx(
-        "flex min-w-[132px] flex-1 items-center justify-center gap-2 rounded-control px-3 py-2 text-sm transition-colors",
-        selected
-          ? "bg-raise2 font-semibold text-t1 shadow-[inset_0_-2px_0_var(--c-acc)]"
-          : "text-t2 hover:bg-[var(--c-hover)] hover:text-t1",
-      )}
-    >
-      <span className="min-w-0 truncate">
-        <Text id={labelId}>{label}</Text>
-      </span>
-      {attention ? <Dot tone={attention} /> : null}
-    </button>
   );
 }
 
@@ -609,7 +432,7 @@ function MachineSetupBand({
                   key={st.id}
                   type="button"
                   onClick={() => onJump(st)}
-                  className="inline-flex min-w-0 items-center gap-1.5 rounded-control border border-warn/50 bg-field px-2 py-1.5 text-left text-2xs font-semibold text-t1 transition-colors hover:bg-[var(--c-hover)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc"
+                  className="inline-flex min-w-0 items-center gap-1.5 rounded-control border border-warn/50 bg-field px-2 py-1.5 text-left text-2xs font-semibold text-t1 transition-colors hover:bg-[var(--c-hover)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
                 >
                   <Dot tone="warn" />
                   <span className="truncate">

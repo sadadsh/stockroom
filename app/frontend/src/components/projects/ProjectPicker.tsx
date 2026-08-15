@@ -11,8 +11,8 @@ import { useModalDismiss } from "../../lib/useModalDismiss";
 
 const INPUT =
   "h-9 w-full rounded-control border border-line bg-field px-3 text-sm text-t1 outline-none " +
-  "placeholder:text-t3 focus:border-acc focus-visible:outline focus-visible:outline-2 " +
-  "focus-visible:outline-offset-1 focus-visible:outline-acc";
+  "placeholder:text-t3 focus:border-focus focus-visible:outline focus-visible:outline-2 " +
+  "focus-visible:outline-offset-1 focus-visible:outline-focus";
 
 export function ProjectPicker({
   projects,
@@ -109,7 +109,7 @@ export function ProjectPicker({
               type="button"
               aria-label={clearSearchLabel}
               onClick={() => setSearch("")}
-              className="absolute right-1.5 top-1/2 flex size-6 -translate-y-1/2 items-center justify-center rounded-control text-t3 hover:bg-raise hover:text-t1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-acc"
+              className="absolute right-1.5 top-1/2 flex size-6 -translate-y-1/2 items-center justify-center rounded-control text-t3 hover:bg-raise hover:text-t1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-focus"
             >
               <CloseIcon />
             </button>
@@ -175,7 +175,7 @@ export function ProjectPicker({
                   className={
                     "group relative w-full rounded-control px-2.5 py-2.5 text-left transition-colors " +
                     "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 " +
-                    "focus-visible:outline-acc " +
+                    "focus-visible:outline-focus " +
                     (active ? "bg-raise2" : "hover:bg-raise")
                   }
                 >
@@ -344,7 +344,7 @@ function LinkProjectDialog({
             type="button"
             aria-label={closeLabel}
             onClick={onClose}
-            className="ml-auto rounded-control p-1.5 text-t3 hover:bg-raise hover:text-t1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-acc"
+            className="ml-auto rounded-control p-1.5 text-t3 hover:bg-raise hover:text-t1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-focus"
           >
             <CloseIcon />
           </button>
@@ -402,7 +402,7 @@ function LinkProjectDialog({
                     className={
                       "flex w-full items-start gap-3 rounded-card border p-3 text-left transition-colors " +
                       "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 " +
-                      "focus-visible:outline-acc " +
+                      "focus-visible:outline-focus " +
                       (selected
                         ? "border-acc bg-acc-soft"
                         : "border-line bg-surface hover:bg-raise")

@@ -88,7 +88,7 @@ export function TargetPolicyEditor({
           onChange={(event) => setEdit({ from: policy, text: event.target.value, error: "" })}
           aria-label={draftLabel}
           spellCheck={false}
-          className="h-64 w-full resize-y rounded-control bg-field p-3 font-mono text-xs text-t1 outline-none focus:ring-1 focus:ring-acc"
+          className="h-64 w-full resize-y rounded-control bg-field p-3 font-mono text-xs text-t1 outline-none focus:ring-1 focus:ring-focus"
         />
         {error ? <p className="mt-2 text-xs text-err-text">{error}</p> : null}
         <div className="mt-3 flex flex-wrap gap-2">

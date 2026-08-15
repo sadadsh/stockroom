@@ -47,7 +47,7 @@ export function TextInspector(props: DomainInspectorProps) {
             aria-label={contentAria}
             value={dev.resolveCopy(copyId, primary.value)}
             onChange={(event) => dev.setCopy(copyId, event.target.value)}
-            className="mt-1 min-h-16 w-full resize-y rounded-control border border-line bg-field px-2 py-1.5 text-xs text-t1 outline-none focus:border-acc"
+            className="mt-1 min-h-16 w-full resize-y rounded-control border border-line bg-field px-2 py-1.5 text-xs text-t1 outline-none focus:border-focus"
           />
         </label>
       ) : <p className="text-2xs text-t3">{readOnlyLabel}</p>}

@@ -236,7 +236,7 @@ describe("the opened component renders the same DOM it shipped with", () => {
     await expectTree(
       "populated",
       await renderWorkspace(populatedDossier()),
-      "84041-6209e371-cb35f69d",
+      "84043-df5f618c-ce8eda5a",
     );
   });
 
@@ -245,12 +245,12 @@ describe("the opened component renders the same DOM it shipped with", () => {
     await expectTree(
       "populated-developer",
       await renderWorkspace(populatedDossier()),
-      "99255-fe7d5d5a-28e55001",
+      "99257-1f1a12c7-d5713046",
     );
   });
 
   it("draws a component nobody has sourced identically", async () => {
-    await expectTree("sparse", await renderWorkspace(sparseDossier()), "26962-17d57b26-e7442920");
+    await expectTree("sparse", await renderWorkspace(sparseDossier()), "26964-1a81344e-621a9052");
   });
 
   it("draws a component nobody has sourced identically in developer mode", async () => {
@@ -260,7 +260,7 @@ describe("the opened component renders the same DOM it shipped with", () => {
     await expectTree(
       "sparse-developer",
       await renderWorkspace(sparseDossier()),
-      "37345-ce48f61e-a4d9b4a1",
+      "37347-dd9ef614-8984d67c",
     );
   });
 
@@ -268,14 +268,14 @@ describe("the opened component renders the same DOM it shipped with", () => {
     resetUiSessionForTests(openComponentInSession(defaultUiSession(), FIXTURE_COMPONENT_ID));
     mockApi.partDossier.mockReturnValue(new Promise(() => {}));
     const view = provide(<ComponentWorkspace componentId={FIXTURE_COMPONENT_ID} />);
-    await expectTree("loading", await settle(view.container), "869-3a3ea981-06d16147");
+    await expectTree("loading", await settle(view.container), "869-b566eb0e-cf139882");
   });
 
   it("draws the failed state identically", async () => {
     resetUiSessionForTests(openComponentInSession(defaultUiSession(), FIXTURE_COMPONENT_ID));
     mockApi.partDossier.mockRejectedValue(new ApiError(500, "no"));
     const view = provide(<ComponentWorkspace componentId={FIXTURE_COMPONENT_ID} />);
-    await expectTree("failed", await settle(view.container), "1298-6a57dd27-5791f462");
+    await expectTree("failed", await settle(view.container), "1298-68231b61-e8555ba3");
   });
 
   it("draws the empty workspace identically", async () => {

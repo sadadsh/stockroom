@@ -30,7 +30,7 @@ function IconPickerModal({ targetViewBox, onSelect, onClose }: {
     return () => window.removeEventListener("keydown", closeOnEscape);
   }, [onClose]);
   return (
-    <div role="presentation" className="fixed inset-0 z-[260] grid place-items-center bg-black/55 p-8" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+    <div role="presentation" className="fixed inset-0 z-[260] grid place-items-center bg-scrim p-8" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
       <section role="dialog" aria-modal="true" aria-label={title} className="flex max-h-[82vh] w-full max-w-5xl flex-col rounded-card bg-popover p-5 shadow-pop">
         <header className="flex items-center justify-between">
           <h3 className="text-base font-semibold text-t1">{title}</h3>
@@ -138,7 +138,7 @@ export function IconInspector(props: DomainInspectorProps) {
               const sanitized = sanitizeIconBody(event.target.value);
               iconIds.forEach((id) => dev.setIconBody(id, sanitized));
             }}
-            className="mt-1 min-h-20 w-full resize-y rounded-control border border-line bg-field px-2 py-1.5 font-mono text-2xs text-t1 outline-none focus:border-acc"
+            className="mt-1 min-h-20 w-full resize-y rounded-control border border-line bg-field px-2 py-1.5 font-mono text-2xs text-t1 outline-none focus:border-focus"
           />
         </label></details>
       ) : null}

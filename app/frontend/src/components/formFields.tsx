@@ -37,7 +37,7 @@ export function ComboField({
         list={listId}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="rounded-control border border-line2 bg-field px-3 py-2 text-base text-t1 outline-none focus:border-acc"
+        className="rounded-control border border-line2 bg-field px-3 py-2 text-base text-t1 outline-none focus:border-focus"
       />
       <datalist id={listId}>
         {options.map((o) => (
@@ -106,7 +106,7 @@ export function TextField({
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
-          className="rounded-control border border-line2 bg-field px-3 py-2 text-base text-t1 outline-none focus:border-acc"
+          className="rounded-control border border-line2 bg-field px-3 py-2 text-base text-t1 outline-none focus:border-focus"
         />
       </label>
       {hint ? <span className="text-xs text-t3">{hint}</span> : null}

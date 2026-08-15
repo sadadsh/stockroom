@@ -28,6 +28,7 @@ import {
   ErrorState,
   Eyebrow,
   LoadingState,
+  RouteHeader,
   SegmentedControl,
   TabPanel,
   TabStrip,
@@ -135,7 +136,7 @@ export function StmViewerPage() {
 
   return (
     <PageShell status={status.data?.mcu_count} families={status.data?.family_count}>
-      <div className="flex-none px-[30px] pb-3">
+      <div className="flex-none border-b border-line bg-band px-2.5 py-1.5">
         <TabStrip
           tabs={STM_TABS}
           active={tab}
@@ -374,8 +375,7 @@ function GhostSpecimen() {
   );
 }
 
-// The page frame: a self-heading header band (the rail carries the active-surface highlight) over
-// a full-height content area the columns fill.
+// The page frame uses the same docked route header as Components, Projects, and Settings.
 function PageShell({
   children,
   status,
@@ -387,17 +387,19 @@ function PageShell({
 }) {
   return (
     <div data-dev-id="stm.root" className="flex min-h-0 flex-1 flex-col">
-      <header className="flex items-baseline gap-3 px-[30px] pb-4 pt-[22px]">
-        <h1 className="text-title font-semibold text-t1">
-          <Text id="stm.viewer.title">STM Viewer</Text>
-        </h1>
-        {status != null ? (
-          <span className="tnum font-mono text-xs text-t3">
-            {status.toLocaleString()} MCUs
-            {families != null ? ` · ${families} families` : ""}
-          </span>
-        ) : null}
-      </header>
+      <RouteHeader
+        heading
+        right={
+          status != null ? (
+            <span className="tnum font-mono">
+              {status.toLocaleString()} MCUs
+              {families != null ? ` · ${families} families` : ""}
+            </span>
+          ) : null
+        }
+      >
+        <Text id="stm.viewer.title">STM Viewer</Text>
+      </RouteHeader>
       {children}
     </div>
   );

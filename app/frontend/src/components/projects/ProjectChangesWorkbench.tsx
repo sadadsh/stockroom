@@ -422,7 +422,7 @@ function ReviewList({
             className={
               "relative w-full border-b border-line px-4 py-3 text-left transition-colors " +
               "focus-visible:z-10 focus-visible:outline focus-visible:outline-2 " +
-              "focus-visible:-outline-offset-2 focus-visible:outline-acc " +
+              "focus-visible:-outline-offset-2 focus-visible:outline-focus " +
               (selected.commit === candidate.commit ? "bg-raise2" : "hover:bg-raise")
             }
           >
@@ -1106,8 +1106,8 @@ function ChangesMessage({ children }: { children: React.ReactNode }) {
 
 const INPUT =
   "h-9 w-full rounded-control border border-line bg-field px-3 text-sm text-t1 outline-none " +
-  "placeholder:text-t3 focus:border-acc focus-visible:outline focus-visible:outline-2 " +
-  "focus-visible:outline-offset-1 focus-visible:outline-acc";
+  "placeholder:text-t3 focus:border-focus focus-visible:outline focus-visible:outline-2 " +
+  "focus-visible:outline-offset-1 focus-visible:outline-focus";
 
 function slug(value: string) {
   return value

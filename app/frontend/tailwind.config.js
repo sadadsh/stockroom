@@ -100,6 +100,8 @@ export default {
         "ok-text": "var(--c-ok-text)",
         "warn-text": "var(--c-warn-text)",
         "err-text": "var(--c-err-text)",
+        "danger-on": "var(--c-danger-on)",
+        scrim: "var(--c-scrim)",
 
         // --- Neutral accent + focus --------------------------------------
         // There is no brand hue and no blue: `acc` is the loud neutral used on a

@@ -139,7 +139,7 @@ function ProviderDisclosure({
         <span className="ui-component-metadata ui-numeric">{formatCount(rows.length)}</span>
       </summary>
       {expanded ? (
-        <div className="border-t border-line/60 bg-panel-2/30">
+        <div className="border-t border-line/60 bg-field">
           {stamp || provider.payloadRef ? (
             <div className="ui-component-metadata break-all border-b border-line/50 px-2 py-1">
               {[stamp?.text, provider.payloadRef].filter(Boolean).join(" · ")}

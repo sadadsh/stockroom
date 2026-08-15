@@ -565,7 +565,7 @@ export function CompletePartModal({
   return (
     <div
       style={{ zIndex: modalZ }}
-      className="fixed inset-0 flex items-start justify-center overflow-y-auto bg-black/55 p-4 pt-[7vh]"
+      className="fixed inset-0 flex items-start justify-center overflow-y-auto bg-scrim p-4 pt-[7vh]"
       role="presentation"
       // Dismiss on the PRESS, and only when the press lands on the scrim itself: the guard every
       // sibling modal uses. Closing on `click` meant a text-selection drag that began inside the
@@ -1335,7 +1335,7 @@ function Field({
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={(e) => e.key === "Enter" && onEnter?.()}
         placeholder={placeholder}
-        className="h-8 w-full rounded-control border border-line2 bg-field px-2.5 text-sm text-t1 outline-none placeholder:text-t3 focus:border-acc"
+        className="h-8 w-full rounded-control border border-line2 bg-field px-2.5 text-sm text-t1 outline-none placeholder:text-t3 focus:border-focus"
       />
     </label>
   );

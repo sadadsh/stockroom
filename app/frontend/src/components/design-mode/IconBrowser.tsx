@@ -56,7 +56,7 @@ export function IconBrowser({
           value={query}
           onChange={(event) => setQuery(event.currentTarget.value)}
           placeholder={searchPlaceholder}
-          className="w-full rounded-control bg-field px-2 py-1.5 text-2xs text-t1 outline-none focus:ring-1 focus:ring-acc"
+          className="w-full rounded-control bg-field px-2 py-1.5 text-2xs text-t1 outline-none focus:ring-1 focus:ring-focus"
         />
       </label>
       <select aria-label={libraryLabel} value={family} onChange={(event) => setFamily(event.currentTarget.value)} className="rounded-control bg-field px-2 text-2xs text-t1">
@@ -76,7 +76,7 @@ export function IconBrowser({
               >
                 <svg className="h-7 w-7 shrink-0" viewBox={entry.viewBox} fill="currentColor" aria-hidden="true" dangerouslySetInnerHTML={{ __html: sanitizeIconMarkup(entry.body) }} />
                 <span className="w-full truncate text-2xs font-semibold">{entry.label}</span>
-                <span className="w-full truncate text-[9px] text-t3">{entry.family}</span>
+                <span className="w-full truncate text-2xs text-t3">{entry.family}</span>
               </button>
           ))}
         </div>

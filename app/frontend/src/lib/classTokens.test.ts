@@ -1,16 +1,21 @@
 import { describe, expect, it } from "vitest";
-import { CLASS_TO_VAR, varsForClassName } from "./classTokens";
+import { CLASS_TO_VAR, TOKEN_COLOR_CLASSES, varsForClassName } from "./classTokens";
 import { DEV_TOKEN_BY_VAR } from "./devTokens";
 
 // The class map is what the inspect surface reads to name an element's tokens from its
 // className, so these tests pin the entry count, the resolver's dedupe/ignore behaviour,
 // and the invariant that every mapped cssVar is a real DEV_TOKEN.
 describe("classTokens resolver", () => {
-  it("has exactly 62 className -> cssVar entries", () => {
-    // 53 before the status TEXT strengths landed. `--c-ok-text` / `--c-warn-text` / `--c-err-text`
-    // back real utilities now (a status WORD wears them, at the 4.5:1 bar), so the inspector has to
-    // be able to name them from a className like every other colour token.
-    expect(Object.keys(CLASS_TO_VAR)).toHaveLength(62);
+  it("maps every editable color through the complete utility-role vocabulary", () => {
+    const nonColorEntries = 20;
+    expect(Object.keys(CLASS_TO_VAR)).toHaveLength(
+      Object.keys(TOKEN_COLOR_CLASSES).length * 6 + nonColorEntries,
+    );
+    for (const name of Object.keys(TOKEN_COLOR_CLASSES)) {
+      for (const role of ["bg", "text", "border", "outline", "ring", "stroke"]) {
+        expect(CLASS_TO_VAR[`${role}-${name}`]).toBe(TOKEN_COLOR_CLASSES[name]);
+      }
+    }
   });
 
   it("resolves known classes in order, deduped, ignoring unknowns", () => {
@@ -18,6 +23,11 @@ describe("classTokens resolver", () => {
     expect(varsForClassName("bg-acc text-t1 p-2")).toEqual(["--c-acc", "--c-t1"]);
     // First-seen order is preserved.
     expect(varsForClassName("text-t1 bg-acc")).toEqual(["--c-t1", "--c-acc"]);
+    // Variants and opacity modifiers still resolve to the underlying editable token.
+    expect(varsForClassName("focus-visible:outline-focus hover:bg-err/10")).toEqual([
+      "--c-focus",
+      "--c-err",
+    ]);
     // A className with no token classes resolves to nothing.
     expect(varsForClassName("p-2 flex items-center")).toEqual([]);
   });

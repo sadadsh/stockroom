@@ -161,7 +161,7 @@ describe("RunningVersionIndicator", () => {
       />,
     );
     // Retrying is not the same fact as blocked, and it is not the same fact as healthy either.
-    expect(container.querySelector(".bg-warn")).not.toBeNull();
+    expect(container.querySelector(".text-warn svg")).not.toBeNull();
     expect(container.querySelector(".bg-err")).toBeNull();
   });
 });

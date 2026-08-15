@@ -449,7 +449,7 @@ function PlacementQueue({
               className={
                 "relative w-full border-b border-line px-3 py-2.5 text-left transition-colors " +
                 "focus-visible:z-10 focus-visible:outline focus-visible:outline-2 " +
-                "focus-visible:-outline-offset-2 focus-visible:outline-acc " +
+                "focus-visible:-outline-offset-2 focus-visible:outline-focus " +
                 (active ? "bg-raise2" : "hover:bg-raise")
               }
             >
@@ -710,8 +710,8 @@ function PlacementRecorder({
 
 const INPUT =
   "h-9 w-full rounded-control border border-line bg-field px-3 text-sm text-t1 outline-none " +
-  "placeholder:text-t3 focus:border-acc focus-visible:outline focus-visible:outline-2 " +
-  "focus-visible:outline-offset-1 focus-visible:outline-acc";
+  "placeholder:text-t3 focus:border-focus focus-visible:outline focus-visible:outline-2 " +
+  "focus-visible:outline-offset-1 focus-visible:outline-focus";
 
 function PlacementState({ state }: { state: AssemblyPlacementState }) {
   const tone =

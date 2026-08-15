@@ -221,7 +221,7 @@ export function BulkImportSection() {
         spellCheck={false}
         rows={4}
         placeholder={"595-TPD6E05U06RVZR\n603-RC0402FR-07100RL\nSN74LVC1G08DBVR"}
-        className="mt-3 w-full resize-y rounded-control bg-field px-3 py-2.5 font-mono text-xs text-t1 placeholder:text-t3 focus:outline-none focus:ring-1 focus:ring-acc disabled:opacity-60"
+        className="mt-3 w-full resize-y rounded-control bg-field px-3 py-2.5 font-mono text-xs text-t1 placeholder:text-t3 focus:outline-none focus:ring-1 focus:ring-focus disabled:opacity-60"
       />
 
       <div className="mt-3 flex flex-wrap items-center gap-2">

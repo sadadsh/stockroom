@@ -384,6 +384,14 @@ describe("the chrome is neutral", () => {
     }
   });
 
+  it.each(THEMES)("%s keeps destructive button text readable", (_theme, selector) => {
+    const block = themeBlock(selector);
+    expect(
+      contrast(property(block, "--c-danger-on"), property(block, "--c-err")),
+      "danger button label contrast",
+    ).toBeGreaterThanOrEqual(4.5);
+  });
+
   it.each(THEMES)("%s carries every text tier on a selected row", (_theme, selector) => {
     // This is the failure the neutral fill actually shipped: a selected picker row put its
     // metadata tier at 2.0:1. Every tier the row uses is measured against the selection fill and
@@ -477,6 +485,10 @@ describe("the chrome is a desktop, not a dashboard", () => {
       const value = property(themeBlock(":root"), name);
       expect(Number(value.replace("px", "")), `${name} = ${value}`).toBeLessThanOrEqual(2);
     }
+  });
+
+  it("simulates keyboard focus with the same focus token controls use", () => {
+    expect(css).toMatch(/\[data-design-preview-state="focus"\][\s\S]*?outline:\s*2px solid var\(--c-focus\)/);
   });
 
   it("casts a shadow only from a genuinely floating surface", () => {

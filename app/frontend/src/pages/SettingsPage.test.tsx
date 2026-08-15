@@ -137,29 +137,8 @@ function toggleDevMode() {
   fireEvent.keyDown(window, { key: "D", ctrlKey: true, shiftKey: true });
 }
 
-// Settings categories are the only navigation layer. Capabilities inside the active category are
-// permanent cards, so a test walks to the scope and can immediately use the control it names.
-const SECTION_NAV: Record<string, RegExp> = {
-  "settings.appearance": /^general$/i,
-  "settings.update": /^general$/i,
-  "settings.profiles": /catalog/i,
-  "settings.sync": /catalog/i,
-  "settings.github": /catalog/i,
-  "settings.health": /maintenance/i,
-  "settings.completion": /maintenance/i,
-  "settings.derivation": /maintenance/i,
-  "settings.cad-clear": /maintenance/i,
-  "settings.librarysync": /maintenance/i,
-  "settings.kicad": /eda tools/i,
-  "settings.altium": /eda tools/i,
-  "settings.distributor": /data sources/i,
-  "settings.rescan": /data sources/i,
-};
-
+// Settings is one continuous page. Tests wait for the exact permanent capability card they use.
 async function openSettings(devId: string) {
-  const user = userEvent.setup();
-  const nav = screen.getByRole("navigation", { name: /settings sections/i });
-  await user.click(within(nav).getByRole("button", { name: SECTION_NAV[devId] }));
   await screen.findByTestId(`${devId}.header`);
 }
 
@@ -607,7 +586,8 @@ describe("SettingsPage — sync + kicad + update", () => {
     expect(
       await screen.findByText(/restart stockroom to finish adopting the installed revision/i),
     ).toBeInTheDocument();
-    expect(screen.queryByText(/^current$/i)).toBeNull();
+    const update = document.querySelector<HTMLElement>('[data-dev-id="settings.update"]')!;
+    expect(within(update).queryByText(/^current$/i)).toBeNull();
   });
 
   it("never presents an unverified offline result as Current", async () => {
@@ -623,7 +603,8 @@ describe("SettingsPage — sync + kicad + update", () => {
     expect(
       await screen.findByText(/remote check incomplete; automatic reruns continue/i),
     ).toBeInTheDocument();
-    expect(screen.queryByText(/^current$/i)).toBeNull();
+    const update = document.querySelector<HTMLElement>('[data-dev-id="settings.update"]')!;
+    expect(within(update).queryByText(/^current$/i)).toBeNull();
     expect(screen.queryByRole("button", { name: /install and restart/i })).toBeNull();
   });
 });
@@ -782,60 +763,31 @@ describe("SettingsPage - copy adoption", () => {
   });
 });
 
-describe("SettingsPage - grouped IA + Machine Setup band", () => {
-  it("starts each settings category at the top instead of inheriting the prior scroll", async () => {
+describe("SettingsPage - flat IA + Machine Setup band", () => {
+  it("mounts every settings capability on one continuous page without category navigation", async () => {
+    renderPage();
+    await screen.findByTestId("settings.appearance.header");
+    expect(screen.queryByRole("navigation", { name: /settings sections/i })).toBeNull();
+    for (const id of [
+      "settings.appearance", "settings.update", "settings.profiles", "settings.sync",
+      "settings.github", "settings.kicad", "settings.altium", "settings.cubemx",
+      "settings.distributor", "settings.rescan", "settings.completion", "settings.derivation",
+      "settings.health", "settings.librarysync", "settings.cad-clear",
+    ]) {
+      expect(screen.getByTestId(`${id}.header`)).toBeInTheDocument();
+    }
+  });
+
+  it("owns one page scroller containing readiness and every capability card", async () => {
     renderPage();
     await screen.findByTestId("settings.appearance.header");
     const content = document.querySelector<HTMLElement>('[data-dev-id="settings.content"]');
+    const machine = document.querySelector<HTMLElement>('[data-dev-id="settings.machine-band"]');
+    const maintenance = document.querySelector<HTMLElement>('[data-dev-id="settings.cad-clear"]');
     expect(content).not.toBeNull();
-    content!.scrollTop = 420;
-
-    await userEvent.click(screen.getByRole("button", { name: "EDA Tools" }));
-
-    await waitFor(() => expect(content!.scrollTop).toBe(0));
-  });
-
-  it("opens on General with both capabilities ready to use", async () => {
-    renderPage();
-    await screen.findByTestId("settings.appearance.header");
-    expect(screen.getByRole("button", { name: /^light$/i })).toBeInTheDocument();
-    expect(screen.getByTestId("settings.update.header")).toBeInTheDocument();
-    expect(screen.queryByTestId("settings.profiles.header")).toBeNull();
-  });
-
-  it("changes both selected state and visible capability DOM when a section control is pressed", async () => {
-    renderPage();
-    const user = userEvent.setup();
-    await screen.findByTestId("settings.appearance.header");
-    const nav = screen.getByRole("navigation", { name: /settings sections/i });
-    const general = within(nav).getByRole("button", { name: /^general$/i });
-    const eda = within(nav).getByRole("button", { name: /^eda tools$/i });
-    expect(general).toHaveAttribute("aria-current", "true");
-
-    await user.click(eda);
-
-    expect(eda).toHaveAttribute("aria-current", "true");
-    expect(general).not.toHaveAttribute("aria-current");
-    expect(screen.queryByTestId("settings.appearance.header")).toBeNull();
-    expect(await screen.findByTestId("settings.kicad.header")).toBeInTheDocument();
-    expect(screen.getByTestId("settings.altium.header")).toBeInTheDocument();
-  });
-
-  it("keeps the machine band, section navigation, and active workspace on one left edge", async () => {
-    renderPage();
-    await screen.findByTestId("settings.appearance.header");
-    const machine = document.querySelector('[data-dev-id="settings.machine-band"]') as HTMLElement;
-    const nav = document.querySelector('[data-dev-id="settings.nav"]') as HTMLElement;
-    const frame = nav.parentElement;
-    const workspace = nav.nextElementSibling;
-
-    expect(frame).not.toBeNull();
-    expect(machine.parentElement).toBe(frame);
-    expect(workspace?.parentElement).toBe(frame);
-    expect(frame).toHaveClass("px-5");
-    expect(machine.className).not.toMatch(/\bml-/);
-    expect(nav.className).not.toMatch(/\bml-/);
-    expect(workspace?.className).not.toMatch(/\bml-/);
+    expect(content).toHaveClass("overflow-y-auto");
+    expect(content).toContainElement(machine);
+    expect(content).toContainElement(maintenance);
   });
 
   it("states the machine verdict from the live settings (all met reads Ready)", async () => {
@@ -848,25 +800,24 @@ describe("SettingsPage - grouped IA + Machine Setup band", () => {
     expect(await screen.findByText("This Machine Is Prepared")).toBeInTheDocument();
   });
 
-  it("counts the unmet setup steps and jumps to the owning section on click", async () => {
-    // BASE has no distributor key and no GitHub token: 2 steps remain
+  it("counts unmet setup steps and focuses the exact owning card", async () => {
+    const scrollIntoView = vi.fn();
+    Element.prototype.scrollIntoView = scrollIntoView;
     renderPage();
     expect(await screen.findByText("2 Setup Steps Need Attention")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: /add a distributor credential/i }));
-    // the jump lands on Data Sources and the permanent capability card is usable immediately
-    await screen.findByTestId("settings.distributor.header");
+    const section = document.querySelector<HTMLElement>('[data-dev-id="settings.distributor"]');
+    expect(scrollIntoView).toHaveBeenCalledWith({ block: "start", behavior: "smooth" });
+    expect(section).toHaveFocus();
     expect(screen.getByLabelText(/mouser api credential/i)).toBeInTheDocument();
   });
 
   it("shows both EDA integrations immediately when KiCad needs attention", async () => {
     mockApi.getSettings.mockResolvedValue({ ...BASE_SETTINGS, kicad_wired: false });
     renderPage();
-    const user = userEvent.setup();
-    const nav = screen.getByRole("navigation", { name: /settings sections/i });
-    await user.click(within(nav).getByRole("button", { name: /eda tools/i }));
     expect(await screen.findByTestId("settings.kicad.header")).toBeInTheDocument();
     expect(screen.getByTestId("settings.altium.header")).toBeInTheDocument();
-    expect(screen.getByText(/not wired so far/i)).toBeInTheDocument();
+    expect(await screen.findByText(/not wired so far/i)).toBeInTheDocument();
   });
 
   it("shows the ODBC driver step only when the probe answers (never off-Windows null)", async () => {
@@ -881,7 +832,6 @@ describe("SettingsPage - grouped IA + Machine Setup band", () => {
       github_token_set: true,
     });
     renderPage();
-    // with the probe honest-null, the ODBC step is absent and the machine still reads Ready
     expect(await screen.findByText("This Machine Is Prepared")).toBeInTheDocument();
     expect(screen.queryByText(/install the odbc driver/i)).toBeNull();
   });
@@ -902,11 +852,8 @@ describe("SettingsPage - critique fixes", () => {
     expect(screen.queryByText("Wire KiCad")).toBeNull();
   });
 
-  it("EDA Tools presents both integrations without a second reveal", async () => {
+  it("presents both EDA integrations without a second reveal", async () => {
     renderPage();
-    const user = userEvent.setup();
-    const nav = screen.getByRole("navigation", { name: /settings sections/i });
-    await user.click(within(nav).getByRole("button", { name: /eda tools/i }));
     expect(await screen.findByTestId("settings.kicad.header")).toBeInTheDocument();
     expect(screen.getByTestId("settings.altium.header")).toBeInTheDocument();
   });
@@ -915,10 +862,6 @@ describe("SettingsPage - critique fixes", () => {
 describe("SettingsPage - capability cards state their own status", () => {
   it("Library Completion, Presentation Data and Clear CAD Files each report their state", async () => {
     renderPage();
-    const user = userEvent.setup();
-    const nav = screen.getByRole("navigation", { name: /settings sections/i });
-    await user.click(within(nav).getByRole("button", { name: /maintenance/i }));
-
     const completion = await screen.findByTestId("settings.completion.header");
     expect(await within(completion).findByText("92 of 158 Complete")).toBeInTheDocument();
 
@@ -953,10 +896,6 @@ describe("SettingsPage - capability cards state their own status", () => {
       reason: "",
     });
     renderPage();
-    const user = userEvent.setup();
-    const nav = screen.getByRole("navigation", { name: /settings sections/i });
-    await user.click(within(nav).getByRole("button", { name: /maintenance/i }));
-
     const librarySync = await screen.findByTestId("settings.librarysync.header");
     expect(await within(librarySync).findByText("Nothing In LFS")).toBeInTheDocument();
     expect(within(librarySync).queryByText("0 In LFS")).toBeNull();
@@ -964,26 +903,17 @@ describe("SettingsPage - capability cards state their own status", () => {
 
   it("EVERY capability card states a concise status", async () => {
     renderPage();
-    const user = userEvent.setup();
-    const nav = screen.getByRole("navigation", { name: /settings sections/i });
     await screen.findByTestId("settings.appearance.header");
+    await screen.findByText("62 In LFS");
 
     const seen: string[] = [];
     const silent: string[] = [];
-    for (const groupName of ["General", "Catalog", "EDA Tools", "Data Sources", "Maintenance"]) {
-      await user.click(
-        within(nav).getByRole("button", { name: new RegExp(`^${groupName}$`, "i") }),
-      );
-      await waitFor(() =>
-        expect(document.querySelectorAll('[data-testid$=".header"]').length).toBeGreaterThan(0),
-      );
-      for (const header of document.querySelectorAll<HTMLElement>('[data-testid$=".header"]')) {
-        const id = header.getAttribute("data-testid") || "";
-        if (!id.startsWith("settings.") || seen.includes(id)) continue;
-        seen.push(id);
-        const summary = within(header).queryByTestId("settings.summary");
-        if (!summary || !summary.textContent?.trim()) silent.push(id);
-      }
+    for (const header of document.querySelectorAll<HTMLElement>('[data-testid$=".header"]')) {
+      const id = header.getAttribute("data-testid") || "";
+      if (!id.startsWith("settings.") || seen.includes(id)) continue;
+      seen.push(id);
+      const summary = within(header).queryByTestId("settings.summary");
+      if (!summary || !summary.textContent?.trim()) silent.push(id);
     }
 
     // assert the key space is non-empty BEFORE trusting an empty failure list: a selector that
@@ -1020,10 +950,6 @@ describe("SettingsPage - capability cards state their own status", () => {
       stale: 58,
     });
     renderPage();
-    const user = userEvent.setup();
-    const nav = screen.getByRole("navigation", { name: /settings sections/i });
-    await user.click(within(nav).getByRole("button", { name: /maintenance/i }));
-
     const completion = await screen.findByTestId("settings.completion.header");
     expect(await within(completion).findByText("All Complete")).toBeInTheDocument();
     const cadClear = screen.getByTestId("settings.cad-clear.header");

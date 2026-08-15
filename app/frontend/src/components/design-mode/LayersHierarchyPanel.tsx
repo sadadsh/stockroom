@@ -179,7 +179,7 @@ export function LayersHierarchyPanel() {
               </select>
             </label>
             {!builtInIds.has(studio.activeVariationId) ? (
-              <button type="button" onClick={deleteActiveVariation} className="self-end rounded-control px-2 py-1 text-xs text-err-text hover:bg-err-soft">
+              <button type="button" onClick={deleteActiveVariation} className="self-end rounded-control px-2 py-1 text-xs text-err-text hover:bg-err/10">
                 {deleteLabel}
               </button>
             ) : null}

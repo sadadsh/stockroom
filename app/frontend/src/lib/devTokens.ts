@@ -512,6 +512,22 @@ export const DEV_TOKENS: DevToken[] = [
     themed: true,
     default: { dark: "#ec9a97", light: "#9c3633" },
   },
+  {
+    cssVar: "--c-danger-on",
+    label: "Danger button text",
+    group: "Status",
+    kind: "color",
+    themed: true,
+    default: { dark: "#111214", light: "#ffffff" },
+  },
+  {
+    cssVar: "--c-scrim",
+    label: "Modal scrim",
+    group: "Surfaces",
+    kind: "color",
+    themed: true,
+    default: { dark: "rgba(0, 0, 0, 0.55)", light: "rgba(0, 0, 0, 0.55)" },
+  },
   // --- Shape (theme-agnostic radii) ---------------------------------------
   {
     cssVar: "--r-card",

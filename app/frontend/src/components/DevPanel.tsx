@@ -126,7 +126,7 @@ function ColorRow({ token }: { token: DevToken }) {
         aria-label={`${token.label} value`}
         value={value}
         onChange={(e) => dev.setToken(token.cssVar, e.target.value)}
-        className="tnum w-[104px] flex-none rounded-control border border-line bg-field px-2 py-1 text-2xs font-mono text-t1 outline-none focus:border-acc"
+        className="tnum w-[104px] flex-none rounded-control border border-line bg-field px-2 py-1 text-2xs font-mono text-t1 outline-none focus:border-focus"
       />
     </div>
   );
@@ -180,7 +180,7 @@ function ShadowRow({ token }: { token: DevToken }) {
         value={value}
         rows={2}
         onChange={(e) => dev.setToken(token.cssVar, e.target.value)}
-        className="mt-1 w-full resize-y rounded-control border border-line bg-field px-2 py-1 text-2xs font-mono leading-snug text-t1 outline-none focus:border-acc"
+        className="mt-1 w-full resize-y rounded-control border border-line bg-field px-2 py-1 text-2xs font-mono leading-snug text-t1 outline-none focus:border-focus"
       />
     </div>
   );
@@ -275,7 +275,7 @@ function CopyEditor() {
         onChange={(e) => dev.setCopy(id, e.target.value)}
         className={
           "w-full resize-y rounded-control border bg-field px-2 py-1.5 text-sm text-t1 outline-none " +
-          (problem ? "border-err focus:border-err" : "border-line2 focus:border-acc")
+          (problem ? "border-err focus:border-err" : "border-line2 focus:border-focus")
         }
       />
       {required.length > 0 ? (
@@ -368,7 +368,7 @@ function Toolbar({ search, setSearch }: { search: string; setSearch: (s: string)
         placeholder="Search"
         value={search}
         onChange={(e) => setSearch(e.target.value)}
-        className="ml-auto w-[104px] flex-none rounded-control border border-line bg-field px-2 py-1 text-2xs text-t1 outline-none focus:border-acc"
+        className="ml-auto w-[104px] flex-none rounded-control border border-line bg-field px-2 py-1 text-2xs text-t1 outline-none focus:border-focus"
       />
     </div>
   );
@@ -690,7 +690,7 @@ function IconTab() {
             value={draftBody}
             rows={4}
             onChange={(e) => dev.setIconBody(iconId, e.target.value)}
-            className="w-full resize-y rounded-control border border-line2 bg-field px-2 py-1.5 text-2xs font-mono leading-snug text-t1 outline-none focus:border-acc"
+            className="w-full resize-y rounded-control border border-line2 bg-field px-2 py-1.5 text-2xs font-mono leading-snug text-t1 outline-none focus:border-focus"
           />
         </div>
       ) : (
@@ -834,7 +834,7 @@ function BoxRow({
         }}
         className={
           "tnum w-[104px] flex-none rounded-control border bg-field px-2 py-1 text-2xs font-mono text-t1 outline-none " +
-          (invalid ? "border-err focus:border-err" : "border-line focus:border-acc")
+          (invalid ? "border-err focus:border-err" : "border-line focus:border-focus")
         }
       />
     </div>
@@ -884,7 +884,7 @@ function GridSlotControl({
           if (v === "auto") dev.resetElementProp(id, prop);
           else if (isValidGridSlot(v)) dev.setElementProp(id, prop, v);
         }}
-        className="w-[104px] flex-none rounded-control border border-line bg-field px-2 py-1 text-2xs font-mono text-t1 outline-none focus:border-acc"
+        className="w-[104px] flex-none rounded-control border border-line bg-field px-2 py-1 text-2xs font-mono text-t1 outline-none focus:border-focus"
       >
         {opts.map((o) => (
           <option key={o} value={o}>
@@ -1629,7 +1629,7 @@ export function DevPanel({
                 value={publishMessage}
                 maxLength={120}
                 onChange={(event) => setPublishMessage(event.target.value)}
-                className="mt-1 w-full rounded-control border border-line bg-popover px-2 py-1.5 text-xs text-t1 outline-none focus:border-acc"
+                className="mt-1 w-full rounded-control border border-line bg-popover px-2 py-1.5 text-xs text-t1 outline-none focus:border-focus"
               />
             </label>
             <p className="mt-2 text-2xs leading-relaxed text-t3">

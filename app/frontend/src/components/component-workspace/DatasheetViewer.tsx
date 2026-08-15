@@ -296,7 +296,7 @@ function DatasheetPdf({
             <nav
               data-dev-id="component-browser.datasheet-outline"
               aria-label={outlineLabel}
-              className="ui-component-metadata min-h-0 w-[13rem] flex-none overflow-auto border border-line bg-panel p-2"
+              className="ui-component-metadata min-h-0 w-[13rem] flex-none overflow-auto border border-line bg-band p-2"
             >
               <Outline onItemClick={({ pageNumber }) => setPage(pageNumber)} />
             </nav>

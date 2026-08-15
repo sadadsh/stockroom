@@ -74,7 +74,7 @@ export function PinoutMap(props: Props) {
         // own Close control - so it is not a control that needs a name, focus, or key handler.
         <div
           style={{ zIndex: modalZ }}
-          className="fixed inset-0 flex items-center justify-center bg-black/50 p-6"
+          className="fixed inset-0 flex items-center justify-center bg-scrim p-6"
           data-testid="pinout-max-overlay"
           role="presentation"
           onClick={close}

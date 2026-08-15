@@ -67,7 +67,7 @@ export function PinoutTable({
             aria-label={filterLabel}
             placeholder={filterLabel}
             onChange={(event) => setFilter(event.target.value)}
-            className="h-7 w-full rounded-control border border-line bg-field px-2 text-xs text-t1 outline-none focus:border-acc"
+            className="h-7 w-full rounded-control border border-line bg-field px-2 text-xs text-t1 outline-none focus:border-focus"
           />
           {shown.length === 0 ? (
             <EmptyState id="component-browser.pinout-no-match">

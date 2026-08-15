@@ -20,28 +20,31 @@ export const settingsScenarioIds = [
 
 type SettingsScenarioId = typeof settingsScenarioIds[number];
 
-function stateFor(id: SettingsScenarioId): { group: NonNullable<ScenarioUiState["settings"]>["group"]; target: string; errorPath?: string } {
-  if (id.includes("appearance") || id.includes("updates")) return { group: "general", target: id.includes("updates") ? "settings.update" : "settings.appearance", errorPath: id.endsWith(".error") ? "/api/update/check" : undefined };
-  if (id.includes("libraries")) return { group: "library", target: "settings.profiles", errorPath: id.endsWith(".error") ? "/api/onboarding" : undefined };
-  if (id.includes("sync")) return { group: "library", target: "settings.sync", errorPath: id.endsWith(".error") ? "/api/sync/status" : undefined };
-  if (id.includes("github")) return { group: "library", target: "settings.github", errorPath: id.endsWith(".error") ? "/api/sync/status" : undefined };
-  if (id.includes("kicad")) return { group: "eda", target: "settings.kicad", errorPath: id.endsWith(".error") ? "/api/system/info" : undefined };
-  if (id.includes("altium")) return { group: "eda", target: id.endsWith("setup-dialog") ? "altiumdb.setup-modal" : id.endsWith("dblib-dialog") ? "altiumdb.modal" : "settings.altium", errorPath: id.endsWith(".error") ? "/api/altium/status" : undefined };
-  if (id.includes("cubemx")) return { group: "eda", target: "settings.cubemx", errorPath: id.endsWith(".error") ? "/api/settings" : undefined };
-  if (id.includes("distributors") || id.includes("vendor-logins")) return { group: "sources", target: id.includes("vendor-logins") ? "settings.vendor-login-row" : "settings.distributor", errorPath: id.endsWith(".error") ? "/api/settings" : undefined };
-  if (id.includes("rescan")) return { group: "sources", target: "settings.rescan", errorPath: id.endsWith(".error") ? "/api/library/rescan/state" : undefined };
-  if (id.includes("health")) return { group: "maintenance", target: "settings.health", errorPath: id.endsWith(".error") ? "/api/doctor/scan" : undefined };
-  if (id.includes("completion")) return { group: "maintenance", target: "settings.completion", errorPath: id.endsWith(".error") ? "/api/library/completion" : undefined };
-  if (id.includes("maintenance")) return { group: "maintenance", target: "settings.derivation", errorPath: id.endsWith(".error") ? "/api/library/derivation" : undefined };
-  if (id.includes("reset-cad")) return { group: "maintenance", target: "confirm.root" };
-  return { group: "maintenance", target: "settings.completion", errorPath: id.endsWith(".error") ? "/api/doctor/scan" : undefined };
+function stateFor(id: SettingsScenarioId): { section: string; target: string; errorPath?: string } {
+  if (id.includes("appearance") || id.includes("updates")) {
+    const section = id.includes("updates") ? "settings.update" : "settings.appearance";
+    return { section, target: section, errorPath: id.endsWith(".error") ? "/api/update/check" : undefined };
+  }
+  if (id.includes("libraries")) return { section: "settings.profiles", target: "settings.profiles", errorPath: id.endsWith(".error") ? "/api/onboarding" : undefined };
+  if (id.includes("sync")) return { section: "settings.sync", target: "settings.sync", errorPath: id.endsWith(".error") ? "/api/sync/status" : undefined };
+  if (id.includes("github")) return { section: "settings.github", target: "settings.github", errorPath: id.endsWith(".error") ? "/api/sync/status" : undefined };
+  if (id.includes("kicad")) return { section: "settings.kicad", target: "settings.kicad", errorPath: id.endsWith(".error") ? "/api/system/info" : undefined };
+  if (id.includes("altium")) return { section: "settings.altium", target: id.endsWith("setup-dialog") ? "altiumdb.setup-modal" : id.endsWith("dblib-dialog") ? "altiumdb.modal" : "settings.altium", errorPath: id.endsWith(".error") ? "/api/altium/status" : undefined };
+  if (id.includes("cubemx")) return { section: "settings.cubemx", target: "settings.cubemx", errorPath: id.endsWith(".error") ? "/api/settings" : undefined };
+  if (id.includes("distributors") || id.includes("vendor-logins")) return { section: "settings.distributor", target: id.includes("vendor-logins") ? "settings.vendor-login-row" : "settings.distributor", errorPath: id.endsWith(".error") ? "/api/settings" : undefined };
+  if (id.includes("rescan")) return { section: "settings.rescan", target: "settings.rescan", errorPath: id.endsWith(".error") ? "/api/library/rescan/state" : undefined };
+  if (id.includes("health")) return { section: "settings.health", target: "settings.health", errorPath: id.endsWith(".error") ? "/api/doctor/scan" : undefined };
+  if (id.includes("completion")) return { section: "settings.completion", target: "settings.completion", errorPath: id.endsWith(".error") ? "/api/library/completion" : undefined };
+  if (id.includes("maintenance")) return { section: "settings.derivation", target: "settings.derivation", errorPath: id.endsWith(".error") ? "/api/library/derivation" : undefined };
+  if (id.includes("reset-cad")) return { section: "settings.cad-clear", target: "confirm.root" };
+  return { section: "settings.completion", target: "settings.completion", errorPath: id.endsWith(".error") ? "/api/doctor/scan" : undefined };
 }
 
 function scenario(id: SettingsScenarioId): DesignScenario {
   const state = stateFor(id);
   const attention = id.endsWith(".attention") || id.endsWith(".diverged") || id.endsWith(".syncing") || id.endsWith("credentials-partial");
   const initialSettings: NonNullable<ScenarioUiState["settings"]> = {
-    group: state.group,
+    section: state.section,
     altiumDialog: id.endsWith("setup-dialog") ? "setup" : id.endsWith("dblib-dialog") ? "dblib" : undefined,
     confirmResetCad: id.endsWith("reset-cad.confirmation"),
     picker: id.endsWith("kicad.picker") ? "kicad" : id.endsWith("cubemx.picker") ? "cubemx" : undefined,

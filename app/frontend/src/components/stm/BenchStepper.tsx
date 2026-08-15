@@ -163,7 +163,7 @@ function ExportMenu({
           "flex h-[27px] cursor-pointer list-none items-center rounded-control border " +
           "border-line bg-raise px-2.5 text-xs font-medium text-t2 transition-colors " +
           "hover:bg-raise2 hover:text-t1 focus-visible:outline focus-visible:outline-2 " +
-          "focus-visible:outline-offset-2 focus-visible:outline-acc " +
+          "focus-visible:outline-offset-2 focus-visible:outline-focus " +
           (disabled ? "cursor-not-allowed opacity-50" : "")
         }
       >

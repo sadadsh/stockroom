@@ -208,7 +208,7 @@ export function Glb3DView({
           ...(presentation?.background ? { background: presentation.background } : {}),
           ...(presentation?.opacity === undefined ? {} : { opacity: presentation.opacity }),
         }}
-        className="relative min-h-0 w-full flex-1 bg-technical outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-acc"
+        className="relative min-h-0 w-full flex-1 bg-technical outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus"
       >
         {presentation?.grid === true ? (
           <div

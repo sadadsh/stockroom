@@ -37,10 +37,11 @@ export function SettingsDisclosure({
     <section
       aria-labelledby={devId ? `${devId}.title` : undefined}
       className={cx(
-        "flex min-w-0 flex-col overflow-hidden rounded-card border border-line bg-raise",
+        "flex min-w-0 scroll-mt-3 flex-col overflow-hidden rounded-card border border-line bg-raise outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus",
         className,
       )}
       data-dev-id={devId}
+      tabIndex={-1}
     >
       <div
         data-testid={devId ? `${devId}.header` : undefined}

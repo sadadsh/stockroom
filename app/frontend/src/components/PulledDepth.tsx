@@ -275,7 +275,7 @@ export function PulledDepth({ result }: { result: EnrichmentResult }) {
                   href={href}
                   target="_blank"
                   rel="noreferrer"
-                  className="rounded-control outline-none hover:brightness-110 focus-visible:ring-2 focus-visible:ring-acc"
+                  className="rounded-control outline-none hover:brightness-110 focus-visible:ring-2 focus-visible:ring-focus"
                   title={openOnDistributor({ distributor: label })}
                 >
                   <Badge tone="ok">{label}</Badge>

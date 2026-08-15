@@ -278,7 +278,14 @@ const KNOWN_PROP_PASSED: readonly string[] = [
   "design.piece-restore",
   "design.piece-move-up",
   "design.piece-move-down",
-]; // 93
+  // ModalShell owns the frame once and receives the caller-specific stable identities as props.
+  "addpart.close",
+  "addpart.header",
+  "confirm.body",
+  "confirm.root",
+  "confirm.scrim",
+  "confirm.title",
+]; // 99
 
 describe("devIds catalogue <-> code parity (IDSYS-02)", () => {
   const catalogueIds = new Set(DEV_IDS.map((e) => e.id));

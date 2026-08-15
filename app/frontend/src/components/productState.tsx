@@ -57,10 +57,12 @@ function cx(...parts: Array<string | false | null | undefined>): string {
 export function RouteHeader({
   right,
   actions,
+  heading = false,
   className,
   children,
   ...rest
-}: { right?: ReactNode; actions?: ReactNode } & HTMLAttributes<HTMLDivElement>) {
+}: { right?: ReactNode; actions?: ReactNode; heading?: boolean } & HTMLAttributes<HTMLDivElement>) {
+  const Title = heading ? "h1" : "span";
   return (
     <div
       className={cx(
@@ -71,7 +73,7 @@ export function RouteHeader({
     >
       {/* min-w-0 so `truncate` has something to shrink against now that the span sizes to its
           content instead of being stretched by a justify-between. */}
-      <span className="min-w-0 truncate text-xs font-semibold text-t2">{children}</span>
+      <Title className="min-w-0 truncate text-xs font-semibold text-t2">{children}</Title>
       {right != null ? (
         <span className="flex-none text-2xs tabular-nums text-t3">{right}</span>
       ) : null}
@@ -457,7 +459,7 @@ export function Region({
             type="button"
             data-dev-id={viewAllDevId}
             onClick={onViewAll}
-            className="ml-auto flex-none rounded-control px-1.5 py-0.5 text-2xs font-medium text-t2 transition-colors hover:text-t1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc"
+            className="ml-auto flex-none rounded-control px-1.5 py-0.5 text-2xs font-medium text-t2 transition-colors hover:text-t1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
           >
             <Text id={viewAllCopyId}>{viewAllLabel}</Text>
           </button>
@@ -601,7 +603,7 @@ export function AttentionItem({
           data-dev-id={actionDevId}
           onClick={onAction}
           aria-label={`${resolved}: ${title}`}
-          className="flex-none rounded-control px-1.5 py-0.5 text-2xs font-medium text-acc transition-colors hover:brightness-125 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc"
+          className="flex-none rounded-control px-1.5 py-0.5 text-2xs font-medium text-acc transition-colors hover:brightness-125 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
         >
           <Text id={actionCopyId}>{actionLabel}</Text>
         </button>

@@ -243,7 +243,7 @@ export function ProjectPlacementStage({
             setExpanded(false);
           }
         }}
-        className="relative min-h-[260px] flex-1 cursor-grab overflow-hidden bg-field outline-none active:cursor-grabbing focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-acc"
+        className="relative min-h-[260px] flex-1 cursor-grab overflow-hidden bg-field outline-none active:cursor-grabbing focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus"
         {...handlers}
       >
         <div
@@ -594,7 +594,7 @@ function PlacementStageToolbar({
           </StageToolButton>
           <button
             type="button"
-            className="h-6 min-w-[42px] px-1 font-mono text-2xs tabular-nums text-t3 hover:text-t1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-acc"
+            className="h-6 min-w-[42px] px-1 font-mono text-2xs tabular-nums text-t3 hover:text-t1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-focus"
             aria-label={fitLabel}
             title={fitLabel}
             onClick={onFit}
@@ -1048,7 +1048,7 @@ function PlacementMarkers({
                     isSelected,
                     isActive,
                     nativeBoard,
-                  )} group-focus-visible:stroke-acc`}
+                  )} group-focus-visible:stroke-focus`}
                   strokeWidth={isActive ? 4 : 2}
                 />
                 <circle
@@ -1657,7 +1657,7 @@ function StageToolButton({
       type="button"
       aria-label={label}
       title={label}
-      className={`flex h-6 w-6 items-center justify-center rounded-control text-t3 transition-colors hover:bg-raise hover:text-t1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-acc disabled:cursor-not-allowed disabled:opacity-35 ${
+      className={`flex h-6 w-6 items-center justify-center rounded-control text-t3 transition-colors hover:bg-raise hover:text-t1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-focus disabled:cursor-not-allowed disabled:opacity-35 ${
         framed ? "border border-line bg-field" : ""
       }`}
       {...props}

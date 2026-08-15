@@ -97,7 +97,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                   dismiss(t.id);
                   t.action?.onClick();
                 }}
-                className="ml-1 rounded-control px-2 py-1 text-xs font-semibold text-acc transition-colors hover:bg-acc/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc"
+                className="ml-1 rounded-control px-2 py-1 text-xs font-semibold text-acc transition-colors hover:bg-acc/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
               >
                 {t.action.label}
               </button>
@@ -109,7 +109,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                 event.stopPropagation();
                 dismiss(t.id);
               }}
-              className="ml-0.5 rounded-control px-1 text-t3 transition-colors hover:bg-raise hover:text-t1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc"
+              className="ml-0.5 rounded-control px-1 text-t3 transition-colors hover:bg-raise hover:text-t1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
             >
               ×
             </button>

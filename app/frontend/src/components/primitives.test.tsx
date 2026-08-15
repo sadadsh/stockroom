@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { useState } from "react";
 import { describe, expect, it } from "vitest";
-import { Button, Card, Panel, RouteHeader, TabStrip } from "./primitives";
+import { Button, Card, Dot, Panel, RouteHeader, TabStrip } from "./primitives";
 
 const TABS = [
   { id: "specs", label: "Specs" },
@@ -99,6 +99,21 @@ describe("RouteHeader's count", () => {
     expect(bar.className).not.toContain("justify-between");
     const spans = Array.from(bar.querySelectorAll("span"));
     expect(spans[spans.indexOf(title) + 1]?.textContent).toBe("1");
+  });
+});
+
+describe("status marks", () => {
+  it("distinguishes warning from neutral by shape, not color", () => {
+    const { container } = render(
+      <>
+        <Dot tone="warn" />
+        <Dot tone="neutral" />
+      </>,
+    );
+    const [warning, neutral] = Array.from(container.children);
+    expect(warning.querySelector("svg")).not.toBeNull();
+    expect(neutral.querySelector("svg")).toBeNull();
+    expect(neutral).toHaveClass("rounded-full");
   });
 });
 

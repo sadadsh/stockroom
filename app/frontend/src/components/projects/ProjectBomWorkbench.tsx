@@ -230,7 +230,7 @@ export function ProjectBomWorkbench({
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
                   placeholder={searchPlaceholder}
-                  className="h-8 w-full rounded-control border border-line bg-field pl-8 pr-2 text-xs text-t1 outline-none placeholder:text-t3 focus:border-acc focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-acc"
+                  className="h-8 w-full rounded-control border border-line bg-field pl-8 pr-2 text-xs text-t1 outline-none placeholder:text-t3 focus:border-focus focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus"
                 />
               </label>
               <AdaptiveChoice
@@ -385,7 +385,7 @@ function BomLineList({
             value={query}
             onChange={(event) => onQueryChange(event.target.value)}
             placeholder={searchPlaceholder}
-            className="h-8 w-full rounded-control border border-line bg-field pl-8 pr-2 text-xs text-t1 outline-none placeholder:text-t3 focus:border-acc"
+            className="h-8 w-full rounded-control border border-line bg-field pl-8 pr-2 text-xs text-t1 outline-none placeholder:text-t3 focus:border-focus"
           />
         </label>
       </div>
@@ -403,7 +403,7 @@ function BomLineList({
                   "relative grid w-full grid-cols-[36px_minmax(0,1fr)] " +
                   "items-start gap-2.5 border-b border-line px-3 py-2.5 text-left transition-colors " +
                   "focus-visible:z-10 focus-visible:outline focus-visible:outline-2 " +
-                  "focus-visible:-outline-offset-2 focus-visible:outline-acc " +
+                  "focus-visible:-outline-offset-2 focus-visible:outline-focus " +
                   (active ? "bg-raise2" : "hover:bg-raise")
                 }
               >
@@ -628,7 +628,7 @@ function BomLineInspector({
                       },
                     )
                   }
-                  className="w-full rounded-card border border-line bg-surface p-3 text-left transition-colors hover:border-line2 hover:bg-raise focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc disabled:opacity-50"
+                  className="w-full rounded-card border border-line bg-surface p-3 text-left transition-colors hover:border-line2 hover:bg-raise focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:opacity-50"
                 >
                   <span className="block text-sm font-semibold text-t1">
                     {candidate.mpn || candidate.display_name}

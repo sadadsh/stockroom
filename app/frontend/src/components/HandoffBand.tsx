@@ -319,7 +319,7 @@ function HandoffValue({
           data-dev-role="detail.handoff-open"
           aria-label={openName({ field: label })}
           title={value.full}
-          className="flex-none rounded-control p-0.5 text-t3 transition-colors hover:text-t1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc"
+          className="flex-none rounded-control p-0.5 text-t3 transition-colors hover:text-t1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
         >
           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
             <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
@@ -349,7 +349,7 @@ function HandoffValue({
         // URL, which would otherwise make this control's screen-reader name depend on whether the
         // caller happened to allow editing - one control, two names.
         aria-label={openName({ field: label })}
-        className="truncate text-xs font-medium text-t1 underline decoration-line underline-offset-2 transition-colors hover:decoration-t1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc"
+        className="truncate text-xs font-medium text-t1 underline decoration-line underline-offset-2 transition-colors hover:decoration-t1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
       >
         {value.text}
       </a>

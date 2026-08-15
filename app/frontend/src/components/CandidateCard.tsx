@@ -292,7 +292,7 @@ function Field({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         className={
-          "min-w-0 flex-1 rounded-control border border-line2 bg-field px-3 py-1.5 text-base text-t1 outline-none focus:border-acc " +
+          "min-w-0 flex-1 rounded-control border border-line2 bg-field px-3 py-1.5 text-base text-t1 outline-none focus:border-focus " +
           (mono ? "tnum" : "")
         }
       />
