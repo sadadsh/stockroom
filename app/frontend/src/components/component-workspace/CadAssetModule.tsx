@@ -442,6 +442,7 @@ function AssetPreview({
         isError={preview.model.isError}
         error={preview.model.error}
         land={preview.land.data ?? null}
+        boardInitiallyVisible={false}
         showViews={interactive}
         showShading={interactive}
         compact

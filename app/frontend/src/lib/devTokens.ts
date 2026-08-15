@@ -237,6 +237,14 @@ export const DEV_TOKENS: DevToken[] = [
     default: { dark: "#1f1f1e", light: "#f5f5f2" },
   },
   {
+    cssVar: "--c-model-stage",
+    label: "3D canvas",
+    group: "Drawing",
+    kind: "color",
+    themed: true,
+    default: { dark: "#1f1f1e", light: "#e7e7e5" },
+  },
+  {
     cssVar: "--c-technical-wash",
     label: "Symbol body wash",
     group: "Drawing",
@@ -307,14 +315,6 @@ export const DEV_TOKENS: DevToken[] = [
     kind: "color",
     themed: true,
     default: { dark: "#63b963", light: "#4a7a4a" },
-  },
-  {
-    cssVar: "--c-layer-pin-one",
-    label: "Pad 1 marker",
-    group: "Drawing",
-    kind: "color",
-    themed: true,
-    default: { dark: "#f0776a", light: "#b0392c" },
   },
   // --- Controls ------------------------------------------------------------
   {

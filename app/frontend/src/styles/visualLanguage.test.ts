@@ -523,7 +523,9 @@ describe("the chrome is a desktop, not a dashboard", () => {
  *   every ink clears 3:1 on its own sheet, so nothing is drawn in near-black on near-black;
  *   the six layer colours stay >=15 CIE76 dE apart, so copper, mask, paste, silkscreen,
  *   fabrication and courtyard remain six distinguishable answers - in dark theme too, where the
- *   values had to be re-tuned rather than reused.
+ *   values had to be re-tuned rather than reused;
+ *   the light 3D canvas sits between workspace chrome and drawing paper, so the transparent WebGL
+ *   render belongs to light mode without losing the package silhouette.
  */
 describe("the technical drawing canvas follows the theme", () => {
   const INKS = [
@@ -535,10 +537,9 @@ describe("the technical drawing canvas follows the theme", () => {
     "--c-layer-silk",
     "--c-layer-fab",
     "--c-layer-courtyard",
-    "--c-layer-pin-one",
   ] as const;
 
-  /** The six switchable layers plus the pad-1 marker: the set that has to stay told apart. */
+  /** The six switchable layers: the set that has to stay told apart. */
   const LAYERS = [
     "--c-layer-copper",
     "--c-layer-mask",
@@ -546,7 +547,6 @@ describe("the technical drawing canvas follows the theme", () => {
     "--c-layer-silk",
     "--c-layer-fab",
     "--c-layer-courtyard",
-    "--c-layer-pin-one",
   ] as const;
 
   /** CIE76 dE, which measures how far apart two colours look rather than how they differ in RGB. */
@@ -585,10 +585,13 @@ describe("the technical drawing canvas follows the theme", () => {
     expect(sheet).toBeLessThan(luminance(rgb(property(block, "--c-t1"))));
   });
 
-  it("keeps the sheet the lightest surface in light theme, where that is what paper is", () => {
+  it("keeps paper brightest and gives the light 3D canvas a softer neutral stage", () => {
     const block = themeBlock(':root[data-theme="light"]');
+    const workspace = luminance(rgb(property(block, "--c-canvas")));
+    const model = luminance(rgb(property(block, "--c-model-stage")));
     const sheet = luminance(rgb(property(block, "--c-technical")));
-    expect(sheet).toBeGreaterThan(luminance(rgb(property(block, "--c-canvas"))));
+    expect(model).toBeGreaterThan(workspace);
+    expect(model).toBeLessThan(sheet);
   });
 
   it.each(THEMES)("%s draws every ink at 3:1 or better on its own sheet", (_theme, selector) => {

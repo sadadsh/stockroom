@@ -262,9 +262,6 @@ export function FootprintPreview({
           : null}
         {visibleLayers.silkscreen ? <Lines land={land} suffix=".SilkS" layer="silkscreen" color={presentation?.layerColors?.silkscreen} /> : null}
 
-        {/* Pin 1, always drawn when the copper is: every orientation check starts from it, and
-            hiding it behind a toggle would make the most important pad the easiest to lose. */}
-        {visibleLayers.copper ? <PinOneMarker pads={land.pads} scale={scale} /> : null}
         {visibleLayers.origin ? <Origin scale={scale} /> : null}
         {visibleLayers.dimensions && copper ? <Dimensions box={copper} scale={scale} /> : null}
         {visibleLayers.numbers ? (
@@ -345,22 +342,6 @@ function Lines({ land, suffix, layer, color }: { land: LandPattern; suffix: stri
           />
         ))}
     </g>
-  );
-}
-
-function PinOneMarker({ pads, scale }: { pads: LandPad[]; scale: number }) {
-  const first = pads.find((pad) => pad.number === "1");
-  if (!first) return null;
-  const half = Math.max(first.size[0], first.size[1]) / 2;
-  return (
-    <circle
-      cx={first.at[0]}
-      cy={first.at[1]}
-      r={half + scale * 0.03}
-      className="fill-none stroke-layer-pin-one"
-      strokeWidth={scale * 0.012}
-      data-pin-one="true"
-    />
   );
 }
 

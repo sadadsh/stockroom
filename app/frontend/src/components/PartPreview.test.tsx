@@ -281,6 +281,24 @@ describe("Glb3DView scene synchronization", () => {
     expect(screen.getByRole("button", { name: "Isometric" })).toHaveClass("min-h-[32px]");
   });
 
+  it("can start a mini viewer model-only while retaining the PCB control", async () => {
+    const handle = sceneHandle();
+    mountSpy.mockReturnValue(handle);
+    wrap(
+      <Glb3DView
+        data={bytes}
+        isLoading={false}
+        isError={false}
+        land={land}
+        compact
+        boardInitiallyVisible={false}
+      />,
+    );
+    await waitFor(() => expect(mountSpy).toHaveBeenCalled());
+    expect(handle.setLayers).toHaveBeenCalledWith({ model: true, pads: true, board: false });
+    expect(screen.getByRole("button", { name: "PCB" })).toHaveAttribute("aria-pressed", "false");
+  });
+
   it("reports visible only after the scene proves renderable geometry", async () => {
     const handle = sceneHandle();
     mountSpy.mockReturnValue(handle);

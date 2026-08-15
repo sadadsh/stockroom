@@ -646,6 +646,18 @@ describe("the previews are drawn from the file", () => {
     expect(screen.getByText(makeDossier().identity.mpn)).toBeInTheDocument();
   });
 
+  it("starts the mini 3D preview without the PCB slab", async () => {
+    await open(attached());
+    const model = module_("model");
+    const user = userEvent.setup();
+    const settings = await within(model).findByRole("button", { name: "3D view settings" });
+    await user.click(settings);
+    expect(within(model).getByRole("button", { name: "PCB" })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
+  });
+
   it("draws the land pattern's pads, and says why a layer switch cannot operate", async () => {
     await open(attached());
     const footprint = module_("footprint");
@@ -655,8 +667,8 @@ describe("the previews are drawn from the file", () => {
       ).not.toBeNull(),
     );
     expect(footprint.querySelectorAll("rect[data-pad]").length).toBe(2);
-    // Pin 1 is always marked when the copper is drawn: every orientation check starts there.
-    expect(footprint.querySelector('[data-pin-one="true"]')).not.toBeNull();
+    // The downloaded pad geometry already identifies pad 1. Do not add a second red ring over it.
+    expect(footprint.querySelector('[data-pin-one="true"]')).toBeNull();
 
     const user = userEvent.setup();
     await user.click(within(footprint).getByRole("button", { name: "Show Or Hide Drawn Detail" }));

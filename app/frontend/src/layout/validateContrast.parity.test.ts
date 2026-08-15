@@ -135,7 +135,6 @@ const REFERENCE_DRAWING_PAIRS: readonly Pair[] = [
       "--c-layer-silk",
       "--c-layer-fab",
       "--c-layer-courtyard",
-      "--c-layer-pin-one",
     ],
     ["--c-technical"],
     "non-text",

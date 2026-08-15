@@ -89,12 +89,15 @@ export function useModelScene({
   isLoading,
   isError,
   onVisibilityChange,
+  boardInitiallyVisible = DEFAULT_LAYERS.board,
 }: {
   data: ArrayBuffer | undefined;
   land: LandPattern | null | undefined;
   isLoading: boolean;
   isError: boolean;
   onVisibilityChange?: (state: ModelVisibility) => void;
+  /** Initial board visibility. Mini previews omit the PCB slab so the component remains the subject. */
+  boardInitiallyVisible?: boolean;
 }): ModelScene {
   const mountRef = useRef<HTMLDivElement>(null);
   // Bind a parse/WebGL failure to the bytes that caused it. A plain boolean survived a part
@@ -115,7 +118,7 @@ export function useModelScene({
   // under reduced motion whatever is asked, so the chip can never claim to be spinning when it is not.
   const [spinning, setSpinning] = useState(startsWithMotion);
   const [showModel, setShowModel] = useState(DEFAULT_LAYERS.model);
-  const [showBoard, setShowBoard] = useState(DEFAULT_LAYERS.board);
+  const [showBoard, setShowBoard] = useState(boardInitiallyVisible);
   const [placementMode, setPlacementMode] = useState<PlacementMode>("auto");
   const [placementAssessment, setPlacementAssessment] =
     useState<PlacementAssessment | null>(null);

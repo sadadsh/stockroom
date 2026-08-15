@@ -33,6 +33,7 @@ export default {
         // desktop, so a 184px preview tile can never be the brightest region of
         // the workspace and outshout the component's own part number.
         technical: "var(--c-technical)",
+        "model-stage": "var(--c-model-stage)",
         "technical-wash": "var(--c-technical-wash)",
         "technical-ink": "var(--c-technical-ink)",
         "technical-note": "var(--c-technical-note)",
@@ -47,7 +48,6 @@ export default {
         "layer-silk": "var(--c-layer-silk)",
         "layer-fab": "var(--c-layer-fab)",
         "layer-courtyard": "var(--c-layer-courtyard)",
-        "layer-pin-one": "var(--c-layer-pin-one)",
 
         // --- Controls: a push button is a bevel over a two-stop fill ------
         "control-top": "var(--c-control-top)",

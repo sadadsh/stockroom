@@ -21,6 +21,20 @@ and `P2` meaningful fit, finish, or clarity debt.
 
 ## Acceptance Captures
 
+### 2026-08-14 — Compact CAD Preview Cleanup
+
+- Capture layer: current source in the real Windows pywebview/WebView2 Development host, captured
+  with background `PrintWindow` so verification did not take foreground focus.
+- Evidence: `work/Model Preview Cleanup Dark.png`, 1,400 × 900, SHA-256 `5b68e394582f`;
+  `work/Model Preview Cleanup Light.png`, 1,400 × 900, SHA-256 `81e6f76876e9`.
+- Intended claim: the mini 3D preview begins with the component alone rather than a PCB slab; the
+  footprint does not add a decorative pad-one ring over source geometry; and light mode uses a soft
+  neutral model stage instead of retaining the dark canvas.
+- Acceptance result: pass. Both themes retain the same model framing, controls, footprint geometry,
+  and full-preview path. The mini preview's PCB control remains available but begins off, while the
+  full inspector retains board context. The light canvas sits between workspace chrome and drawing
+  paper luminance, preserving the package silhouette without a black tile.
+
 ### 2026-08-14 — Price-First Sourcing Information Architecture
 
 - Capture layer: current source in the real Windows pywebview/WebView2 Development host with the

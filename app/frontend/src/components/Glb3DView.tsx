@@ -41,6 +41,7 @@ export function Glb3DView({
   compact = false,
   controls = "bar",
   trailing = null,
+  boardInitiallyVisible = true,
   onVisibilityChange,
 }: {
   data: ArrayBuffer | undefined;
@@ -92,6 +93,8 @@ export function Glb3DView({
   controls?: ModelControlsMode;
   /** Placed at the end of the control strip, so a host's own icon shares the one line. */
   trailing?: React.ReactNode;
+  /** Mini previews start model-only; the full inspector keeps its PCB context. */
+  boardInitiallyVisible?: boolean;
   /**
    * Reports rendered truth, not file presence. `visible` is emitted only after
    * Three.js has parsed non-empty geometry and computed its first complete frame.
@@ -99,7 +102,14 @@ export function Glb3DView({
   onVisibilityChange?: (state: ModelVisibility) => void;
 }) {
   const presentation = useOptionalDesignStudio()?.resolvedCadPresentation["cad.model3d"]?.model3d;
-  const scene = useModelScene({ data, land, isLoading, isError, onVisibilityChange });
+  const scene = useModelScene({
+    data,
+    land,
+    isLoading,
+    isError,
+    boardInitiallyVisible,
+    onVisibilityChange,
+  });
   const [compactControlsOpen, setCompactControlsOpen] = useState(false);
   const settingsRef = useRef<HTMLDivElement>(null);
   // Resolved above the loading/error returns so the hook order is stable across every branch.
@@ -198,7 +208,7 @@ export function Glb3DView({
           ...(presentation?.background ? { background: presentation.background } : {}),
           ...(presentation?.opacity === undefined ? {} : { opacity: presentation.opacity }),
         }}
-        className="relative min-h-0 w-full flex-1 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-acc"
+        className="relative min-h-0 w-full flex-1 bg-model-stage outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-acc"
       >
         {presentation?.grid === true ? (
           <div
