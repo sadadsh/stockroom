@@ -7,6 +7,7 @@
  * key is only ever shown as a last-4 hint.
  */
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { Link as AstryxLink } from "@astryxdesign/core/Link";
 import { ApiError, api } from "../api/client";
 import type { SetLibraryBody, SettingsPatch, WiringReport } from "../api/types";
 import { useJob } from "../lib/useJob";
@@ -1743,25 +1744,25 @@ function AboutSettingsSection({ version, note = "" }: { version: string; note?: 
           </p>
         ) : null}
       </div>
-      <div data-dev-id="about.links" className="flex flex-none flex-wrap gap-2">
-        <a
+      <div data-dev-id="about.links" className="flex flex-none flex-wrap items-center gap-3">
+        <AstryxLink
           href="https://www.linkedin.com/in/sadadhaidari"
-          target="_blank"
-          rel="noreferrer"
-          className="inline-flex items-center gap-2 rounded-control border border-line2 bg-raise2 px-3 py-2 text-xs font-semibold text-t2 shadow-card transition hover:text-t1 hover:brightness-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+          isExternalLink
+          isStandalone
+          className="gap-1.5 text-xs"
         >
-          <Icon id="brand.linkedin" className="h-4 w-4" />
+          <Icon id="brand.linkedin" className="h-3.5 w-3.5" />
           <Text id="modal.about.linkedin">LinkedIn</Text>
-        </a>
-        <a
+        </AstryxLink>
+        <AstryxLink
           href="https://github.com/sadadsh"
-          target="_blank"
-          rel="noreferrer"
-          className="inline-flex items-center gap-2 rounded-control border border-line2 bg-raise2 px-3 py-2 text-xs font-semibold text-t2 shadow-card transition hover:text-t1 hover:brightness-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+          isExternalLink
+          isStandalone
+          className="gap-1.5 text-xs"
         >
-          <Icon id="brand.github" className="h-4 w-4" />
+          <Icon id="brand.github" className="h-3.5 w-3.5" />
           <Text id="modal.about.github">GitHub</Text>
-        </a>
+        </AstryxLink>
       </div>
       </div>
     </div>

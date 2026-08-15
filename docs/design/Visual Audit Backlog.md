@@ -21,6 +21,34 @@ and `P2` meaningful fit, finish, or clarity debt.
 
 ## Acceptance Captures
 
+### 2026-08-14 — Restrained ASTRYX Neutral Foundation
+
+- Capture layer: current Vite source in headless installed Microsoft Edge using the shipped Design
+  Studio `About Open` and `Search Initial` scenarios at 1,400 × 900. Native WebView2 remains a
+  separate host-level acceptance boundary.
+- Evidence: `work/Astryx Neutral About Dark.png`, SHA-256 `1e9bca56f76f`;
+  `work/Astryx Neutral About Light.png`, SHA-256 `971a0cd6842e`;
+  `work/Astryx Neutral Search Dark.png`, SHA-256 `bd2e24d7b004`;
+  `work/Astryx Neutral Search Light.png`, SHA-256 `4bab39a975d1`; and
+  `work/Astryx Neutral Measurements.json`, SHA-256 `e75d83432620`.
+- Intended claim: ASTRYX is an incremental foundation, not a replacement shell. Its editable
+  Neutral theme follows Stockroom's existing machine-owned dark/light preference, Segoe UI
+  Variable typography, 2px engineering-tool geometry, authored grayscale surfaces, shadows, and
+  status colors. About uses semantic external links with explicit new-tab announcements; Search
+  uses platform-aware ASTRYX key hints. Existing navigation, layout, data rows, modals, and product
+  primitives retain ownership.
+- Acceptance result: browser pass in both themes. The document and rendered subtree identify the
+  active `neutral` theme; all five captured key hints retain 4px inline padding, 2px corners, and
+  the platform font, while both About links resolve to the correct theme text color and platform
+  font. React 19 exposed and repaired one real batching dependency in `useJob`: terminal job state
+  is now computed synchronously from the stream rather than as a side effect of a deferred React
+  state updater. The complete Windows gate passed 239 WindowHost tests, 5 converter tests, 5,980
+  parallel backend tests with 20 skipped, 51 serialized tests, 2,823 frontend tests, TypeScript,
+  production build, and deterministic distribution synchronization. ASTRYX raises the current
+  critical CSS from 77.28/15.64 kB raw/gzip to 230.75/42.29 kB and the main JavaScript plus split
+  JSX runtime from 2,402.21/625.13 kB to 2,593.32/680.73 kB; this accepted foundation cost is
+  recorded rather than hidden, and further component adoption must earn its payload and UX cost.
+
 ### 2026-08-14 — Graphite Palette, Line-Free Sourcing, Fitted CAD, And Settings About
 
 - Capture layer: current Vite source in headless installed Microsoft Edge using the shipped Design

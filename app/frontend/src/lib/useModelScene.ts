@@ -75,7 +75,7 @@ export interface ModelViewerControls {
 
 export interface ModelScene {
   /** Attach to the element the canvas is mounted into. */
-  mountRef: RefObject<HTMLDivElement>;
+  mountRef: RefObject<HTMLDivElement | null>;
   /** True once THESE bytes failed to parse or this device could not give a WebGL context. */
   failed: boolean;
   /** The land pattern the overlay renderer can actually draw, or null. */

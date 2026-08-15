@@ -14,6 +14,8 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { Theme as AstryxTheme } from "@astryxdesign/core/theme";
+import { neutralTheme } from "../themes/neutral/neutral";
 import { readPref, writePref } from "./uiPrefs";
 
 export type Theme = "dark" | "light";
@@ -67,6 +69,17 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   );
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
+}
+
+/** Mount ASTRYX at the real application boundary without changing every component test root. */
+export function AstryxThemeBridge({ children }: { children: ReactNode }) {
+  const { theme } = useTheme();
+  return (
+    // ASTRYX uses display: contents here, preserving Stockroom's existing shell geometry.
+    <AstryxTheme theme={neutralTheme} mode={theme}>
+      {children}
+    </AstryxTheme>
+  );
 }
 
 export function useTheme(): ThemeContextValue {

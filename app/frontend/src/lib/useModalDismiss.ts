@@ -62,7 +62,7 @@ const FOCUSABLE =
 
 export interface ModalLayer {
   /** Attach to the dialog element. The trap and the initial focus both read it. */
-  ref: RefObject<HTMLDivElement>;
+  ref: RefObject<HTMLDivElement | null>;
   /** 0 for the bottom-most open modal, 1 for one opened from inside it, and so on. */
   depth: number;
   /** Whether this layer answers Escape and traps Tab. Exactly one open layer is the top. */

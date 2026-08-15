@@ -139,6 +139,9 @@ def test_fixture_release_bundle_is_complete_valid_and_reproducible(
     assert "Tabler Icons 3.45.0" in notices
     assert "Material Symbols" in notices
     assert "Phosphor 2.1.1" in notices
+    assert "ASTRYX Core 0.4.1" in notices
+    assert "StyleX 0.19.0" in notices
+    assert "Lucide React 1.18.0" in notices
     assert (support / "Licenses" / "AltiumSharp Apache-2.0.txt").read_text(
         encoding="utf-8"
     ).startswith("Apache License")

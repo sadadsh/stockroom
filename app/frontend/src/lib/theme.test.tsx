@@ -1,7 +1,7 @@
 import { describe, expect, it, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { ThemeProvider, useTheme } from "./theme";
+import { AstryxThemeBridge, ThemeProvider, useTheme } from "./theme";
 
 function Probe() {
   const { theme, toggle, setTheme } = useTheme();
@@ -21,6 +21,7 @@ describe("ThemeProvider", () => {
     // the injected copy is part of the slate a test has to reset.
     window.__STOCKROOM_UI__ = {};
     delete document.documentElement.dataset.theme;
+    delete document.documentElement.dataset.astryxTheme;
   });
 
   it("defaults to dark and marks the root", () => {
@@ -31,6 +32,16 @@ describe("ThemeProvider", () => {
     );
     expect(screen.getByTestId("theme").textContent).toBe("dark");
     expect(document.documentElement.dataset.theme).toBe("dark");
+  });
+
+  it("bridges the machine theme into the editable ASTRYX neutral theme", () => {
+    render(
+      <ThemeProvider>
+        <AstryxThemeBridge><Probe /></AstryxThemeBridge>
+      </ThemeProvider>,
+    );
+    expect(document.documentElement.dataset.astryxTheme).toBe("neutral");
+    expect(document.querySelector('[data-astryx-theme="neutral"][data-theme="dark"]')).not.toBeNull();
   });
 
   it("toggles to light and marks the root", async () => {

@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { api } from "../api/client";
 import type { OnboardingStatus, SettingsInfo, WiringReport } from "../api/types";
 import { ToastProvider } from "../lib/toast";
-import { ThemeProvider } from "../lib/theme";
+import { AstryxThemeBridge, ThemeProvider } from "../lib/theme";
 import { DevModeProvider } from "../lib/devMode";
 import { resetUpdateClocksForTests } from "../lib/useUpdateStanding";
 import { SettingsPage } from "./SettingsPage";
@@ -106,9 +106,11 @@ function renderPage() {
   return render(
     <QueryClientProvider client={qc}>
       <ThemeProvider>
-        <ToastProvider>
-          <SettingsPage />
-        </ToastProvider>
+        <AstryxThemeBridge>
+          <ToastProvider>
+            <SettingsPage />
+          </ToastProvider>
+        </AstryxThemeBridge>
       </ThemeProvider>
     </QueryClientProvider>,
   );
@@ -123,11 +125,13 @@ function renderDevPage() {
   return render(
     <QueryClientProvider client={qc}>
       <ThemeProvider>
-        <DevModeProvider>
-          <ToastProvider>
-            <SettingsPage />
-          </ToastProvider>
-        </DevModeProvider>
+        <AstryxThemeBridge>
+          <DevModeProvider>
+            <ToastProvider>
+              <SettingsPage />
+            </ToastProvider>
+          </DevModeProvider>
+        </AstryxThemeBridge>
       </ThemeProvider>
     </QueryClientProvider>,
   );
@@ -783,11 +787,11 @@ describe("SettingsPage - flat IA + Machine Setup band", () => {
     const about = await screen.findByTestId("settings.about.header");
     expect(about).toHaveTextContent("About Stockroom");
     expect(document.querySelector('[data-dev-id="about.root"]')).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "LinkedIn" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: /LinkedIn.*opens in new tab/i })).toHaveAttribute(
       "href",
       "https://www.linkedin.com/in/sadadhaidari",
     );
-    expect(screen.getByRole("link", { name: "GitHub" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: /GitHub.*opens in new tab/i })).toHaveAttribute(
       "href",
       "https://github.com/sadadsh",
     );

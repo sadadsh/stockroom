@@ -6,7 +6,7 @@ import App from "./App";
 import { RouterProvider } from "./lib/router";
 import { AddPartProvider } from "./lib/addPart";
 import { ToastProvider } from "./lib/toast";
-import { ThemeProvider } from "./lib/theme";
+import { AstryxThemeBridge, ThemeProvider } from "./lib/theme";
 import { DesignStudioProvider } from "./design-studio/DesignStudioProvider";
 import { DevInspector } from "./components/DevInspector";
 import { DesignIdentityRuntime } from "./components/DesignIdentityRuntime";
@@ -52,23 +52,25 @@ createRoot(rootEl).render(
             runtime; this is the one place the runtime is loaded, and it arrives as its own chunk. */}
         <LazyMotion features={loadMotionFeatures}>
           <ThemeProvider>
-            {/* Dev mode wraps the app so its token overrides apply for everyone on boot; the panel
-                itself renders only while dev mode is toggled on (Ctrl/Cmd+Shift+D). */}
-            <DesignStudioProvider>
-              <ToastProvider>
-                <RouterProvider>
-                  <CaptureProvider>
-                    <AddPartProvider>
-                      <DesignStudioShell>
-                        <App />
-                      </DesignStudioShell>
-                    </AddPartProvider>
-                  </CaptureProvider>
-                </RouterProvider>
-              </ToastProvider>
-              <DevInspector />
-              <DesignIdentityRuntime />
-            </DesignStudioProvider>
+            <AstryxThemeBridge>
+              {/* Dev mode wraps the app so its token overrides apply for everyone on boot; the panel
+                  itself renders only while dev mode is toggled on (Ctrl/Cmd+Shift+D). */}
+              <DesignStudioProvider>
+                <ToastProvider>
+                  <RouterProvider>
+                    <CaptureProvider>
+                      <AddPartProvider>
+                        <DesignStudioShell>
+                          <App />
+                        </DesignStudioShell>
+                      </AddPartProvider>
+                    </CaptureProvider>
+                  </RouterProvider>
+                </ToastProvider>
+                <DevInspector />
+                <DesignIdentityRuntime />
+              </DesignStudioProvider>
+            </AstryxThemeBridge>
           </ThemeProvider>
         </LazyMotion>
       </MotionConfig>

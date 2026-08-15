@@ -23,7 +23,9 @@ describe("the shared UI scheme", () => {
   });
 
   it("contains no retired semantic utilities that Tailwind cannot generate", () => {
-    expect(matches(/\b(?:bg|text|border)-(?:panel(?:-2)?|positive|accent|err-soft)\b/g)).toEqual([]);
+    // ASTRYX theme token names such as `--color-text-accent` are CSS-variable contracts, not
+    // retired Tailwind utilities. Guard executable class vocabulary only.
+    expect(matches(/(?<!color-)\b(?:bg|text|border)-(?:panel(?:-2)?|positive|accent|err-soft)\b/g)).toEqual([]);
   });
 
   it("keeps interface text on the four-size typography scale", () => {

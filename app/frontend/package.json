@@ -4,6 +4,9 @@
   "version": "0.7.0",
   "type": "module",
   "description": "Stockroom SPA (KiCad V10 component library manager)",
+  "astryx": {
+    "theme": "./src/themes/neutral/neutralTheme.ts"
+  },
   "scripts": {
     "dev": "vite",
     "build": "node scripts/check-tokens.mjs && tsc -b && vite build && node scripts/emit-design-studio-scenarios.mjs",
@@ -14,6 +17,8 @@
     "doctor": "npx frontend check@latest"
   },
   "dependencies": {
+    "@astryxdesign/core": "^0.4.1",
+    "@astryxdesign/theme-neutral": "^0.4.1",
     "@fontsource-variable/geist-mono": "^5.3.0",
     "@fortawesome/free-brands-svg-icons": "7.3.1",
     "@fortawesome/free-regular-svg-icons": "7.3.1",
@@ -23,6 +28,7 @@
     "@iconify-json/ph": "1.2.2",
     "@iconify-json/simple-icons": "1.2.93",
     "@iconify-json/tabler": "1.2.38",
+    "@stylexjs/stylex": "^0.19.0",
     "@tabler/icons": "3.46.0",
     "@tanstack/react-query": "^5.56.2",
     "@tanstack/react-table": "^8.21.3",
@@ -31,13 +37,14 @@
     "d3-zoom": "^3.0.0",
     "motion": "^12.42.2",
     "pdfjs-dist": "5.4.296",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
     "react-pdf": "^10.4.1",
     "three": "^0.169.0",
     "three-viewport-gizmo": "^2.2.0"
   },
   "devDependencies": {
+    "@astryxdesign/cli": "^0.4.1",
     "@babel/core": "7.29.7",
     "@tailwindcss/container-queries": "^0.1.1",
     "@testing-library/jest-dom": "^6.9.1",
@@ -45,8 +52,8 @@
     "@testing-library/user-event": "^14.6.1",
     "@types/d3-selection": "^3.0.11",
     "@types/d3-zoom": "^3.0.8",
-    "@types/react": "^18.3.11",
-    "@types/react-dom": "^18.3.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
     "@types/three": "^0.169.0",
     "@vitejs/plugin-react": "^6.0.4",
     "@vitest/coverage-v8": "^4.1.10",

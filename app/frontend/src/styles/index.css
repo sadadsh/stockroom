@@ -1,4 +1,14 @@
-@tailwind base;
+/* Astryx owns its reset and component layers; Stockroom's existing Tailwind utilities remain
+   unlayered so this incremental adoption cannot silently restyle legacy product surfaces. */
+@layer reset, tw-preflight, astryx-base, astryx-theme;
+
+@import "@astryxdesign/core/reset.css";
+@import "@astryxdesign/core/astryx.css";
+@import "../themes/neutral/neutral.css";
+
+@layer tw-preflight {
+  @tailwind base;
+}
 @tailwind components;
 @tailwind utilities;
 

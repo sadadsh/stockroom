@@ -29,10 +29,15 @@ describe("useJob", () => {
     );
     const { result } = renderHook(() => useJob<Array<{ mpn: string }>>());
 
+    let terminal: Awaited<ReturnType<typeof result.current.run>> | undefined;
     await act(async () => {
-      await result.current.run("job123");
+      terminal = await result.current.run("job123");
     });
 
+    // React 19 may defer state updaters past the async return boundary. The caller still receives
+    // the stream's exact terminal answer synchronously rather than a stale `running` snapshot.
+    expect(terminal?.status).toBe("done");
+    expect(terminal?.result).toEqual([{ mpn: "LM358" }]);
     expect(result.current.status).toBe("done");
     expect(result.current.result).toEqual([{ mpn: "LM358" }]);
     // The progress event is folded into state (a live progress bar reads this).

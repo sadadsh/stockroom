@@ -46,51 +46,52 @@ export function useJob<T = unknown>() {
   // rather than the fact that a job was started.
   const run = useCallback(async (jobId: string): Promise<JobState<T>> => {
     let final: JobState<T> = { status: "running", progress: null, result: null, error: null };
-    const settle = (next: JobState<T>): JobState<T> => (final = next);
-    setState(settle({ status: "running", progress: null, result: null, error: null }));
+    const settle = (next: JobState<T>): void => {
+      // `run()` returns this exact terminal answer. Never derive it as a side effect inside a React
+      // state updater: React 19 may batch that updater until after this async function returns.
+      final = next;
+      setState(next);
+    };
+    settle(final);
     let body: ReadableStream<Uint8Array>;
     try {
       body = await api.openJobStream(jobId);
     } catch (err) {
-      setState(settle({
+      settle({
         status: "error",
         progress: null,
         result: null,
         error: err instanceof Error ? err.message : "could not open the job stream",
-      }));
+      });
       return final;
     }
     try {
       for await (const ev of streamEvents(body)) {
         if (ev.event === "progress") {
-          const progress = ev.data as JobProgress;
-          setState((s) => settle({ ...s, progress }));
+          settle({ ...final, progress: ev.data as JobProgress });
         } else if (ev.event === "result") {
-          const result = (ev.data as { result: T }).result;
-          setState((s) => settle({ ...s, status: "done", result }));
+          settle({ ...final, status: "done", result: (ev.data as { result: T }).result });
         } else if (ev.event === "error") {
           const detail = (ev.data as { detail?: string }).detail;
-          setState((s) => settle({ ...s, status: "error", error: detail ?? "the job failed" }));
+          settle({ ...final, status: "error", error: detail ?? "the job failed" });
         } else if (ev.event === "done") {
           break;
         }
       }
     } catch (err) {
-      setState((s) => settle({
-        ...s,
+      settle({
+        ...final,
         status: "error",
         error: err instanceof Error ? err.message : "the job stream broke",
-      }));
+      });
       return final;
     }
     // The stream ended cleanly but without a terminal result/error event (an
     // abnormal EOF: the sidecar died or the host dropped the SSE body). Do not sit
     // in "running" forever; surface an honest error instead.
-    setState((s) =>
-      s.status === "running"
-        ? settle({ ...s, status: "error", error: "the job stream ended without a result" })
-        : s,
-    );
+    if (final.status === "running") {
+      settle({ ...final, status: "error", error: "the job stream ended without a result" });
+    }
     return final;
   }, []);
 

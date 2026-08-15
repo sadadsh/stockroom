@@ -17,6 +17,7 @@ import {
   observeElementRect,
   useVirtualizer,
 } from "@tanstack/react-virtual";
+import { Kbd } from "@astryxdesign/core/Kbd";
 import type { ParametricFacet, SearchRow } from "../api/types";
 import { useFacetsQuery, useParametricFacets, useSearchQuery } from "../api/queries";
 import {
@@ -433,9 +434,8 @@ function SearchQueryBar({
         data-dev-id="search.close"
       >
         <Text id="search.close">Close</Text>
-        <kbd className="inline-flex h-[16px] min-w-[20px] items-center justify-center rounded-control border border-line2 bg-raise2 px-1 font-mono text-2xs font-medium text-t2">
-          <Text id="search.close-key">Esc</Text>
-        </kbd>
+        <Kbd keys="escape" className="text-2xs" />
+        <span className="sr-only"><Text id="search.close-key">Esc</Text></span>
       </button>
     </div>
   );
@@ -578,17 +578,17 @@ function sortToSession(sort: {
     : { kind: sort.key.kind, direction: sort.dir };
 }
 
+const ASTRYX_KEY: Record<string, string> = {
+  "↑": "up",
+  "↓": "down",
+  "↵": "enter",
+  Esc: "escape",
+};
+
 function KbdHint({ keys, label }: { keys: string[]; label: string }) {
   return (
     <span className="inline-flex items-center gap-1.5">
-      {keys.map((k) => (
-        <kbd
-          key={k}
-          className="inline-flex h-[18px] min-w-[20px] items-center justify-center rounded-control border border-line2 bg-raise2 px-1.5 font-mono text-2xs font-medium text-t2"
-        >
-          {k}
-        </kbd>
-      ))}
+      {keys.map((key) => <Kbd key={key} keys={ASTRYX_KEY[key] ?? key} />)}
       {label}
     </span>
   );

@@ -23,6 +23,32 @@ application's current colour; these transformations do not change its meaning.
   Copyright Phosphor Icons contributors. License: MIT. Source:
   https://github.com/phosphor-icons/core. The MIT terms printed below apply.
 
+Frontend design system
+
+- ASTRYX Core 0.4.1 and ASTRYX Neutral Theme 0.4.1. Copyright (c) 2026
+  Meta Platforms, Inc. License: MIT. Source: https://github.com/facebook/astryx.
+  The MIT terms printed below apply.
+- StyleX 0.19.0. Copyright Meta Platforms, Inc. and contributors. License:
+  MIT. Source: https://github.com/facebook/stylex. The MIT terms printed below
+  apply.
+- Lucide React 1.18.0. Copyright (c) 2026 Lucide Icons and Contributors.
+  License: ISC; icons derived from Feather remain under the MIT License.
+  Source: https://github.com/lucide-icons/lucide.
+
+ISC License
+
+Permission to use, copy, modify, and/or distribute this software for any
+purpose with or without fee is hereby granted, provided that the above
+copyright notice and this permission notice appear in all copies.
+
+THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY
+SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+
 Native CAD converter
 
 The native CAD converter is built from source and distributed as a separate
