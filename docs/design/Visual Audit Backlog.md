@@ -29,10 +29,13 @@ and `P2` meaningful fit, finish, or clarity debt.
   separate host-level acceptance boundary.
 - Evidence: `work/Graphite Settings Dark.png`, SHA-256 `9f09839d166b`;
   `work/Graphite Settings Light.png`, SHA-256 `601d183bad04`;
-  `work/Line Free Sourcing Light.png`, SHA-256 `8319989f2bd0`;
-  `work/Fitted CAD Light Compact.png`, SHA-256 `048d2a4bcb89`;
-  `work/Fitted CAD Dark Compact.png`, SHA-256 `4e76b7e9d611`; and
+  `work/CAD Fixture Corrected Light.png`, SHA-256 `ee616e88afef`;
+  `work/CAD Fixture Corrected Dark Compact.png`, SHA-256 `3ad4ad83a1b0`; and
   `work/Graphite UI Audit Measurements.json`, SHA-256 `a5ca176c0731`.
+  The former `work/Line Free Sourcing Light.png`, `work/Fitted CAD Light Compact.png`, and
+  `work/Fitted CAD Dark Compact.png` are rejected for CAD-fidelity review: their visual scenario
+  contradicted its own LM358DR identity with a two-pin rectangular symbol and a two-pad pseudo-
+  footprint.
 - Intended claim: the app uses a deeper graphite dark ladder and a soft near-white neutral light
   ladder; Sourcing contains no structural rules and presents every visible price tier as a pill;
   the CAD Assets body never scrolls and instead divides available height across all three previews;
@@ -43,7 +46,11 @@ and `P2` meaningful fit, finish, or clarity debt.
   measured `447/447` with 113/113/112 px modules. Computed CAD overflow remained `hidden` in both.
   About retained the authoritative version, stale-build note path, author, LinkedIn, and GitHub.
   The former `rail.about` Design Studio target remains as a compatibility wrapper inside the moved
-  Settings content, so personal design documents do not become invalid.
+  Settings content, so personal design documents do not become invalid. Owner review correctly
+  rejected the original CAD drawing evidence even though its layout measurements passed. The
+  repaired scenario now carries all eight LM358 terminals, two recognizable amplifier units, and
+  an eight-pad SOIC land pattern with silkscreen, fabrication, courtyard, and pin-one geometry; a
+  regression requires the scenario's identity, symbol, and footprint terminal counts to agree.
 
 ### 2026-08-14 — Full UI Scheme Structural Audit And Flat Settings
 

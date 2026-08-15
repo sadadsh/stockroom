@@ -528,31 +528,75 @@ export const COMPONENT_SHELL: PartShell = {
 export const COMPONENT_SYMBOL_GEOMETRY: SymbolGeometry = {
   units: "mm",
   name: "LM358",
+  // Keep only the short functional marks an op-amp drawing needs. The old fake OUT1/IN1 labels
+  // sprawled across a tiny rectangle and taught screenshot review to accept a symbol no EDA tool
+  // would show; output and supply names remain KiCad's hidden `~` while + and - stay readable.
   namesHidden: false,
   numbersHidden: false,
   pins: [
-    { number: "1", name: "OUT1", electrical: "output", style: "line", at: [-4, 0.8], angle: 0, length: 2, hidden: false },
-    { number: "2", name: "IN1-", electrical: "input", style: "line", at: [-4, -0.8], angle: 0, length: 2, hidden: false },
+    { number: "1", name: "~", electrical: "output", style: "line", at: [5, 2.5], angle: 180, length: 2.5, hidden: false },
+    { number: "2", name: "-", electrical: "input", style: "inverted", at: [-5, 3.5], angle: 0, length: 2.5, hidden: false },
+    { number: "3", name: "+", electrical: "input", style: "line", at: [-5, 1.5], angle: 0, length: 2.5, hidden: false },
+    { number: "4", name: "~", electrical: "power_in", style: "line", at: [0, -7], angle: 90, length: 2.5, hidden: false },
+    { number: "5", name: "+", electrical: "input", style: "line", at: [-5, -1.5], angle: 0, length: 2.5, hidden: false },
+    { number: "6", name: "-", electrical: "input", style: "inverted", at: [-5, -3.5], angle: 0, length: 2.5, hidden: false },
+    { number: "7", name: "~", electrical: "output", style: "line", at: [5, -2.5], angle: 180, length: 2.5, hidden: false },
+    { number: "8", name: "~", electrical: "power_in", style: "line", at: [0, 7], angle: 270, length: 2.5, hidden: false },
   ],
-  graphics: [{
-    kind: "rectangle",
-    points: [[-2, -1], [2, 1]],
-    center: [0, 0],
-    radius: 0,
-    width: 0.2,
-    fill: "none",
-    closed: true,
-  }],
-  bounds: { x: -2, y: -1, width: 4, height: 2 },
+  graphics: [
+    {
+      kind: "polyline",
+      points: [[-2.5, 0.5], [2.5, 2.5], [-2.5, 4.5], [-2.5, 0.5]],
+      center: [0, 2.5],
+      radius: 0,
+      width: 0.2,
+      fill: "none",
+      closed: true,
+    },
+    {
+      kind: "polyline",
+      points: [[-2.5, -4.5], [2.5, -2.5], [-2.5, -0.5], [-2.5, -4.5]],
+      center: [0, -2.5],
+      radius: 0,
+      width: 0.2,
+      fill: "none",
+      closed: true,
+    },
+  ],
+  // Preview geometry bounds include terminal connection points, matching the production endpoint.
+  bounds: { x: -5, y: -7, width: 10, height: 14 },
 };
+
+const SOIC_PAD_LAYERS = ["F.Cu", "F.Paste", "F.Mask"];
 
 export const COMPONENT_LAND_PATTERN: LandPattern = {
   units: "mm",
   pads: [
-    { number: "1", at: [-1.9, -1.27], size: [0.6, 1.5], shape: "rect", rotation: 0, drill: 0, pad_type: "smd", side: "front", rratio: 0, layers: ["F.Cu", "F.Paste", "F.Mask"] },
-    { number: "2", at: [-1.9, 0], size: [0.6, 1.5], shape: "rect", rotation: 0, drill: 0, pad_type: "smd", side: "front", rratio: 0, layers: ["F.Cu", "F.Paste", "F.Mask"] },
+    { number: "1", at: [-2.7, -1.905], size: [1.5, 0.6], shape: "roundrect", rotation: 0, drill: 0, pad_type: "smd", side: "front", rratio: 0.18, layers: SOIC_PAD_LAYERS },
+    { number: "2", at: [-2.7, -0.635], size: [1.5, 0.6], shape: "roundrect", rotation: 0, drill: 0, pad_type: "smd", side: "front", rratio: 0.18, layers: SOIC_PAD_LAYERS },
+    { number: "3", at: [-2.7, 0.635], size: [1.5, 0.6], shape: "roundrect", rotation: 0, drill: 0, pad_type: "smd", side: "front", rratio: 0.18, layers: SOIC_PAD_LAYERS },
+    { number: "4", at: [-2.7, 1.905], size: [1.5, 0.6], shape: "roundrect", rotation: 0, drill: 0, pad_type: "smd", side: "front", rratio: 0.18, layers: SOIC_PAD_LAYERS },
+    { number: "5", at: [2.7, 1.905], size: [1.5, 0.6], shape: "roundrect", rotation: 0, drill: 0, pad_type: "smd", side: "front", rratio: 0.18, layers: SOIC_PAD_LAYERS },
+    { number: "6", at: [2.7, 0.635], size: [1.5, 0.6], shape: "roundrect", rotation: 0, drill: 0, pad_type: "smd", side: "front", rratio: 0.18, layers: SOIC_PAD_LAYERS },
+    { number: "7", at: [2.7, -0.635], size: [1.5, 0.6], shape: "roundrect", rotation: 0, drill: 0, pad_type: "smd", side: "front", rratio: 0.18, layers: SOIC_PAD_LAYERS },
+    { number: "8", at: [2.7, -1.905], size: [1.5, 0.6], shape: "roundrect", rotation: 0, drill: 0, pad_type: "smd", side: "front", rratio: 0.18, layers: SOIC_PAD_LAYERS },
   ],
-  graphics: [{ start: [-2, -1], end: [2, -1], layer: "F.SilkS", width: 0.2 }],
+  graphics: [
+    { start: [-1.9, -2.5], end: [-0.55, -2.5], layer: "F.SilkS", width: 0.2 },
+    { start: [0.55, -2.5], end: [1.9, -2.5], layer: "F.SilkS", width: 0.2 },
+    { start: [-1.9, -2.5], end: [-1.9, 2.5], layer: "F.SilkS", width: 0.2 },
+    { start: [1.9, -2.5], end: [1.9, 2.5], layer: "F.SilkS", width: 0.2 },
+    { start: [-1.9, 2.5], end: [1.9, 2.5], layer: "F.SilkS", width: 0.2 },
+    { start: [-2, -1.9], end: [-1.4, -2.5], layer: "F.Fab", width: 0.1 },
+    { start: [-1.4, -2.5], end: [2, -2.5], layer: "F.Fab", width: 0.1 },
+    { start: [2, -2.5], end: [2, 2.5], layer: "F.Fab", width: 0.1 },
+    { start: [2, 2.5], end: [-2, 2.5], layer: "F.Fab", width: 0.1 },
+    { start: [-2, 2.5], end: [-2, -1.9], layer: "F.Fab", width: 0.1 },
+    { start: [-3.7, -2.85], end: [3.7, -2.85], layer: "F.CrtYd", width: 0.05 },
+    { start: [3.7, -2.85], end: [3.7, 2.85], layer: "F.CrtYd", width: 0.05 },
+    { start: [3.7, 2.85], end: [-3.7, 2.85], layer: "F.CrtYd", width: 0.05 },
+    { start: [-3.7, 2.85], end: [-3.7, -2.85], layer: "F.CrtYd", width: 0.05 },
+  ],
   model_placement: null,
 };
 
