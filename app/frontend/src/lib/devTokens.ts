@@ -223,8 +223,8 @@ export const DEV_TOKENS: DevToken[] = [
     default: { dark: "#202225", light: "#cdd0d4" },
   },
   // --- The technical drawing sheet ------------------------------------------
-  // Its own group, because these eleven are adjusted together or not at all: the
-  // sheet, the two ink tiers on it, and the seven layer colours of a land pattern.
+  // Its own group, because these ten are adjusted together or not at all: the
+  // sheet, the two ink tiers on it, and the six layer colours of a land pattern.
   // Nudging the sheet without the ink is how a symbol ends up drawn in near-black
   // on a near-black canvas, which is the exact failure this family exists to fix.
   {
@@ -235,14 +235,6 @@ export const DEV_TOKENS: DevToken[] = [
     themed: true,
     // Theme-aware: a bright sheet in dark theme was the brightest thing on screen.
     default: { dark: "#1f1f1e", light: "#f5f5f2" },
-  },
-  {
-    cssVar: "--c-model-stage",
-    label: "3D canvas",
-    group: "Drawing",
-    kind: "color",
-    themed: true,
-    default: { dark: "#1f1f1e", light: "#e7e7e5" },
   },
   {
     cssVar: "--c-technical-wash",

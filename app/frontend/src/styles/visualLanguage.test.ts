@@ -523,9 +523,7 @@ describe("the chrome is a desktop, not a dashboard", () => {
  *   every ink clears 3:1 on its own sheet, so nothing is drawn in near-black on near-black;
  *   the six layer colours stay >=15 CIE76 dE apart, so copper, mask, paste, silkscreen,
  *   fabrication and courtyard remain six distinguishable answers - in dark theme too, where the
- *   values had to be re-tuned rather than reused;
- *   the light 3D canvas sits between workspace chrome and drawing paper, so the transparent WebGL
- *   render belongs to light mode without losing the package silhouette.
+ *   values had to be re-tuned rather than reused.
  */
 describe("the technical drawing canvas follows the theme", () => {
   const INKS = [
@@ -585,13 +583,10 @@ describe("the technical drawing canvas follows the theme", () => {
     expect(sheet).toBeLessThan(luminance(rgb(property(block, "--c-t1"))));
   });
 
-  it("keeps paper brightest and gives the light 3D canvas a softer neutral stage", () => {
+  it("keeps the shared preview sheet brightest in light theme", () => {
     const block = themeBlock(':root[data-theme="light"]');
-    const workspace = luminance(rgb(property(block, "--c-canvas")));
-    const model = luminance(rgb(property(block, "--c-model-stage")));
     const sheet = luminance(rgb(property(block, "--c-technical")));
-    expect(model).toBeGreaterThan(workspace);
-    expect(model).toBeLessThan(sheet);
+    expect(sheet).toBeGreaterThan(luminance(rgb(property(block, "--c-canvas"))));
   });
 
   it.each(THEMES)("%s draws every ink at 3:1 or better on its own sheet", (_theme, selector) => {

@@ -25,15 +25,17 @@ and `P2` meaningful fit, finish, or clarity debt.
 
 - Capture layer: current source in the real Windows pywebview/WebView2 Development host, captured
   with background `PrintWindow` so verification did not take foreground focus.
-- Evidence: `work/Model Preview Cleanup Dark.png`, 1,400 × 900, SHA-256 `5b68e394582f`;
-  `work/Model Preview Cleanup Light.png`, 1,400 × 900, SHA-256 `81e6f76876e9`.
+- Evidence: `work/Model Preview Cleanup Dark.png`, 1,400 × 900, SHA-256 `5b68e394582f`.
+  The intermediate light capture `81e6f76876e9` was rejected because the model used a distinct
+  background rather than the product's shared technical sheet.
 - Intended claim: the mini 3D preview begins with the component alone rather than a PCB slab; the
-  footprint does not add a decorative pad-one ring over source geometry; and light mode uses a soft
-  neutral model stage instead of retaining the dark canvas.
-- Acceptance result: pass. Both themes retain the same model framing, controls, footprint geometry,
-  and full-preview path. The mini preview's PCB control remains available but begins off, while the
-  full inspector retains board context. The light canvas sits between workspace chrome and drawing
-  paper luminance, preserving the package silhouette without a black tile.
+  footprint does not add a decorative pad-one ring over source geometry; and Model, Footprint, and
+  Schematic use the same theme-aware technical-sheet background.
+- Acceptance result: dark native pass and light structural pass. The mini preview's PCB control
+  remains available but begins off, while the full inspector retains board context. A regression
+  mounts all three live preview implementations and requires `bg-technical` on every canvas; token
+  parity proves that shared surface flips with the theme. A replacement native light capture remains
+  deferred while the owner uses the foreground desktop, because verification must not interrupt it.
 
 ### 2026-08-14 — Price-First Sourcing Information Architecture
 

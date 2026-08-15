@@ -646,6 +646,16 @@ describe("the previews are drawn from the file", () => {
     expect(screen.getByText(makeDossier().identity.mpn)).toBeInTheDocument();
   });
 
+  it("uses one technical sheet background for model, footprint, and schematic", async () => {
+    await open(attached());
+    const canvases = [
+      await within(module_("model")).findByTestId("model-canvas"),
+      module_("footprint").querySelector('[data-dev-id="component-browser.footprint-canvas"]'),
+      module_("symbol").querySelector('[data-dev-id="component-browser.symbol-canvas"]'),
+    ];
+    for (const canvas of canvases) expect(canvas).toHaveClass("bg-technical");
+  });
+
   it("starts the mini 3D preview without the PCB slab", async () => {
     await open(attached());
     const model = module_("model");

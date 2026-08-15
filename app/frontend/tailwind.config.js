@@ -33,7 +33,6 @@ export default {
         // desktop, so a 184px preview tile can never be the brightest region of
         // the workspace and outshout the component's own part number.
         technical: "var(--c-technical)",
-        "model-stage": "var(--c-model-stage)",
         "technical-wash": "var(--c-technical-wash)",
         "technical-ink": "var(--c-technical-ink)",
         "technical-note": "var(--c-technical-note)",

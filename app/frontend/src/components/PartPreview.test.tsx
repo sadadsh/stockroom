@@ -296,6 +296,7 @@ describe("Glb3DView scene synchronization", () => {
     );
     await waitFor(() => expect(mountSpy).toHaveBeenCalled());
     expect(handle.setLayers).toHaveBeenCalledWith({ model: true, pads: true, board: false });
+    expect(screen.getByTestId("model-canvas")).toHaveClass("bg-technical");
     expect(screen.getByRole("button", { name: "PCB" })).toHaveAttribute("aria-pressed", "false");
   });
 

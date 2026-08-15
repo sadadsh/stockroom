@@ -88,10 +88,6 @@
        secondary annotation tier (electrical-type initials, origin cross,
        dimension witness lines) held one step under the line work. */
     --c-technical: #1f1f1e;
-    /* The transparent Three.js canvas needs a quieter photographic sweep than the paper-like
-       symbol and footprint sheet. It stays dark here and becomes a soft mid-light neutral in
-       light mode, preserving the package silhouette without leaving a black tile in light chrome. */
-    --c-model-stage: #1f1f1e;
     --c-technical-wash: #2b2b28;
     --c-technical-ink: #e8e8e6;
     --c-technical-note: #9d9d9a;
@@ -349,7 +345,6 @@
        because here that is what a drawing sheet IS, and the chrome around it is
        light too, so nothing is outshouted. The ink goes back to near-black. */
     --c-technical: #f5f5f2;
-    --c-model-stage: #e7e7e5;
     --c-technical-wash: #f0efe8;
     --c-technical-ink: #1b1b1b;
     --c-technical-note: #5c5c5a;
