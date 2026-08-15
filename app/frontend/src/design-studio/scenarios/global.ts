@@ -58,7 +58,10 @@ function uiFor(id: GlobalScenarioId): Readonly<ScenarioUiState> {
     const setupError = id.includes("error") ? "Could not set up the catalog." : undefined;
     return { onboarding: { mode, setupError } };
   }
-  if (id.startsWith("global.about.")) return { rail: { aboutOpen: true, aboutNote: id.endsWith(".current") ? "Stockroom is current." : undefined } };
+  if (id.startsWith("global.about.")) return {
+    settings: { section: "settings.about" },
+    rail: { aboutNote: id.endsWith(".current") ? "Stockroom is current." : undefined },
+  };
   if (id === "global.rail.collapsed" || id === "global.rail.expanded") return { railState: id.endsWith("collapsed") ? "collapsed" : "expanded" };
   if (id === "global.theme.dark" || id === "global.theme.light") return { theme: id.endsWith("light") ? "light" : "dark" };
   if (id.startsWith("global.add-parts.")) return { addParts: { state: id.split(".").slice(-1)[0] as NonNullable<ScenarioUiState["addParts"]>["state"] } };
@@ -88,7 +91,7 @@ function targetFor(id: GlobalScenarioId): string {
 
 function scenario(id: GlobalScenarioId): DesignScenario {
   return {
-    id, title: id === "global.real-data" ? "Real Data" : id.split(".").slice(1).join(" ").replace(/(^|[ -])\w/g, (letter) => letter.toUpperCase()), area: "global", group: "Global", route: "components",
+    id, title: id === "global.real-data" ? "Real Data" : id.split(".").slice(1).join(" ").replace(/(^|[ -])\w/g, (letter) => letter.toUpperCase()), area: "global", group: "Global", route: id.startsWith("global.about.") ? "settings" : "components",
     fixtures: globalFixtures(id), initialUi: uiFor(id), expectedTargets: [targetFor(id)],
   };
 }

@@ -41,7 +41,7 @@ export function SourcingSection({
   );
   if (collapsed) {
     return (
-      <section data-dev-id={devId} className="border-b border-line last:border-b-0">
+      <section data-dev-id={devId} className="mb-1 last:mb-0">
         <details className="group">
           <summary className="flex min-h-[28px] cursor-pointer list-none items-center gap-2 px-2 py-1 hover:bg-[var(--c-hover)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-focus">
             {heading}
@@ -50,14 +50,14 @@ export function SourcingSection({
               className="h-3 w-3 flex-none text-t3 transition-transform group-open:rotate-90"
             />
           </summary>
-          <div className="border-t border-line">{children}</div>
+          <div>{children}</div>
         </details>
       </section>
     );
   }
   return (
-    <section data-dev-id={devId} className="border-b border-line last:border-b-0">
-      <header className="flex min-h-[21px] items-center gap-2 border-b border-line px-2 py-0.5">
+    <section data-dev-id={devId} className="mb-1 last:mb-0">
+      <header className="flex min-h-[21px] items-center gap-2 px-2 py-0.5">
         {heading}
       </header>
       <div>{children}</div>
@@ -85,7 +85,7 @@ export function SourcingSubSection({
   children: ReactNode;
 }) {
   return (
-    <section data-dev-id={devId} className="border-b border-line/60 last:border-b-0">
+    <section data-dev-id={devId} className="mb-1 last:mb-0">
       <header className="flex min-h-[20px] items-baseline gap-2 px-2 pt-1">
         <h4 className="ui-property-label min-w-0 truncate">{title}</h4>
         {count === undefined ? null : (
@@ -110,7 +110,7 @@ export function SourcingDisclosure({
   children: ReactNode;
 }) {
   return (
-    <details data-dev-id={devId} className="group border-t border-line/60">
+    <details data-dev-id={devId} className="group bg-row-alt/25">
       <summary className="flex min-h-[24px] cursor-pointer list-none items-center gap-1.5 px-2 py-1 text-xs font-medium text-t2 hover:bg-[var(--c-hover)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-focus">
         {icon ? <Icon id={icon} className="h-3.5 w-3.5 flex-none text-t3" /> : null}
         <span>{label}</span>

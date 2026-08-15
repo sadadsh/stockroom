@@ -46,28 +46,26 @@
        darkest, the workspace sits on it, a panel sits on the workspace, a
        section groups inside the panel. Steps are small (5-8 points of value)
        because separation comes from the 1px border, not from a big value jump. */
-    --c-app: #1f2022;
-    --c-canvas: #1f2022;
-    --c-rail: #1f2022;
-    --c-surface: #2a2c2f;
-    --c-raise: #2a2c2f;
-    --c-raise2: #34373b;
-    --c-section: #34373b;
-    --c-active: #3e4247;
+    --c-app: #17191a;
+    --c-canvas: #17191a;
+    --c-rail: #17191a;
+    --c-surface: #222527;
+    --c-raise: #222527;
+    --c-raise2: #2b2f31;
+    --c-section: #2b2f31;
+    --c-active: #353a3d;
     /* an input well, recessed below the panel it sits in */
-    --c-field: #202225;
-    /* Floating menus and popovers. One step off the panel so a menu reads as
-       lifted, and dark enough that --c-t3 clears 4.5:1 on it (measured: 4.60). */
-    --c-popover: #34373b;
+    --c-field: #1b1d1f;
+    /* Floating menus and popovers. One step off the panel so a menu reads as lifted. */
+    --c-popover: #2b2f31;
     /* the chrome band: panel title strips, modal headers, sticky table headers,
        the bottom status bar. OPAQUE by contract, since scrolling rows pass
        beneath it. */
-    --c-band: #26282b;
-    /* the recessed well an asset render sits in (Part Canvas). Opaque: the
-       former alpha value stacked differently on every parent it appeared over. */
-    --c-stage: #202225;
+    --c-band: #1d2022;
+    /* the recessed well an asset render sits in (Part Canvas). */
+    --c-stage: #1a1c1e;
     /* a sticky header strip. Opaque, so nothing needs backdrop blur to be legible. */
-    --c-sticky: #26282b;
+    --c-sticky: #1d2022;
     /* --- The technical drawing canvas -------------------------------------
        The sheet the symbol and the land pattern are drawn on, plus the ink on it.
 
@@ -87,10 +85,10 @@
        `wash` is KiCad's pale body fill behind an IC rectangle; `note` is the
        secondary annotation tier (electrical-type initials, origin cross,
        dimension witness lines) held one step under the line work. */
-    --c-technical: #1f1f1e;
-    --c-technical-wash: #2b2b28;
-    --c-technical-ink: #e8e8e6;
-    --c-technical-note: #9d9d9a;
+    --c-technical: #151615;
+    --c-technical-wash: #252725;
+    --c-technical-ink: #e6e8e7;
+    --c-technical-note: #9a9e9b;
     /* The land pattern's layers. A THIRD color-is-data family alongside --cat-*
        and --stm-*: which layer a shape is on is the datum, and a grayscale
        encoding of six layers would carry none of it. Brighter here than in light
@@ -104,10 +102,10 @@
 
     /* --- Controls ---------------------------------------------------------
        A push button is a 1px bevel over a two-stop fill, not a floating card. */
-    --c-control-top: #3e4247;
-    --c-control-bottom: #34373b;
-    --c-control-hover: #3e4247;
-    --c-control-pressed: #26282b;
+    --c-control-top: #353a3d;
+    --c-control-bottom: #2b2f31;
+    --c-control-hover: #353a3d;
+    --c-control-pressed: #1d2022;
     /* --- Selection and active state (NEUTRAL; there is no hue in chrome at all)
        Selection is a SURFACE SHIFT plus a solid edge marker, and nothing else.
 
@@ -130,20 +128,19 @@
        Dark steps UP off the panel and light steps DOWN off it, because "raised" in a
        light tool window is the darker wash - the direction differs, the rule is the
        same: the selected row separates from the surface it sits in. */
-    --c-selected: #383c41;
-    --c-selected-hover: #3d4146;
-    --c-selected-edge: #e0e2e5;
-    /* Every other row in a data grid. A 1.06:1 step off the workspace: enough to
-       follow a row across eight columns, not enough to read as stripes. */
-    --c-row-alt: #26282b;
+    --c-selected: #303538;
+    --c-selected-hover: #363b3e;
+    --c-selected-edge: #e4e6e5;
+    /* Every other row in a data grid. A quiet step off the workspace. */
+    --c-row-alt: #1d2022;
 
     /* --- Borders ----------------------------------------------------------
        Three weights: a dark groove under a raised edge, the ordinary hairline,
        and the light bevel on top of it. */
-    --c-line-dark: #242629;
-    --c-line: #303236;
-    --c-line2: #383b3f;
-    --c-edge: #666c73;
+    --c-line-dark: #202325;
+    --c-line: #2b2e30;
+    --c-line2: #35383a;
+    --c-edge: #5e6467;
     --edge-hi: rgba(255, 255, 255, 0.05);
 
     /* --- Text tiers (five, and only five) ---------------------------------
@@ -154,11 +151,11 @@
        disabled  unavailable controls and values
        Each is an opaque hex. Measured against --c-canvas / --c-band / --c-popover
        (the three surfaces small text lands on) by styles/visualLanguage.test.ts. */
-    --c-t1: #e5e7ea;
-    --c-t2: #c3c8ce;
-    --c-t3: #a9afb7;
-    --c-t4: #949aa2;
-    --c-t5: #6e747c;
+    --c-t1: #eceeed;
+    --c-t2: #c9cdcb;
+    --c-t3: #aeb3b1;
+    --c-t4: #9fa5a2;
+    --c-t5: #676d6a;
     --c-text-primary: var(--c-t1);
     --c-text-secondary: var(--c-t2);
     --c-text-label: var(--c-t3);
@@ -198,10 +195,10 @@
        WORD wears `text-ok-text` / `text-err-text` and only a mark keeps `bg-ok` or
        `border-err`. `styles/visualLanguage.test.ts` holds both halves. */
     --c-ok: #56a36c;
-    --c-warn: #a9afb7;
+    --c-warn: #aeb3b1;
     --c-err: #c95b58;
     --c-ok-text: #78c08c;
-    --c-warn-text: #c3c8ce;
+    --c-warn-text: #c9cdcb;
     --c-err-text: #ec9a97;
     --c-danger-on: #111214;
     --c-scrim: rgba(0, 0, 0, 0.55);
@@ -246,13 +243,13 @@
        longer amber either. Measured against every surface it can land on: 13.04 on
        the workspace, 8.88 on a selected row, 8.10 on the active surface (dark);
        12.95 on the workspace (light). */
-    --c-acc: #d2d5d9;
-    --c-acc-on: #1f2022;
-    --c-acc-strong: #eaecee;
+    --c-acc: #d6d9d7;
+    --c-acc-on: #17191a;
+    --c-acc-strong: #f0f1f0;
     --c-acc-soft: rgba(255, 255, 255, 0.1);
-    --c-focus: #e4e6e9;
-    --c-hover: rgba(255, 255, 255, 0.045);
-    --c-ring-track: #202225;
+    --c-focus: #f0f1f0;
+    --c-hover: rgba(255, 255, 255, 0.05);
+    --c-ring-track: #1a1c1e;
 
     /* --- Elevation --------------------------------------------------------
        A resting panel is FLAT: a border and a 1px top bevel, no drop shadow.
@@ -267,18 +264,18 @@
        hover bounce, which is a web-app tell; a desktop control settles. */
     --ease-spring: cubic-bezier(0.2, 0, 0.2, 1);
 
-    --body-bg: #1f2022;
-    --root-bg: #1f2022;
-    --sb-thumb: #464a4f;
-    --sb-thumb-hover: #565b61;
-    --sb-track: #202225;
+    --body-bg: #17191a;
+    --root-bg: #17191a;
+    --sb-thumb: #404547;
+    --sb-thumb-hover: #515759;
+    --sb-track: #1a1c1e;
 
     /* the file-card line art (Symbol / Footprint / 3D) */
-    --c-icon-line: #a9afb7;
-    --c-icon-fill: #949aa2;
-    --c-icon-cube: #a9afb7;
-    --c-icon-edge: #464a4f;
-    --c-icon-faint: #c3c8ce;
+    --c-icon-line: #aeb3b1;
+    --c-icon-fill: #959b98;
+    --c-icon-cube: #aeb3b1;
+    --c-icon-edge: #404547;
+    --c-icon-faint: #c9cdcb;
 
     /* --- Shape (theme-agnostic) ------------------------------------------
        Windows engineering chrome is SQUARE. A panel, a band and a row have no
@@ -328,28 +325,28 @@
   }
 
   :root[data-theme="light"] {
-    /* The same ladder inverted: a light Windows tool window is a warm-neutral
-       frame with near-white panels and a genuinely white input well. */
-    --c-app: #d9dbde;
-    --c-canvas: #d9dbde;
-    --c-rail: #d9dbde;
-    --c-surface: #edeef0;
-    --c-raise: #edeef0;
-    --c-raise2: #e2e4e7;
-    --c-section: #e2e4e7;
-    --c-active: #cdd0d4;
+    /* Soft neutral paper: the frame recedes instead of turning the entire window
+       into a mid-grey slab, while white remains reserved for fields and lifted cards. */
+    --c-app: #f2f3f2;
+    --c-canvas: #f2f3f2;
+    --c-rail: #f2f3f2;
+    --c-surface: #fbfbfa;
+    --c-raise: #fbfbfa;
+    --c-raise2: #f5f6f5;
+    --c-section: #f5f6f5;
+    --c-active: #e5e7e5;
     --c-field: #ffffff;
-    --c-popover: #f3f4f6;
-    --c-band: #dddfe2;
-    --c-stage: #d2d5d9;
-    --c-sticky: #dddfe2;
+    --c-popover: #ffffff;
+    --c-band: #f0f1f0;
+    --c-stage: #eaebea;
+    --c-sticky: #f0f1f0;
     /* Paper, on a light desktop: the sheet stays the lightest thing in the frame
        because here that is what a drawing sheet IS, and the chrome around it is
        light too, so nothing is outshouted. The ink goes back to near-black. */
-    --c-technical: #f5f5f2;
-    --c-technical-wash: #f0efe8;
-    --c-technical-ink: #1b1b1b;
-    --c-technical-note: #5c5c5a;
+    --c-technical: #fafaf8;
+    --c-technical-wash: #f1f1ec;
+    --c-technical-ink: #242625;
+    --c-technical-note: #666a67;
     --c-layer-copper: #b06a2c;
     --c-layer-mask: #9c4a86;
     --c-layer-paste: #7a7a7a;
@@ -357,29 +354,29 @@
     --c-layer-fab: #96803a;
     --c-layer-courtyard: #4a7a4a;
 
-    --c-control-top: #fbfbfc;
-    --c-control-bottom: #e8eaec;
-    --c-control-hover: #f1f2f4;
-    --c-control-pressed: #d2d5d9;
+    --c-control-top: #ffffff;
+    --c-control-bottom: #f2f3f2;
+    --c-control-hover: #f7f8f7;
+    --c-control-pressed: #e7e9e7;
     /* The same rule inverted: on a light desktop the selected row is the DARKER
        wash, which is what "raised" means here, and the edge marker goes near-black
        so the 2px rule is the loudest thing about the row. */
-    --c-selected: #dcdfe2;
-    --c-selected-hover: #d4d7db;
-    --c-selected-edge: #24272b;
-    --c-row-alt: #e6e8ea;
+    --c-selected: #e4e7e5;
+    --c-selected-hover: #e2e5e3;
+    --c-selected-edge: #2c302e;
+    --c-row-alt: #f6f7f6;
 
-    --c-line-dark: #d7dadd;
-    --c-line: #e3e5e7;
-    --c-line2: #dadddf;
+    --c-line-dark: #f0f1f0;
+    --c-line: #eceeec;
+    --c-line2: #e3e5e3;
     --c-edge: #ffffff;
     --edge-hi: rgba(255, 255, 255, 0.9);
 
-    --c-t1: #1b1d20;
-    --c-t2: #3a3e43;
-    --c-t3: #565b61;
-    --c-t4: #6b7178;
-    --c-t5: #979da4;
+    --c-t1: #252826;
+    --c-t2: #454a47;
+    --c-t3: #5e6460;
+    --c-t4: #737a76;
+    --c-t5: #a4aaa6;
     --c-text-primary: var(--c-t1);
     --c-text-secondary: var(--c-t2);
     --c-text-label: var(--c-t3);
@@ -390,10 +387,10 @@
     --c-ok: #2e7a4b;
     /* Neutral, for the reason stated on the dark block: a warning is a triangle and
        a word, not a colour. These are the label and secondary text values. */
-    --c-warn: #565b61;
+    --c-warn: #5e6460;
     --c-err: #b33f3c;
     --c-ok-text: #266840;
-    --c-warn-text: #3a3e43;
+    --c-warn-text: #454a47;
     --c-err-text: #9c3633;
     --c-danger-on: #ffffff;
     --c-scrim: rgba(0, 0, 0, 0.55);
@@ -422,15 +419,14 @@
     --stm-classify-divergent: #a9761b;
     --stm-classify-partial: #66606e;
 
-    --c-acc: #3a3e43;
+    --c-acc: #343936;
     --c-acc-on: #ffffff;
-    --c-acc-strong: #24272b;
-    /* Selection must read as selection, not as a hover that stuck: the build's
-       token gate holds --c-acc-soft above 0.1 and above twice --c-hover. */
-    --c-acc-soft: rgba(0, 0, 0, 0.12);
-    --c-focus: #15171a;
-    --c-hover: rgba(0, 0, 0, 0.045);
-    --c-ring-track: #cdd0d4;
+    --c-acc-strong: #202422;
+    /* Selection must read as selection, not as a hover that stuck. */
+    --c-acc-soft: rgba(0, 0, 0, 0.1);
+    --c-focus: #202422;
+    --c-hover: rgba(0, 0, 0, 0.04);
+    --c-ring-track: #e6e9e6;
 
     --shadow-card: inset 0 1px 0 var(--edge-hi);
     --shadow-raise: inset 0 1px 0 var(--edge-hi), 0 1px 2px rgba(20, 22, 26, 0.12);
@@ -439,17 +435,17 @@
 
     --ease-spring: cubic-bezier(0.2, 0, 0.2, 1);
 
-    --body-bg: #d9dbde;
-    --root-bg: #d9dbde;
-    --sb-thumb: #b9bec4;
-    --sb-thumb-hover: #a8aeb5;
-    --sb-track: #cdd0d4;
+    --body-bg: #f2f3f2;
+    --root-bg: #f2f3f2;
+    --sb-thumb: #c5cac6;
+    --sb-thumb-hover: #b2b8b3;
+    --sb-track: #e6e9e6;
 
-    --c-icon-line: #565b61;
-    --c-icon-fill: #6b7178;
-    --c-icon-cube: #565b61;
-    --c-icon-edge: #a8aeb5;
-    --c-icon-faint: #6b7178;
+    --c-icon-line: #606662;
+    --c-icon-fill: #737a76;
+    --c-icon-cube: #606662;
+    --c-icon-edge: #b2b8b3;
+    --c-icon-faint: #737a76;
   }
 
   html,
@@ -734,6 +730,12 @@
     line-height: var(--lh-ui-body);
     color: var(--c-text-primary);
     font-variant-numeric: tabular-nums;
+  }
+
+  /* Sourcing is grouped by space and surface value, never ruled like a ledger.
+     Control outlines remain intact; only structural descendants lose separators. */
+  .sourcing-line-free :is(section, details, header, li, tr, th, td, div) {
+    border-color: transparent !important;
   }
 }
 

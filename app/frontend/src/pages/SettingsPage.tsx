@@ -53,6 +53,7 @@ import {
 import { Text, useCopyFormatter, useText } from "../lib/copy";
 import { Icon } from "../components/Icon";
 import {
+  aboutVersion,
   shortRevision,
   updateTargetRevision,
   type UpdateStanding,
@@ -111,6 +112,10 @@ interface SetupStep {
   metLabelId: string;
   met: boolean;
   target: string;
+}
+
+function jumpToSettingsStep(step: SetupStep) {
+  revealSettings(step.target, true);
 }
 
 export function SettingsPage() {
@@ -180,14 +185,10 @@ export function SettingsPage() {
 
   const s = settingsQ.data;
   const odbcInstalled = odbc.data?.installed;
-  const githubAccounts = syncQ.data?.github_auth.accounts ?? [];
+  const githubAccounts = syncQ.data?.github_auth?.accounts ?? [];
   // A legacy app-owned token may still exist on an upgraded machine. It remains a temporary
   // compatibility signal, but the UI creates no new tokens and GCM is the durable authority.
   const githubConnected = githubAccounts.length > 0 || Boolean(s?.github_token_set);
-
-  function jump(step: SetupStep) {
-    revealSettings(step.target, true);
-  }
 
   // -- the Machine Setup verdict: is THIS machine fully set up? ---------------
   const steps: SetupStep[] = [];
@@ -254,7 +255,7 @@ export function SettingsPage() {
         <MachineSetupBand
           loading={!s}
           steps={steps}
-          onJump={jump}
+          onJump={jumpToSettingsStep}
           updateStanding={updateStanding.standing}
           updateBehind={updateQ.data?.behind ?? 0}
           updateState={updateQ.data?.state}
@@ -1466,7 +1467,7 @@ function GitHubSection() {
     "settings.github.toast-connected",
     "GitHub sign-in complete. Git remote permissions now control catalog sharing.",
   );
-  const accounts = status.data?.github_auth.accounts ?? [];
+  const accounts = status.data?.github_auth?.accounts ?? [];
   const pending = loginJob.status === "running";
 
   async function onSignIn() {
@@ -1712,12 +1713,70 @@ function UpdateSection() {
   );
 }
 
+function AboutSettingsSection({ version, note = "" }: { version: string; note?: string }) {
+  return (
+    <div data-dev-id="about.root" className="flex flex-wrap items-center gap-4">
+      {/* Keep the former rail target addressable so existing personal Design Studio documents can
+          follow About into Settings instead of becoming invalid. It owns no product navigation. */}
+      <div data-dev-id="rail.about" className="contents">
+      <div
+        data-dev-id="about.icon"
+        className="grid h-11 w-11 flex-none place-items-center rounded-control bg-raise2 shadow-card"
+      >
+        <Icon id="brand.wordmark" className="ico h-6 w-6 text-t1" />
+      </div>
+      <div className="min-w-[14rem] flex-1">
+        <p data-dev-id="about.credit" className="text-sm text-t2">
+          <Text id="modal.about.credit">Made with love, from </Text>
+          <span className="font-medium text-t1">
+            <Text id="modal.about.author">Sadad Haidari</Text>
+          </span>
+          .
+        </p>
+        <p className="mt-1 text-xs text-t3">
+          <span className="font-medium"><Text id="modal.about.version">Version</Text></span>{" "}
+          <span className="tnum font-mono">{version}</span>
+        </p>
+        {note ? (
+          <p data-dev-id="about.stale" className="mt-1 text-xs leading-relaxed text-warn">
+            {note}
+          </p>
+        ) : null}
+      </div>
+      <div data-dev-id="about.links" className="flex flex-none flex-wrap gap-2">
+        <a
+          href="https://www.linkedin.com/in/sadadhaidari"
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex items-center gap-2 rounded-control border border-line2 bg-raise2 px-3 py-2 text-xs font-semibold text-t2 shadow-card transition hover:text-t1 hover:brightness-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+        >
+          <Icon id="brand.linkedin" className="h-4 w-4" />
+          <Text id="modal.about.linkedin">LinkedIn</Text>
+        </a>
+        <a
+          href="https://github.com/sadadsh"
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex items-center gap-2 rounded-control border border-line2 bg-raise2 px-3 py-2 text-xs font-semibold text-t2 shadow-card transition hover:text-t1 hover:brightness-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+        >
+          <Icon id="brand.github" className="h-4 w-4" />
+          <Text id="modal.about.github">GitHub</Text>
+        </a>
+      </div>
+      </div>
+    </div>
+  );
+}
+
 // The General group's disclosures. Each group panel resolves its own cached queries (the same keys
 // the page header already reads, so no extra request) and computes its own collapsed-row summaries,
 // which keeps SettingsPage itself the page frame rather than the sum of all five panels.
 function GeneralGroup() {
   const { theme } = useTheme();
-  const { view: updateStanding } = useUpdateStanding();
+  const { query: update, view: updateStanding } = useUpdateStanding();
+  const scenarioRail = useScenarioUiState().rail;
+  const aboutNote = scenarioRail?.aboutNote
+    ?? (updateStanding.standing === "restart_required" ? updateStanding.detail : "");
   return (
     <>
         <SettingsDisclosure
@@ -1736,6 +1795,20 @@ function GeneralGroup() {
           data-dev-id="settings.appearance"
         >
           <AppearanceSection />
+        </SettingsDisclosure>
+        <SettingsDisclosure
+          title="About Stockroom"
+          titleId="settings.about.title"
+          hint="Application version, installed build, and project links."
+          hintId="settings.about.hint"
+          summary={<span className="tnum font-mono">{aboutVersion(update.data, __APP_VERSION__)}</span>}
+          className="@3xl:col-span-2"
+          data-dev-id="settings.about"
+        >
+          <AboutSettingsSection
+            version={aboutVersion(update.data, __APP_VERSION__)}
+            note={aboutNote}
+          />
         </SettingsDisclosure>
         <SettingsDisclosure
           title="Automatic Updates"
@@ -1785,7 +1858,7 @@ function LibraryGroup() {
   const librariesQ = useOnboarding();
   const s = settingsQ.data;
   const sync = syncQ.data;
-  const githubAccounts = sync?.github_auth.accounts ?? [];
+  const githubAccounts = sync?.github_auth?.accounts ?? [];
   // A legacy app-owned token may still exist on an upgraded machine. It remains a temporary
   // compatibility signal, but the UI creates no new tokens and GCM is the durable authority.
   const githubConnected = githubAccounts.length > 0 || Boolean(s?.github_token_set);
@@ -1928,7 +2001,7 @@ function SourcesGroup() {
   // Procurement Rescan: when prices and stock were last refreshed. Through the same shared
   // `lastChecked`, so the collapsed row and the open body can never disagree about the date.
   const rescanState = useRescanState().data;
-  const rescanSummary = !rescanState
+  const rescanSummary = !rescanState?.parts
     ? null
     : (() => {
         const { checkedAt, total } = lastChecked(rescanState);
@@ -2019,7 +2092,7 @@ function MaintenanceGroup() {
   const healthSummary = !doc
     ? null
     : (() => {
-        const outstanding = doc.fixable.length + doc.manual.length + doc.uncommitted.length;
+        const outstanding = (doc.fixable?.length ?? 0) + (doc.manual?.length ?? 0) + (doc.uncommitted?.length ?? 0);
         return outstanding > 0 ? (
           <Badge tone="warn">{`${outstanding} To Fix`}</Badge>
         ) : (

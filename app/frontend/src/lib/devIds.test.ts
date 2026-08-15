@@ -193,11 +193,10 @@ import { DEV_IDS, DEV_ID_AREAS, DEV_ID_BY_ID } from "./devIds";
 // blockers, repository collaboration, shared review, and build completion in the real workbenches.
 // 496 with the STM target-definition rules surface used by the real Bench scenario.
 // 497 with the background guided-capture status exposed to global scenario coverage.
-// 500 after Design Studio simplification removed four obsolete drawer/compare targets while
-// keeping the component-scoped Manage Models tab, EDA selection, modal browser, navigation,
-// and status. 501 exposes each opened component's inline offer price ladder for direct editing.
-// Missing CAD art/status and the authored datasheet page cluster replace generated identities.
-const EXPECTED_ENTRIES = 504;
+// Moving About from a rail modal into Settings retires three modal-only targets and adds one
+// settings card target. The legacy rail target remains registered so personal design documents do
+// not become invalid merely because the product control moved.
+const EXPECTED_ENTRIES = 502;
 
 describe("devIds catalogue", () => {
   // The count is asserted from a single constant so bumping it is one edit, and so the test NAME can

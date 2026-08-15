@@ -21,6 +21,30 @@ and `P2` meaningful fit, finish, or clarity debt.
 
 ## Acceptance Captures
 
+### 2026-08-14 — Graphite Palette, Line-Free Sourcing, Fitted CAD, And Settings About
+
+- Capture layer: current Vite source in headless installed Microsoft Edge using the shipped Design
+  Studio `About Open` and `Full Data` scenarios. This exercises the real production components and
+  CSS at 1,400 × 900 and 1,100 × 650 without taking foreground focus; native WebView2 remains a
+  separate host-level acceptance boundary.
+- Evidence: `work/Graphite Settings Dark.png`, SHA-256 `9f09839d166b`;
+  `work/Graphite Settings Light.png`, SHA-256 `601d183bad04`;
+  `work/Line Free Sourcing Light.png`, SHA-256 `8319989f2bd0`;
+  `work/Fitted CAD Light Compact.png`, SHA-256 `048d2a4bcb89`;
+  `work/Fitted CAD Dark Compact.png`, SHA-256 `4e76b7e9d611`; and
+  `work/Graphite UI Audit Measurements.json`, SHA-256 `a5ca176c0731`.
+- Intended claim: the app uses a deeper graphite dark ladder and a soft near-white neutral light
+  ladder; Sourcing contains no structural rules and presents every visible price tier as a pill;
+  the CAD Assets body never scrolls and instead divides available height across all three previews;
+  and About is a permanent Settings card rather than a rail modal.
+- Acceptance result: browser pass in both themes and both measured heights. The populated sourcing
+  scenario exposed four price-break pills and zero ruled descendants. At 1,400 × 900 the CAD body
+  measured `697/697` client/scroll height with three 227/227/226 px modules; at 1,100 × 650 it
+  measured `447/447` with 113/113/112 px modules. Computed CAD overflow remained `hidden` in both.
+  About retained the authoritative version, stale-build note path, author, LinkedIn, and GitHub.
+  The former `rail.about` Design Studio target remains as a compatibility wrapper inside the moved
+  Settings content, so personal design documents do not become invalid.
+
 ### 2026-08-14 — Full UI Scheme Structural Audit And Flat Settings
 
 - Audit layer: complete frontend source review across tokens, primitives, route shells, settings,

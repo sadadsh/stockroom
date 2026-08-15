@@ -39,7 +39,6 @@ import { PreferredSourceControl } from "./PreferredSourceControl";
 import { CadWorkspaceTabs } from "./ManageModelsWorkspace";
 import {
   WorkspaceColumnFrame,
-  WorkspaceColumnScroller,
   WorkspaceColumnTitleStrip,
 } from "./WorkspaceColumns";
 import { cadAssetStatus } from "./workspaceStatus";
@@ -218,15 +217,20 @@ export function CadPreferredSourcePart() {
   );
 }
 
-/** The column's one scroller, and the group the three modules are read as. */
+/**
+ * The three assets always fit the pane. The available height is divided between expanded modules;
+ * focusing one keeps two compact previews and gives the remaining space to the focused asset.
+ * `data-workspace-scroll` stays as the stable column-body address, but CAD deliberately owns no
+ * scrollbar: a drawing preview scales, while specifications and evidence retain scrolling.
+ */
 export function CadBodyChrome({ children }: RegionChromeProps) {
   const columnTitle = useText("component-browser.column-cad", "CAD Assets");
   return (
-    <WorkspaceColumnScroller id="cad">
-      <div aria-label={columnTitle} role="group">
+    <div data-workspace-scroll="cad" className="min-h-0 flex-1 overflow-hidden">
+      <div aria-label={columnTitle} role="group" className="flex h-full min-h-0 flex-col">
         {children}
       </div>
-    </WorkspaceColumnScroller>
+    </div>
   );
 }
 

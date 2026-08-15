@@ -486,20 +486,12 @@ describe("DesignStudioShell", () => {
     expect(entry).toHaveFocus();
   });
 
-  it("lets an open production modal own Escape before Design Studio", async () => {
+  it("keeps About inside Settings instead of opening a production modal", async () => {
     await renderStudio();
-    const aboutButton = screen.getByRole("button", { name: "About" });
-    await userEvent.setup().click(aboutButton);
-    expect(await screen.findByRole("dialog", { name: "About Stockroom" })).toBeVisible();
-
-    fireEvent.keyDown(window, { key: "Escape" });
-
-    await waitFor(() =>
-      expect(screen.queryByRole("dialog", { name: "About Stockroom" })).not.toBeInTheDocument(),
-    );
-    expect(screen.getByRole("region", { name: "Stockroom Preview" })).toBeVisible();
-    expect(screen.getByRole("button", { name: "Preview" })).toHaveAttribute("aria-pressed", "true");
-    await waitFor(() => expect(aboutButton).toHaveFocus());
+    expect(screen.queryByRole("button", { name: "About" })).toBeNull();
+    await chooseScenario("About Open");
+    expect(await screen.findByRole("heading", { name: "About Stockroom" })).toBeVisible();
+    expect(screen.queryByRole("dialog", { name: "About Stockroom" })).toBeNull();
   });
 
   it("lets the real SpecMatrix Columns popover own Escape before Design Studio", async () => {

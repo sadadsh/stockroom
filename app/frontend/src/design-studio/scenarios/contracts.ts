@@ -5,7 +5,6 @@ import { defineScenarioStateContracts } from "../scenarioStateContracts";
 const globalContractIds = [
   "global.real-data", "global.onboarding.open", "global.onboarding.create", "global.onboarding.clone",
   "global.onboarding.error", "global.onboarding.create-error", "global.onboarding.clone-error",
-  "global.about.open", "global.about.current", "global.about.update-available", "global.about.stale",
   "global.rail.expanded", "global.rail.collapsed", "global.theme.dark", "global.theme.light",
   "global.update.current", "global.update.available", "global.update.updating", "global.update.error",
   "global.add-parts.empty", "global.add-parts.validating", "global.add-parts.exact", "global.add-parts.mismatch",
@@ -15,6 +14,10 @@ const globalContractIds = [
   "global.capture.active", "global.capture.backgrounded", "global.capture.complete", "global.capture.error", "global.offline",
   "global.service-error", "global.stale", "global.source-promotion.unavailable", "global.source-promotion.ready",
   "global.source-promotion.blocked", "global.source-promotion.success", "global.source-promotion.failure",
+] as const;
+
+const globalAboutContractIds = [
+  "global.about.open", "global.about.current", "global.about.update-available", "global.about.stale",
 ] as const;
 
 const componentContractIds = [
@@ -73,6 +76,7 @@ const settingsContractIds = [
 ] as const;
 
 export const globalStateContracts = defineScenarioStateContracts("global", "components", globalContractIds);
+export const globalAboutStateContracts = defineScenarioStateContracts("global", "settings", globalAboutContractIds);
 export const componentStateContracts = defineScenarioStateContracts("components", "components", componentContractIds);
 export const providerStateContracts = defineScenarioStateContracts("components", "components", providerContractIds);
 export const projectStateContracts = defineScenarioStateContracts("projects", "projects", projectContractIds);
@@ -81,6 +85,7 @@ export const settingsStateContracts = defineScenarioStateContracts("settings", "
 
 export const bootstrapStateContracts = [
   ...globalStateContracts,
+  ...globalAboutStateContracts,
   ...componentStateContracts,
   ...providerStateContracts,
   ...projectStateContracts,

@@ -474,7 +474,7 @@ describe("the distributor offers ledger", () => {
     },
   });
 
-  it("keeps every price break visible and puts every secondary offer fact in one disclosure", async () => {
+  it("keeps every price break visible as a line-free pill and puts secondary facts in one disclosure", async () => {
     const { user } = await open(offersDossier);
     const ledger = screen.getByRole("list", { name: "Distributor offers" });
     const offer = region("component-browser.offer-row");
@@ -482,8 +482,12 @@ describe("the distributor offers ledger", () => {
 
     expect(ledger).not.toHaveClass("overflow-x-auto");
     expect(ledger.querySelector("table")).toBeNull();
-    expect(within(ladder).getByText("Count")).toBeVisible();
-    expect(within(ladder).getByText("Unit Price")).toBeVisible();
+    const pills = ladder.querySelectorAll<HTMLElement>("[data-price-break-pill]");
+    expect(pills).toHaveLength(2);
+    for (const pill of pills) {
+      expect(pill).toHaveClass("rounded-full");
+      expect(pill.className).not.toMatch(/border|divide/);
+    }
     expect(within(ladder).getByText("USD0.42")).toBeVisible();
     expect(within(ladder).getByText("USD0.22")).toBeVisible();
     expect(within(offer).getByText("Stock")).not.toBeVisible();

@@ -14,7 +14,7 @@ export interface ScenarioLocalOutcome {
 
 export interface ScenarioUiState {
   onboarding?: { mode?: "open" | "create" | "clone"; setupError?: string };
-  rail?: { aboutOpen?: boolean; aboutNote?: string };
+  rail?: { aboutNote?: string };
   search?: { open?: boolean; query?: string; category?: string | null };
   service?: { error?: string };
   settings?: {

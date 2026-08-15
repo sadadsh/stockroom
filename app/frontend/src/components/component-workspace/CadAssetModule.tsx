@@ -103,10 +103,10 @@ function MissingAssetArt({ kind }: { kind: RepresentationKind }) {
  */
 function previewStageClass(expanded: boolean): string {
   return (
-    "flex w-full flex-none items-center justify-center overflow-hidden border-y border-line " +
+    "flex w-full items-center justify-center overflow-hidden border-y border-line " +
     "bg-technical focus-visible:outline focus-visible:outline-2 " +
     "focus-visible:-outline-offset-2 focus-visible:outline-focus " +
-    (expanded ? "h-[184px]" : "h-[56px]")
+    (expanded ? "min-h-[40px] flex-1" : "h-[56px] min-h-[32px] flex-none")
   );
 }
 
@@ -169,7 +169,10 @@ export function CadAssetModule({
       data-expanded={expanded ? "true" : "false"}
       data-status={status}
       aria-label={label}
-      className="flex min-h-0 flex-none flex-col border-b border-line last:border-b-0"
+      className={
+        "flex min-h-0 flex-col border-b border-line last:border-b-0 " +
+        (expanded ? "flex-1" : "flex-none")
+      }
     >
       {/* One dense line: name, state, and the source ONLY when it differs from the column's. */}
       <h3 className="flex items-center gap-2 px-2 py-1">

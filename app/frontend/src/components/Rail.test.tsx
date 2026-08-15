@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Rail } from "./Rail";
 import { DevModeProvider } from "../lib/devMode";
@@ -169,11 +169,9 @@ describe("Rail", () => {
 
   it("carries stable data-dev-id attributes, including the derived rail.nav-* ids, that all resolve via DEV_ID_BY_ID", () => {
     const { container } = render(<Rail />);
-    // The rail shell and the About trigger are static ids on their anchor elements.
-    // The three primary/footer destinations get their id derived on the reusable RailItem.
+    // The rail shell is static; primary/footer destinations derive ids on RailItem.
     const expected = [
       "rail.root",
-      "rail.about",
       "rail.nav-components",
       "rail.nav-stm",
       "rail.nav-settings",
@@ -182,122 +180,6 @@ describe("Rail", () => {
       const el = container.querySelector(`[data-dev-id="${id}"]`);
       expect(el, `expected an element with data-dev-id="${id}"`).not.toBeNull();
       expect(DEV_ID_BY_ID.has(id), `expected ${id} to resolve via DEV_ID_BY_ID`).toBe(true);
-    }
-  });
-
-});
-
-// The AboutModal is the only Rail region this phase adopts (its nav glyphs + nav.* labels belong to
-// Phase 2 and are untouched here). `../lib/theme` is module-mocked above, so DevModeProvider's
-// useTheme() resolves the same dark stub and no ThemeProvider is needed.
-describe("Rail AboutModal - copy + brand icon adoption", () => {
-  beforeEach(() => {
-    resetUpdateClocksForTests();
-    state.route = "components";
-    updateState.state = "up_to_date";
-    updateState.channel = "main";
-    updateState.current_release_id = "";
-    updateState.target_release_id = "";
-    updateState.current_revision = BACKEND_REVISION;
-    updateState.target_revision = BACKEND_REVISION;
-  });
-
-  function toggleDevMode() {
-    fireEvent.keyDown(window, { key: "D", ctrlKey: true, shiftKey: true });
-  }
-
-  it("keeps the non-dev About behaviour: opens, exposes the two links, and closes on the scrim", async () => {
-    const { container } = render(
-      <DevModeProvider>
-        <Rail />
-      </DevModeProvider>,
-    );
-    await userEvent.click(screen.getByRole("button", { name: /About/ }));
-
-    // The dialog opens with its accessible name and both social links resolve their hrefs.
-    expect(screen.getByRole("dialog", { name: "About Stockroom" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "LinkedIn" })).toHaveAttribute(
-      "href",
-      "https://www.linkedin.com/in/sadadhaidari",
-    );
-    expect(screen.getByRole("link", { name: "GitHub" })).toHaveAttribute(
-      "href",
-      "https://github.com/sadadsh",
-    );
-
-    // Off dev mode a <Text> is a bare string: no editable copy targets exist in the modal.
-    expect(container.querySelector("[data-copy-id]")).toBeNull();
-
-    // A scrim click closes it.
-    fireEvent.click(container.querySelector('[data-dev-id="about.scrim"]')!);
-    expect(screen.queryByRole("dialog", { name: "About Stockroom" })).toBeNull();
-  });
-
-  it("wraps the title and link labels as copy ids and draws each brand glyph through <Icon> in dev mode", async () => {
-    const { container } = render(
-      <DevModeProvider>
-        <Rail />
-      </DevModeProvider>,
-    );
-    // Open the modal first, then toggle dev mode: in dev mode the About button's own <Text> label
-    // intercepts the click (click-to-edit), so opening must happen while dev mode is off.
-    await userEvent.click(screen.getByRole("button", { name: /About/ }));
-    toggleDevMode();
-
-    // The visible AboutModal labels carry their modals.json ids.
-    expect(container.querySelector('[data-copy-id="modal.about.title"]')).not.toBeNull();
-    expect(container.querySelector('[data-copy-id="modal.about.credit"]')).not.toBeNull();
-    expect(container.querySelector('[data-copy-id="modal.about.linkedin"]')).not.toBeNull();
-    expect(container.querySelector('[data-copy-id="modal.about.github"]')).not.toBeNull();
-
-    // "Sadad Haidari" stays a literal proper noun inside its emphasized span (not a copy target).
-    expect(screen.getByText("Sadad Haidari")).toBeInTheDocument();
-
-    // Each of the three brand glyphs renders through <Icon>, which advertises its id in dev mode.
-    const about = container.querySelector('[data-dev-id="about.root"]')!;
-    expect(about.querySelector('svg[data-icon-id="brand.wordmark"]')).not.toBeNull();
-    expect(about.querySelector('svg[data-icon-id="brand.linkedin"]')).not.toBeNull();
-    expect(about.querySelector('svg[data-icon-id="brand.github"]')).not.toBeNull();
-  });
-  it("shows a real version string in the About modal (FIX-02)", async () => {
-    render(<Rail />);
-    await userEvent.click(screen.getByRole("button", { name: /About/ }));
-    // a Title Case "Version" label with the build-injected value beside it
-    const label = screen.getByText("Version");
-    expect(label).toBeInTheDocument();
-    expect(typeof __APP_VERSION__).toBe("string");
-    expect(__APP_VERSION__.length).toBeGreaterThan(0);
-    expect(screen.getByText(__APP_VERSION__)).toBeInTheDocument();
-    // no em dash anywhere in the About modal copy (design contract)
-    expect(screen.getByRole("dialog").textContent).not.toContain("—");
-  });
-
-  it("does not let the version line claim a revision this window is not running", async () => {
-    // C8: About states the backend's authoritative release AS the version. That is the same
-    // confident claim the pill used to make, so the window that names the version names the
-    // disagreement too. Needs a bundle carrying a revision (see the pill case above).
-    if (!BUNDLE_REVISION) return;
-    updateState.current_revision = "222222222222";
-    updateState.target_revision = "222222222222";
-    const { container } = render(<Rail />);
-    await userEvent.click(screen.getByRole("button", { name: /About/ }));
-    const note = container.querySelector('[data-dev-id="about.stale"]');
-    expect(note).not.toBeNull();
-    expect(note!.textContent).toContain("2222222");
-  });
-
-  it("shows the installed production release instead of the source build version", async () => {
-    updateState.channel = "production";
-    updateState.current_revision = "release-1.2.3.4";
-    updateState.target_revision = "release-1.2.3.4";
-
-    render(<Rail />);
-    await userEvent.click(screen.getByRole("button", { name: /About/ }));
-
-    expect(screen.getByText("1.2.3.4")).toBeInTheDocument();
-    expect(screen.queryByText("release-1.2.3.4")).toBeNull();
-    if (__APP_VERSION__ !== "1.2.3.4") {
-      expect(screen.queryByText(__APP_VERSION__)).toBeNull();
     }
   });
 
@@ -413,8 +295,8 @@ describe("the rail's three reported defects", () => {
 
   it("uses the same glyph centerline when pinned and for every collapsed utility", () => {
     // REAL WEBVIEW2 MEASUREMENT before:
-    //   collapsed nav/about 25.5px, update 16px, theme 20.5px
-    //   pinned nav/about 30.5px, update 31px
+    //   collapsed nav 25.5px, update 16px, theme 20.5px
+    //   pinned nav 30.5px, update 31px
     // The panel itself never moved. Those differences came from four separate padding/wrapper
     // arrangements. One grid and one glyph box derive a 25.5px centerline for every control in
     // both states.
@@ -423,7 +305,7 @@ describe("the rail's three reported defects", () => {
     setWidth(1000);
     window.__STOCKROOM_UI__ = {};
     const compact = render(<DevModeProvider><Rail /></DevModeProvider>);
-    for (const id of ["rail.nav-components", "rail.about", "rail.update", "rail.theme-toggle"]) {
+    for (const id of ["rail.nav-components", "rail.update", "rail.theme-toggle"]) {
       const control = compact.container.querySelector(`[data-dev-id="${id}"]`)!;
       expect(control.querySelector("span[aria-hidden]")!.className).toContain("w-[35px]");
     }
@@ -434,7 +316,6 @@ describe("the rail's three reported defects", () => {
     const pinned = render(<DevModeProvider><Rail /></DevModeProvider>);
     for (const id of [
       "rail.nav-components",
-      "rail.about",
       "rail.update",
       "rail.theme-toggle",
     ]) {

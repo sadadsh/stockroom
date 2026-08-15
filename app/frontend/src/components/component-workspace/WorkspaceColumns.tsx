@@ -470,17 +470,19 @@ export function WorkspaceColumnTitleStrip({
 export function WorkspaceColumnScroller({
   id,
   scrollRef,
+  className = "",
   children,
 }: {
   id: WorkspaceColumnId;
   scrollRef?: (node: HTMLDivElement | null) => void;
+  className?: string;
   children: ReactNode;
 }) {
   return (
     <div
       ref={scrollRef}
       data-workspace-scroll={id}
-      className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden"
+      className={`min-h-0 flex-1 overflow-y-auto overflow-x-hidden ${className}`.trim()}
     >
       {children}
     </div>

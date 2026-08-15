@@ -128,6 +128,7 @@ export function SourcingBodyChrome({ children }: RegionChromeProps) {
   return (
     <WorkspaceColumnScroller
       id="sourcing"
+      className="sourcing-line-free"
       scrollRef={(node) => {
         workspace.sourcing.scrollRef.current = node;
       }}

@@ -76,7 +76,7 @@
       "title": "About Open",
       "area": "global",
       "group": "Global",
-      "route": "components",
+      "route": "settings",
       "expectedTargets": [
         "about.root"
       ]
@@ -86,7 +86,7 @@
       "title": "About Current",
       "area": "global",
       "group": "Global",
-      "route": "components",
+      "route": "settings",
       "expectedTargets": [
         "about.root"
       ]
@@ -96,7 +96,7 @@
       "title": "About Update-Available",
       "area": "global",
       "group": "Global",
-      "route": "components",
+      "route": "settings",
       "expectedTargets": [
         "about.root"
       ]
@@ -106,7 +106,7 @@
       "title": "About Stale",
       "area": "global",
       "group": "Global",
-      "route": "components",
+      "route": "settings",
       "expectedTargets": [
         "about.root"
       ]

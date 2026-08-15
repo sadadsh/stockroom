@@ -112,23 +112,22 @@ describe("the non-vacuity proofs", () => {
   });
 
   it("warns on a real shipped pairing the workspace happens not to use", () => {
-    // `--c-active` at the label tier measures 4.43 in light theme. Real values, real failure - the
-    // table omits the pairing because no workspace piece paints text on that surface, not because
-    // the values pass.
+    // `--c-active` at the muted tier fails in light theme. Real values, real failure - the table
+    // omits the pairing because no workspace piece paints muted text on that surface.
     //
     // Killing mutation: any change that makes the floor comparison never fire.
-    const pairings: ContrastPairing[] = [{ ink: "--c-t3", surface: "--c-active", bar: "text" }];
+    const pairings: ContrastPairing[] = [{ ink: "--c-t4", surface: "--c-active", bar: "text" }];
     const issues = warnings(validateContrast(DEFAULT_WORKSPACE_LAYOUT, shipped, { pairings }));
     expect(issues).toHaveLength(1);
     expect(issues[0].subject).toMatchObject({
       kind: "token-pair",
       theme: "light",
-      ink: "--c-t3",
+      ink: "--c-t4",
       surface: "--c-active",
     });
-    expect(issues[0].detail?.ratio).toBeCloseTo(4.43, 2);
+    expect(issues[0].detail?.ratio).toBeCloseTo(3.54, 2);
     // The same pairing clears the floor in dark theme, which is why one row appears and not two.
-    expect(contrastRatio(devTokenValues("dark")["--c-t3"], devTokenValues("dark")["--c-active"]))
+    expect(contrastRatio(devTokenValues("dark")["--c-t4"], devTokenValues("dark")["--c-active"]))
       .toBeGreaterThan(CONTRAST_FLOOR.text);
     expect(WORKSPACE_TEXT_SURFACES).not.toContain("--c-active");
   });
@@ -183,7 +182,7 @@ describe("the document decides which pairings are live", () => {
     // The mechanism the composer (plan Phase 5) needs: a piece that brings its own pairings stops
     // being measured when it stops being placed.
     const pairings: ContrastPairing[] = [
-      { ink: "--c-t3", surface: "--c-active", bar: "text", pieces: ["workspace.sourcing-offers"] },
+      { ink: "--c-t4", surface: "--c-active", bar: "text", pieces: ["workspace.sourcing-offers"] },
     ];
     expect(warnings(validateContrast(DEFAULT_WORKSPACE_LAYOUT, shipped, { pairings }))).toHaveLength(1);
 

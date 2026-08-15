@@ -713,12 +713,12 @@ describe("opening a component", () => {
     expect(readUiSession().component_views.p1?.representation_layout).toBe("all");
   });
 
-  it("scrolls in the three columns and nowhere else", async () => {
+  it("scrolls only evidence columns while CAD resizes to fit", async () => {
     wrap(<ComponentsPage />);
     await screen.findByText("Description p0");
     const root = document.querySelector<HTMLElement>('[data-dev-id="component-browser.root"]')!;
     // The hard contract: height 100%, a zero min-height so flex children can shrink, and no
-    // scrolling of its own. Each column owns its scrollbar; nothing above them does.
+    // scrolling of its own. Evidence columns scroll; the CAD body scales its previews to fit.
     expect(root.className).toContain("h-full");
     expect(root.className).toContain("min-h-0");
     expect(root.className).toContain("overflow-hidden");
@@ -728,8 +728,11 @@ describe("opening a component", () => {
     const scrollers = Array.from(
       root.querySelectorAll<HTMLElement>("[class*='overflow-y-auto'],[class*='overflow-auto']"),
     ).filter((element) => !element.closest('[role="dialog"]'));
-    expect(scrollers).toHaveLength(3);
+    expect(scrollers).toHaveLength(2);
     expect(scrollers.every((element) => element.hasAttribute("data-workspace-scroll"))).toBe(true);
+    const cad = root.querySelector<HTMLElement>('[data-workspace-scroll="cad"]')!;
+    expect(cad).toHaveClass("overflow-hidden");
+    expect(cad).not.toHaveClass("overflow-y-auto");
   });
 
   // The search hotkey is a document-level subscription. A page that leaves it attached after

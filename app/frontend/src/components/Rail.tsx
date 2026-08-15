@@ -11,8 +11,7 @@ import { useTheme } from "../lib/theme";
 import { Text, useText } from "../lib/copy";
 import { Icon } from "./Icon";
 import { readPref, writePref } from "../lib/uiPrefs";
-import { useModalDismiss } from "../lib/useModalDismiss";
-import { aboutVersion, type UpdateStanding } from "../lib/updateStanding";
+import { type UpdateStanding } from "../lib/updateStanding";
 import { useUpdateStanding } from "../lib/useUpdateStanding";
 import { useScenarioUiState } from "../design-studio/scenarioState";
 
@@ -111,7 +110,6 @@ export function Rail() {
   // One glyph serves both directions, so each direction needs its own name and its own tooltip.
   const expandRailLabel = useText("nav.rail-expand", "Expand Rail");
   const collapseRailLabel = useText("nav.rail-collapse", "Collapse Rail");
-  const railAboutLabel = useText("nav.about-label", "About");
   const designStudioLabel = useText("nav.design-studio", "Design Studio");
   const [collapsed, setCollapsed] = useState(readCollapsed);
   // Persist only what the USER chose. This effect used to run on mount, which wrote the derived
@@ -141,21 +139,8 @@ export function Rail() {
   const footItems = items.filter((item) => item.group === "foot");
   const active = railRouteFor(route);
 
-  const { query: update, view: updateView } = useUpdateStanding();
-  const [aboutOpen, setAboutOpen] = useState(false);
-  const scenarioRail = useScenarioUiState().rail;
-  const scenarioAboutOpen = scenarioRail?.aboutOpen;
+  const { view: updateView } = useUpdateStanding();
   const scenarioRailState = useScenarioUiState().railState;
-  const priorAboutOpen = useRef<boolean | null>(null);
-  useEffect(() => {
-    if (scenarioAboutOpen === undefined) {
-      if (priorAboutOpen.current !== null) setAboutOpen(priorAboutOpen.current);
-      priorAboutOpen.current = null;
-      return;
-    }
-    if (priorAboutOpen.current === null) priorAboutOpen.current = aboutOpen;
-    setAboutOpen(scenarioAboutOpen);
-  }, [scenarioAboutOpen]);
   useEffect(() => {
     if (scenarioRailState) setCollapsed(scenarioRailState === "collapsed");
   }, [scenarioRailState]);
@@ -305,24 +290,6 @@ export function Rail() {
             {designStudioLabel}
           </span>
         </button>
-        <button
-          type="button"
-          data-dev-id="rail.about"
-          aria-label={collapsed ? railAboutLabel : undefined}
-          title={collapsed ? railAboutLabel : undefined}
-          onClick={() => setAboutOpen(true)}
-          className={
-            RAIL_ROW +
-            " text-sm font-medium text-t2 transition hover:bg-[var(--c-hover)] hover:text-t1"
-          }
-        >
-          <span aria-hidden className={RAIL_GLYPH}>
-            <Icon id="nav.about" className="h-full w-full" />
-          </span>
-          <span className={collapsed ? COLLAPSED_LABEL + " whitespace-nowrap" : ""}>
-            <Text id="nav.about">About</Text>
-          </span>
-        </button>
         <div
           data-dev-id="rail.utility"
           className="flex flex-col items-stretch gap-0.5"
@@ -394,129 +361,7 @@ export function Rail() {
           </button>
         </div>
       </div>
-      {aboutOpen ? (
-        <AboutModal
-          onClose={() => setAboutOpen(false)}
-          version={aboutVersion(update.data, __APP_VERSION__)}
-          // About states the backend's authoritative release as THE version. That is the same
-          // confident claim the pill used to make, so when the running bundle disagrees with the
-          // backend, the window that names the version also names the disagreement.
-          note={scenarioRail?.aboutNote ?? (updateView.standing === "restart_required" ? updateView.detail : "")}
-        />
-      ) : null}
     </nav>
-    </div>
-  );
-}
-
-// The About window: what this is + who made it, with links out. Opaque bg-popover over a scrim,
-// the same idiom as the app's other modals.
-//
-// The comment here used to claim "Esc / a scrim click closes it". Only the scrim click was true.
-// FOUND BY `windrive.py tour` 2026-07-25, which could not get past it: the sweep clicked About,
-// then reported every control behind the scrim as unreachable and every later surface as
-// UNREACHABLE, because nothing it tried would dismiss this dialog. Driven live, it carried
-// **zero buttons** and ignored Escape, so the only way out was clicking a backdrop that advertises
-// nothing. Seven other modals already adopted `useModalDismiss`; this one never did, while still
-// declaring `role="dialog" aria-modal`. A modal that traps you is worse than a panel that does not
-// claim to be one.
-function AboutModal({
-  onClose,
-  version,
-  note = "",
-}: {
-  onClose: () => void;
-  version: string;
-  note?: string;
-}) {
-  const aboutLabel = useText("modal.about.aria", "About Stockroom");
-  const closeAboutLabel = useText("modal.about.close", "Close About");
-  // Always mounted only while open, so `open` is true whenever this renders. The hook owns Escape,
-  // the focus move into the dialog and the focus restore on the way out.
-  const { ref: dialogRef, zIndex: modalZ } = useModalDismiss(true, onClose);
-  return (
-    <div
-      data-dev-id="about.scrim"
-      style={{ zIndex: modalZ }}
-      className="fixed inset-0 flex items-center justify-center bg-scrim p-4"
-      role="presentation"
-      onClick={onClose}
-    >
-      <div
-        ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
-        aria-label={aboutLabel}
-        data-dev-id="about.root"
-        tabIndex={-1}
-        onClick={(e) => e.stopPropagation()}
-        className="relative w-full max-w-[380px] rounded-card border border-line2 bg-popover p-6 text-center shadow-pop focus-visible:outline-none"
-      >
-        {/* A VISIBLE way out. Escape and the scrim both work now, and neither is discoverable by
-            looking - this dialog had no control of any kind in it. */}
-        <button
-          type="button"
-          data-dev-id="about.close"
-          onClick={onClose}
-          aria-label={closeAboutLabel}
-          title={closeAboutLabel}
-          className="absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-control text-t3 transition-colors hover:bg-[var(--c-hover)] hover:text-t1 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus"
-        >
-          <svg width="11" height="11" viewBox="0 0 11 11" fill="none" aria-hidden>
-            <path d="M1 1l9 9M10 1l-9 9" stroke="currentColor" strokeWidth="1.5"
-                  strokeLinecap="round" />
-          </svg>
-        </button>
-        <div
-          data-dev-id="about.icon"
-          className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-control bg-raise2 shadow-card"
-        >
-          {/* brand category, so <Icon> does NOT auto-add .ico; the original className (with the literal
-              ico token) is passed through so --icon-stroke keeps retuning it. Byte-identical output. */}
-          <Icon id="brand.wordmark" className="ico h-6 w-6 text-t1" />
-        </div>
-        <div data-dev-id="about.title" className="text-lg font-semibold text-t1">
-          <Text id="modal.about.title">Stockroom</Text>
-        </div>
-        <p data-dev-id="about.credit" className="mt-1 text-sm text-t2">
-          <Text id="modal.about.credit">Made with love, from </Text>
-          <span className="font-medium text-t1">
-            <Text id="modal.about.author">Sadad Haidari</Text>
-          </span>
-          .
-        </p>
-        <p className="mt-2 text-xs text-t3">
-          <span className="font-medium">
-            <Text id="modal.about.version">Version</Text>
-          </span>{" "}
-          <span className="tnum font-mono">{version}</span>
-        </p>
-        {note ? (
-          <p data-dev-id="about.stale" className="mt-1 text-xs leading-relaxed text-warn">
-            {note}
-          </p>
-        ) : null}
-        <div data-dev-id="about.links" className="mt-4 flex justify-center gap-2.5">
-          <a
-            href="https://www.linkedin.com/in/sadadhaidari"
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center gap-2 rounded-control border border-line2 bg-raise2 px-3 py-2 text-xs font-semibold text-t2 shadow-card transition hover:text-t1 hover:brightness-110"
-          >
-            <Icon id="brand.linkedin" className="h-4 w-4" />
-            <Text id="modal.about.linkedin">LinkedIn</Text>
-          </a>
-          <a
-            href="https://github.com/sadadsh"
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center gap-2 rounded-control border border-line2 bg-raise2 px-3 py-2 text-xs font-semibold text-t2 shadow-card transition hover:text-t1 hover:brightness-110"
-          >
-            <Icon id="brand.github" className="h-4 w-4" />
-            <Text id="modal.about.github">GitHub</Text>
-          </a>
-        </div>
-      </div>
     </div>
   );
 }

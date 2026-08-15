@@ -66,7 +66,7 @@ export const DEV_TOKENS: DevToken[] = [
     group: "Accent",
     kind: "color",
     themed: true,
-    default: { dark: "#d2d5d9", light: "#3a3e43" },
+    default: { dark: "#d6d9d7", light: "#343936" },
   },
   {
     cssVar: "--c-acc-on",
@@ -74,7 +74,7 @@ export const DEV_TOKENS: DevToken[] = [
     group: "Accent",
     kind: "color",
     themed: true,
-    default: { dark: "#1f2022", light: "#ffffff" },
+    default: { dark: "#17191a", light: "#ffffff" },
   },
   {
     cssVar: "--c-acc-strong",
@@ -82,7 +82,7 @@ export const DEV_TOKENS: DevToken[] = [
     group: "Accent",
     kind: "color",
     themed: true,
-    default: { dark: "#eaecee", light: "#24272b" },
+    default: { dark: "#f0f1f0", light: "#202422" },
   },
   {
     cssVar: "--c-acc-soft",
@@ -90,7 +90,7 @@ export const DEV_TOKENS: DevToken[] = [
     group: "Accent",
     kind: "color",
     themed: true,
-    default: { dark: "rgba(255, 255, 255, 0.1)", light: "rgba(0, 0, 0, 0.12)" },
+    default: { dark: "rgba(255, 255, 255, 0.1)", light: "rgba(0, 0, 0, 0.1)" },
   },
   {
     cssVar: "--c-focus",
@@ -98,7 +98,7 @@ export const DEV_TOKENS: DevToken[] = [
     group: "Accent",
     kind: "color",
     themed: true,
-    default: { dark: "#e4e6e9", light: "#15171a" },
+    default: { dark: "#f0f1f0", light: "#202422" },
   },
   {
     cssVar: "--c-hover",
@@ -106,7 +106,7 @@ export const DEV_TOKENS: DevToken[] = [
     group: "Accent",
     kind: "color",
     themed: true,
-    default: { dark: "rgba(255, 255, 255, 0.045)", light: "rgba(0, 0, 0, 0.045)" },
+    default: { dark: "rgba(255, 255, 255, 0.05)", light: "rgba(0, 0, 0, 0.04)" },
   },
   // --- Surfaces ------------------------------------------------------------
   {
@@ -115,7 +115,7 @@ export const DEV_TOKENS: DevToken[] = [
     group: "Surfaces",
     kind: "color",
     themed: true,
-    default: { dark: "#1f2022", light: "#d9dbde" },
+    default: { dark: "#17191a", light: "#f2f3f2" },
   },
   {
     cssVar: "--c-canvas",
@@ -123,7 +123,7 @@ export const DEV_TOKENS: DevToken[] = [
     group: "Surfaces",
     kind: "color",
     themed: true,
-    default: { dark: "#1f2022", light: "#d9dbde" },
+    default: { dark: "#17191a", light: "#f2f3f2" },
   },
   {
     cssVar: "--c-rail",
@@ -131,7 +131,7 @@ export const DEV_TOKENS: DevToken[] = [
     group: "Surfaces",
     kind: "color",
     themed: true,
-    default: { dark: "#1f2022", light: "#d9dbde" },
+    default: { dark: "#17191a", light: "#f2f3f2" },
   },
   {
     cssVar: "--c-surface",
@@ -139,7 +139,7 @@ export const DEV_TOKENS: DevToken[] = [
     group: "Surfaces",
     kind: "color",
     themed: true,
-    default: { dark: "#2a2c2f", light: "#edeef0" },
+    default: { dark: "#222527", light: "#fbfbfa" },
   },
   {
     cssVar: "--c-raise",
@@ -147,7 +147,7 @@ export const DEV_TOKENS: DevToken[] = [
     group: "Surfaces",
     kind: "color",
     themed: true,
-    default: { dark: "#2a2c2f", light: "#edeef0" },
+    default: { dark: "#222527", light: "#fbfbfa" },
   },
   {
     cssVar: "--c-raise2",
@@ -155,7 +155,7 @@ export const DEV_TOKENS: DevToken[] = [
     group: "Surfaces",
     kind: "color",
     themed: true,
-    default: { dark: "#34373b", light: "#e2e4e7" },
+    default: { dark: "#2b2f31", light: "#f5f6f5" },
   },
   {
     cssVar: "--c-section",
@@ -163,7 +163,7 @@ export const DEV_TOKENS: DevToken[] = [
     group: "Surfaces",
     kind: "color",
     themed: true,
-    default: { dark: "#34373b", light: "#e2e4e7" },
+    default: { dark: "#2b2f31", light: "#f5f6f5" },
   },
   {
     cssVar: "--c-active",
@@ -171,7 +171,7 @@ export const DEV_TOKENS: DevToken[] = [
     group: "Surfaces",
     kind: "color",
     themed: true,
-    default: { dark: "#3e4247", light: "#cdd0d4" },
+    default: { dark: "#353a3d", light: "#e5e7e5" },
   },
   {
     cssVar: "--c-field",
@@ -179,7 +179,7 @@ export const DEV_TOKENS: DevToken[] = [
     group: "Surfaces",
     kind: "color",
     themed: true,
-    default: { dark: "#202225", light: "#ffffff" },
+    default: { dark: "#1b1d1f", light: "#ffffff" },
   },
   {
     cssVar: "--c-popover",
@@ -187,7 +187,7 @@ export const DEV_TOKENS: DevToken[] = [
     group: "Surfaces",
     kind: "color",
     themed: true,
-    default: { dark: "#34373b", light: "#f3f4f6" },
+    default: { dark: "#2b2f31", light: "#ffffff" },
   },
   {
     cssVar: "--c-band",
@@ -196,7 +196,7 @@ export const DEV_TOKENS: DevToken[] = [
     kind: "color",
     themed: true,
     // Opaque by contract: it backs sticky headers that rows scroll beneath.
-    default: { dark: "#26282b", light: "#dddfe2" },
+    default: { dark: "#1d2022", light: "#f0f1f0" },
   },
   {
     cssVar: "--c-stage",
@@ -204,7 +204,7 @@ export const DEV_TOKENS: DevToken[] = [
     group: "Surfaces",
     kind: "color",
     themed: true,
-    default: { dark: "#202225", light: "#d2d5d9" },
+    default: { dark: "#1a1c1e", light: "#eaebea" },
   },
   {
     cssVar: "--c-sticky",
@@ -212,7 +212,7 @@ export const DEV_TOKENS: DevToken[] = [
     group: "Surfaces",
     kind: "color",
     themed: true,
-    default: { dark: "#26282b", light: "#dddfe2" },
+    default: { dark: "#1d2022", light: "#f0f1f0" },
   },
   {
     cssVar: "--c-ring-track",
@@ -220,7 +220,7 @@ export const DEV_TOKENS: DevToken[] = [
     group: "Surfaces",
     kind: "color",
     themed: true,
-    default: { dark: "#202225", light: "#cdd0d4" },
+    default: { dark: "#1a1c1e", light: "#e6e9e6" },
   },
   // --- The technical drawing sheet ------------------------------------------
   // Its own group, because these ten are adjusted together or not at all: the
@@ -234,7 +234,7 @@ export const DEV_TOKENS: DevToken[] = [
     kind: "color",
     themed: true,
     // Theme-aware: a bright sheet in dark theme was the brightest thing on screen.
-    default: { dark: "#1f1f1e", light: "#f5f5f2" },
+    default: { dark: "#151615", light: "#fafaf8" },
   },
   {
     cssVar: "--c-technical-wash",
@@ -242,7 +242,7 @@ export const DEV_TOKENS: DevToken[] = [
     group: "Drawing",
     kind: "color",
     themed: true,
-    default: { dark: "#2b2b28", light: "#f0efe8" },
+    default: { dark: "#252725", light: "#f1f1ec" },
   },
   {
     cssVar: "--c-technical-ink",
@@ -250,7 +250,7 @@ export const DEV_TOKENS: DevToken[] = [
     group: "Drawing",
     kind: "color",
     themed: true,
-    default: { dark: "#e8e8e6", light: "#1b1b1b" },
+    default: { dark: "#e6e8e7", light: "#242625" },
   },
   {
     cssVar: "--c-technical-note",
@@ -258,7 +258,7 @@ export const DEV_TOKENS: DevToken[] = [
     group: "Drawing",
     kind: "color",
     themed: true,
-    default: { dark: "#9d9d9a", light: "#5c5c5a" },
+    default: { dark: "#9a9e9b", light: "#666a67" },
   },
   {
     cssVar: "--c-layer-copper",
@@ -315,7 +315,7 @@ export const DEV_TOKENS: DevToken[] = [
     group: "Controls",
     kind: "color",
     themed: true,
-    default: { dark: "#3e4247", light: "#fbfbfc" },
+    default: { dark: "#353a3d", light: "#ffffff" },
   },
   {
     cssVar: "--c-control-bottom",
@@ -323,7 +323,7 @@ export const DEV_TOKENS: DevToken[] = [
     group: "Controls",
     kind: "color",
     themed: true,
-    default: { dark: "#34373b", light: "#e8eaec" },
+    default: { dark: "#2b2f31", light: "#f2f3f2" },
   },
   {
     cssVar: "--c-control-hover",
@@ -331,7 +331,7 @@ export const DEV_TOKENS: DevToken[] = [
     group: "Controls",
     kind: "color",
     themed: true,
-    default: { dark: "#3e4247", light: "#f1f2f4" },
+    default: { dark: "#353a3d", light: "#f7f8f7" },
   },
   {
     cssVar: "--c-control-pressed",
@@ -339,7 +339,7 @@ export const DEV_TOKENS: DevToken[] = [
     group: "Controls",
     kind: "color",
     themed: true,
-    default: { dark: "#26282b", light: "#d2d5d9" },
+    default: { dark: "#1d2022", light: "#e7e9e7" },
   },
   // Selection and active state, NEUTRAL. The fill steps away from the panel (up in dark, down in
   // light) and a solid 2px edge marker runs down the row; there is no hue involved. The value is
@@ -352,7 +352,7 @@ export const DEV_TOKENS: DevToken[] = [
     group: "Controls",
     kind: "color",
     themed: true,
-    default: { dark: "#383c41", light: "#dcdfe2" },
+    default: { dark: "#303538", light: "#e4e7e5" },
   },
   {
     cssVar: "--c-selected-hover",
@@ -360,7 +360,7 @@ export const DEV_TOKENS: DevToken[] = [
     group: "Controls",
     kind: "color",
     themed: true,
-    default: { dark: "#3d4146", light: "#d4d7db" },
+    default: { dark: "#363b3e", light: "#e2e5e3" },
   },
   {
     cssVar: "--c-selected-edge",
@@ -368,7 +368,7 @@ export const DEV_TOKENS: DevToken[] = [
     group: "Controls",
     kind: "color",
     themed: true,
-    default: { dark: "#e0e2e5", light: "#24272b" },
+    default: { dark: "#e4e6e5", light: "#2c302e" },
   },
   {
     cssVar: "--c-row-alt",
@@ -376,7 +376,7 @@ export const DEV_TOKENS: DevToken[] = [
     group: "Surfaces",
     kind: "color",
     themed: true,
-    default: { dark: "#26282b", light: "#e6e8ea" },
+    default: { dark: "#1d2022", light: "#f6f7f6" },
   },
   // --- Borders -------------------------------------------------------------
   {
@@ -385,7 +385,7 @@ export const DEV_TOKENS: DevToken[] = [
     group: "Borders",
     kind: "color",
     themed: true,
-    default: { dark: "#242629", light: "#d7dadd" },
+    default: { dark: "#202325", light: "#f0f1f0" },
   },
   {
     cssVar: "--c-line",
@@ -393,7 +393,7 @@ export const DEV_TOKENS: DevToken[] = [
     group: "Borders",
     kind: "color",
     themed: true,
-    default: { dark: "#303236", light: "#e3e5e7" },
+    default: { dark: "#2b2e30", light: "#eceeec" },
   },
   {
     cssVar: "--c-line2",
@@ -401,7 +401,7 @@ export const DEV_TOKENS: DevToken[] = [
     group: "Borders",
     kind: "color",
     themed: true,
-    default: { dark: "#383b3f", light: "#dadddf" },
+    default: { dark: "#35383a", light: "#e3e5e3" },
   },
   {
     cssVar: "--c-edge",
@@ -409,7 +409,7 @@ export const DEV_TOKENS: DevToken[] = [
     group: "Borders",
     kind: "color",
     themed: true,
-    default: { dark: "#666c73", light: "#ffffff" },
+    default: { dark: "#5e6467", light: "#ffffff" },
   },
   // --- Text ----------------------------------------------------------------
   // Five tiers, opaque. Not everything is near-white: t1 is reserved for identity,
@@ -420,7 +420,7 @@ export const DEV_TOKENS: DevToken[] = [
     group: "Text",
     kind: "color",
     themed: true,
-    default: { dark: "#e5e7ea", light: "#1b1d20" },
+    default: { dark: "#eceeed", light: "#252826" },
   },
   {
     cssVar: "--c-t2",
@@ -428,7 +428,7 @@ export const DEV_TOKENS: DevToken[] = [
     group: "Text",
     kind: "color",
     themed: true,
-    default: { dark: "#c3c8ce", light: "#3a3e43" },
+    default: { dark: "#c9cdcb", light: "#454a47" },
   },
   {
     cssVar: "--c-t3",
@@ -436,7 +436,7 @@ export const DEV_TOKENS: DevToken[] = [
     group: "Text",
     kind: "color",
     themed: true,
-    default: { dark: "#a9afb7", light: "#565b61" },
+    default: { dark: "#aeb3b1", light: "#5e6460" },
   },
   {
     cssVar: "--c-t4",
@@ -444,7 +444,7 @@ export const DEV_TOKENS: DevToken[] = [
     group: "Text",
     kind: "color",
     themed: true,
-    default: { dark: "#949aa2", light: "#6b7178" },
+    default: { dark: "#9fa5a2", light: "#737a76" },
   },
   {
     cssVar: "--c-t5",
@@ -452,7 +452,7 @@ export const DEV_TOKENS: DevToken[] = [
     group: "Text",
     kind: "color",
     themed: true,
-    default: { dark: "#6e747c", light: "#979da4" },
+    default: { dark: "#676d6a", light: "#a4aaa6" },
   },
   // --- Status --------------------------------------------------------------
   {
@@ -473,7 +473,7 @@ export const DEV_TOKENS: DevToken[] = [
     group: "Status",
     kind: "color",
     themed: true,
-    default: { dark: "#a9afb7", light: "#565b61" },
+    default: { dark: "#aeb3b1", light: "#5e6460" },
   },
   {
     cssVar: "--c-err",
@@ -502,7 +502,7 @@ export const DEV_TOKENS: DevToken[] = [
     group: "Status",
     kind: "color",
     themed: true,
-    default: { dark: "#c3c8ce", light: "#3a3e43" },
+    default: { dark: "#c9cdcb", light: "#454a47" },
   },
   {
     cssVar: "--c-err-text",

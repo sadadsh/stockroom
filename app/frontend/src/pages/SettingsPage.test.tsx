@@ -769,13 +769,30 @@ describe("SettingsPage - flat IA + Machine Setup band", () => {
     await screen.findByTestId("settings.appearance.header");
     expect(screen.queryByRole("navigation", { name: /settings sections/i })).toBeNull();
     for (const id of [
-      "settings.appearance", "settings.update", "settings.profiles", "settings.sync",
+      "settings.appearance", "settings.about", "settings.update", "settings.profiles", "settings.sync",
       "settings.github", "settings.kicad", "settings.altium", "settings.cubemx",
       "settings.distributor", "settings.rescan", "settings.completion", "settings.derivation",
       "settings.health", "settings.librarysync", "settings.cad-clear",
     ]) {
       expect(screen.getByTestId(`${id}.header`)).toBeInTheDocument();
     }
+  });
+
+  it("places About, the installed version, and project links inside Settings", async () => {
+    renderPage();
+    const about = await screen.findByTestId("settings.about.header");
+    expect(about).toHaveTextContent("About Stockroom");
+    expect(document.querySelector('[data-dev-id="about.root"]')).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "LinkedIn" })).toHaveAttribute(
+      "href",
+      "https://www.linkedin.com/in/sadadhaidari",
+    );
+    expect(screen.getByRole("link", { name: "GitHub" })).toHaveAttribute(
+      "href",
+      "https://github.com/sadadsh",
+    );
+    expect(screen.getAllByText(__APP_VERSION__).length).toBeGreaterThan(0);
+    expect(screen.queryByRole("dialog", { name: "About Stockroom" })).toBeNull();
   });
 
   it("owns one page scroller containing readiness and every capability card", async () => {

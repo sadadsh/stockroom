@@ -700,13 +700,13 @@ describe("every region the renderer draws owns at most one scroll axis", () => {
       const regionScrollers = scrollers.filter((entry) =>
         isRegionScroller(entry.element, regionDevIds),
       );
-      // The floor: the columns' own scrollers and the band's sideways overflow are all present, so
-      // the assertions below are made against a real set rather than an empty one.
-      expect(scrollers.length, `${document_.id}: scrollers found`).toBeGreaterThanOrEqual(4);
+      // The floor: two evidence-column scrollers and the band's sideways overflow are present.
+      // CAD deliberately scales its three previews into its pane and owns no scroll axis.
+      expect(scrollers.length, `${document_.id}: scrollers found`).toBeGreaterThanOrEqual(3);
       expect(
         regionScrollers.length,
         `${document_.id}: region scrollers found`,
-      ).toBeGreaterThanOrEqual(4);
+      ).toBeGreaterThanOrEqual(3);
 
       for (const { element, axes } of scrollers) {
         expect([...axes], `${document_.id}: ${element.className}`).toHaveLength(1);

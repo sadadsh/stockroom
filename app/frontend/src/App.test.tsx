@@ -306,8 +306,8 @@ describe("App shell", () => {
     expect(document.querySelector('[data-dev-id="toast.status"]')).toBeInTheDocument();
 
     await activate("global.about.open");
-    expect(await screen.findByRole("dialog", { name: "About Stockroom" })).toBeInTheDocument();
-    await userEvent.setup().click(screen.getByRole("button", { name: "Close About" }));
+    expect(await screen.findByRole("heading", { name: "About Stockroom" })).toBeInTheDocument();
+    expect(document.querySelector('[data-dev-id="settings.about"]')).toBeInTheDocument();
 
     await activate("global.update.available");
     expect((await screen.findAllByText("Update Available")).length).toBeGreaterThan(0);

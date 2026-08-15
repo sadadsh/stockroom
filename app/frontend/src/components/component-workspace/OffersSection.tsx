@@ -1,5 +1,5 @@
 import { useEffect, useRef, type ReactNode } from "react";
-import type { DistributorOffer } from "../../api/dossierTypes";
+import type { DistributorOffer, PriceBreak } from "../../api/dossierTypes";
 import { Text, useCopyFormatter, useText } from "../../lib/copy";
 import { formatCount, formatPrice, formatTimestamp } from "../../lib/formatValue";
 import { Icon } from "../Icon";
@@ -110,14 +110,14 @@ function FullRecordAction({ label, onClick }: { label: string; onClick: () => vo
 function ProviderGroup({ group }: { group: OfferGroup }) {
   const count = group.offers.length;
   return (
-    <li data-sourcing-provider={group.provider} className="border-b border-line last:border-b-0">
+    <li data-sourcing-provider={group.provider} className="mb-1 last:mb-0">
       <div className="flex min-h-[26px] items-center gap-2 bg-row-alt/45 px-2 py-1">
         <span className="ui-row-secondary min-w-0 flex-1 truncate text-t1">{group.providerLabel}</span>
         <span className="ui-component-metadata flex-none tabular-nums">
           {formatCount(count)} {count === 1 ? "offer" : "offers"}
         </span>
       </div>
-      <ul className="divide-y divide-line/60">
+      <ul className="space-y-1">
         {group.offers.map((offer) => (
           <OfferPriceLadder key={`${offer.provider}:${offer.sku}`} offer={offer} />
         ))}
@@ -156,23 +156,21 @@ function OfferPriceLadder({ offer }: { offer: DistributorOffer }) {
           <p className="ui-component-metadata py-0.5">{noPriceBreaks}</p>
         ) : (
           <dl
-            className="grid min-w-0 grid-cols-2 gap-x-3"
+            className="flex min-w-0 flex-wrap gap-1"
             aria-label={priceLadderLabel({ provider: offer.providerLabel })}
           >
-            <div className="contents">
-              <dt className="ui-property-label border-b border-line/60 py-0.5">
-                <Text id="component-browser.price-col-qty">Count</Text>
-              </dt>
-              <dd className="ui-property-label border-b border-line/60 py-0.5 text-right">
-                <Text id="component-browser.price-col-price">Unit Price</Text>
-              </dd>
-            </div>
-            {offer.priceBreaks.map((entry, index) => (
-              <div key={`${entry.qty}:${entry.price}:${index}`} className="contents">
-                <dt className="ui-component-metadata border-b border-line/40 py-0.5">
+            {keyedPriceBreaks(offer.priceBreaks).map(({ entry, key }) => (
+              <div
+                key={key}
+                data-price-break-pill
+                className="inline-flex min-w-0 items-baseline gap-1.5 rounded-full bg-raise2 px-2 py-1"
+              >
+                <dt className="ui-component-metadata whitespace-nowrap">
+                  <span className="sr-only"><Text id="component-browser.price-col-qty">Count</Text>{" "}</span>
                   {entry.qty === null ? emptyValue : formatCount(entry.qty)}
                 </dt>
-                <dd className="ui-key-fact ui-numeric border-b border-line/40 py-0.5 text-right">
+                <dd className="ui-key-fact ui-numeric whitespace-nowrap">
+                  <span className="sr-only"><Text id="component-browser.price-col-price">Unit Price</Text>{" "}</span>
                   {entry.price === null ? emptyValue : formatPrice(entry.price, offer.currency)}
                 </dd>
               </div>
@@ -229,6 +227,16 @@ function OfferPriceLadder({ offer }: { offer: DistributorOffer }) {
   );
 }
 
+function keyedPriceBreaks(entries: readonly PriceBreak[]): Array<{ entry: PriceBreak; key: string }> {
+  const seen = new Map<string, number>();
+  return entries.map((entry) => {
+    const value = `${entry.qty ?? "none"}:${entry.price ?? "none"}`;
+    const occurrence = (seen.get(value) ?? 0) + 1;
+    seen.set(value, occurrence);
+    return { entry, key: `${value}:${occurrence}` };
+  });
+}
+
 function hasOfferMetadata(offer: DistributorOffer, stamp: ReturnType<typeof formatTimestamp> | null): boolean {
   return Boolean(
     offer.stock !== null
@@ -282,7 +290,7 @@ function SupplyFailures({
     >
       <ul className="flex flex-col">
         {failures.map((failure) => (
-          <li key={failure.provider} className="ui-component-metadata border-b border-line/60 px-2 py-1 text-warn last:border-b-0">
+          <li key={failure.provider} className="ui-component-metadata px-2 py-1 text-warn">
             {failureText(failure)}
           </li>
         ))}

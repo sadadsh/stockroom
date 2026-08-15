@@ -456,6 +456,19 @@ describe("the preferred source is a control, not a caption", () => {
 /* -------------------------------------------------------------- module behaviour */
 
 describe("the three modules", () => {
+  it("divides the available pane height between assets without a CAD scrollbar", async () => {
+    const column = await open(attached());
+    const body = column.querySelector<HTMLElement>('[data-workspace-scroll="cad"]')!;
+    expect(body).toHaveClass("overflow-hidden");
+    expect(body).not.toHaveClass("overflow-y-auto");
+    for (const kind of ["symbol", "footprint", "model"]) {
+      expect(module_(kind)).toHaveClass("flex-1");
+      expect(
+        module_(kind).querySelector('[data-dev-id="component-browser.asset-preview"]'),
+      ).toHaveClass("flex-1");
+    }
+  });
+
   it("keeps every header AND a preview when one module is focused", async () => {
     const column = await open(attached());
     const user = userEvent.setup();
