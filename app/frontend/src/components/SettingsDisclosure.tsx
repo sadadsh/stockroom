@@ -8,6 +8,7 @@
  * exposing their controls.
  */
 import { type ReactNode } from "react";
+import { Card as AstryxCard } from "@astryxdesign/core/Card";
 import { Text } from "../lib/copy";
 
 function cx(...parts: Array<string | false | null | undefined>): string {
@@ -34,10 +35,13 @@ export function SettingsDisclosure({
   "data-dev-id"?: string;
 }) {
   return (
-    <section
+    <AstryxCard
+      padding={0}
+      elevation="low"
+      role="region"
       aria-labelledby={devId ? `${devId}.title` : undefined}
       className={cx(
-        "flex min-w-0 scroll-mt-3 flex-col overflow-hidden rounded-card border border-line bg-raise outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus",
+        "flex min-w-0 scroll-mt-3 flex-col overflow-hidden outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus",
         className,
       )}
       data-dev-id={devId}
@@ -59,7 +63,7 @@ export function SettingsDisclosure({
         </div>
         {summary ? (
           <span
-            className="mt-0.5 flex flex-none items-center gap-1.5 whitespace-nowrap rounded-control border border-line bg-field px-2 py-1 text-2xs font-medium text-t2"
+            className="mt-0.5 flex flex-none items-center gap-1.5 whitespace-nowrap px-1 py-1 text-2xs font-semibold text-t2"
             data-testid="settings.summary"
           >
             {summary}
@@ -67,6 +71,6 @@ export function SettingsDisclosure({
         ) : null}
       </div>
       <div className="min-w-0 px-3.5 py-3.5">{children}</div>
-    </section>
+    </AstryxCard>
   );
 }

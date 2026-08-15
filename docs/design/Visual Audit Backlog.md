@@ -21,6 +21,44 @@ and `P2` meaningful fit, finish, or clarity debt.
 
 ## Acceptance Captures
 
+### 2026-08-14 — ASTRYX Composition Audit And Settings Rhythm
+
+- Owner observation: **Supported**. The first component-level ASTRYX pass still looked assembled from
+  unrelated pieces. Settings mixed boxed summaries, distant label/value pairs, variable control
+  heights, custom cards, and isolated ASTRYX controls; Search placed its result count over Filters
+  while Sort controlled Results. The complete screenshot-by-screenshot disposition and adoption map
+  is `docs/design/ASTRYX Adoption Audit.md`.
+- Capture layer: current production build in headless installed Microsoft Edge through the shipped
+  Design Studio scenarios at a 1,400 × 900 browser viewport. Design Studio's compact captures scale
+  its fixed preview stage and remain fit evidence, not native minimum-window or typography evidence.
+- Evidence: `work/ASTRYX Settings Composition Dark.png`, SHA-256 `99833729a24f`;
+  `work/ASTRYX Settings Composition Light.png`, SHA-256 `90acad8e2ac9`;
+  `work/ASTRYX Catalog Inputs Dark.png`, SHA-256 `0dd35d3b36c4`;
+  `work/ASTRYX Catalog Inputs Light.png`, SHA-256 `d1345b533ab3`;
+  `work/ASTRYX Version Disagreement Dark.png`, SHA-256 `4575d20b2090`;
+  `work/ASTRYX Search Composition Dark.png`, SHA-256 `4ca3a3e05c36`;
+  `work/ASTRYX Search Composition Light.png`, SHA-256 `d9bfb473e356`; and
+  `work/ASTRYX Composition Measurements.json`, SHA-256 `52318ceb4d9e`.
+- Applied composition: every Settings capability uses one low-elevation ASTRYX Card family; the
+  machine verdict is one joined surface; summaries are unboxed; status evidence uses a bounded
+  9–13rem property grid; About aligns identity, version evidence, and project links on one grid;
+  two non-sensitive catalog fields use 28px ASTRYX TextInput controls; and ASTRYX Banner appears
+  only for a real version disagreement. Search now places Results, count, active filters, and Sort
+  in one 34px results header aligned against the 34px Filters header.
+- Rejected path: a global ASTRYX Button adapter. ASTRYX 0.4.1 emits an empty `role="status"` live
+  region inside every idle button, producing false status landmarks across provider workflows and
+  changing stable workspace DOM. Stockroom retained its shared action primitive rather than
+  weakening semantics or recapturing a regression.
+- Acceptance result: all 17 measured ASTRYX card surfaces share 2px corners, one background, and
+  one inset highlight; both migrated inputs measure 28px with 2px corners and Segoe UI Variable.
+  The stale About fixture now carries valid differing revisions and a restart instruction, with a
+  regression proving the banner and update card agree. The complete Windows gate passed 239
+  WindowHost tests, 5 converter tests, 5,980 parallel backend tests with 20 skipped, 51 serialized
+  tests, 2,824 frontend tests, TypeScript, production build, and deterministic distribution
+  synchronization. ASTRYX Doctor and npm audit remain clean. The composed slice adds 0.07 kB gzip
+  CSS and 17.71 kB gzip main JavaScript over the Neutral foundation; further replacements remain
+  subject to the audit map and screenshot acceptance.
+
 ### 2026-08-14 — Restrained ASTRYX Neutral Foundation
 
 - Capture layer: current Vite source in headless installed Microsoft Edge using the shipped Design

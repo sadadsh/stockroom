@@ -34,9 +34,22 @@ function globalFixtures(id: GlobalScenarioId): ScenarioFixture[] {
   const reads: ScenarioFixture[] = [];
   for (const item of settingsReadFixtures({ updateState })) {
     if (isOnboarding && item.path === "/api/onboarding") continue;
+    const staleUpdate = id.endsWith("about.stale") && item.path === "/api/update/check"
+      ? {
+          ...item,
+          response: {
+            ...(item.response as Record<string, unknown>),
+            state: "up_to_date",
+            update_available: false,
+            current_revision: "1111111111111111111111111111111111111111",
+            target_revision: "1111111111111111111111111111111111111111",
+            detail: "The backend is current, but this window is still running the previous interface.",
+          },
+        }
+      : item;
     reads.push(id === "global.update.error" && item.path === "/api/update/check"
-      ? { ...item, behavior: { state: "error" as const, status: 503, message: "Update check unavailable." } }
-      : item);
+      ? { ...staleUpdate, behavior: { state: "error" as const, status: 503, message: "Update check unavailable." } }
+      : staleUpdate);
   }
   if (isOnboarding) reads.unshift(fixture("GET", "/api/onboarding", firstRun));
   if (id.startsWith("global.search.")) {
@@ -60,7 +73,13 @@ function uiFor(id: GlobalScenarioId): Readonly<ScenarioUiState> {
   }
   if (id.startsWith("global.about.")) return {
     settings: { section: "settings.about" },
-    rail: { aboutNote: id.endsWith(".current") ? "Stockroom is current." : undefined },
+    rail: {
+      aboutNote: id.endsWith(".current")
+        ? "Stockroom is current."
+        : id.endsWith(".stale")
+          ? "The running frontend and backend versions disagree. Restart Stockroom to apply the prepared release."
+          : undefined,
+    },
   };
   if (id === "global.rail.collapsed" || id === "global.rail.expanded") return { railState: id.endsWith("collapsed") ? "collapsed" : "expanded" };
   if (id === "global.theme.dark" || id === "global.theme.light") return { theme: id.endsWith("light") ? "light" : "dark" };

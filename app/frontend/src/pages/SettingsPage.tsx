@@ -7,7 +7,10 @@
  * key is only ever shown as a last-4 hint.
  */
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { Banner as AstryxBanner } from "@astryxdesign/core/Banner";
+import { Card as AstryxCard } from "@astryxdesign/core/Card";
 import { Link as AstryxLink } from "@astryxdesign/core/Link";
+import { TextInput as AstryxTextInput } from "@astryxdesign/core/TextInput";
 import { ApiError, api } from "../api/client";
 import type { SetLibraryBody, SettingsPatch, WiringReport } from "../api/types";
 import { useJob } from "../lib/useJob";
@@ -44,7 +47,6 @@ import { useToast } from "../lib/toast";
 import {
   Badge,
   Button,
-  Card,
   Dot,
   ErrorState,
   Eyebrow,
@@ -93,11 +95,11 @@ function StatusRow({
   value: ReactNode;
 }) {
   return (
-    <div className="flex items-center justify-between gap-4 py-2">
-      <span className="flex-none text-xs text-t3">
+    <div className="grid grid-cols-[minmax(9rem,13rem)_minmax(0,1fr)] items-baseline gap-4 py-1.5">
+      <span className="text-xs text-t3">
         {labelId ? <Text id={labelId}>{label}</Text> : label}
       </span>
-      <span className="min-w-0 truncate text-right text-sm text-t1">{value}</span>
+      <span className="min-w-0 break-words text-left text-sm text-t1">{value}</span>
     </div>
   );
 }
@@ -298,14 +300,13 @@ function MachineSetupBand({
 }) {
   const unmet = steps.filter((st) => !st.met);
   return (
-    <div
-      className="grid flex-none grid-cols-1 gap-3 @3xl:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)]"
+    <AstryxCard
+      padding={0}
+      elevation="low"
+      className="grid flex-none grid-cols-1 overflow-hidden @3xl:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)]"
       data-dev-id="settings.machine-band"
     >
-      <Card className="flex min-w-0 items-center gap-4 px-4 py-3.5">
-        <span className="grid h-9 w-9 flex-none place-items-center rounded-control border border-line2 bg-field text-t2">
-          <Icon id="nav.update" className="h-4 w-4" />
-        </span>
+      <section className="flex min-w-0 items-center gap-4 border-b border-line px-4 py-3.5 @3xl:border-b-0 @3xl:border-r">
         <div className="min-w-0 flex-1">
           <Eyebrow className="mb-0.5">
             <Text id="settings.delivery.title">Application Updates</Text>
@@ -377,9 +378,9 @@ function MachineSetupBand({
             <Text id="settings.delivery.get-exe">Get Stockroom.exe</Text>
           </a>
         </div>
-      </Card>
+      </section>
 
-      <Card className="min-w-0 px-4 py-3.5">
+      <section className="min-w-0 px-4 py-3.5">
         <div className="flex items-start justify-between gap-3">
           <div>
             <Eyebrow className="mb-0.5">
@@ -445,8 +446,8 @@ function MachineSetupBand({
             )}
           </div>
         ) : null}
-      </Card>
-    </div>
+      </section>
+    </AstryxCard>
   );
 }
 
@@ -629,20 +630,24 @@ function LibraryRepositoriesSection() {
           ))}
         </div>
         {mode === "clone" ? (
-          <input
+          <AstryxTextInput
+            label={cloneUrlLabel}
+            isLabelHidden
             value={url}
-            onChange={(event) => setUrl(event.target.value)}
+            onChange={setUrl}
             placeholder={cloneUrlLabel}
-            aria-label={cloneUrlLabel}
-            className={INPUT_CLS}
+            size="sm"
+            width="100%"
           />
         ) : null}
-        <input
+        <AstryxTextInput
+          label={mode === "open" ? openFolderLabel : newFolderLabel}
+          isLabelHidden
           value={path}
-          onChange={(event) => setPath(event.target.value)}
+          onChange={setPath}
           placeholder={mode === "open" ? openFolderLabel : newFolderLabel}
-          aria-label={mode === "open" ? openFolderLabel : newFolderLabel}
-          className={INPUT_CLS}
+          size="sm"
+          width="100%"
         />
         <Button
           onClick={() =>
@@ -1715,8 +1720,12 @@ function UpdateSection() {
 }
 
 function AboutSettingsSection({ version, note = "" }: { version: string; note?: string }) {
+  const versionIsCurrent = /\bcurrent\b/i.test(note);
   return (
-    <div data-dev-id="about.root" className="flex flex-wrap items-center gap-4">
+    <div
+      data-dev-id="about.root"
+      className="grid grid-cols-[44px_minmax(0,1fr)_auto] items-start gap-4 max-[900px]:grid-cols-[44px_minmax(0,1fr)]"
+    >
       {/* Keep the former rail target addressable so existing personal Design Studio documents can
           follow About into Settings instead of becoming invalid. It owns no product navigation. */}
       <div data-dev-id="rail.about" className="contents">
@@ -1738,20 +1747,27 @@ function AboutSettingsSection({ version, note = "" }: { version: string; note?: 
           <span className="font-medium"><Text id="modal.about.version">Version</Text></span>{" "}
           <span className="tnum font-mono">{version}</span>
         </p>
-        {note ? (
-          <p data-dev-id="about.stale" className="mt-1 text-xs leading-relaxed text-warn">
-            {note}
-          </p>
+        {note && !versionIsCurrent ? (
+          <AstryxBanner
+            data-dev-id="about.stale"
+            status="warning"
+            title={<Text id="settings.about.version-disagreement">Version Disagreement</Text>}
+            description={note}
+            container="section"
+            className="mt-2"
+          />
         ) : null}
       </div>
-      <div data-dev-id="about.links" className="flex flex-none flex-wrap items-center gap-3">
+      <div
+        data-dev-id="about.links"
+        className="flex flex-none flex-wrap items-center gap-3 max-[900px]:col-start-2"
+      >
         <AstryxLink
           href="https://www.linkedin.com/in/sadadhaidari"
           isExternalLink
           isStandalone
           className="gap-1.5 text-xs"
         >
-          <Icon id="brand.linkedin" className="h-3.5 w-3.5" />
           <Text id="modal.about.linkedin">LinkedIn</Text>
         </AstryxLink>
         <AstryxLink
@@ -1760,7 +1776,6 @@ function AboutSettingsSection({ version, note = "" }: { version: string; note?: 
           isStandalone
           className="gap-1.5 text-xs"
         >
-          <Icon id="brand.github" className="h-3.5 w-3.5" />
           <Text id="modal.about.github">GitHub</Text>
         </AstryxLink>
       </div>

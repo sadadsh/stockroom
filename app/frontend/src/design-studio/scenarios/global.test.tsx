@@ -67,6 +67,15 @@ describe("global Design Studio scenarios", () => {
     },
   );
 
+  it("keeps the stale About scenario internally coherent", async () => {
+    await mountScenario("global.about.stale");
+    const about = document.querySelector('[data-dev-id="about.root"]');
+    const updates = document.querySelector('[data-dev-id="settings.update"]');
+    expect(about).toHaveTextContent("Version Disagreement");
+    expect(about).toHaveTextContent("Restart Stockroom to apply the prepared release");
+    expect(updates).toHaveTextContent("Restart Required");
+  });
+
   it.each([
     ["global.onboarding.open", "onboarding.gate"],
     ["global.about.open", "about.root"],

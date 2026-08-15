@@ -301,17 +301,6 @@ export function SearchOverlay({ onClose, onOpenPart }: Props) {
     <div className="fixed inset-0 z-[100] flex flex-col bg-canvas" data-dev-id="search.root">
       <SearchQueryBar q={q} onQuery={setQ} onClose={onClose} />
 
-      <SearchSubBar
-        loading={searchResults.isLoading}
-        shown={shown}
-        chips={chips}
-        filters={filters}
-        setFilters={setFilters}
-        sort={sort}
-        setSort={setSort}
-        columns={columns}
-      />
-
       {/* main: the schema-driven facet rail + the results grid, border-split docked panes */}
       <div
         className="grid min-h-0 flex-1"
@@ -332,9 +321,16 @@ export function SearchOverlay({ onClose, onOpenPart }: Props) {
         />
 
         <div className="flex min-h-0 min-w-0 flex-col border-l border-line">
-          <RouteHeader>
-            <Text id="search.results.header">Results</Text>
-          </RouteHeader>
+          <SearchSubBar
+            loading={searchResults.isLoading}
+            shown={shown}
+            chips={chips}
+            filters={filters}
+            setFilters={setFilters}
+            sort={sort}
+            setSort={setSort}
+            columns={columns}
+          />
           <div
             ref={setResultsScrollElement}
             className="min-h-0 flex-1 overflow-auto"
@@ -471,48 +467,51 @@ function SearchSubBar({
   const removeChipName = useCopyFormatter("search.chip-remove-aria", "Remove {field} filter");
   return (
     <div
-      className="flex min-h-[34px] flex-none flex-wrap items-center gap-x-3 gap-y-1 border-b border-line bg-surface px-3.5 py-1"
+      className="flex min-h-[34px] flex-none flex-wrap items-center gap-x-3 gap-y-1 border-b border-line bg-surface px-3 py-1"
       data-dev-id="search.subbar"
     >
-      <span className="flex-none text-sm font-semibold text-t1" data-dev-id="search.result-count">
-        {loading ? "…" : shown}
-        <span className="ml-1.5 text-xs font-medium text-t3">
-          {shown === 1 ? (
-            <Text id="search.count-noun-one">result</Text>
-          ) : (
-            <Text id="search.count-noun-many">results</Text>
-          )}
+        <span className="flex-none text-xs font-semibold text-t2">
+          <Text id="search.results.header">Results</Text>
         </span>
-      </span>
-      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5" data-dev-id="search.chips">
-        {chips.map((chip) => (
-          <span
-            key={chip.id}
-            className="inline-flex items-center gap-1.5 rounded-control border border-line bg-raise2 py-0.5 pl-2 pr-1 text-xs font-semibold text-t1"
-          >
-            <span className="font-medium text-t3">{chip.keyLabel}:</span>
-            {chip.value}
+        <span className="flex-none text-xs font-semibold text-t1" data-dev-id="search.result-count">
+          {loading ? "…" : shown}
+          <span className="ml-1.5 text-xs font-medium text-t3">
+            {shown === 1 ? (
+              <Text id="search.count-noun-one">result</Text>
+            ) : (
+              <Text id="search.count-noun-many">results</Text>
+            )}
+          </span>
+        </span>
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5" data-dev-id="search.chips">
+          {chips.map((chip) => (
+            <span
+              key={chip.id}
+              className="inline-flex items-center gap-1.5 rounded-control border border-line bg-raise2 py-0.5 pl-2 pr-1 text-xs font-semibold text-t1"
+            >
+              <span className="font-medium text-t3">{chip.keyLabel}:</span>
+              {chip.value}
+              <button
+                type="button"
+                onClick={() => setFilters(chip.remove)}
+                aria-label={removeChipName({ field: chip.keyLabel })}
+                className="grid h-4 w-4 place-items-center rounded-control text-t3 hover:bg-line2 hover:text-t1"
+              >
+                <XSmall />
+              </button>
+            </span>
+          ))}
+          {hasAnyFilter(filters) ? (
             <button
               type="button"
-              onClick={() => setFilters(chip.remove)}
-              aria-label={removeChipName({ field: chip.keyLabel })}
-              className="grid h-4 w-4 place-items-center rounded-control text-t3 hover:bg-line2 hover:text-t1"
+              onClick={() => setFilters(clearAll(filters))}
+              className="text-xs font-semibold text-t2 hover:text-t1"
             >
-              <XSmall />
+              <Text id="search.clear-all">Clear All</Text>
             </button>
-          </span>
-        ))}
-        {hasAnyFilter(filters) ? (
-          <button
-            type="button"
-            onClick={() => setFilters(clearAll(filters))}
-            className="text-xs font-semibold text-t2 hover:text-t1"
-          >
-            <Text id="search.clear-all">Clear All</Text>
-          </button>
-        ) : null}
-      </div>
-      <SortControl sort={sort} setSort={setSort} columns={columns} />
+          ) : null}
+        </div>
+        <SortControl sort={sort} setSort={setSort} columns={columns} />
     </div>
   );
 }
@@ -692,7 +691,7 @@ function SortControl({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex h-[26px] items-center gap-1.5 rounded-control border border-line bg-raise px-2.5 text-xs font-medium text-t2 hover:bg-raise2 hover:text-t1"
+        className="flex h-[22px] items-center gap-1.5 rounded-control border border-line bg-raise px-2 text-xs font-medium text-t2 hover:bg-raise2 hover:text-t1"
         data-dev-id="search.sort"
       >
         <Text id="search.sort.label">Sort</Text>{" "}
@@ -767,7 +766,7 @@ function FacetRail({
   const classHeading = useText("search.rail.class-heading", "Class");
   return (
     <div className="flex min-h-0 flex-col" data-dev-id="search.rail">
-      <RouteHeader right={activeCount > 0 ? `${activeCount} active` : undefined}>
+      <RouteHeader className="h-[34px]" right={activeCount > 0 ? `${activeCount} active` : undefined}>
         <Text id="search.filters.header">Filters</Text>
       </RouteHeader>
       <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-2 pt-1">
