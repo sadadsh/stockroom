@@ -93,9 +93,12 @@ class MachineConfig:
     # discovery (PATH + standard locations) does not find. Empty = auto-discover.
     kicad_cli_override: str = ""
     sync_enabled: bool = True
-    # Set once the user completes first-run onboarding (picked / cloned / created a library,
-    # or chose to continue with the default). Drives the one-time welcome screen (M9b).
+    # Legacy compatibility flag. Guided Setup derives readiness from current GitHub/repository and
+    # selected-tool facts; this flag is set only after that aggregate reaches Ready.
     onboarded: bool = False
+    # Accepted resumable Guided Setup decisions and operation receipts. Current readiness is never
+    # trusted from this document: store.guided_setup revalidates the repository and tool on reads.
+    guided_setup: dict[str, object] = field(default_factory=dict)
     window: dict = field(default_factory=dict)
     # UI preferences (theme, rail_collapsed). MACHINE level, not profile level: they follow the
     # person, not the library. They live here rather than in the browser because the host binds an
