@@ -296,6 +296,37 @@ def test_guided_repository_create_switches_only_after_github_returns_identity(
     assert app_ctx.config.onboarded is False
 
 
+def test_connect_selected_kicad_runs_as_a_job_and_records_verified_receipt(
+    client, app_ctx, monkeypatch
+):
+    app_ctx.config.primary_eda = "kicad"
+    monkeypatch.setattr(app_ctx, "rewire_kicad", lambda: None)
+    monkeypatch.setattr(
+        "stockroom.api.routers.onboarding.guided_setup.current_tool_connection",
+        lambda _ctx: {
+            "tool": "kicad",
+            "installed": True,
+            "connected": True,
+            "restart_required": True,
+            "detail": "KiCad is connected.",
+        },
+    )
+
+    started = client.post("/api/onboarding/tool/connect")
+    assert started.status_code == 200
+    with client.stream(
+        "GET",
+        f"/api/jobs/{started.json()['job_id']}/events",
+    ) as stream:
+        events = "".join(stream.iter_text())
+
+    assert '"verified": true' in events
+    assert app_ctx.config.guided_setup["tool_connection"] == {
+        "tool": "kicad",
+        "receipt": {"verified": True, "restart_required": True},
+    }
+
+
 @pytest.mark.parametrize(
     "payload",
     [

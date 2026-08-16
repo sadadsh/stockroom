@@ -12,6 +12,7 @@ No em dashes anywhere (standing owner rule).
 
 from __future__ import annotations
 
+from dataclasses import asdict
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, Request
@@ -282,6 +283,52 @@ def onboarding_router(require_token) -> APIRouter:
                 repository={"owner": repository.owner, "name": repository.name},
             ),
         )
+
+    @r.post("/tool/connect")
+    def connect_tool(request: Request) -> dict:
+        """Run the selected tool's explicit setup operation as one resumable job."""
+
+        ctx = request.app.state.ctx
+        policy = PrimaryEdaPolicy(ctx.config)
+        primary = policy.primary_tool
+        if primary is None:
+            raise ValueError("choose KiCad or Altium before connecting the tool")
+
+        def work(progress):
+            receipt: dict[str, object]
+            if primary.key == "kicad":
+                progress({"stage": "wiring", "pct": 0.3, "message": "connecting KiCad"})
+                ctx.rewire_kicad()
+                connection = guided_setup.current_tool_connection(ctx)
+                if not connection["connected"]:
+                    raise ValueError(str(connection["detail"]))
+                receipt = {
+                    "verified": True,
+                    "restart_required": bool(connection["restart_required"]),
+                }
+            else:
+                progress({"stage": "setup", "pct": 0.2, "message": "connecting Altium"})
+                from stockroom.altium.convergence import converge_altium_library
+                from stockroom.api.routers.altium import _WRITE_LOCK
+
+                target = Path(ctx.profile.root) / "altium" / "Stockroom.DbLib"
+                with _WRITE_LOCK:
+                    result = converge_altium_library(target)
+                if not result.ok:
+                    raise ValueError(result.detail)
+                receipt = {"verified": True, "result": asdict(result)}
+            guided_setup.record_tool_connection(
+                ctx.config,
+                tool=primary.key,
+                receipt=receipt,
+            )
+            progress({"stage": "verified", "pct": 1.0, "message": f"{primary.label} connected"})
+            return {
+                "tool_connection": guided_setup.current_tool_connection(ctx),
+                "receipt": receipt,
+            }
+
+        return {"job_id": ctx.jobs.submit(work)}
 
     @r.post("/source-data")
     def source_data(request: Request, body: GuidedSourceDataBody) -> dict:

@@ -154,6 +154,21 @@ def _altium_connection(ctx, state: dict[str, object]) -> dict[str, object]:
     }
 
 
+def current_tool_connection(ctx) -> dict[str, object]:
+    policy = PrimaryEdaPolicy(ctx.config)
+    primary = policy.primary_tool
+    state = _state(ctx.config)
+    if primary is None:
+        return {
+            "tool": None,
+            "installed": False,
+            "connected": False,
+            "restart_required": False,
+            "detail": "Choose KiCad or Altium.",
+        }
+    return _kicad_connection(ctx) if primary.key == "kicad" else _altium_connection(ctx, state)
+
+
 def status(ctx, github: dict[str, object]) -> dict[str, object]:
     """Return the one authoritative Guided Setup document consumed by every setup surface."""
 
@@ -175,18 +190,7 @@ def status(ctx, github: dict[str, object]) -> dict[str, object]:
         and verified.get("writable") is True
     )
 
-    if primary is None:
-        tool = {
-            "tool": None,
-            "installed": False,
-            "connected": False,
-            "restart_required": False,
-            "detail": "Choose KiCad or Altium.",
-        }
-    elif primary.key == "kicad":
-        tool = _kicad_connection(ctx)
-    else:
-        tool = _altium_connection(ctx, state)
+    tool = current_tool_connection(ctx)
 
     source = state.get("source_data")
     source_decided = bool(isinstance(source, dict) and source.get("decided") is True)
