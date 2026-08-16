@@ -269,6 +269,7 @@ def test_create_personal_private_repository_uses_json_stdin() -> None:
         _result('{"login":"sadadsh","name":"Sadad"}'),
         _result("[[]]"),
         _result(returncode=1, stderr="not found"),
+        _result('{"name":"Stockroom-Catalog","html_url":"https://github.com/sadadsh/Stockroom-Catalog"}'),
         _result(_repo_json()),
     )
     cli = GitHubCli(executable=Path("gh.exe"), runner=runner)
@@ -293,6 +294,14 @@ def test_create_personal_private_repository_uses_json_stdin() -> None:
         "name": "Stockroom-Catalog",
         "private": True,
     }
+    assert runner.calls[4][0] == [
+        "gh.exe",
+        "repo",
+        "view",
+        "sadadsh/Stockroom-Catalog",
+        "--json",
+        "name,url,visibility,viewerPermission",
+    ]
 
 
 def test_create_organization_public_repository_uses_org_endpoint() -> None:
@@ -300,6 +309,7 @@ def test_create_organization_public_repository_uses_org_endpoint() -> None:
         _result('{"login":"sadadsh","name":null}'),
         _result('[[{"login":"acme"}]]'),
         _result(returncode=1),
+        _result('{"name":"Catalog","html_url":"https://github.com/acme/Catalog"}'),
         _result(_repo_json(owner="acme", name="Catalog", visibility="PUBLIC")),
     )
     cli = GitHubCli(executable=Path("gh.exe"), runner=runner)

@@ -1935,21 +1935,55 @@ internal sealed class WebViewWindowHost : IDisposable
             }
             else
             {
-                var dialog = new OpenFolderDialog
+                var boundaryText = purpose == "catalog"
+                    ? Environment.GetEnvironmentVariable("STOCKROOM_LIBRARY_ROOT_BOUNDARY")
+                    : null;
+                var boundary = string.IsNullOrWhiteSpace(boundaryText)
+                    ? null
+                    : Path.GetFullPath(boundaryText);
+                while (true)
                 {
-                    Multiselect = false,
-                    Title = purpose switch
+                    var dialog = new OpenFolderDialog
                     {
-                        "project" => "Choose A Project Folder",
-                        "catalog" => "Choose A Catalog Repository Folder",
-                        "kicad-config" => "Choose The KiCad Configuration Folder",
-                        _ => "Choose The STM32CubeMX Folder",
-                    },
-                };
-                if (dialog.ShowDialog(_window) == true
-                    && !string.IsNullOrWhiteSpace(dialog.FolderName))
-                {
-                    paths = [Path.GetFullPath(dialog.FolderName)];
+                        Multiselect = false,
+                        Title = purpose switch
+                        {
+                            "project" => "Choose A Project Folder",
+                            "catalog" => "Choose A Catalog Repository Folder",
+                            "kicad-config" => "Choose The KiCad Configuration Folder",
+                            _ => "Choose The STM32CubeMX Folder",
+                        },
+                    };
+                    if (boundary is not null)
+                    {
+                        dialog.InitialDirectory = boundary;
+                    }
+                    if (dialog.ShowDialog(_window) != true
+                        || string.IsNullOrWhiteSpace(dialog.FolderName))
+                    {
+                        break;
+                    }
+                    var selected = Path.GetFullPath(dialog.FolderName);
+                    if (boundary is not null)
+                    {
+                        var relative = Path.GetRelativePath(boundary, selected);
+                        var outside = Path.IsPathRooted(relative)
+                            || relative == ".."
+                            || relative.StartsWith($"..{Path.DirectorySeparatorChar}", StringComparison.Ordinal)
+                            || relative.StartsWith($"..{Path.AltDirectorySeparatorChar}", StringComparison.Ordinal);
+                        if (outside)
+                        {
+                            MessageBox.Show(
+                                _window,
+                                $"Choose a Catalog Repository folder inside:\n{boundary}",
+                                "Stockroom Development",
+                                MessageBoxButton.OK,
+                                MessageBoxImage.Information);
+                            continue;
+                        }
+                    }
+                    paths = [selected];
+                    break;
                 }
             }
         }

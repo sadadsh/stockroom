@@ -60,6 +60,9 @@ public sealed class NativeEntryContractTests
         Assert.Contains("\"kicad-config\"", source, StringComparison.Ordinal);
         Assert.Contains("Choose A Catalog Repository Folder", source, StringComparison.Ordinal);
         Assert.Contains("Choose The KiCad Configuration Folder", source, StringComparison.Ordinal);
+        Assert.Contains("STOCKROOM_LIBRARY_ROOT_BOUNDARY", source, StringComparison.Ordinal);
+        Assert.Contains("dialog.InitialDirectory = boundary", source, StringComparison.Ordinal);
+        Assert.Contains("Path.GetRelativePath(boundary, selected)", source, StringComparison.Ordinal);
     }
 
     [Fact]

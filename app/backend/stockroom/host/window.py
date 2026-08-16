@@ -757,11 +757,26 @@ class _HostApi:
         folder_dialog = getattr(dialog_types, "FOLDER", None)
         if folder_dialog is None:
             folder_dialog = webview.FOLDER_DIALOG
-        result = window.create_file_dialog(
-            folder_dialog,
-            allow_multiple=False,
+        boundary_text = (
+            os.environ.get("STOCKROOM_LIBRARY_ROOT_BOUNDARY", "").strip()
+            if purpose == "catalog"
+            else ""
         )
-        return list(result) if result else []
+        boundary = Path(boundary_text).resolve(strict=False) if boundary_text else None
+        while True:
+            dialog_options: dict[str, object] = {"allow_multiple": False}
+            if boundary is not None:
+                dialog_options["directory"] = str(boundary)
+            result = window.create_file_dialog(folder_dialog, **dialog_options)
+            if not result:
+                return []
+            selected = Path(result[0]).resolve(strict=False)
+            if boundary is None or selected == boundary or boundary in selected.parents:
+                return [str(selected)]
+            window.create_confirmation_dialog(
+                "Stockroom Development",
+                f"Choose a Catalog Repository folder inside:\n{boundary}",
+            )
 
     def pick_project_folder(self) -> list[str]:
         """Compatibility bridge for a renderer that predates the purpose-based picker."""

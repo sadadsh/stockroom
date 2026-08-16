@@ -57,6 +57,36 @@ def test_guided_setup_folder_purposes_use_the_native_dialog(
     win.create_file_dialog.assert_called_once_with(folder_kind, allow_multiple=False)
 
 
+def test_development_catalog_picker_starts_inside_and_rejects_outside_boundary(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+):
+    from stockroom.host import window as host_window
+
+    boundary = tmp_path / "Libraries"
+    boundary.mkdir()
+    outside = tmp_path / "Components"
+    outside.mkdir()
+    selected = boundary / "Catalog"
+    selected.mkdir()
+    monkeypatch.setenv("STOCKROOM_LIBRARY_ROOT_BOUNDARY", str(boundary))
+    folder_kind = object()
+    webview = _webview_module(folder_kind=folder_kind)
+    monkeypatch.setitem(sys.modules, "webview", webview)
+    win = MagicMock()
+    win.create_file_dialog.side_effect = [(str(outside),), (str(selected),)]
+    monkeypatch.setattr(host_window, "active_window", lambda: win)
+
+    assert host_window._HostApi().pick_folder("catalog") == [str(selected.resolve())]
+    assert win.create_file_dialog.call_count == 2
+    win.create_file_dialog.assert_called_with(
+        folder_kind,
+        directory=str(boundary.resolve()),
+        allow_multiple=False,
+    )
+    win.create_confirmation_dialog.assert_called_once()
+
+
 def test_project_folder_picker_supports_an_older_pywebview_and_cancel(
     monkeypatch: pytest.MonkeyPatch,
 ):

@@ -420,11 +420,11 @@ class GitHubCli:
                     )
                 return raced
             raise GitHubCliError("GitHub repository creation failed.")
-        repository = _repository(
-            self._json(result, error="GitHub repository response was invalid."),
-            expected_owner=valid_owner,
-        )
-        if repository.name.casefold() != valid_name.casefold():
+        # The REST create response does not contain GraphQL's viewerPermission field. Re-read the
+        # exact repository through the same strict `gh repo view` contract used by Connect Existing
+        # before claiming creation or write readiness.
+        repository = self._lookup_repository(valid_owner, valid_name)
+        if repository is None or repository.visibility != visibility:
             raise GitHubCliError("GitHub repository response was invalid.")
         return repository
 
