@@ -46,6 +46,17 @@ describe("pickHostFolder", () => {
     expect(pickFolder).toHaveBeenCalledWith("project");
   });
 
+  it.each([
+    ["catalog", "D:\\Catalogs\\Stockroom"],
+    ["kicad-config", "C:\\Users\\Engineer\\AppData\\Roaming\\kicad\\10.0"],
+  ] as const)("uses the managed bridge for the %s workflow", async (purpose, selected) => {
+    const pickFolder = vi.fn().mockResolvedValue([selected]);
+    exposeManaged({ pickFolder });
+
+    await expect(pickHostFolder(purpose)).resolves.toBe(selected);
+    expect(pickFolder).toHaveBeenCalledWith(purpose);
+  });
+
   it("supports the previous project-only host during a rolling handoff", async () => {
     const legacy = vi.fn().mockResolvedValue(["D:\\Hardware\\Controller"]);
     exposeApi({ pick_project_folder: legacy });

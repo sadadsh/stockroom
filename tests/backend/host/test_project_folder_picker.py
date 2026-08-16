@@ -38,6 +38,25 @@ def test_project_folder_picker_uses_the_current_folder_dialog_contract(
     win.create_file_dialog.assert_called_once_with(folder_kind, allow_multiple=False)
 
 
+@pytest.mark.parametrize("purpose", ["catalog", "kicad-config"])
+def test_guided_setup_folder_purposes_use_the_native_dialog(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    purpose: str,
+):
+    from stockroom.host import window as host_window
+
+    folder_kind = object()
+    webview = _webview_module(folder_kind=folder_kind)
+    monkeypatch.setitem(sys.modules, "webview", webview)
+    win = MagicMock()
+    win.create_file_dialog.return_value = (str(tmp_path),)
+    monkeypatch.setattr(host_window, "active_window", lambda: win)
+
+    assert host_window._HostApi().pick_folder(purpose) == [str(tmp_path)]
+    win.create_file_dialog.assert_called_once_with(folder_kind, allow_multiple=False)
+
+
 def test_project_folder_picker_supports_an_older_pywebview_and_cancel(
     monkeypatch: pytest.MonkeyPatch,
 ):

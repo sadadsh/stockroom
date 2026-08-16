@@ -1,6 +1,6 @@
 import { guardPreviewEffect } from "../design-studio/previewEffects";
 
-export type HostFolderPurpose = "project" | "stm-cubemx" | "kicad-config";
+export type HostFolderPurpose = "project" | "catalog" | "stm-cubemx" | "kicad-config";
 
 type HostFolderApi = {
   pick_folder?: (purpose: HostFolderPurpose) => Promise<string[]>;
@@ -19,7 +19,14 @@ export class HostFolderPickerUnavailableError extends Error {
 }
 
 export async function pickHostFolder(purpose: HostFolderPurpose): Promise<string> {
-  const label = purpose === "project" ? "project" : purpose === "stm-cubemx" ? "CubeMX" : "KiCad config";
+  const label =
+    purpose === "project"
+      ? "project"
+      : purpose === "catalog"
+        ? "Catalog Repository"
+        : purpose === "stm-cubemx"
+          ? "CubeMX"
+          : "KiCad config";
   guardPreviewEffect({
     kind: "host-folder-picker",
     action: `choosing a ${label} folder`,

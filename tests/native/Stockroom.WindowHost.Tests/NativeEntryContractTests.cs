@@ -48,6 +48,21 @@ public sealed class NativeEntryContractTests
     }
 
     [Fact]
+    public void GuidedSetupFolderPurposesCrossThePackagedHostBridge()
+    {
+        var source = File.ReadAllText(
+            Path.Combine(
+                AppContext.BaseDirectory,
+                "..", "..", "..", "..", "..", "..",
+                "app", "desktop", "Stockroom.WindowHost", "WebViewWindowHost.cs"));
+
+        Assert.Contains("\"catalog\"", source, StringComparison.Ordinal);
+        Assert.Contains("\"kicad-config\"", source, StringComparison.Ordinal);
+        Assert.Contains("Choose A Catalog Repository Folder", source, StringComparison.Ordinal);
+        Assert.Contains("Choose The KiCad Configuration Folder", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void NativeHostCarriesOneCoherentProductVersion()
     {
         Assert.Equal("0.7.0.0", LauncherDiagnostics.ProductVersion());

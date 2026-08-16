@@ -745,7 +745,7 @@ class _HostApi:
     def pick_folder(self, purpose: str) -> list[str]:
         """Pick one folder for an allowlisted Stockroom workflow."""
 
-        if purpose not in {"project", "stm-cubemx"}:
+        if purpose not in {"project", "catalog", "stm-cubemx", "kicad-config"}:
             return []
 
         import webview

@@ -1527,7 +1527,7 @@ internal sealed class WebViewWindowHost : IDisposable
                   });
                   window.__STOCKROOM_HOST__ = Object.freeze({
                     pickFolder(purpose) {
-                      if (purpose !== "project" && purpose !== "stm-cubemx") {
+                      if (!["project", "catalog", "stm-cubemx", "kicad-config"].includes(purpose)) {
                         return Promise.reject(new Error("Unknown Stockroom folder purpose."));
                       }
                       const id = crypto.randomUUID();
@@ -1903,7 +1903,7 @@ internal sealed class WebViewWindowHost : IDisposable
             if (!Guid.TryParseExact(id, "D", out _)
                 || (fileRequest
                     ? purpose != "cad-recovery"
-                    : purpose is not ("project" or "stm-cubemx")))
+                    : purpose is not ("project" or "catalog" or "stm-cubemx" or "kicad-config")))
             {
                 return;
             }
@@ -1938,9 +1938,13 @@ internal sealed class WebViewWindowHost : IDisposable
                 var dialog = new OpenFolderDialog
                 {
                     Multiselect = false,
-                    Title = purpose == "project"
-                        ? "Choose A Project Folder"
-                        : "Choose The STM32CubeMX Folder",
+                    Title = purpose switch
+                    {
+                        "project" => "Choose A Project Folder",
+                        "catalog" => "Choose A Catalog Repository Folder",
+                        "kicad-config" => "Choose The KiCad Configuration Folder",
+                        _ => "Choose The STM32CubeMX Folder",
+                    },
                 };
                 if (dialog.ShowDialog(_window) == true
                     && !string.IsNullOrWhiteSpace(dialog.FolderName))
