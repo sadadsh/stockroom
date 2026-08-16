@@ -28,8 +28,23 @@ def test_status_reports_current_library(client):
     assert d["libraries_root"].endswith("/libraries")  # the fixture library root
     assert d["profiles"] == ["Main"]
     assert d["under_git"] is True
-    assert set(d) >= {"onboarded", "first_run", "libraries_root", "profiles",
-                      "under_git", "default_dir"}
+    assert set(d) >= {
+        "onboarded",
+        "first_run",
+        "libraries_root",
+        "profiles",
+        "under_git",
+        "default_dir",
+        "primary_eda",
+        "primary_eda_pending",
+        "primary_eda_confirmation_required",
+        "recommended_primary_eda",
+        "primary_eda_requirements",
+        "retained_optional_eda",
+        "eda_tools",
+    }
+    assert d["primary_eda"] is None
+    assert d["primary_eda_confirmation_required"] is True
 
 
 def test_status_never_treats_an_application_repo_library_as_onboarded(
@@ -49,6 +64,7 @@ def test_status_requires_token(anon_client):
 
 
 def test_set_library_open_repoints_engine_live(client, app_ctx, tmp_path):
+    app_ctx.config.primary_eda = "kicad"
     other = _library(tmp_path / "other", "Bench")
     r = client.post("/api/onboarding/library", json={"mode": "open", "path": str(other)})
     assert r.status_code == 200
@@ -70,12 +86,27 @@ def test_set_library_open_repoints_engine_live(client, app_ctx, tmp_path):
     assert client.get("/api/onboarding").json()["libraries_root"] == other.as_posix()
 
 
-def test_set_library_create_makes_a_fresh_library(client, tmp_path):
+def test_set_library_create_makes_a_fresh_library(client, app_ctx, tmp_path):
+    app_ctx.config.primary_eda = "kicad"
     dest = tmp_path / "fresh"
     r = client.post("/api/onboarding/library", json={"mode": "create", "path": str(dest)})
     assert r.status_code == 200
     assert (dest / ".git").exists()
     assert r.json()["libraries_root"] == dest.as_posix()
+
+
+def test_set_library_rejects_unconfirmed_primary_eda(client, app_ctx, tmp_path):
+    app_ctx.config.primary_eda = ""
+    destination = tmp_path / "fresh"
+
+    response = client.post(
+        "/api/onboarding/library",
+        json={"mode": "create", "path": str(destination)},
+    )
+
+    assert response.status_code == 400
+    assert not destination.exists()
+    assert app_ctx.config.onboarded is False
 
 
 def test_set_library_open_missing_dir_is_400(client, tmp_path):
@@ -88,7 +119,32 @@ def test_set_library_unknown_mode_is_400(client):
     assert client.post("/api/onboarding/library", json={"mode": "teleport"}).status_code == 400
 
 
+def test_existing_onboarded_machine_without_primary_eda_requires_confirmation(
+    client, app_ctx
+):
+    app_ctx.config.onboarded = True
+    app_ctx.config.primary_eda = ""
+
+    status = client.get("/api/onboarding").json()
+
+    assert status["onboarded"] is True
+    assert status["first_run"] is False
+    assert status["primary_eda"] is None
+    assert status["primary_eda_confirmation_required"] is True
+    assert status["recommended_primary_eda"] in {"kicad", "altium", None}
+
+
+def test_completion_rejects_an_unconfirmed_primary_eda(client, app_ctx):
+    app_ctx.config.primary_eda = ""
+
+    response = client.post("/api/onboarding/complete")
+
+    assert response.status_code == 400
+    assert app_ctx.config.onboarded is False
+
+
 def test_complete_marks_onboarded(client, app_ctx):
+    app_ctx.config.primary_eda = "kicad"
     r = client.post("/api/onboarding/complete")
     assert r.status_code == 200 and r.json()["onboarded"] is True
     assert app_ctx.config.onboarded is True

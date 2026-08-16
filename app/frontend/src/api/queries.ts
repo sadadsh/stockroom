@@ -960,7 +960,12 @@ export function useUpdateSettings() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (patch: SettingsPatch) => api.updateSettings(patch),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["settings"] }),
+    onSuccess: async (_settings, patch) => {
+      await qc.invalidateQueries({ queryKey: ["settings"] });
+      if (patch.primary_eda !== undefined) {
+        await qc.invalidateQueries({ queryKey: ["onboarding"] });
+      }
+    },
   });
 }
 

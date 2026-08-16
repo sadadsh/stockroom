@@ -53,6 +53,12 @@ def config_dir() -> Path:
 @dataclass
 class MachineConfig:
     active_profile: str = "Stockroom"
+    # One explicitly confirmed per-machine CAD tool. Blank means the person has not confirmed a
+    # choice, including an existing installation migrating from the former implicit KiCad default.
+    # A requested switch stays pending while old-tool work drains; the old tool remains primary
+    # until PrimaryEdaPolicy activates the pending choice.
+    primary_eda: str = ""
+    primary_eda_pending: str = ""
     # Where the library repo lives on this machine (M9a). Blank on a fresh install, so the
     # app runs first-run onboarding (open / clone / create a library); persisted thereafter.
     # A frozen exe ships no library, so this is the ONLY thing that tells it where to look.

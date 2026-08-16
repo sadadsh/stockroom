@@ -26,6 +26,13 @@ import {
 export const COMPONENT_ID = "component-ti-lm358dr";
 
 export const ONBOARDING_READY: OnboardingStatus = {
+  primary_eda: "kicad",
+  primary_eda_pending: null,
+  primary_eda_confirmation_required: false,
+  recommended_primary_eda: "kicad",
+  primary_eda_requirements: ["symbol", "footprint", "model"],
+  retained_optional_eda: ["altium"],
+  eda_tools: [],
   onboarded: true,
   first_run: false,
   libraries_root: "C:\\Stockroom",

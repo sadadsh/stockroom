@@ -201,6 +201,11 @@ class EdaTool:
 
     key: str
     label: str
+    # Stable machine-readiness checks and the Settings anchor that owns their repair. Primary EDA
+    # policy reads these instead of branching on tool keys. A future tool declares its own setup
+    # contract here and immediately participates in onboarding and Settings DTOs.
+    setup_checks: tuple[str, ...] = ()
+    settings_target: str = ""
     # Per-user or machine-generated files. Committing these is what makes two peers
     # conflict on every pull, so they are ignored in any synced workspace.
     ignore: tuple[str, ...] = ()
@@ -303,6 +308,8 @@ class EdaTool:
 _KICAD = EdaTool(
     key="kicad",
     label="KiCad",
+    setup_checks=("installation", "catalog_wiring"),
+    settings_target="settings.kicad",
     # A stored PDF wins: KiCad resolves `${SR_LIB}/datasheets/<file>` through the path variable it
     # holds in its own config, so the local copy opens instantly and works with no network. The
     # vendor URL is the fallback for a part whose PDF was never fetched.
@@ -372,6 +379,8 @@ _KICAD = EdaTool(
 _ALTIUM = EdaTool(
     key="altium",
     label="Altium Designer",
+    setup_checks=("installation", "odbc", "catalog_connection"),
+    settings_target="settings.altium",
     ignore=(
         "History/",  # Altium's local revision history folder
         "__Previews/",

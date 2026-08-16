@@ -9,7 +9,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button, Card, Eyebrow } from "./primitives";
-import { useCompleteOnboarding, useSetLibrary } from "../api/queries";
+import { useCompleteOnboarding, useSetLibrary, useUpdateSettings } from "../api/queries";
 import { Text, useCopyFormatter, useText } from "../lib/copy";
 import { useToast } from "../lib/toast";
 import { ApiError } from "../api/client";
@@ -40,7 +40,8 @@ export function OnboardingGate({ status }: { status: OnboardingStatus }) {
   const { toast } = useToast();
   const setLibrary = useSetLibrary();
   const complete = useCompleteOnboarding();
-  const busy = setLibrary.isPending || complete.isPending;
+  const updateSettings = useUpdateSettings();
+  const busy = setLibrary.isPending || complete.isPending || updateSettings.isPending;
   // The two examples below are sample DATA, but they are still chrome a person reads, so the
   // wording is editable. The doubled backslashes are the literal characters the field shows.
   const openPathPlaceholder = useText(
@@ -63,6 +64,10 @@ export function OnboardingGate({ status }: { status: OnboardingStatus }) {
     "onboarding.toast-setup-failed",
     "Could not set up the components",
   );
+  const toolChoiceFailed = useText(
+    "onboarding.toast-tool-choice-failed",
+    "Could not save the CAD tool",
+  );
 
   useEffect(() => {
     if (scenarioMode === undefined) {
@@ -83,6 +88,86 @@ export function OnboardingGate({ status }: { status: OnboardingStatus }) {
     if (scenarioSetupError === undefined) return;
     return toast(scenarioSetupError, "err", undefined, null);
   }, [scenarioSetupError, toast]);
+
+  if (status.primary_eda_confirmation_required) {
+    return (
+      <div
+        data-dev-id="onboarding.gate"
+        className="flex min-h-screen items-center justify-center bg-app px-4 py-10"
+      >
+        <Card className="w-full max-w-lg p-6">
+          <Eyebrow>
+            <Text id="onboarding.eda.eyebrow">Main CAD Tool</Text>
+          </Eyebrow>
+          <h1 className="mt-1 text-xl font-semibold text-t1">
+            <Text id="onboarding.eda.title">Choose Your CAD Tool</Text>
+          </h1>
+          <p className="mt-2 text-sm text-t2">
+            <Text id="onboarding.eda.lede">
+              Stockroom configures one tool for routine use on this PC. You can switch later without
+              removing retained assets for the other tool.
+            </Text>
+          </p>
+          <div className="mt-5 space-y-2">
+            {status.eda_tools.map((tool) => {
+              const recommended = tool.key === status.recommended_primary_eda;
+              return (
+                <section
+                  key={tool.key}
+                  className="flex items-center gap-3 rounded-control border border-line bg-raise px-3 py-3"
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-baseline gap-2">
+                      <span className="text-sm font-medium text-t1">{tool.label}</span>
+                      {recommended ? (
+                        <span className="text-xs text-ok-text">
+                          <Text id="onboarding.eda.recommended">Recommended</Text>
+                        </span>
+                      ) : null}
+                    </div>
+                    <p className="mt-0.5 text-xs text-t3">
+                      {tool.detected ? (
+                        <Text id="onboarding.eda.detected">Detected On This PC</Text>
+                      ) : (
+                        <Text id="onboarding.eda.not-detected">Not Detected</Text>
+                      )}
+                    </p>
+                  </div>
+                  <Button
+                    onClick={() =>
+                      updateSettings.mutate(
+                        { primary_eda: tool.key },
+                        {
+                          onError: (error) =>
+                            toast(
+                              error instanceof ApiError ? error.message : toolChoiceFailed,
+                              "err",
+                            ),
+                        },
+                      )
+                    }
+                    disabled={busy}
+                  >
+                    <Text
+                      id={`onboarding.eda.use-${tool.key}`}
+                      values={{ tool: tool.label }}
+                    >
+                      {"Use {tool}"}
+                    </Text>
+                  </Button>
+                </section>
+              );
+            })}
+          </div>
+          <p className="mt-4 border-t border-line pt-3 text-xs text-t3">
+            <Text id="onboarding.eda.consent">
+              Detection is just a recommendation. Stockroom does not select a tool.
+            </Text>
+          </p>
+        </Card>
+      </div>
+    );
+  }
 
   // Each mode has its own required field: open needs a path, clone needs a URL; create
   // can fall back to the default location, so its path is optional.

@@ -27,6 +27,13 @@ vi.mock("../../api/client", async (importActual) => {
         incomplete: 0,
       }),
       getOnboarding: vi.fn().mockResolvedValue({
+        primary_eda: "kicad",
+        primary_eda_pending: null,
+        primary_eda_confirmation_required: false,
+        recommended_primary_eda: "kicad",
+        primary_eda_requirements: ["symbol", "footprint", "model"],
+        retained_optional_eda: ["altium"],
+        eda_tools: [],
         onboarded: true,
         first_run: false,
         libraries_root: "C:\\Stockroom",

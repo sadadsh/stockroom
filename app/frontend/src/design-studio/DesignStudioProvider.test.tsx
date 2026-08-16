@@ -71,6 +71,13 @@ function personalDocument(): DesignDocument {
 }
 
 const ONBOARDING_STATUS: OnboardingStatus = {
+  primary_eda: "kicad",
+  primary_eda_pending: null,
+  primary_eda_confirmation_required: false,
+  recommended_primary_eda: "kicad",
+  primary_eda_requirements: ["symbol", "footprint", "model"],
+  retained_optional_eda: ["altium"],
+  eda_tools: [],
   onboarded: false,
   first_run: true,
   libraries_root: "C:\\Stockroom",

@@ -1,6 +1,7 @@
 import type { FamiliesResponse, McusResponse, PinoutDTO, TargetDefinitionDTO } from "../../api/types";
 import type { ScenarioFixture } from "../scenario";
 import { createScenarioFixtureValidatorRegistry } from "../scenarioFixtureValidation";
+import { ONBOARDING_READY } from "./componentFixtures";
 import { projectFixtureValidators } from "./projectFixtures";
 
 export const STM_PART = "STM32F407V(E-G)Tx";
@@ -61,7 +62,7 @@ export function stmReadFixtures(options: StmFixtureOptions = {}): ScenarioFixtur
   const status = options.status ?? STM_STATUS;
   const mcus = options.mcus ?? STM_MCUS;
   return [
-    { method: "GET", path: "/api/onboarding", params: {}, body: undefined, response: { onboarded: true, first_run: false, libraries_root: "C:\\Stockroom", profiles: [], under_git: true, default_dir: "C:\\Stockroom", libraries: [] } },
+    { method: "GET", path: "/api/onboarding", params: {}, body: undefined, response: ONBOARDING_READY },
     { method: "GET", path: "/api/stm/status", params: {}, body: undefined, response: status },
     { method: "GET", path: "/api/stm/families", params: {}, body: undefined, response: STM_FAMILIES },
     { method: "GET", path: "/api/stm/mcus", params: {}, body: undefined, response: mcus, behavior: options.mcusBehavior },

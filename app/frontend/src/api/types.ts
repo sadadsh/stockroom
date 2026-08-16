@@ -649,9 +649,32 @@ export interface BulkReport {
   items: BulkReportItem[];
 }
 
+export interface EdaToolChoice {
+  key: string;
+  label: string;
+  detected: boolean;
+  selected: boolean;
+  pending: boolean;
+  setup_checks: string[];
+  settings_target: string;
+}
+
+// Shared by Settings and onboarding so recommendation, explicit consent, and switch-pending state
+// cannot drift into two answers. A null primary_eda is intentional: detection recommends but never
+// silently selects a tool.
+export interface PrimaryEdaInfo {
+  primary_eda: string | null;
+  primary_eda_pending: string | null;
+  primary_eda_confirmation_required: boolean;
+  recommended_primary_eda: string | null;
+  primary_eda_requirements: string[];
+  retained_optional_eda: string[];
+  eda_tools: EdaToolChoice[];
+}
+
 // GET/PATCH /api/settings -> the redacted per-machine settings surface. The raw
 // Mouser key never crosses the wire; only its presence and a last-4 hint do.
-export interface SettingsInfo {
+export interface SettingsInfo extends PrimaryEdaInfo {
   mouser_api_key_set: boolean;
   mouser_api_key_hint: string;
   github_token_set: boolean;
@@ -677,6 +700,7 @@ export interface SettingsInfo {
 
 // The PATCH /api/settings body: only the sent fields are touched.
 export interface SettingsPatch {
+  primary_eda?: string;
   mouser_api_key?: string;
   github_token?: string;
   digikey_client_id?: string;
@@ -700,7 +724,7 @@ export interface ActivateResponse {
 
 // GET /api/onboarding (M9b/M9c): where the library lives + whether the one-time
 // first-run welcome should show. A frozen exe ships no library, so this is the gate.
-export interface OnboardingStatus {
+export interface OnboardingStatus extends PrimaryEdaInfo {
   onboarded: boolean;
   first_run: boolean;
   libraries_root: string;

@@ -59,6 +59,13 @@ vi.mock("../api/client", async (importActual) => {
 const mockApi = vi.mocked(api);
 
 const BASE_SETTINGS: SettingsInfo = {
+  primary_eda: "kicad",
+  primary_eda_pending: null,
+  primary_eda_confirmation_required: false,
+  recommended_primary_eda: "kicad",
+  primary_eda_requirements: ["symbol", "footprint", "model"],
+  retained_optional_eda: ["altium"],
+  eda_tools: [],
   mouser_api_key_set: false,
   mouser_api_key_hint: "",
   github_token_set: false,
@@ -75,6 +82,13 @@ const BASE_SETTINGS: SettingsInfo = {
 };
 
 const BASE_ONBOARDING: OnboardingStatus = {
+  primary_eda: "kicad",
+  primary_eda_pending: null,
+  primary_eda_confirmation_required: false,
+  recommended_primary_eda: "kicad",
+  primary_eda_requirements: ["symbol", "footprint", "model"],
+  retained_optional_eda: ["altium"],
+  eda_tools: [],
   onboarded: true,
   first_run: false,
   libraries_root: "C:/Libraries/Main",

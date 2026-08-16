@@ -22,7 +22,10 @@ export default function App() {
   // gate ONLY when the backend positively reports first_run; while the status is loading,
   // errored, or already onboarded, render the app normally (no blank/flashing frame).
   const onboarding = useOnboarding();
-  if (onboarding.data?.first_run) {
+  if (
+    onboarding.data?.first_run ||
+    onboarding.data?.primary_eda_confirmation_required
+  ) {
     return <OnboardingGate status={onboarding.data} />;
   }
   return (

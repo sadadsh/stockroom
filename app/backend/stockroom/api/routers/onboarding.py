@@ -17,6 +17,10 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, Request
 
 from stockroom.api.schemas import SetLibraryBody
+from stockroom.eda.primary_policy import (
+    PrimaryEdaPolicy,
+    machine_detected_tool_keys,
+)
 from stockroom.store import onboarding as onb
 from stockroom.vcs.repo import GitError, GitRepo
 
@@ -48,6 +52,7 @@ def _status(ctx) -> dict:
             "under_git": (path / ".git").exists(),
         })
     return {
+        **PrimaryEdaPolicy(cfg).dto(machine_detected_tool_keys(ctx)),
         "onboarded": onboarded,
         "first_run": not onboarded,
         "libraries_root": root.as_posix(),
@@ -56,6 +61,11 @@ def _status(ctx) -> dict:
         "default_dir": onb.default_library_dir().as_posix(),
         "libraries": workspaces,
     }
+
+
+def _require_primary_eda(ctx) -> None:
+    if PrimaryEdaPolicy(ctx.config).primary_tool is None:
+        raise ValueError("choose KiCad or Altium before completing setup")
 
 
 def onboarding_router(require_token) -> APIRouter:
@@ -72,6 +82,7 @@ def onboarding_router(require_token) -> APIRouter:
         # same token keeps authenticating). A bad mode / missing dir / non-empty clone dest
         # is a ValueError -> 400; a clone GitError -> 503.
         ctx = request.app.state.ctx
+        _require_primary_eda(ctx)
         root = onb.set_library(
             ctx.config, body.mode,
             path=body.path or None, url=body.url or None, dest=body.dest or None,
@@ -83,6 +94,7 @@ def onboarding_router(require_token) -> APIRouter:
     def complete(request: Request) -> dict:
         # Dismiss the welcome screen keeping the current (e.g. auto-created default) library.
         ctx = request.app.state.ctx
+        _require_primary_eda(ctx)
         onb.complete_onboarding(ctx.config)
         return _status(ctx)
 

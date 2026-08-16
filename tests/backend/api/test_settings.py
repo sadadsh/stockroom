@@ -158,6 +158,37 @@ def test_patch_empty_github_token_clears_the_credential(client, app_ctx):
     assert got.returncode != 0  # the credential header was removed
 
 
+# -- Primary CAD Tool (per-machine, explicit, switchable) -----------------------
+
+
+def test_get_settings_requires_an_explicit_primary_eda_choice(client):
+    body = client.get("/api/settings").json()
+
+    assert body["primary_eda"] is None
+    assert body["primary_eda_pending"] is None
+    assert body["primary_eda_confirmation_required"] is True
+    assert body["recommended_primary_eda"] in {"kicad", "altium", None}
+    assert [tool["key"] for tool in body["eda_tools"]] == ["kicad", "altium"]
+
+
+def test_patch_primary_eda_applies_live_and_persists(client, app_ctx):
+    response = client.patch("/api/settings", json={"primary_eda": "altium"})
+
+    assert response.status_code == 200
+    assert response.json()["primary_eda"] == "altium"
+    assert response.json()["primary_eda_confirmation_required"] is False
+    assert app_ctx.config.primary_eda == "altium"
+    saved = json.loads((config_dir() / "config.json").read_text(encoding="utf-8"))
+    assert saved["primary_eda"] == "altium"
+
+
+def test_patch_primary_eda_rejects_an_unknown_tool(client, app_ctx):
+    response = client.patch("/api/settings", json={"primary_eda": "unknown"})
+
+    assert response.status_code == 400
+    assert app_ctx.config.primary_eda == ""
+
+
 # -- KiCad overrides + wiring status (not secrets: shown raw) -------------------
 
 

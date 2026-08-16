@@ -31,6 +31,36 @@ function isOptionalNumber(value: unknown): boolean {
   return value === undefined || typeof value === "number";
 }
 
+function isNullableString(value: unknown): boolean {
+  return value === null || typeof value === "string";
+}
+
+function isEdaToolChoice(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    typeof value.key === "string" &&
+    typeof value.label === "string" &&
+    typeof value.detected === "boolean" &&
+    typeof value.selected === "boolean" &&
+    typeof value.pending === "boolean" &&
+    isStringArray(value.setup_checks) &&
+    typeof value.settings_target === "string"
+  );
+}
+
+export function isPrimaryEdaInfo(value: Record<string, unknown>): boolean {
+  return (
+    isNullableString(value.primary_eda) &&
+    isNullableString(value.primary_eda_pending) &&
+    typeof value.primary_eda_confirmation_required === "boolean" &&
+    isNullableString(value.recommended_primary_eda) &&
+    isStringArray(value.primary_eda_requirements) &&
+    isStringArray(value.retained_optional_eda) &&
+    Array.isArray(value.eda_tools) &&
+    value.eda_tools.every(isEdaToolChoice)
+  );
+}
+
 function isOnboardingLibrary(value: unknown): boolean {
   return (
     isRecord(value) &&
@@ -46,6 +76,7 @@ function isOnboardingLibrary(value: unknown): boolean {
 function isOnboardingResponse(value: unknown): value is OnboardingStatus {
   return (
     isRecord(value) &&
+    isPrimaryEdaInfo(value) &&
     typeof value.onboarded === "boolean" &&
     typeof value.first_run === "boolean" &&
     typeof value.libraries_root === "string" &&

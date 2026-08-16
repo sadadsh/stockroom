@@ -12,6 +12,10 @@ from pathlib import Path
 
 from fastapi import APIRouter, Depends, Request
 
+from stockroom.eda.primary_policy import (
+    PrimaryEdaPolicy,
+    machine_detected_tool_keys,
+)
 from stockroom.kicad.common_json import read_env_var
 from stockroom.stm.source import normalize_cubemx_source
 
@@ -70,6 +74,7 @@ def _load_dev_creds(ctx) -> list[str]:
 def _settings_dto(ctx) -> dict:
     config = ctx.config
     return {
+        **PrimaryEdaPolicy(config).dto(machine_detected_tool_keys(ctx)),
         "mouser_api_key_set": bool(config.mouser_api_key),
         "mouser_api_key_hint": _hint(config.mouser_api_key),
         # The GitHub token is never revealed, only whether one is stored + its last 4 chars, so the
@@ -137,6 +142,12 @@ def settings_router(require_token) -> APIRouter:
         ctx = request.app.state.ctx
         # only touch a field the caller actually sent, so an empty PATCH is a
         # no-op and an unknown field is ignored rather than corrupting the config
+        if "primary_eda" in body:
+            # No Assets operation exists in this first contract slice, so a Settings choice has
+            # no running tool to drain and activates immediately. Assets will pass its captured
+            # active tool to the same policy when queued builds land.
+            PrimaryEdaPolicy(ctx.config).request_switch(str(body["primary_eda"] or ""))
+            ctx.config.save()
         if "mouser_api_key" in body:
             ctx.config.mouser_api_key = str(body["mouser_api_key"] or "")
             ctx.config.save()

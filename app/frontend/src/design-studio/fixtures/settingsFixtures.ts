@@ -1,9 +1,20 @@
+import type { OnboardingStatus, SettingsInfo } from "../../api/types";
 import type { ScenarioFixture } from "../scenario";
-import { createScenarioFixtureValidatorRegistry } from "../scenarioFixtureValidation";
+import {
+  createScenarioFixtureValidatorRegistry,
+  isPrimaryEdaInfo,
+} from "../scenarioFixtureValidation";
 import { COMPONENT_FACETS } from "./componentFixtures";
 import { stmFixtureValidators } from "./stmFixtures";
 
-export const SETTINGS_READY = {
+export const SETTINGS_READY: SettingsInfo = {
+  primary_eda: "kicad", primary_eda_pending: null,
+  primary_eda_confirmation_required: false, recommended_primary_eda: "kicad",
+  primary_eda_requirements: ["symbol", "footprint", "model"], retained_optional_eda: ["altium"],
+  eda_tools: [
+    { key: "kicad", label: "KiCad", detected: true, selected: true, pending: false, setup_checks: ["installation", "catalog_wiring"], settings_target: "settings.kicad" },
+    { key: "altium", label: "Altium Designer", detected: true, selected: false, pending: false, setup_checks: ["installation", "odbc", "catalog_connection"], settings_target: "settings.altium" },
+  ],
   mouser_api_key_set: true, mouser_api_key_hint: "1234", github_token_set: false,
   github_token_hint: "", digikey_client_id: "fixture-client", digikey_client_secret_set: true,
   digikey_client_secret_hint: "5678", kicad_config_override: "", kicad_cli_override: "",
@@ -12,7 +23,11 @@ export const SETTINGS_READY = {
   kicad_cli_available: true, kicad_wired: true, stm_cubemx_source: "C:\\ST\\STM32CubeMX",
 };
 
-export const SETTINGS_ONBOARDING = {
+export const SETTINGS_ONBOARDING: OnboardingStatus = {
+  primary_eda: "kicad", primary_eda_pending: null,
+  primary_eda_confirmation_required: false, recommended_primary_eda: "kicad",
+  primary_eda_requirements: ["symbol", "footprint", "model"], retained_optional_eda: ["altium"],
+  eda_tools: SETTINGS_READY.eda_tools,
   onboarded: true, first_run: false, libraries_root: "C:\\Stockroom", profiles: ["Main", "Archive"],
   under_git: true, default_dir: "C:\\Stockroom\\Main", libraries: [
     { name: "Main", path: "C:\\Stockroom\\Main", active: true, available: true, under_git: true },
@@ -94,7 +109,18 @@ const settingsPaths = [
   "/api/library/lfs", "/api/library/hygiene", "/api/library/cad", "/api/library/derivation",
 ];
 
+const settingsResponseValidators = Object.fromEntries(
+  settingsPaths.map((path) => [
+    `GET ${path}`,
+    (fixture: ScenarioFixture) => fixture.body === undefined && isRecord(fixture.response),
+  ]),
+);
+settingsResponseValidators["GET /api/settings"] = (fixture: ScenarioFixture) =>
+  fixture.body === undefined &&
+  isRecord(fixture.response) &&
+  isPrimaryEdaInfo(fixture.response);
+
 export const settingsFixtureValidators = createScenarioFixtureValidatorRegistry(
-  Object.fromEntries(settingsPaths.map((path) => [`GET ${path}`, (fixture: ScenarioFixture) => fixture.body === undefined && isRecord(fixture.response)])),
+  settingsResponseValidators,
   stmFixtureValidators,
 );

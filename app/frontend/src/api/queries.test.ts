@@ -12,10 +12,11 @@ import {
   useRestoreDeletedPart,
   useResumeWorkSession,
   useSetSpecs,
+  useUpdateSettings,
   useValidateProjectReview,
 } from "./queries";
 import { api } from "./client";
-import type { PartDetail } from "./types";
+import type { PartDetail, SettingsInfo } from "./types";
 import { makePartDetail } from "../test/partFixture";
 
 const PART_DETAIL: PartDetail = makePartDetail({
@@ -37,6 +38,46 @@ function invalidatedKeys(spy: { mock: { calls: unknown[][] } }): string[] {
 }
 
 afterEach(() => vi.restoreAllMocks());
+
+describe("Primary CAD Tool reconciliation", () => {
+  it("refreshes Settings and onboarding after an explicit choice", async () => {
+    const qc = new QueryClient();
+    const spy = vi.spyOn(qc, "invalidateQueries");
+    const settings: SettingsInfo = {
+      primary_eda: "altium",
+      primary_eda_pending: null,
+      primary_eda_confirmation_required: false,
+      recommended_primary_eda: "altium",
+      primary_eda_requirements: ["symbol", "footprint", "model"],
+      retained_optional_eda: ["kicad"],
+      eda_tools: [],
+      mouser_api_key_set: false,
+      mouser_api_key_hint: "",
+      github_token_set: false,
+      github_token_hint: "",
+      digikey_client_id: "",
+      digikey_client_secret_set: false,
+      digikey_client_secret_hint: "",
+      kicad_config_override: "",
+      kicad_cli_override: "",
+      kicad_config_dir: "",
+      kicad_cli_path: "",
+      kicad_cli_available: false,
+      kicad_wired: false,
+    };
+    vi.spyOn(api, "updateSettings").mockResolvedValue(settings);
+
+    const { result } = renderHook(() => useUpdateSettings(), {
+      wrapper: wrapperWith(qc),
+    });
+    result.current.mutate({ primary_eda: "altium" });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    expect(invalidatedKeys(spy)).toEqual(
+      expect.arrayContaining(["settings", "onboarding"]),
+    );
+  });
+});
 
 describe("profile + sync invalidation", () => {
   it("activating a profile refreshes the parts, facets, profiles and system views", async () => {

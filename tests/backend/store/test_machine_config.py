@@ -106,6 +106,34 @@ def test_libraries_root_defaults_blank_and_round_trips(tmp_path):
     assert MachineConfig.load(path).libraries_root == str(tmp_path / "lib")
 
 
+def test_primary_eda_defaults_unconfirmed_and_round_trips_switch_state(tmp_path):
+    config = MachineConfig()
+    assert config.primary_eda == ""
+    assert config.primary_eda_pending == ""
+
+    path = tmp_path / "config.json"
+    MachineConfig(
+        onboarded=True,
+        primary_eda="kicad",
+        primary_eda_pending="altium",
+    ).save(path)
+
+    loaded = MachineConfig.load(path)
+    assert loaded.primary_eda == "kicad"
+    assert loaded.primary_eda_pending == "altium"
+
+
+def test_existing_config_without_primary_eda_requires_migration_choice(tmp_path):
+    path = tmp_path / "config.json"
+    path.write_text(json.dumps({"onboarded": True}), encoding="utf-8")
+
+    loaded = MachineConfig.load(path)
+
+    assert loaded.onboarded is True
+    assert loaded.primary_eda == ""
+    assert loaded.primary_eda_pending == ""
+
+
 def test_legacy_plaintext_secrets_migrate_before_json_is_scrubbed(tmp_path):
     path = tmp_path / "legacy.json"
     path.write_text(

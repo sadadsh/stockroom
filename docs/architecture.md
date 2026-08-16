@@ -85,6 +85,7 @@ package only for a genuinely new domain.
 | `ingest/` | Turning verified provider/download evidence into staged, complete-to-add candidates. |
 | `enrich/` | Filling a part's data from distributor APIs + scraped pages (the pipeline, per-field sourcing, passives). |
 | `templates/` | Versioned tool-neutral shared-template contracts and explicit per-EDA bindings. Template declarations never substitute for native verification. |
+| `eda/` | Registry-owned CAD-tool capabilities plus `PrimaryEdaPolicy`, the sole interpreter of the confirmed per-machine tool, recommendation, requirements, Settings promotion, retained other-tool assets, and switch-pending state. |
 | `scrape/` | Fetching + extracting distributor/vendor pages (`extract/sites/` is one module per site). |
 | `projects/` | Project-level analysis: BOM, fill, checks, buildability. |
 | `altium/` | The Altium DbLib emitter + status. |

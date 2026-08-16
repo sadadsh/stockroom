@@ -95,6 +95,69 @@ function ScenarioProbe({ expose }: { expose: (activate: (id: string) => Promise<
 }
 
 describe("App shell", () => {
+  it("gates an existing installation until Primary CAD Tool confirmation", async () => {
+    const onboarding = vi.spyOn(api, "getOnboarding").mockResolvedValue({
+      primary_eda: null,
+      primary_eda_pending: null,
+      primary_eda_confirmation_required: true,
+      recommended_primary_eda: "kicad",
+      primary_eda_requirements: [],
+      retained_optional_eda: ["kicad", "altium"],
+      eda_tools: [
+        {
+          key: "kicad",
+          label: "KiCad",
+          detected: true,
+          selected: false,
+          pending: false,
+          setup_checks: ["installation", "catalog_wiring"],
+          settings_target: "settings.kicad",
+        },
+        {
+          key: "altium",
+          label: "Altium Designer",
+          detected: false,
+          selected: false,
+          pending: false,
+          setup_checks: ["installation", "odbc", "catalog_connection"],
+          settings_target: "settings.altium",
+        },
+      ],
+      onboarded: true,
+      first_run: false,
+      libraries_root: "C:/Stockroom",
+      profiles: ["Stockroom"],
+      under_git: true,
+      default_dir: "C:/Stockroom",
+      libraries: [],
+    });
+    try {
+      const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+      render(
+        <QueryClientProvider client={qc}>
+          <ThemeProvider>
+            <ToastProvider>
+              <RouterProvider initial="components">
+                <CaptureProvider>
+                  <AddPartProvider>
+                    <App />
+                  </AddPartProvider>
+                </CaptureProvider>
+              </RouterProvider>
+            </ToastProvider>
+          </ThemeProvider>
+        </QueryClientProvider>,
+      );
+
+      expect(
+        await screen.findByRole("heading", { name: "Choose Your CAD Tool" }),
+      ).toBeInTheDocument();
+      expect(screen.queryByText("Stockroom", { selector: "span" })).not.toBeInTheDocument();
+    } finally {
+      onboarding.mockRestore();
+    }
+  });
+
   it("renders the rail and the Components page for the default route", async () => {
     mockApi.listParts.mockResolvedValue({ parts: [SUMMARY], count: 1 });
     mockApi.facets.mockResolvedValue({
@@ -257,7 +320,18 @@ describe("App shell", () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       status: 200,
-      json: async () => ({ onboarded: true, first_run: false, libraries: [] }),
+      json: async () => ({
+        primary_eda: "kicad",
+        primary_eda_pending: null,
+        primary_eda_confirmation_required: false,
+        recommended_primary_eda: "kicad",
+        primary_eda_requirements: ["symbol", "footprint", "model"],
+        retained_optional_eda: ["altium"],
+        eda_tools: [],
+        onboarded: true,
+        first_run: false,
+        libraries: [],
+      }),
     });
     vi.stubGlobal("fetch", fetchMock);
     let activateScenario: ((id: string) => Promise<void>) | undefined;

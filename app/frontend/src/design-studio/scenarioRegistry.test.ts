@@ -8,7 +8,10 @@ import { projectScenarios } from "./scenarios/projects";
 import { providerScenarios } from "./scenarios/provider";
 import { stmScenarios } from "./scenarios/stm";
 import { settingsScenarios } from "./scenarios/settings";
-import { settingsFixtureValidators } from "./fixtures/settingsFixtures";
+import {
+  SETTINGS_READY,
+  settingsFixtureValidators,
+} from "./fixtures/settingsFixtures";
 import { defineScenarioStateContracts } from "./scenarioStateContracts";
 
 function scenario(id: string): DesignScenario {
@@ -25,6 +28,13 @@ function scenario(id: string): DesignScenario {
         params: {},
         body: undefined,
         response: {
+          primary_eda: "kicad",
+          primary_eda_pending: null,
+          primary_eda_confirmation_required: false,
+          recommended_primary_eda: "kicad",
+          primary_eda_requirements: ["symbol", "footprint", "model"],
+          retained_optional_eda: ["altium"],
+          eda_tools: [],
           onboarded: true,
           first_run: false,
           libraries_root: "C:\\Stockroom",
@@ -133,6 +143,32 @@ describe("registerScenarios", () => {
 
     expect(registerScenarios([invalid]).issues).toContainEqual(
       expect.objectContaining({ code: "invalid-fixture-shape" }),
+    );
+  });
+
+  it("rejects a Settings fixture missing the Primary CAD Tool contract", () => {
+    const { primary_eda: _primaryEda, ...missingPrimaryEda } = SETTINGS_READY;
+    const invalid = {
+      ...scenario("settings.invalid-primary-eda"),
+      route: "settings",
+      fixtures: [
+        {
+          method: "GET",
+          path: "/api/settings",
+          params: {},
+          body: undefined,
+          response: missingPrimaryEda,
+        },
+      ],
+    } as DesignScenario;
+
+    expect(
+      registerScenarios([invalid], settingsFixtureValidators).issues,
+    ).toContainEqual(
+      expect.objectContaining({
+        code: "invalid-fixture-shape",
+        scenarioId: invalid.id,
+      }),
     );
   });
 
