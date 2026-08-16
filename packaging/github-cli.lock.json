@@ -1,0 +1,7 @@
+{
+  "schema": "stockroom-github-cli-lock/1",
+  "version": "2.95.0",
+  "archive": "gh_2.95.0_windows_amd64.zip",
+  "url": "https://github.com/cli/cli/releases/download/v2.95.0/gh_2.95.0_windows_amd64.zip",
+  "sha256": "19a7154161ada9cfaa9e57edb752ecc679b75c391a62e4f7b586eea1df30b5bb"
+}

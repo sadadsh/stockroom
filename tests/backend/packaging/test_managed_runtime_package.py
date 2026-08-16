@@ -41,6 +41,7 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 LAUNCHER = REPOSITORY_ROOT / "packaging" / "stockroom_launcher.py"
 SPEC = REPOSITORY_ROOT / "packaging" / "stockroom.spec"
 BUILD_SCRIPT = REPOSITORY_ROOT / "packaging" / "Build-Windows-Package.ps1"
+GITHUB_CLI_LOCK = REPOSITORY_ROOT / "packaging" / "github-cli.lock.json"
 WORKER_PROBE = REPOSITORY_ROOT / "packaging" / "package_worker_probe.py"
 _SID = "S-1-5-21-111111111-222222222-333333333-1001"
 
@@ -67,12 +68,20 @@ def _cad_converter_publish(root: Path) -> Path:
     return root
 
 
+def _github_cli_publish(root: Path) -> Path:
+    (root / "bin").mkdir(parents=True, exist_ok=True)
+    (root / "bin" / "gh.exe").write_bytes(b"MZgithub-cli")
+    (root / "LICENSE").write_text("MIT License\n", encoding="utf-8")
+    return root
+
+
 def _build_fixture(executable: Path, bundle: Path) -> dict[str, str]:
     return build_release_bundle(
         mode="Fixture",
         executable=executable,
         window_host_root=_window_host_publish(executable.parent / "Window Host Publish"),
         cad_converter_root=_cad_converter_publish(executable.parent / "CAD Converter Publish"),
+        github_cli_root=_github_cli_publish(executable.parent / "GitHub CLI Publish"),
         bundle_root=bundle,
         version="1.2.3.4",
         minimum_host_version="1.0.0.0",
@@ -115,6 +124,7 @@ def test_fixture_release_bundle_is_complete_valid_and_reproducible(
         "backend",
         "cad-converter",
         "cad-converter-runtime",
+        "github-cli",
         "license",
         "notice",
         "sbom",
@@ -132,6 +142,10 @@ def test_fixture_release_bundle_is_complete_valid_and_reproducible(
     assert first_evidence["cad_converter_sha256"] == hashlib.sha256(
         b"MZcad-converter"
     ).hexdigest()
+    assert next(member for member in manifest.members if member.kind == "github-cli").path == (
+        "Tools/gh.exe"
+    )
+    assert first_evidence["github_cli_sha256"] == hashlib.sha256(b"MZgithub-cli").hexdigest()
     support = first / "Initial Release" / "release-1.2.3.4" / "Support"
     notices = (support / "Third Party Notices.txt").read_text(encoding="utf-8")
     assert "OpenMcdf 3.1.4" in notices
@@ -142,6 +156,10 @@ def test_fixture_release_bundle_is_complete_valid_and_reproducible(
     assert "ASTRYX Core 0.4.1" in notices
     assert "StyleX 0.19.0" in notices
     assert "Lucide React 1.18.0" in notices
+    assert "GitHub CLI 2.95.0" in notices
+    assert (support / "Licenses" / "GitHub CLI MIT.txt").read_text(
+        encoding="utf-8"
+    ).startswith("MIT License")
     assert (support / "Licenses" / "AltiumSharp Apache-2.0.txt").read_text(
         encoding="utf-8"
     ).startswith("Apache License")
@@ -159,6 +177,7 @@ def test_fixture_release_bundle_is_complete_valid_and_reproducible(
     } >= {
         "Support/Licenses/Apache-2.0.txt",
         "Support/Licenses/Font Awesome Free License.txt",
+        "Support/Licenses/GitHub CLI MIT.txt",
     }
 
 
@@ -174,6 +193,7 @@ def test_production_bundle_requires_a_valid_offline_root(tmp_path: Path) -> None
             executable=executable,
             window_host_root=_window_host_publish(tmp_path / "Window Host Publish"),
             cad_converter_root=_cad_converter_publish(tmp_path / "CAD Converter Publish"),
+            github_cli_root=_github_cli_publish(tmp_path / "GitHub CLI Publish"),
             bundle_root=tmp_path / "Production",
             version="1.2.3.4",
             minimum_host_version="1.0.0.0",
@@ -205,6 +225,7 @@ def test_release_bundle_rejects_an_invalid_host_abi_floor(
             executable=executable,
             window_host_root=_window_host_publish(tmp_path / "Window Host Publish"),
             cad_converter_root=_cad_converter_publish(tmp_path / "CAD Converter Publish"),
+            github_cli_root=_github_cli_publish(tmp_path / "GitHub CLI Publish"),
             bundle_root=tmp_path / "Update",
             version="1.2.3.4",
             minimum_host_version=minimum_host_version,
@@ -226,6 +247,7 @@ def test_fixture_release_bundle_authors_explicit_predecessor_chain(
         executable=executable,
         window_host_root=_window_host_publish(tmp_path / "Window Host Publish"),
         cad_converter_root=_cad_converter_publish(tmp_path / "CAD Converter Publish"),
+        github_cli_root=_github_cli_publish(tmp_path / "GitHub CLI Publish"),
         bundle_root=bundle,
         version="2.0.0.0",
         minimum_host_version="1.0.0.0",
@@ -368,6 +390,7 @@ def test_production_feed_requires_and_uses_root_authorized_online_keys(
         executable=executable,
         window_host_root=_window_host_publish(tmp_path / "Window Host Publish"),
         cad_converter_root=_cad_converter_publish(tmp_path / "CAD Converter Publish"),
+        github_cli_root=_github_cli_publish(tmp_path / "GitHub CLI Publish"),
         bundle_root=bundle,
         version="7.8.9.10",
         minimum_host_version="7.0.0.0",
@@ -561,6 +584,7 @@ def test_persisted_v1_release_activates_packaged_v2_in_shared_data_root(
         executable=executable,
         window_host_root=_window_host_publish(tmp_path / "Window Host Publish"),
         cad_converter_root=_cad_converter_publish(tmp_path / "CAD Converter Publish"),
+        github_cli_root=_github_cli_publish(tmp_path / "GitHub CLI Publish"),
         bundle_root=v1_bundle,
         version="1.0.0.0",
         minimum_host_version="1.0.0.0",
@@ -574,6 +598,7 @@ def test_persisted_v1_release_activates_packaged_v2_in_shared_data_root(
         executable=executable,
         window_host_root=_window_host_publish(tmp_path / "Window Host Publish"),
         cad_converter_root=_cad_converter_publish(tmp_path / "CAD Converter Publish"),
+        github_cli_root=_github_cli_publish(tmp_path / "GitHub CLI Publish"),
         bundle_root=v2_bundle,
         version="2.0.0.0",
         minimum_host_version="1.0.0.0",
@@ -694,9 +719,27 @@ def test_frozen_worker_and_native_host_are_the_managed_runtime_contract() -> Non
     assert "STOCKROOM_UV_EXECUTABLE" not in spec
     assert "stockroom-build-identity.json" in build
     assert '"--minimum-host-version", $MinimumHostVersion' in build
+    assert '"--github-cli-root", $GitHubCliRoot' in build
+    assert "Get-PinnedGitHubCli" in build
+    assert "downloaded GitHub CLI archive does not match its pinned SHA-256" in build
     assert "minimum_host_version = $MinimumHostVersion" in build
     assert "update_check_interval_seconds" in build
     assert '"--native-host-probe"' not in launcher
+
+
+def test_github_cli_lock_pins_the_official_windows_archive() -> None:
+    lock = json.loads(GITHUB_CLI_LOCK.read_text(encoding="utf-8"))
+
+    assert lock == {
+        "schema": "stockroom-github-cli-lock/1",
+        "version": "2.95.0",
+        "archive": "gh_2.95.0_windows_amd64.zip",
+        "url": (
+            "https://github.com/cli/cli/releases/download/v2.95.0/"
+            "gh_2.95.0_windows_amd64.zip"
+        ),
+        "sha256": "19a7154161ada9cfaa9e57edb752ecc679b75c391a62e4f7b586eea1df30b5bb",
+    }
 
 
 def test_frozen_port_worker_failure_is_noninteractive(

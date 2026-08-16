@@ -25,6 +25,7 @@ from stockroom.service import ServiceMode
 from stockroom.store.machine_config import MachineConfig
 from stockroom.store.onboarding import bootstrap_library
 from stockroom.update import AcceptedRelease, ReleaseHealthStage, verify_local_release_set
+from stockroom.vcs.github_cli import GitHubCli, GitHubCliError
 
 
 class PackagedWorkerProbeError(RuntimeError):
@@ -108,6 +109,24 @@ def run_packaged_worker_probe(
         raise PackagedWorkerProbeError(
             "release manifest binds the native CAD converter at an unexpected path"
         )
+    github_cli_members = [
+        candidate.members[member.path]
+        for member in candidate.manifest.members
+        if member.kind == "github-cli"
+    ]
+    if github_cli_members != [release_directory / "Tools" / "gh.exe"]:
+        raise PackagedWorkerProbeError(
+            "release manifest does not bind exactly one GitHub CLI at Tools/gh.exe"
+        )
+    github_cli_executable = github_cli_members[0]
+    try:
+        github_cli_version = GitHubCli(executable=github_cli_executable).version()
+    except GitHubCliError as exc:
+        raise PackagedWorkerProbeError("packaged GitHub CLI version probe failed") from exc
+    if github_cli_version != "2.95.0":
+        raise PackagedWorkerProbeError("packaged GitHub CLI version is not pinned")
+    github_cli_sha256 = hashlib.sha256(github_cli_executable.read_bytes()).hexdigest()
+
     probe_lia = Path(__file__).with_name("Cad Converter Probe.lia").resolve(strict=True)
     with tempfile.TemporaryDirectory(prefix="Stockroom Packaged CAD Probe ") as temporary:
         converted = convert_pcad_ascii(
@@ -271,6 +290,8 @@ def run_packaged_worker_probe(
                 "candidate_generation": adopted.candidate_service_generation,
                 "candidate_release_id": release_id,
                 "exact_cad_converter_sha256": converter_sha256,
+                "exact_github_cli_sha256": github_cli_sha256,
+                "github_cli_version": github_cli_version,
                 "exact_worker_sha256": hashlib.sha256(
                     worker_executable.read_bytes()
                 ).hexdigest(),

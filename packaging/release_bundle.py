@@ -136,6 +136,8 @@ def _spdx_document(
     executable_sha1: str,
     executable_sha256: str,
     cad_converter_files: Sequence[tuple[str, str, str]],
+    github_cli_sha1: str,
+    github_cli_sha256: str,
     release_id: str,
     source_revision: str,
     source_date_epoch: int,
@@ -192,6 +194,15 @@ def _spdx_document(
                         start=1,
                     )
                 ],
+                {
+                    "SPDXID": "SPDXRef-GitHubCli",
+                    "checksums": [
+                        {"algorithm": "SHA1", "checksumValue": github_cli_sha1},
+                        {"algorithm": "SHA256", "checksumValue": github_cli_sha256},
+                    ],
+                    "copyrightText": "Copyright GitHub, Inc. and contributors",
+                    "fileName": "./Tools/gh.exe",
+                },
             ],
             "name": f"Stockroom {release_id}",
             "packages": [
@@ -239,6 +250,14 @@ def _spdx_document(
                     "name": "System.Text.Encoding.CodePages",
                     "versionInfo": "9.0.0",
                 },
+                {
+                    "SPDXID": "SPDXRef-Package-GitHubCli",
+                    "downloadLocation": "https://github.com/cli/cli",
+                    "licenseConcluded": "MIT",
+                    "licenseDeclared": "MIT",
+                    "name": "GitHub CLI",
+                    "versionInfo": "2.95.0",
+                },
             ],
             "relationships": [
                 {
@@ -259,6 +278,16 @@ def _spdx_document(
                     }
                     for index in range(1, len(cad_converter_files) + 1)
                 ],
+                {
+                    "relatedSpdxElement": "SPDXRef-GitHubCli",
+                    "relationshipType": "CONTAINS",
+                    "spdxElementId": "SPDXRef-Package-Stockroom",
+                },
+                {
+                    "relatedSpdxElement": "SPDXRef-Package-GitHubCli",
+                    "relationshipType": "DEPENDS_ON",
+                    "spdxElementId": "SPDXRef-Package-Stockroom",
+                },
                 *[
                     {
                         "relatedSpdxElement": dependency,
@@ -284,6 +313,7 @@ def build_release_bundle(
     executable: Path,
     window_host_root: Path,
     cad_converter_root: Path,
+    github_cli_root: Path,
     bundle_root: Path,
     version: str,
     minimum_host_version: str,
@@ -349,6 +379,11 @@ def build_release_bundle(
         )
     if not _CAD_THIRD_PARTY_NOTICE.is_file() or not _ALTIUMSHARP_LICENSE.is_file():
         raise ReleaseBundleError("native CAD converter licensing inputs are unavailable")
+    github_cli_root = Path(github_cli_root).resolve(strict=True)
+    github_cli_executable = github_cli_root / "bin" / "gh.exe"
+    github_cli_license = github_cli_root / "LICENSE"
+    if not github_cli_executable.is_file() or not github_cli_license.is_file():
+        raise ReleaseBundleError("pinned GitHub CLI payload is incomplete")
     if source_date_epoch < 315532800 or source_date_epoch > 2147483647:
         raise ReleaseBundleError("source date epoch is outside the reproducible range")
     if type(protocol_version) is not int or protocol_version <= 0:
@@ -444,11 +479,29 @@ def build_release_bundle(
         )
         cad_converter_spdx.append((relative.as_posix(), sha1, sha256))
 
+    github_cli_bytes = github_cli_executable.read_bytes()
+    github_cli_sha1 = hashlib.sha1(  # noqa: S324 - required by SPDX 2.3
+        github_cli_bytes,
+        usedforsecurity=False,
+    ).hexdigest()
+    github_cli_sha256 = _sha256(github_cli_bytes)
+    github_cli_path = release_root / "Tools" / "gh.exe"
+    github_cli_path.parent.mkdir(parents=True, exist_ok=True)
+    github_cli_path.write_bytes(github_cli_bytes)
+    github_cli_member = {
+        "kind": "github-cli",
+        "path": "Tools/gh.exe",
+        "sha256": github_cli_sha256,
+        "size": len(github_cli_bytes),
+    }
+
     sbom_bytes = _spdx_document(
         executable_name=backend_name,
         executable_sha1=backend_sha1,
         executable_sha256=backend_sha256,
         cad_converter_files=cad_converter_spdx,
+        github_cli_sha1=github_cli_sha1,
+        github_cli_sha256=github_cli_sha256,
         release_id=release_id,
         source_revision=source_revision,
         source_date_epoch=source_date_epoch,
@@ -470,11 +523,15 @@ def build_release_bundle(
         release_root / "Support" / "Licenses" / "Font Awesome Free License.txt"
     )
     font_awesome_license_path.write_bytes(font_awesome_license_bytes)
+    github_cli_license_bytes = github_cli_license.read_bytes()
+    github_cli_license_path = release_root / "Support" / "Licenses" / "GitHub CLI MIT.txt"
+    github_cli_license_path.write_bytes(github_cli_license_bytes)
     # MSIX/App Installer own the native WPF host. TUF release sets own only
     # rolling worker payloads, tools, and support evidence; downloading another
     # self-contained WPF runtime could not update the already-running host.
     members = [
         *cad_converter_members,
+        github_cli_member,
         *backend_members,
         {
             "kind": "sbom",
@@ -505,6 +562,12 @@ def build_release_bundle(
             "path": "Support/Licenses/Font Awesome Free License.txt",
             "sha256": _sha256(font_awesome_license_bytes),
             "size": len(font_awesome_license_bytes),
+        },
+        {
+            "kind": "license",
+            "path": "Support/Licenses/GitHub CLI MIT.txt",
+            "sha256": _sha256(github_cli_license_bytes),
+            "size": len(github_cli_license_bytes),
         },
     ]
     manifest_document = {
@@ -563,6 +626,7 @@ def build_release_bundle(
             for member in cad_converter_members
             if member["kind"] == "cad-converter"
         ),
+        "github_cli_sha256": github_cli_sha256,
         "compatible_from_release_ids": ",".join(compatible_predecessors),
         "manifest_sha256": manifest_sha256,
         "minimum_host_version": host_version_floor,
@@ -579,6 +643,7 @@ def main() -> int:
     parser.add_argument("--executable", required=True, type=Path)
     parser.add_argument("--window-host-root", required=True, type=Path)
     parser.add_argument("--cad-converter-root", required=True, type=Path)
+    parser.add_argument("--github-cli-root", required=True, type=Path)
     parser.add_argument("--bundle-root", required=True, type=Path)
     parser.add_argument("--version", required=True)
     parser.add_argument("--minimum-host-version", required=True)
@@ -602,6 +667,7 @@ def main() -> int:
         executable=args.executable,
         window_host_root=args.window_host_root,
         cad_converter_root=args.cad_converter_root,
+        github_cli_root=args.github_cli_root,
         bundle_root=args.bundle_root,
         version=args.version,
         minimum_host_version=args.minimum_host_version,

@@ -33,6 +33,7 @@ $ContractModule = "packaging.package_contract"
 $ReleaseBundleTool = Join-Path $PackagingRoot "release_bundle.py"
 $ReleaseFeedModule = "packaging.release_feed"
 $WorkerProbeTool = Join-Path $PackagingRoot "package_worker_probe.py"
+$GitHubCliLockPath = Join-Path $PackagingRoot "github-cli.lock.json"
 $SpecPath = Join-Path $PackagingRoot "stockroom.spec"
 $SourceIcon = Join-Path $RepositoryRoot "app\backend\stockroom\host\assets\stockroom.ico"
 $WindowHostProject = Join-Path $RepositoryRoot "app\desktop\Stockroom.WindowHost\Stockroom.WindowHost.csproj"
@@ -365,6 +366,43 @@ Invoke-Checked -FilePath $UvPath -Arguments @(
 
 $WorkRoot = Initialize-OutputDirectory -Path (Join-Path $OutputRoot "Work")
 $ArtifactsRoot = Initialize-OutputDirectory -Path (Join-Path $OutputRoot "Artifacts")
+
+function Get-PinnedGitHubCli {
+    if (-not (Test-Path -LiteralPath $GitHubCliLockPath -PathType Leaf)) {
+        throw "The pinned GitHub CLI lock is missing."
+    }
+    $lock = Get-Content -Raw -LiteralPath $GitHubCliLockPath | ConvertFrom-Json
+    $lockProperties = @($lock.PSObject.Properties.Name | Sort-Object)
+    if (
+        [string]::Join(",", $lockProperties) -cne "archive,schema,sha256,url,version" -or
+        $lock.schema -cne "stockroom-github-cli-lock/1" -or
+        $lock.version -notmatch '^(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)$' -or
+        $lock.archive -cne "gh_$($lock.version)_windows_amd64.zip" -or
+        $lock.url -cne "https://github.com/cli/cli/releases/download/v$($lock.version)/$($lock.archive)" -or
+        $lock.sha256 -notmatch '^[0-9a-f]{64}$'
+    ) {
+        throw "The pinned GitHub CLI lock is invalid."
+    }
+
+    $downloadRoot = Initialize-OutputDirectory -Path (Join-Path $WorkRoot "GitHub CLI Download")
+    $archivePath = Join-Path $downloadRoot $lock.archive
+    Invoke-WebRequest -UseBasicParsing -Uri $lock.url -OutFile $archivePath
+    if ((Get-Sha256 -Path $archivePath) -cne $lock.sha256) {
+        throw "The downloaded GitHub CLI archive does not match its pinned SHA-256."
+    }
+
+    $publishRoot = Initialize-OutputDirectory -Path (Join-Path $WorkRoot "GitHub CLI Publish")
+    Expand-Archive -LiteralPath $archivePath -DestinationPath $publishRoot
+    if (
+        -not (Test-Path -LiteralPath (Join-Path $publishRoot "bin\gh.exe") -PathType Leaf) -or
+        -not (Test-Path -LiteralPath (Join-Path $publishRoot "LICENSE") -PathType Leaf)
+    ) {
+        throw "The pinned GitHub CLI archive is incomplete."
+    }
+    return $publishRoot
+}
+
+$GitHubCliRoot = Get-PinnedGitHubCli
 $ContractRoot = Initialize-OutputDirectory -Path (Join-Path $ArtifactsRoot "Package Contract")
 $SeedRoot = Initialize-OutputDirectory -Path (Join-Path $WorkRoot "Contract Seed")
 $SeedPackage = Join-Path $SeedRoot "Package"
@@ -617,6 +655,7 @@ function Initialize-PackageStage {
         [Parameter(Mandatory)][string]$WorkerRoot,
         [Parameter(Mandatory)][string]$WindowHostRoot,
         [Parameter(Mandatory)][string]$CadConverterRoot,
+        [Parameter(Mandatory)][string]$GitHubCliRoot,
         [Parameter(Mandatory)][string]$AppInstallerPath
     )
 
@@ -645,6 +684,7 @@ function Initialize-PackageStage {
         "--executable", $WorkerRoot,
         "--window-host-root", (Join-Path $stage "WindowHost"),
         "--cad-converter-root", $CadConverterRoot,
+        "--github-cli-root", $GitHubCliRoot,
         "--bundle-root", (Join-Path $stage "Update"),
         "--version", $Version,
         "--minimum-host-version", $MinimumHostVersion,
@@ -675,6 +715,7 @@ $FirstStage = Initialize-PackageStage `
     -WorkerRoot $FirstExecutable `
     -WindowHostRoot $FirstWindowHost `
     -CadConverterRoot $FirstCadConverter `
+    -GitHubCliRoot $GitHubCliRoot `
     -AppInstallerPath $FinalAppInstaller
 
 $PayloadInventory = Join-Path $ArtifactsRoot "Payload Manifest.json"
@@ -748,6 +789,7 @@ if (-not $SkipReproducibilityProof -and $Mode -eq "Fixture") {
         -WorkerRoot $SecondExecutable `
         -WindowHostRoot $SecondWindowHost `
         -CadConverterRoot $SecondCadConverter `
+        -GitHubCliRoot $GitHubCliRoot `
         -AppInstallerPath $SecondAppInstaller
     $secondPackage = Join-Path $WorkRoot $PackageFileName
     Invoke-Checked -FilePath $MakeAppx -Arguments @(
@@ -1055,6 +1097,10 @@ $Evidence = [ordered]@{
             executable_sha256 = Get-Sha256 -Path (
                 Join-Path $FirstCadConverter "Stockroom.CadConverter.exe"
             )
+        }
+        github_cli = [ordered]@{
+            version = (Get-Content -Raw -LiteralPath $GitHubCliLockPath | ConvertFrom-Json).version
+            executable_sha256 = Get-Sha256 -Path (Join-Path $GitHubCliRoot "bin\gh.exe")
         }
     }
     signing = [ordered]@{

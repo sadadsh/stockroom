@@ -49,6 +49,13 @@ WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
 ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
+GitHub CLI
+
+GitHub CLI 2.95.0 is distributed as the pinned official Windows amd64 release.
+Copyright GitHub, Inc. and contributors. License: MIT. Source:
+https://github.com/cli/cli. A full copy is included in
+Support/Licenses/GitHub CLI MIT.txt.
+
 Native CAD converter
 
 The native CAD converter is built from source and distributed as a separate
