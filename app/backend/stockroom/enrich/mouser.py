@@ -319,6 +319,14 @@ def parse_mouser_payload(body: dict | None, mpn: str) -> EnrichmentResult:
     return result
 
 
+def validate_api_key(api_key: str, *, probe_mpn: str = "NE555P") -> str:
+    """Validate one person-supplied key without retaining payload or credential material."""
+
+    adapter = MouserAdapter(api_key)
+    adapter.lookup(probe_mpn)
+    return adapter.last_status or "network_error"
+
+
 class MouserAdapter:
     def __init__(self, api_key: str = "", requester=None):
         self.api_key = api_key or ""

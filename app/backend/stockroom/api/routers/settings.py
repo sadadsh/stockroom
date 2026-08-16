@@ -18,6 +18,7 @@ from stockroom.eda.primary_policy import (
 )
 from stockroom.kicad.common_json import read_env_var
 from stockroom.stm.source import normalize_cubemx_source
+from stockroom.store import guided_setup
 
 
 def _hint(key: str) -> str:
@@ -146,8 +147,14 @@ def settings_router(require_token) -> APIRouter:
             # No Assets operation exists in this first contract slice, so a Settings choice has
             # no running tool to drain and activates immediately. Assets will pass its captured
             # active tool to the same policy when queued builds land.
-            PrimaryEdaPolicy(ctx.config).request_switch(str(body["primary_eda"] or ""))
-            ctx.config.save()
+            policy = PrimaryEdaPolicy(ctx.config)
+            before = policy.primary_tool.key if policy.primary_tool else None
+            policy.request_switch(str(body["primary_eda"] or ""))
+            after = policy.primary_tool.key if policy.primary_tool else None
+            if after != before:
+                guided_setup.clear_after_primary_change(ctx.config)
+            else:
+                ctx.config.save()
         if "mouser_api_key" in body:
             ctx.config.mouser_api_key = str(body["mouser_api_key"] or "")
             ctx.config.save()
@@ -173,16 +180,9 @@ def settings_router(require_token) -> APIRouter:
         if _vendor_dirty:
             ctx.config.save()
         if "github_token" in body:
-            ctx.config.github_token = str(body["github_token"] or "").strip()
-            ctx.config.save()
-            # Apply the credential to the library repo LIVE so push/pull authenticate immediately,
-            # not only after the next boot. Non-fatal: a non-git library never fails the save.
-            try:
-                from stockroom.vcs import github_auth
-
-                github_auth.configure(ctx.repo, ctx.config.github_token)
-            except Exception:  # noqa: BLE001 - applying the credential is best-effort
-                pass
+            raise ValueError(
+                "pasted GitHub tokens are not accepted; use Sign In With GitHub"
+            )
         if "kicad_cli_override" in body or "kicad_config_override" in body:
             # strip whitespace AND the quotes Windows "Copy as path" wraps around
             # a path, which would otherwise break wiring and CLI discovery

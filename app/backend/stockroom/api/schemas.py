@@ -499,6 +499,29 @@ class DiscoverProjectsBody(BaseModel):
     eda: str | None = None
 
 
+class GuidedRepositoryBody(BaseModel):
+    """Create or connect one GitHub-backed Catalog Repository without typed URLs."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    mode: Literal["create", "connect"]
+    owner: str
+    name: str
+    visibility: Literal["public", "private"] | None = None
+    path: str
+
+
+class GuidedSourceDataBody(BaseModel):
+    """Accept optional official-catalog credentials or explicitly skip the step."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    skipped: bool = False
+    mouser_api_key: str | None = None
+    digikey_client_id: str | None = None
+    digikey_client_secret: str | None = None
+
+
 class SetLibraryBody(BaseModel):
     """First-run onboarding: point the app at a library (M9b). `mode` is open / create /
     clone; `path` (open, or an explicit create/clone dir), `url` (clone source), and `dest`

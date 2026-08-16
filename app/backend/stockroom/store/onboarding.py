@@ -174,6 +174,35 @@ def bootstrap_library(config: MachineConfig) -> Path:
     return lib
 
 
+def guided_clone_destination(
+    destination: str | Path,
+    *,
+    expected_url: str,
+) -> tuple[Path, bool]:
+    """Preflight a guided clone and identify an exact resumable checkout.
+
+    Returns ``(path, False)`` for an absent/empty destination and ``(path, True)`` only when the
+    destination is already a Git checkout whose credential-free origin exactly matches GitHub's
+    expected repository. Every other non-empty folder is refused before remote creation.
+    """
+
+    root = _require_library_root_boundary(Path(destination))
+    if not root.exists():
+        return root, False
+    if not root.is_dir():
+        raise ValueError(f"not a directory: {root}")
+    if not any(root.iterdir()):
+        return root, False
+    repo = GitRepo(root)
+    if not (root / ".git").exists():
+        raise ValueError(f"clone destination is not empty: {root}")
+    actual = repo.remote_url("origin").strip().rstrip("/")
+    expected = expected_url.strip().rstrip("/")
+    if actual.casefold().removesuffix(".git") != expected.casefold().removesuffix(".git"):
+        raise ValueError("existing clone origin does not match the selected Catalog Repository")
+    return root, True
+
+
 def set_library(
     config: MachineConfig,
     mode: str,
@@ -181,6 +210,7 @@ def set_library(
     path: str | Path | None = None,
     url: str | None = None,
     dest: str | Path | None = None,
+    complete: bool = True,
 ) -> Path:
     """Complete onboarding by pointing the app at a library. Modes:
       - "open":   use an existing local directory (must exist);
@@ -221,7 +251,7 @@ def set_library(
         GitRepo(root).clone_from(clone_url)
     else:
         raise ValueError(f"unknown onboarding mode: {mode!r} (expected open / create / clone)")
-    return _finalize(root, config, onboarded=True)
+    return _finalize(root, config, onboarded=complete)
 
 
 def complete_onboarding(config: MachineConfig) -> None:

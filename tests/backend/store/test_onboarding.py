@@ -146,6 +146,30 @@ def test_clone_from_local_source_repo(tmp_path):
     assert library_is_initialized(root) and cfg.onboarded is True
 
 
+def test_guided_clone_preflight_accepts_an_empty_destination(tmp_path):
+    destination = tmp_path / "catalog"
+    assert onboarding.guided_clone_destination(
+        destination,
+        expected_url="https://github.com/engineer/catalog.git",
+    ) == (destination.resolve(), False)
+
+
+def test_guided_clone_preflight_resumes_only_the_exact_origin(tmp_path):
+    destination = _library(tmp_path / "catalog")
+    repo = GitRepo(destination)
+    repo.add_remote("origin", "https://github.com/engineer/catalog.git")
+
+    assert onboarding.guided_clone_destination(
+        destination,
+        expected_url="https://github.com/engineer/catalog.git",
+    ) == (destination.resolve(), True)
+    with pytest.raises(ValueError, match="origin does not match"):
+        onboarding.guided_clone_destination(
+            destination,
+            expected_url="https://github.com/engineer/other.git",
+        )
+
+
 def test_clone_requires_a_url():
     with pytest.raises(ValueError):
         onboarding.set_library(MachineConfig(), "clone", url="")

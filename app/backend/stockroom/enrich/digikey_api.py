@@ -96,6 +96,16 @@ def _default_requester(client_id: str, client_secret: str, timeout: float = 8):
     return request
 
 
+def validate_credentials(client_id: str, client_secret: str, *, timeout: float = 8) -> str:
+    """Validate OAuth credentials without returning or persisting the bearer token."""
+
+    try:
+        token = _fetch_token(client_id, client_secret, timeout)
+    except EnrichError as exc:
+        return status_from_error(exc)
+    return "ok" if token else "network_error"
+
+
 class DigiKeyClient:
     """One authenticated Product Information V4 client.
 

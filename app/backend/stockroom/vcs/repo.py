@@ -179,6 +179,9 @@ class GitRepo:
         command = [self.git, "-C", str(self.root), *args]
         environment = os.environ.copy()
         environment["GIT_TERMINAL_PROMPT"] = "0"
+        environment["GCM_INTERACTIVE"] = "Never"
+        environment["GIT_ASKPASS"] = ""
+        environment["SSH_ASKPASS"] = ""
         try:
             proc = subprocess.run(
                 command,
@@ -234,23 +237,35 @@ class GitRepo:
     @_serialized
     def clone_from(self, origin: Path) -> None:
         self.root.parent.mkdir(parents=True, exist_ok=True)
-        proc = subprocess.run(
-            [
-                self.git,
-                "-c",
-                "core.autocrlf=false",
-                "-c",
-                "core.longpaths=true",
-                "clone",
-                str(origin),
-                str(self.root),
-            ],
-            capture_output=True,
-            text=True,
-            creationflags=_NO_WINDOW,
-        )
+        environment = os.environ.copy()
+        environment["GIT_TERMINAL_PROMPT"] = "0"
+        environment["GCM_INTERACTIVE"] = "Never"
+        environment["GIT_ASKPASS"] = ""
+        environment["SSH_ASKPASS"] = ""
+        try:
+            proc = subprocess.run(
+                [
+                    self.git,
+                    "-c",
+                    "core.autocrlf=false",
+                    "-c",
+                    "core.longpaths=true",
+                    "clone",
+                    str(origin),
+                    str(self.root),
+                ],
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                creationflags=_NO_WINDOW,
+                env=environment,
+                timeout=_GIT_TIMEOUT_SECONDS,
+            )
+        except subprocess.TimeoutExpired as exc:
+            raise GitError("git clone timed out") from exc
         if proc.returncode != 0:
-            raise GitError(f"git clone failed: {proc.stderr.strip()}")
+            raise GitError("git clone failed")
         self._run("config", "--local", "core.autocrlf", "false")
         self._run("config", "--local", "core.longpaths", "true")
         self._set_test_identity_if_missing()

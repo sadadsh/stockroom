@@ -391,10 +391,19 @@ class AppContext:
         try:
             from stockroom.vcs import github_auth
 
-            github_auth.configure(
-                self.repo,
-                getattr(self.config, "github_token", ""),
-            )
+            legacy_token = getattr(self.config, "github_token", "")
+            if legacy_token:
+                github_auth.configure(self.repo, legacy_token)
+            else:
+                # Scrub only the unsafe historical config header. Do not reject GCM's migrated
+                # credential on every later boot merely because Stockroom's compatibility field
+                # is intentionally blank.
+                self.repo.unset_config(github_auth.EXTRAHEADER_KEY)
+            if legacy_token:
+                # One-way migration only. GCM now owns the exact-repository credential; Stockroom
+                # immediately erases its compatibility copy and never accepts a replacement PAT.
+                self.config.github_token = ""
+                self.config.save()
         except Exception:  # noqa: BLE001 - auth config is best-effort at boot
             pass
 

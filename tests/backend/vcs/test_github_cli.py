@@ -48,6 +48,7 @@ def _repo_json(
             "name": name,
             "url": f"https://github.com/{owner}/{name}",
             "visibility": visibility,
+            "viewerPermission": "ADMIN",
             "ignored": "not returned",
         }
     )
@@ -69,6 +70,20 @@ def test_packaged_cli_is_resolved_before_path(tmp_path: Path) -> None:
     )
 
     assert resolved == packaged
+    assert path_calls == []
+
+
+def test_frozen_runtime_never_falls_back_to_mutable_path(tmp_path: Path) -> None:
+    worker = tmp_path / "release-1" / "Backend" / "Stockroom Worker.exe"
+    worker.parent.mkdir(parents=True)
+    worker.write_bytes(b"worker")
+    path_calls: list[str] = []
+
+    assert resolve_github_cli(
+        frozen=True,
+        process_executable=worker,
+        path_lookup=lambda name: path_calls.append(name) or "C:/Mutable/gh.exe",
+    ) is None
     assert path_calls == []
 
 
@@ -113,6 +128,18 @@ def test_unavailable_or_unparseable_version_fails_closed() -> None:
         runner=ScriptedRunner(_result("unexpected output")),
     )
     assert malformed.availability().available is False
+
+
+def test_local_authentication_status_never_requests_token_output() -> None:
+    runner = ScriptedRunner(_result(returncode=0))
+    cli = GitHubCli(executable=Path("gh.exe"), runner=runner)
+
+    assert cli.authenticated() is True
+    assert runner.calls[0] == (
+        ["gh.exe", "auth", "status", "--hostname", "github.com", "--active"],
+        None,
+        10.0,
+    )
 
 
 def test_browser_login_keeps_auth_output_private_and_returns_selected_viewer_fields() -> None:
@@ -169,6 +196,7 @@ def test_repository_listing_is_bounded_and_selects_non_secret_fields() -> None:
                         "name": "Catalog",
                         "url": "https://github.com/acme/Catalog",
                         "visibility": "PUBLIC",
+                        "viewerPermission": "ADMIN",
                     }
                 ]
             )
@@ -182,6 +210,7 @@ def test_repository_listing_is_bounded_and_selects_non_secret_fields() -> None:
             name="Catalog",
             url="https://github.com/acme/Catalog",
             visibility="public",
+            permission="admin",
         ),
     )
     assert runner.calls[0][0] == [
@@ -192,10 +221,28 @@ def test_repository_listing_is_bounded_and_selects_non_secret_fields() -> None:
         "--limit",
         "25",
         "--json",
-        "name,url,visibility",
+        "name,url,visibility,viewerPermission",
     ]
     with pytest.raises(ValueError, match="between 1 and 100"):
         cli.list_repositories("acme", limit=101)
+
+
+def test_exact_repository_lookup_returns_non_secret_identity() -> None:
+    runner = ScriptedRunner(_result(_repo_json(owner="acme", name="Catalog")))
+    cli = GitHubCli(executable=Path("gh.exe"), runner=runner)
+
+    repository = cli.repository("acme", "Catalog")
+
+    assert repository.owner == "acme"
+    assert repository.url == "https://github.com/acme/Catalog"
+    assert runner.calls[0][0] == [
+        "gh.exe",
+        "repo",
+        "view",
+        "acme/Catalog",
+        "--json",
+        "name,url,visibility,viewerPermission",
+    ]
 
 
 def test_create_personal_private_repository_uses_json_stdin() -> None:
@@ -253,10 +300,23 @@ def test_create_returns_existing_repository_without_a_second_write() -> None:
     repository = cli.create_repository(
         "sadadsh",
         "Stockroom-Catalog",
-        visibility="private",
+        visibility="public",
     )
 
     assert repository.visibility == "public"
+    assert len(runner.calls) == 3
+
+
+def test_create_refuses_existing_repository_with_different_visibility() -> None:
+    runner = ScriptedRunner(
+        _result('{"login":"sadadsh","name":null}'),
+        _result("[[]]"),
+        _result(_repo_json(visibility="PUBLIC")),
+    )
+    cli = GitHubCli(executable=Path("gh.exe"), runner=runner)
+
+    with pytest.raises(GitHubCliError, match="different visibility"):
+        cli.create_repository("sadadsh", "Stockroom-Catalog", visibility="private")
     assert len(runner.calls) == 3
 
 

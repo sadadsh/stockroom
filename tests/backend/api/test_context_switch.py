@@ -32,6 +32,23 @@ def _profile_tree(root):
     }
 
 
+def test_repository_auth_migrates_and_erases_a_legacy_pat(app_ctx, monkeypatch):
+    observed = []
+    app_ctx.config.github_token = "ghp_LEGACY"
+    monkeypatch.setattr(
+        "stockroom.vcs.github_auth.configure",
+        lambda repo, token: observed.append((repo, token)),
+    )
+
+    app_ctx.configure_repository_auth()
+
+    assert observed == [(app_ctx.repo, "ghp_LEGACY")]
+    assert app_ctx.config.github_token == ""
+
+    app_ctx.configure_repository_auth()
+    assert observed == [(app_ctx.repo, "ghp_LEGACY")]
+
+
 def test_building_an_empty_context_is_read_only_for_canonical_profile_data(tmp_path):
     """One integrated boot invariant covers every EDA adapter and future derived artifact.
 

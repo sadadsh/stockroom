@@ -123,39 +123,23 @@ def test_settings_is_token_guarded(anon_client):
     )
 
 
-# -- GitHub personal access token (auto-push auth) -----------------------------
+# -- GitHub browser authentication ---------------------------------------------
 
 
-def test_get_settings_reports_no_github_token_when_unset(client):
+def test_get_settings_reports_no_legacy_github_token_when_unset(client):
     assert client.get("/api/settings").json()["github_token_set"] is False
 
 
-def test_patch_github_token_sets_it_live_and_never_leaks_it(client, app_ctx):
-    r = client.patch("/api/settings", json={"github_token": "ghp_SECRET1234"})
-    body = r.json()
-    assert body["github_token_set"] is True and body["github_token_hint"] == "1234"
-    assert "ghp_SECRET" not in json.dumps(body)  # only presence + last-4, never the raw token
-    assert app_ctx.config.github_token == "ghp_SECRET1234"
-    # No reversible credential is ever written into the repository's Git config.
-    got = app_ctx.repo._run("config", "--get", "http.https://github.com/.extraheader", check=False)
-    assert got.returncode != 0
+def test_settings_rejects_pasted_github_tokens(client, app_ctx):
+    response = client.patch(
+        "/api/settings",
+        json={"github_token": "ghp_SECRET1234"},
+    )
 
-
-def test_patch_persists_the_github_token_outside_plaintext_config(client):
-    client.patch("/api/settings", json={"github_token": "ghp_PERSIST42"})
-    saved = json.loads((config_dir() / "config.json").read_text(encoding="utf-8"))
-    assert "github_token" not in saved
-    from stockroom.store.machine_config import MachineConfig
-
-    assert MachineConfig.load().github_token == "ghp_PERSIST42"
-
-
-def test_patch_empty_github_token_clears_the_credential(client, app_ctx):
-    client.patch("/api/settings", json={"github_token": "ghp_TEMP"})
-    client.patch("/api/settings", json={"github_token": ""})
+    assert response.status_code == 400
+    assert "Sign In With GitHub" in response.json()["detail"]
     assert app_ctx.config.github_token == ""
-    got = app_ctx.repo._run("config", "--get", "http.https://github.com/.extraheader", check=False)
-    assert got.returncode != 0  # the credential header was removed
+    assert not (config_dir() / "config.json").exists()
 
 
 # -- Primary CAD Tool (per-machine, explicit, switchable) -----------------------

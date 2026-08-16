@@ -49,6 +49,13 @@ def _github(*, authenticated: bool = True, online: bool = True):
         "online": online,
         "viewer": "engineer",
         "owners": [{"login": "engineer", "kind": "user"}],
+        "verified_repository": {
+            "owner": "engineer",
+            "name": "stockroom-catalog",
+            "url": "https://github.com/engineer/stockroom-catalog",
+            "visibility": "private",
+            "writable": True,
+        },
     }
 
 
@@ -91,6 +98,20 @@ def test_current_github_auth_and_connectivity_are_required_even_after_progress(t
 
     assert guided_setup.status(ctx, _github(authenticated=False))["step"] == "catalog_repository"
     assert guided_setup.status(ctx, _github(online=False))["step"] == "catalog_repository"
+
+
+def test_read_only_repository_never_becomes_ready(tmp_path):
+    ctx = _ctx(
+        tmp_path,
+        remote="https://github.com/engineer/stockroom-catalog.git",
+    )
+    github = _github()
+    github["verified_repository"]["writable"] = False
+
+    document = guided_setup.status(ctx, github)
+
+    assert document["repository_ready"] is False
+    assert document["step"] == "catalog_repository"
 
 
 def test_repository_requires_a_credential_free_github_https_origin(tmp_path):

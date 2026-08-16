@@ -28,6 +28,7 @@ _VERSION_PATTERN = re.compile(r"gh version ([0-9]+(?:\.[0-9]+){1,3})(?=\s|$)")
 
 Visibility = Literal["public", "private", "internal"]
 OwnerKind = Literal["personal", "organization"]
+RepositoryPermission = Literal["admin", "maintain", "write", "triage", "read"]
 
 
 class GitHubCliError(RuntimeError):
@@ -70,6 +71,11 @@ class GitHubRepository:
     name: str
     url: str
     visibility: Visibility
+    permission: RepositoryPermission
+
+    @property
+    def writable(self) -> bool:
+        return self.permission in {"admin", "maintain", "write"}
 
 
 def _default_runner(
@@ -104,8 +110,7 @@ def resolve_github_cli(
     executable = Path(sys.executable) if process_executable is None else Path(process_executable)
     if is_frozen:
         packaged = executable.resolve().parent.parent / "Tools" / "gh.exe"
-        if packaged.is_file():
-            return packaged
+        return packaged if packaged.is_file() else None
     discovered = path_lookup("gh")
     return Path(discovered).resolve() if discovered else None
 
@@ -204,6 +209,23 @@ class GitHubCli:
             raise GitHubCliError("GitHub CLI is unavailable.")
         return status.version
 
+    def authenticated(self) -> bool:
+        """Read local gh credential state without exposing or printing the credential."""
+
+        if self._executable is None:
+            return False
+        result = self._run(
+            "auth",
+            "status",
+            "--hostname",
+            "github.com",
+            "--active",
+            error="GitHub sign-in status check failed.",
+            check=False,
+            timeout=10.0,
+        )
+        return result.returncode == 0
+
     def login_browser(self) -> GitHubViewer:
         self._run(
             "auth",
@@ -289,7 +311,7 @@ class GitHubCli:
             "--limit",
             str(limit),
             "--json",
-            "name,url,visibility",
+            "name,url,visibility,viewerPermission",
             error="GitHub repository listing failed.",
         )
         document = self._json(result, error="GitHub repository list was invalid.")
@@ -306,7 +328,7 @@ class GitHubCli:
             "view",
             f"{owner}/{name}",
             "--json",
-            "name,url,visibility",
+            "name,url,visibility,viewerPermission",
             error="GitHub repository lookup failed.",
             check=False,
         )
@@ -316,6 +338,15 @@ class GitHubCli:
         repository = _repository(document, expected_owner=owner)
         if repository.name.casefold() != name.casefold():
             raise GitHubCliError("GitHub repository response was invalid.")
+        return repository
+
+    def repository(self, owner: str, name: str) -> GitHubRepository:
+        """Return one exact repository or fail without leaking CLI output."""
+
+        valid_owner, valid_name = validate_owner_repository(owner, name)
+        repository = self._lookup_repository(valid_owner, valid_name)
+        if repository is None:
+            raise GitHubCliError("The selected GitHub repository is unavailable.")
         return repository
 
     def create_repository(
@@ -335,6 +366,11 @@ class GitHubCli:
 
         existing = self._lookup_repository(valid_owner, valid_name)
         if existing is not None:
+            if existing.visibility != visibility:
+                raise GitHubCliError(
+                    "A repository with that name already exists with different visibility. "
+                    "Connect Existing or choose another name."
+                )
             return existing
 
         endpoint = (
@@ -362,6 +398,11 @@ class GitHubCli:
         if result.returncode != 0:
             raced = self._lookup_repository(valid_owner, valid_name)
             if raced is not None:
+                if raced.visibility != visibility:
+                    raise GitHubCliError(
+                        "A repository with that name already exists with different visibility. "
+                        "Connect Existing or choose another name."
+                    )
                 return raced
             raise GitHubCliError("GitHub repository creation failed.")
         repository = _repository(
@@ -440,9 +481,18 @@ def _repository(value: object, *, expected_owner: str) -> GitHubRepository:
     if raw_visibility not in {"public", "private", "internal"}:
         raise GitHubCliError("GitHub repository response was invalid.")
     visibility = raw_visibility
+    raw_permission = _required_string(
+        record,
+        "viewerPermission",
+        "GitHub repository response",
+    ).casefold()
+    if raw_permission not in {"admin", "maintain", "write", "triage", "read"}:
+        raise GitHubCliError("GitHub repository response was invalid.")
+    permission = raw_permission
     return GitHubRepository(
         owner=expected_owner,
         name=name,
         url=f"https://github.com/{expected_owner}/{name}",
         visibility=visibility,
+        permission=permission,
     )

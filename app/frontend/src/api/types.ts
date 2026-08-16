@@ -702,7 +702,6 @@ export interface SettingsInfo extends PrimaryEdaInfo {
 export interface SettingsPatch {
   primary_eda?: string;
   mouser_api_key?: string;
-  github_token?: string;
   digikey_client_id?: string;
   digikey_client_secret?: string;
   kicad_config_override?: string;

@@ -16,16 +16,106 @@ from pathlib import Path
 
 from fastapi import APIRouter, Depends, Request
 
-from stockroom.api.schemas import SetLibraryBody
+from stockroom.api.errors import ApiError
+from stockroom.api.schemas import (
+    GuidedRepositoryBody,
+    GuidedSourceDataBody,
+    SetLibraryBody,
+)
 from stockroom.eda.primary_policy import (
     PrimaryEdaPolicy,
     machine_detected_tool_keys,
 )
+from stockroom.store import guided_setup
 from stockroom.store import onboarding as onb
+from stockroom.vcs.github_cli import (
+    GitHubCli,
+    GitHubCliError,
+    credential_free_clone_url,
+)
 from stockroom.vcs.repo import GitError, GitRepo
 
 
-def _status(ctx) -> dict:
+def _github_status(
+    cli: GitHubCli | None = None,
+    *,
+    repository: dict[str, str] | None = None,
+) -> dict[str, object]:
+    authority = cli or GitHubCli()
+    availability = authority.availability()
+    base: dict[str, object] = {
+        "available": availability.available,
+        "version": availability.version,
+        "authenticated": False,
+        "online": False,
+        "viewer": None,
+        "owners": [],
+    }
+    if not availability.available:
+        return base
+    authenticated = authority.authenticated()
+    if not authenticated:
+        return {
+            **base,
+            "online": True,
+            "error": "Sign in with GitHub to continue.",
+        }
+    try:
+        viewer = authority.viewer()
+    except GitHubCliError:
+        return {
+            **base,
+            "authenticated": True,
+            "error": "GitHub could not be reached. Stockroom will retry automatically.",
+        }
+    try:
+        owners = authority.owners()
+    except GitHubCliError:
+        return {
+            **base,
+            "authenticated": True,
+            "online": True,
+            "viewer": {"login": viewer.login, "name": viewer.name},
+            "error": "GitHub organizations could not be loaded. Try this step again.",
+        }
+    result: dict[str, object] = {
+        **base,
+        "authenticated": True,
+        "online": True,
+        "viewer": {"login": viewer.login, "name": viewer.name},
+        "owners": [
+            {"login": owner.login, "kind": owner.kind}
+            for owner in owners
+        ],
+    }
+    if repository is not None:
+        try:
+            exact = authority.repository(repository["owner"], repository["name"])
+        except GitHubCliError:
+            try:
+                authority.viewer()
+            except GitHubCliError:
+                result["online"] = False
+                result["error"] = (
+                    "GitHub could not be reached. Stockroom will retry automatically."
+                )
+            else:
+                result["error"] = (
+                    "The connected Catalog Repository is unavailable to this GitHub account."
+                )
+        else:
+            result["verified_repository"] = {
+                "owner": exact.owner,
+                "name": exact.name,
+                "url": exact.url,
+                "visibility": exact.visibility,
+                "permission": exact.permission,
+                "writable": exact.writable,
+            }
+    return result
+
+
+def _status(ctx, *, github: dict[str, object] | None = None) -> dict:
     cfg = ctx.config
     root = Path(ctx.libraries_root)
     onboarded = bool(getattr(cfg, "onboarded", False))
@@ -60,6 +150,11 @@ def _status(ctx) -> dict:
         "under_git": under_git,
         "default_dir": onb.default_library_dir().as_posix(),
         "libraries": workspaces,
+        "guided_setup": guided_setup.status(
+            ctx,
+            github
+            or _github_status(repository=guided_setup.github_remote(ctx.repo)),
+        ),
     }
 
 
@@ -86,8 +181,157 @@ def onboarding_router(require_token) -> APIRouter:
         root = onb.set_library(
             ctx.config, body.mode,
             path=body.path or None, url=body.url or None, dest=body.dest or None,
+            complete=False,
         )
         ctx.switch_library(root)
+        ctx.config.onboarded = False
+        ctx.config.save()
+        return _status(ctx)
+
+    @r.post("/github/login")
+    def github_login(request: Request) -> dict:
+        """Start the bundled GitHub CLI browser flow without exposing its token."""
+
+        ctx = request.app.state.ctx
+
+        def work(progress):
+            progress({"stage": "waiting", "pct": 0.2, "message": "waiting for GitHub sign-in"})
+            cli = GitHubCli()
+            viewer = cli.login_browser()
+            return {
+                "viewer": {"login": viewer.login, "name": viewer.name},
+                "owners": [
+                    {"login": owner.login, "kind": owner.kind}
+                    for owner in cli.owners()
+                ],
+            }
+
+        return {"job_id": ctx.jobs.submit(work)}
+
+    @r.get("/github/repositories/{owner}")
+    def github_repositories(owner: str) -> dict:
+        repositories = GitHubCli().list_repositories(owner, limit=100)
+        return {
+            "repositories": [
+                {
+                    "owner": repository.owner,
+                    "name": repository.name,
+                    "url": repository.url,
+                    "visibility": repository.visibility,
+                    "permission": repository.permission,
+                    "writable": repository.writable,
+                }
+                for repository in repositories
+            ]
+        }
+
+    @r.post("/repository")
+    def set_guided_repository(request: Request, body: GuidedRepositoryBody) -> dict:
+        """Create/connect, clone, initialize, and switch one GitHub Catalog Repository."""
+
+        ctx = request.app.state.ctx
+        _require_primary_eda(ctx)
+        destination = body.path.strip()
+        if not destination:
+            raise ValueError("choose a Catalog Repository folder with Windows Explorer")
+        expected_url = credential_free_clone_url(body.owner, body.name)
+        selected_root, adopt_existing = onb.guided_clone_destination(
+            destination,
+            expected_url=expected_url,
+        )
+        cli = GitHubCli()
+        if body.mode == "create":
+            if body.visibility is None:
+                raise ValueError("choose Public or Private for the Catalog Repository")
+            repository = cli.create_repository(
+                body.owner,
+                body.name,
+                visibility=body.visibility,
+            )
+        else:
+            repository = cli.repository(body.owner, body.name)
+
+        if adopt_existing:
+            root = onb.set_library(
+                ctx.config,
+                "open",
+                path=selected_root,
+                complete=False,
+            )
+        else:
+            root = onb.set_library(
+                ctx.config,
+                "clone",
+                url=repository.url,
+                dest=selected_root,
+                complete=False,
+            )
+        ctx.switch_library(root)
+        ctx.config.onboarded = False
+        guided_setup.record_repository(
+            ctx.config,
+            owner=repository.owner,
+            name=repository.name,
+            visibility=repository.visibility,
+            url=repository.url,
+        )
+        return _status(
+            ctx,
+            github=_github_status(
+                cli,
+                repository={"owner": repository.owner, "name": repository.name},
+            ),
+        )
+
+    @r.post("/source-data")
+    def source_data(request: Request, body: GuidedSourceDataBody) -> dict:
+        ctx = request.app.state.ctx
+        mouser = (
+            body.mouser_api_key.strip()
+            if not body.skipped and body.mouser_api_key is not None
+            else None
+        )
+        digikey_id = (
+            body.digikey_client_id.strip()
+            if not body.skipped and body.digikey_client_id is not None
+            else None
+        )
+        digikey_secret = (
+            body.digikey_client_secret.strip()
+            if not body.skipped and body.digikey_client_secret is not None
+            else None
+        )
+        submitted_mouser = bool(mouser)
+        submitted_digikey = bool(digikey_id and digikey_secret)
+        partial_digikey = bool(digikey_id) != bool(digikey_secret)
+        if partial_digikey:
+            raise ValueError("DigiKey needs both Client ID and Client Secret")
+        if not body.skipped and not (submitted_mouser or submitted_digikey):
+            raise ValueError("connect Mouser or DigiKey, or skip this optional step")
+        if submitted_mouser:
+            from stockroom.enrich.mouser import validate_api_key
+
+            result = validate_api_key(mouser or "")
+            if result == "auth_error":
+                raise ValueError("Mouser rejected that API key")
+            if result not in {"ok", "not_found"}:
+                raise ApiError(503, "Mouser could not be reached; try this step again")
+        if submitted_digikey:
+            from stockroom.enrich.digikey_api import validate_credentials
+
+            result = validate_credentials(digikey_id or "", digikey_secret or "")
+            if result == "auth_error":
+                raise ValueError("DigiKey rejected those API credentials")
+            if result != "ok":
+                raise ApiError(503, "DigiKey could not be reached; try this step again")
+        if mouser is not None:
+            ctx.config.mouser_api_key = mouser
+        if digikey_id is not None:
+            ctx.config.digikey_client_id = digikey_id
+        if digikey_secret is not None:
+            ctx.config.digikey_client_secret = digikey_secret
+        ctx.config.save()
+        guided_setup.record_source_decision(ctx.config, skipped=body.skipped)
         return _status(ctx)
 
     @r.post("/complete")
@@ -95,6 +339,9 @@ def onboarding_router(require_token) -> APIRouter:
         # Dismiss the welcome screen keeping the current (e.g. auto-created default) library.
         ctx = request.app.state.ctx
         _require_primary_eda(ctx)
+        document = guided_setup.status(ctx, _github_status())
+        if not document["ready"]:
+            raise ValueError(f"complete the {document['step']} setup step first")
         onb.complete_onboarding(ctx.config)
         return _status(ctx)
 

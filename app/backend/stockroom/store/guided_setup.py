@@ -79,7 +79,7 @@ def clear_after_primary_change(config) -> None:
     config.save()
 
 
-def _github_remote(repo) -> dict[str, str] | None:
+def github_remote(repo) -> dict[str, str] | None:
     try:
         remote = str(repo.remote_url("origin") or "").strip()
     except Exception:  # noqa: BLE001 - a malformed/missing repository is simply not ready
@@ -161,10 +161,19 @@ def status(ctx, github: dict[str, object]) -> dict[str, object]:
     state = _state(config)
     policy = PrimaryEdaPolicy(config)
     primary = policy.primary_tool
-    remote = _github_remote(ctx.repo)
+    remote = github_remote(ctx.repo)
     authenticated = bool(github.get("authenticated"))
     online = bool(github.get("online"))
-    repository_ready = remote is not None and authenticated and online
+    verified = github.get("verified_repository")
+    repository_ready = bool(
+        remote is not None
+        and authenticated
+        and online
+        and isinstance(verified, dict)
+        and str(verified.get("owner", "")).casefold() == remote["owner"].casefold()
+        and str(verified.get("name", "")).casefold() == remote["name"].casefold()
+        and verified.get("writable") is True
+    )
 
     if primary is None:
         tool = {

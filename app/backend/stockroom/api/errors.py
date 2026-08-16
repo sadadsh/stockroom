@@ -14,6 +14,7 @@ from stockroom.kicad.errors import KiCadCliError
 from stockroom.mutation.library_ops import IncompleteError
 from stockroom.projects.collaboration import CollaborationError
 from stockroom.service import WorkflowCoordinatorError
+from stockroom.vcs.github_cli import GitHubCliError
 from stockroom.vcs.repo import GitError
 from stockroom.workflow import WorkflowConflict
 
@@ -49,7 +50,7 @@ def status_for(exc: Exception) -> int:
         }:
             return 503
         return 409
-    if isinstance(exc, GitError):
+    if isinstance(exc, (GitError, GitHubCliError)):
         return 503
     if isinstance(exc, (IngestError, EnrichError, KiCadCliError)):
         return 502
