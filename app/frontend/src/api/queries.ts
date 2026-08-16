@@ -372,6 +372,10 @@ export function useOnboarding() {
     queryKey: ["onboarding"],
     queryFn: () => api.getOnboarding(),
     retry: false,
+    // Design Studio and Vitest fixtures are immutable evidence packets; production revalidates
+    // connectivity and repository/tool readiness continuously.
+    refetchInterval: import.meta.env.MODE === "test" ? false : 10_000,
+    refetchIntervalInBackground: true,
   });
 }
 

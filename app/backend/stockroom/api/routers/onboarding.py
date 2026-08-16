@@ -12,6 +12,7 @@ No em dashes anywhere (standing owner rule).
 
 from __future__ import annotations
 
+import threading
 from dataclasses import asdict
 from pathlib import Path
 
@@ -36,6 +37,8 @@ from stockroom.vcs.github_cli import (
 )
 from stockroom.vcs.repo import GitError, GitRepo
 
+_TOOL_SETUP_LOCK = threading.Lock()
+
 
 def _github_status(
     cli: GitHubCli | None = None,
@@ -54,7 +57,13 @@ def _github_status(
     }
     if not availability.available:
         return base
-    authenticated = authority.authenticated()
+    try:
+        authenticated = authority.authenticated()
+    except GitHubCliError:
+        return {
+            **base,
+            "error": "GitHub could not be reached. Stockroom will retry automatically.",
+        }
     if not authenticated:
         return {
             **base,
@@ -119,7 +128,7 @@ def _github_status(
 def _status(ctx, *, github: dict[str, object] | None = None) -> dict:
     cfg = ctx.config
     root = Path(ctx.libraries_root)
-    onboarded = bool(getattr(cfg, "onboarded", False))
+    onboarded = guided_setup.completed(cfg)
     # under_git via git itself (rev-parse), so the in-repo library, backed by the ENCLOSING app
     # repo with no nested .git of its own, still reports True.
     try:
@@ -179,15 +188,20 @@ def onboarding_router(require_token) -> APIRouter:
         # is a ValueError -> 400; a clone GitError -> 503.
         ctx = request.app.state.ctx
         _require_primary_eda(ctx)
-        root = onb.set_library(
-            ctx.config, body.mode,
-            path=body.path or None, url=body.url or None, dest=body.dest or None,
-            complete=False,
-        )
-        ctx.switch_library(root)
-        ctx.config.onboarded = False
-        ctx.config.save()
-        return _status(ctx)
+        if not _TOOL_SETUP_LOCK.acquire(blocking=False):
+            raise ApiError(409, "Guided Setup is already changing the Catalog Repository")
+        try:
+            root = onb.set_library(
+                ctx.config, body.mode,
+                path=body.path or None, url=body.url or None, dest=body.dest or None,
+                complete=False,
+            )
+            ctx.switch_library(root)
+            ctx.config.onboarded = False
+            ctx.config.save()
+            return _status(ctx)
+        finally:
+            _TOOL_SETUP_LOCK.release()
 
     @r.post("/github/login")
     def github_login(request: Request) -> dict:
@@ -235,54 +249,63 @@ def onboarding_router(require_token) -> APIRouter:
         destination = body.path.strip()
         if not destination:
             raise ValueError("choose a Catalog Repository folder with Windows Explorer")
-        expected_url = credential_free_clone_url(body.owner, body.name)
-        selected_root, adopt_existing = onb.guided_clone_destination(
-            destination,
-            expected_url=expected_url,
-        )
-        cli = GitHubCli()
-        if body.mode == "create":
-            if body.visibility is None:
-                raise ValueError("choose Public or Private for the Catalog Repository")
-            repository = cli.create_repository(
-                body.owner,
-                body.name,
-                visibility=body.visibility,
+        if not _TOOL_SETUP_LOCK.acquire(blocking=False):
+            raise ApiError(409, "Guided Setup is already changing the CAD tool or Catalog Repository")
+        try:
+            expected_url = credential_free_clone_url(body.owner, body.name)
+            selected_root, adopt_existing = onb.guided_clone_destination(
+                destination,
+                expected_url=expected_url,
             )
-        else:
-            repository = cli.repository(body.owner, body.name)
+            cli = GitHubCli()
+            if body.mode == "create":
+                if body.visibility is None:
+                    raise ValueError("choose Public or Private for the Catalog Repository")
+                repository = cli.create_repository(
+                    body.owner,
+                    body.name,
+                    visibility=body.visibility,
+                )
+            else:
+                repository = cli.repository(body.owner, body.name)
+            if not repository.writable:
+                raise ValueError(
+                    "Stockroom needs write permission for the selected Catalog Repository"
+                )
 
-        if adopt_existing:
-            root = onb.set_library(
+            if adopt_existing:
+                root = onb.set_library(
+                    ctx.config,
+                    "open",
+                    path=selected_root,
+                    complete=False,
+                )
+            else:
+                root = onb.set_library(
+                    ctx.config,
+                    "clone",
+                    url=repository.url,
+                    dest=selected_root,
+                    complete=False,
+                )
+            ctx.switch_library(root)
+            ctx.config.onboarded = False
+            guided_setup.record_repository(
                 ctx.config,
-                "open",
-                path=selected_root,
-                complete=False,
-            )
-        else:
-            root = onb.set_library(
-                ctx.config,
-                "clone",
+                owner=repository.owner,
+                name=repository.name,
+                visibility=repository.visibility,
                 url=repository.url,
-                dest=selected_root,
-                complete=False,
             )
-        ctx.switch_library(root)
-        ctx.config.onboarded = False
-        guided_setup.record_repository(
-            ctx.config,
-            owner=repository.owner,
-            name=repository.name,
-            visibility=repository.visibility,
-            url=repository.url,
-        )
-        return _status(
-            ctx,
-            github=_github_status(
-                cli,
-                repository={"owner": repository.owner, "name": repository.name},
-            ),
-        )
+            return _status(
+                ctx,
+                github=_github_status(
+                    cli,
+                    repository={"owner": repository.owner, "name": repository.name},
+                ),
+            )
+        finally:
+            _TOOL_SETUP_LOCK.release()
 
     @r.post("/tool/connect")
     def connect_tool(request: Request) -> dict:
@@ -293,10 +316,28 @@ def onboarding_router(require_token) -> APIRouter:
         primary = policy.primary_tool
         if primary is None:
             raise ValueError("choose KiCad or Altium before connecting the tool")
+        if not _TOOL_SETUP_LOCK.acquire(blocking=False):
+            raise ApiError(409, "CAD tool setup is already running")
+        selected_tool = primary.key
+        selected_profile_root = Path(ctx.profile.root)
+        selected_ops = ctx.ops
 
         def work(progress):
+            try:
+                return _connect_selected_tool(progress)
+            finally:
+                _TOOL_SETUP_LOCK.release()
+
+        def _connect_selected_tool(progress):
+            current = PrimaryEdaPolicy(ctx.config).primary_tool
+            if (
+                current is None
+                or current.key != selected_tool
+                or Path(ctx.profile.root) != selected_profile_root
+            ):
+                raise ValueError("The selected CAD tool or Catalog Repository changed; try again")
             receipt: dict[str, object]
-            if primary.key == "kicad":
+            if selected_tool == "kicad":
                 progress({"stage": "wiring", "pct": 0.3, "message": "connecting KiCad"})
                 ctx.rewire_kicad()
                 connection = guided_setup.current_tool_connection(ctx)
@@ -308,27 +349,45 @@ def onboarding_router(require_token) -> APIRouter:
                 }
             else:
                 progress({"stage": "setup", "pct": 0.2, "message": "connecting Altium"})
-                from stockroom.altium.convergence import converge_altium_library
+                from stockroom.altium.convergence import (
+                    converge_altium_library,
+                    verify_catalog_library,
+                )
                 from stockroom.api.routers.altium import _WRITE_LOCK
 
-                target = Path(ctx.profile.root) / "altium" / "Stockroom.DbLib"
+                target = selected_profile_root / "altium" / "Stockroom.DbLib"
                 with _WRITE_LOCK:
-                    result = converge_altium_library(target)
-                if not result.ok:
+                    selected_ops.regenerate_altium_dblib()
+                    result = converge_altium_library(
+                        target,
+                        verifier=verify_catalog_library,
+                    )
+                if result.status not in {"verified", "already-verified"} or not target.is_file():
                     raise ValueError(result.detail)
                 receipt = {"verified": True, "result": asdict(result)}
             guided_setup.record_tool_connection(
                 ctx.config,
-                tool=primary.key,
+                tool=selected_tool,
                 receipt=receipt,
             )
+            final = PrimaryEdaPolicy(ctx.config).primary_tool
+            if (
+                final is None
+                or final.key != selected_tool
+                or Path(ctx.profile.root) != selected_profile_root
+            ):
+                raise ValueError("The selected CAD tool or Catalog Repository changed; try again")
             progress({"stage": "verified", "pct": 1.0, "message": f"{primary.label} connected"})
             return {
                 "tool_connection": guided_setup.current_tool_connection(ctx),
                 "receipt": receipt,
             }
 
-        return {"job_id": ctx.jobs.submit(work)}
+        try:
+            return {"job_id": ctx.jobs.submit(work, write=True)}
+        except Exception:
+            _TOOL_SETUP_LOCK.release()
+            raise
 
     @r.post("/source-data")
     def source_data(request: Request, body: GuidedSourceDataBody) -> dict:
@@ -386,10 +445,14 @@ def onboarding_router(require_token) -> APIRouter:
         # Dismiss the welcome screen keeping the current (e.g. auto-created default) library.
         ctx = request.app.state.ctx
         _require_primary_eda(ctx)
-        document = guided_setup.status(ctx, _github_status())
+        document = guided_setup.status(
+            ctx,
+            _github_status(repository=guided_setup.github_remote(ctx.repo)),
+        )
         if not document["ready"]:
             raise ValueError(f"complete the {document['step']} setup step first")
         onb.complete_onboarding(ctx.config)
+        guided_setup.record_completion(ctx.config)
         return _status(ctx)
 
     return r

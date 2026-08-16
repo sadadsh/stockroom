@@ -52,6 +52,15 @@ def test_github_status_distinguishes_sign_in_from_an_outage():
     assert offline["online"] is False
     assert "retry automatically" in offline["error"]
 
+    class AuthProbeOffline(SignedOut):
+        def authenticated(self):
+            raise GitHubCliError("sanitized")
+
+    auth_probe_offline = _github_status(AuthProbeOffline())
+    assert auth_probe_offline["authenticated"] is False
+    assert auth_probe_offline["online"] is False
+    assert "retry automatically" in auth_probe_offline["error"]
+
 
 def test_status_reports_current_library(client):
     d = client.get("/api/onboarding").json()
@@ -149,7 +158,7 @@ def test_set_library_unknown_mode_is_400(client):
     assert client.post("/api/onboarding/library", json={"mode": "teleport"}).status_code == 400
 
 
-def test_existing_onboarded_machine_without_primary_eda_requires_confirmation(
+def test_legacy_onboarded_machine_still_requires_explicit_guided_setup_completion(
     client, app_ctx
 ):
     app_ctx.config.onboarded = True
@@ -157,8 +166,8 @@ def test_existing_onboarded_machine_without_primary_eda_requires_confirmation(
 
     status = client.get("/api/onboarding").json()
 
-    assert status["onboarded"] is True
-    assert status["first_run"] is False
+    assert status["onboarded"] is False
+    assert status["first_run"] is True
     assert status["primary_eda"] is None
     assert status["primary_eda_confirmation_required"] is True
     assert status["recommended_primary_eda"] in {"kicad", "altium", None}
@@ -184,6 +193,64 @@ def test_complete_marks_onboarded_only_after_authoritative_readiness(
     r = client.post("/api/onboarding/complete")
     assert r.status_code == 200 and r.json()["onboarded"] is True
     assert app_ctx.config.onboarded is True
+    assert app_ctx.config.guided_setup["completed"] is True
+
+
+def test_complete_revalidates_the_exact_repository_without_mocking_readiness(
+    client, app_ctx, monkeypatch
+):
+    from stockroom.store import guided_setup
+
+    app_ctx.config.primary_eda = "kicad"
+    app_ctx.repo._run(
+        "remote",
+        "add",
+        "origin",
+        "https://github.com/engineer/stockroom-catalog.git",
+    )
+    guided_setup.record_source_decision(app_ctx.config, skipped=True)
+    monkeypatch.setattr(
+        guided_setup,
+        "current_tool_connection",
+        lambda _ctx: {
+            "tool": "kicad",
+            "installed": True,
+            "connected": True,
+            "restart_required": False,
+            "detail": "KiCad is connected.",
+        },
+    )
+    observed = []
+
+    def github_status(_cli=None, *, repository=None):
+        observed.append(repository)
+        return {
+            "available": True,
+            "authenticated": True,
+            "online": True,
+            "verified_repository": {
+                "owner": "engineer",
+                "name": "stockroom-catalog",
+                "visibility": "private",
+                "writable": True,
+            },
+        }
+
+    monkeypatch.setattr(
+        "stockroom.api.routers.onboarding._github_status",
+        github_status,
+    )
+
+    response = client.post("/api/onboarding/complete")
+
+    assert response.status_code == 200
+    assert app_ctx.config.onboarded is True
+    assert app_ctx.config.guided_setup["completed"] is True
+    assert observed[0] == {
+        "owner": "engineer",
+        "name": "stockroom-catalog",
+        "url": "https://github.com/engineer/stockroom-catalog.git",
+    }
 
 
 def test_complete_refuses_a_partial_guided_setup(client, app_ctx, monkeypatch):
@@ -198,6 +265,30 @@ def test_complete_refuses_a_partial_guided_setup(client, app_ctx, monkeypatch):
     assert response.status_code == 400
     assert "catalog_repository" in response.json()["detail"]
     assert app_ctx.config.onboarded is False
+
+
+def test_guided_mutations_refuse_to_overlap_tool_setup(client, app_ctx, tmp_path):
+    from stockroom.api.routers.onboarding import _TOOL_SETUP_LOCK
+
+    app_ctx.config.primary_eda = "kicad"
+    assert _TOOL_SETUP_LOCK.acquire(blocking=False)
+    try:
+        repository = client.post(
+            "/api/onboarding/repository",
+            json={
+                "mode": "connect",
+                "owner": "engineer",
+                "name": "catalog",
+                "path": str(tmp_path / "catalog"),
+            },
+        )
+        switch = client.patch("/api/settings", json={"primary_eda": "altium"})
+    finally:
+        _TOOL_SETUP_LOCK.release()
+
+    assert repository.status_code == 409
+    assert switch.status_code == 409
+    assert app_ctx.config.primary_eda == "kicad"
 
 
 def test_guided_repository_preflights_destination_before_remote_creation(
@@ -296,11 +387,60 @@ def test_guided_repository_create_switches_only_after_github_returns_identity(
     assert app_ctx.config.onboarded is False
 
 
+def test_read_only_repository_is_rejected_before_local_mutation(
+    client, app_ctx, tmp_path, monkeypatch
+):
+    app_ctx.config.primary_eda = "kicad"
+    selected = tmp_path / "catalog"
+    repository = GitHubRepository(
+        owner="engineer",
+        name="stockroom-catalog",
+        url="https://github.com/engineer/stockroom-catalog.git",
+        visibility="private",
+        permission="read",
+    )
+
+    class Authority:
+        def repository(self, owner, name):
+            return repository
+
+    monkeypatch.setattr("stockroom.api.routers.onboarding.GitHubCli", Authority)
+    monkeypatch.setattr(
+        "stockroom.api.routers.onboarding.onb.set_library",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            AssertionError("read-only repository must not mutate local state")
+        ),
+    )
+
+    response = client.post(
+        "/api/onboarding/repository",
+        json={
+            "mode": "connect",
+            "owner": "engineer",
+            "name": "stockroom-catalog",
+            "path": str(selected),
+        },
+    )
+
+    assert response.status_code == 400
+    assert "write permission" in response.json()["detail"]
+    assert app_ctx.libraries_root != selected
+    assert "repository" not in app_ctx.config.guided_setup
+
+
 def test_connect_selected_kicad_runs_as_a_job_and_records_verified_receipt(
     client, app_ctx, monkeypatch
 ):
     app_ctx.config.primary_eda = "kicad"
     monkeypatch.setattr(app_ctx, "rewire_kicad", lambda: None)
+    submitted_write_lanes = []
+    original_submit = app_ctx.jobs.submit
+
+    def submit(fn, *, write=False):
+        submitted_write_lanes.append(write)
+        return original_submit(fn, write=write)
+
+    monkeypatch.setattr(app_ctx.jobs, "submit", submit)
     monkeypatch.setattr(
         "stockroom.api.routers.onboarding.guided_setup.current_tool_connection",
         lambda _ctx: {
@@ -321,6 +461,7 @@ def test_connect_selected_kicad_runs_as_a_job_and_records_verified_receipt(
         events = "".join(stream.iter_text())
 
     assert '"verified": true' in events
+    assert submitted_write_lanes == [True]
     assert app_ctx.config.guided_setup["tool_connection"] == {
         "tool": "kicad",
         "receipt": {"verified": True, "restart_required": True},

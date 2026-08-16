@@ -12,6 +12,8 @@ from pathlib import Path
 
 from fastapi import APIRouter, Depends, Request
 
+from stockroom.api.errors import ApiError
+from stockroom.api.routers.onboarding import _TOOL_SETUP_LOCK
 from stockroom.eda.primary_policy import (
     PrimaryEdaPolicy,
     machine_detected_tool_keys,
@@ -144,17 +146,21 @@ def settings_router(require_token) -> APIRouter:
         # only touch a field the caller actually sent, so an empty PATCH is a
         # no-op and an unknown field is ignored rather than corrupting the config
         if "primary_eda" in body:
-            # No Assets operation exists in this first contract slice, so a Settings choice has
-            # no running tool to drain and activates immediately. Assets will pass its captured
-            # active tool to the same policy when queued builds land.
-            policy = PrimaryEdaPolicy(ctx.config)
-            before = policy.primary_tool.key if policy.primary_tool else None
-            policy.request_switch(str(body["primary_eda"] or ""))
-            after = policy.primary_tool.key if policy.primary_tool else None
-            if after != before:
-                guided_setup.clear_after_primary_change(ctx.config)
-            else:
-                ctx.config.save()
+            # Tool setup holds the same lease, so a switch cannot redirect an in-flight setup.
+            # Assets will later extend this policy with its longer-lived tool operation lease.
+            if not _TOOL_SETUP_LOCK.acquire(blocking=False):
+                raise ApiError(409, "CAD tool setup is already running")
+            try:
+                policy = PrimaryEdaPolicy(ctx.config)
+                before = policy.primary_tool.key if policy.primary_tool else None
+                policy.request_switch(str(body["primary_eda"] or ""))
+                after = policy.primary_tool.key if policy.primary_tool else None
+                if after != before:
+                    guided_setup.clear_after_primary_change(ctx.config)
+                else:
+                    ctx.config.save()
+            finally:
+                _TOOL_SETUP_LOCK.release()
         if "mouser_api_key" in body:
             ctx.config.mouser_api_key = str(body["mouser_api_key"] or "")
             ctx.config.save()

@@ -1,5 +1,6 @@
 import { AppShell } from "./components/AppShell";
 import { OnboardingGate } from "./components/OnboardingGate";
+import { ErrorState, LoadingState } from "./components/productState";
 import { CaptureStatusPill } from "./components/CaptureStatusPill";
 import { LibraryPage } from "./pages/LibraryPage";
 import { ProjectsPage } from "./pages/ProjectsPage";
@@ -20,7 +21,21 @@ export default function App() {
   // The server revalidates the GitHub checkout and selected-tool connection on every read.
   // The shell opens only from that complete proof, never from the compatibility first_run flag.
   const onboarding = useOnboarding();
-  if (onboarding.data && !onboarding.data.guided_setup.ready) {
+  if (onboarding.isPending) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-app p-6">
+        <LoadingState id="app.setup.checking">Checking setup...</LoadingState>
+      </main>
+    );
+  }
+  if (onboarding.isError || !onboarding.data) {
+    return (
+      <main data-dev-id="onboarding.setup-error" className="flex min-h-screen items-center justify-center bg-app p-6">
+        <ErrorState id="app.setup.error">Stockroom could not check setup. Reconnect, then restart Stockroom.</ErrorState>
+      </main>
+    );
+  }
+  if (!onboarding.data.guided_setup.ready || !onboarding.data.onboarded) {
     return <OnboardingGate status={onboarding.data} />;
   }
   return (

@@ -113,11 +113,6 @@ export const BLOCKED_TERMS: readonly BlockedTerm[] = [
 
   // --- status and action vocabulary ------------------------------------------------------------
   {
-    term: "Ready",
-    replacement: "Prepared, Available, or Free",
-    note: "Three different claims were wearing one word. Prepared: this finished its preparation. Available: an update exists to install. Free: nobody is holding this resource.",
-  },
-  {
     term: "Retry / Try Again",
     replacement: "Rerun",
     note: "The action runs the same operation again, which is what rerunning is. Note `retries` and `retried` are already clear of the letter, so prose can still say a retry happened.",
@@ -434,6 +429,14 @@ export interface AllowedTerm {
 }
 
 export const INDUSTRY_TERMS: readonly AllowedTerm[] = [
+  {
+    term: "Catalog Repository",
+    why: "The accepted domain model names the GitHub-backed collaboration authority the Catalog Repository; Git remote or checkout names only one implementation edge and loses product ownership semantics.",
+  },
+  {
+    term: "Ready",
+    why: "Guided Setup has one owner-approved terminal verdict named Ready; Prepared is a separate historical UI status and would contradict the accepted setup contract.",
+  },
   {
     term: "Courtyard",
     why: "IPC-7351's own name for the placement envelope of a land pattern; a keep-out is a DIFFERENT PCB entity, so renaming it would tell an EDA reader something false about the drawing.",

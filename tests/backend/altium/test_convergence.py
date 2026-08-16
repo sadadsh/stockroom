@@ -14,8 +14,10 @@ from stockroom.altium.convergence import (
     AltiumLibraryConvergenceService,
     PersistenceVerification,
     converge_altium_library,
+    convergence_receipt_matches,
     render_installed_libraries_probe_script,
     render_persistence_probe_script,
+    verify_catalog_library,
     verify_libraries_absent,
     verify_persistent_library,
 )
@@ -298,6 +300,40 @@ def test_convergence_installs_then_verifies_in_a_second_session_before_receiptin
     payload = json.loads(receipt.read_text(encoding="utf-8"))
     assert payload["schema"] == 1
     assert payload["libraries"][0]["evidence"]["component_key"] == "TPD6E05U06RVZR"
+    assert convergence_receipt_matches(target, receipt_path=receipt, driver=driver)
+
+    target.unlink()
+    assert not convergence_receipt_matches(target, receipt_path=receipt, driver=driver)
+
+
+def test_empty_catalog_convergence_receipts_fresh_registration_without_fake_part(tmp_path):
+    target = _dblib(tmp_path)
+    with sqlite3.connect(tmp_path / "stockroom-parts.db") as connection:
+        connection.execute('DELETE FROM "Parts"')
+        connection.commit()
+    driver = _Driver(
+        tmp_path,
+        _Outcome(
+            "ok",
+            marker_text="SR-Installed0=C:\\fake\\Stockroom.DbLib\nDONE\n",
+        ),
+    )
+    receipt = tmp_path / "receipts.json"
+
+    result = converge_altium_library(
+        target,
+        receipt_path=receipt,
+        driver=driver,
+        workdir=tmp_path / "work",
+        installer=lambda *_args, **_kwargs: InstallResult("ok", "installed"),
+        verifier=verify_catalog_library,
+    )
+
+    assert result.status == "verified"
+    assert result.component_key == ""
+    evidence = json.loads(receipt.read_text(encoding="utf-8"))["libraries"][0]["evidence"]
+    assert evidence["verification_kind"] == "registration"
+    assert convergence_receipt_matches(target, receipt_path=receipt, driver=driver)
 
 
 def test_failed_fresh_session_proof_never_writes_a_receipt(tmp_path):

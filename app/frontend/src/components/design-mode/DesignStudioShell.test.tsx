@@ -170,7 +170,7 @@ function renderApp() {
 
 async function renderStudio() {
   const result = renderApp();
-  const entry = screen.getByRole("button", { name: "Design Studio" });
+  const entry = await screen.findByRole("button", { name: "Design Studio" });
   await userEvent.setup().click(entry);
   await screen.findByRole("region", { name: "Stockroom Preview" });
   return { ...result, entry };
@@ -222,7 +222,7 @@ afterEach(() => {
 describe("DesignStudioShell", () => {
   it("opens canvas-first with Preview active and every drawer closed", async () => {
     renderApp();
-    await userEvent.setup().click(screen.getByRole("button", { name: "Design Studio" }));
+    await userEvent.setup().click(await screen.findByRole("button", { name: "Design Studio" }));
 
     expect(screen.queryByRole("complementary", { name: "Screens" })).not.toBeInTheDocument();
     expect(screen.queryByRole("complementary", { name: "Inspector" })).not.toBeInTheDocument();

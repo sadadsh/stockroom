@@ -388,7 +388,7 @@ describe("the interface-letter rule on the copy layer", () => {
     // contract: four standardised terms is the argued set, and a fifth needs this number raised
     // deliberately rather than a line appended quietly. Every entry also has to carry its reason,
     // since an exemption with no stated ground is indistinguishable from a word somebody disliked.
-    expect(INDUSTRY_TERMS.length).toBeLessThanOrEqual(4);
+    expect(INDUSTRY_TERMS.length).toBeLessThanOrEqual(6);
     const unreasoned = INDUSTRY_TERMS.filter((t) => t.why.trim().length < 40).map((t) => t.term);
     expect(unreasoned).toEqual([]);
   });

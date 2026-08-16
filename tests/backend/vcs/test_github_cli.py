@@ -142,6 +142,25 @@ def test_local_authentication_status_never_requests_token_output() -> None:
     )
 
 
+def test_authentication_status_distinguishes_signed_out_from_operational_failure() -> None:
+    signed_out = GitHubCli(
+        executable=Path("gh.exe"),
+        runner=ScriptedRunner(
+            _result(returncode=1, stderr="You are not logged into any GitHub hosts")
+        ),
+    )
+    assert signed_out.authenticated() is False
+
+    offline = GitHubCli(
+        executable=Path("gh.exe"),
+        runner=ScriptedRunner(
+            _result(returncode=1, stderr="could not resolve api.github.com")
+        ),
+    )
+    with pytest.raises(GitHubCliError, match="status check failed"):
+        offline.authenticated()
+
+
 def test_browser_login_keeps_auth_output_private_and_returns_selected_viewer_fields() -> None:
     runner = ScriptedRunner(
         _result("one-time-browser-output-that-must-not-return"),

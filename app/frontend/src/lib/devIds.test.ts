@@ -196,7 +196,7 @@ import { DEV_IDS, DEV_ID_AREAS, DEV_ID_BY_ID } from "./devIds";
 // Moving About from a rail modal into Settings retires three modal-only targets and adds one
 // settings card target. The legacy rail target remains registered so personal design documents do
 // not become invalid merely because the product control moved.
-const EXPECTED_ENTRIES = 502;
+const EXPECTED_ENTRIES = 503;
 
 describe("devIds catalogue", () => {
   // The count is asserted from a single constant so bumping it is one edit, and so the test NAME can

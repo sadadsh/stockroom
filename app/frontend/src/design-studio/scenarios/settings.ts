@@ -25,7 +25,7 @@ function stateFor(id: SettingsScenarioId): { section: string; target: string; er
     const section = id.includes("updates") ? "settings.update" : "settings.appearance";
     return { section, target: section, errorPath: id.endsWith(".error") ? "/api/update/check" : undefined };
   }
-  if (id.includes("libraries")) return { section: "settings.profiles", target: "settings.profiles", errorPath: id.endsWith(".error") ? "/api/onboarding" : undefined };
+  if (id.includes("libraries")) return { section: "settings.profiles", target: "settings.profiles", errorPath: id.endsWith(".error") ? "/api/profiles" : undefined };
   if (id.includes("sync")) return { section: "settings.sync", target: "settings.sync", errorPath: id.endsWith(".error") ? "/api/sync/status" : undefined };
   if (id.includes("github")) return { section: "settings.github", target: "settings.github", errorPath: id.endsWith(".error") ? "/api/sync/status" : undefined };
   if (id.includes("kicad")) return { section: "settings.kicad", target: "settings.kicad", errorPath: id.endsWith(".error") ? "/api/system/info" : undefined };

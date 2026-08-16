@@ -79,6 +79,7 @@ class PersistenceVerification:
     footprint_library: str = ""
     placement_parameters: str = ""
     altium_log: str = ""
+    verification_kind: str = "placement"
 
     @property
     def ok(self) -> bool:
@@ -558,6 +559,76 @@ def verify_persistent_library(
     )
 
 
+def verify_catalog_library(
+    dblib: Path,
+    *,
+    driver: AltiumDriverLike | None = None,
+    workdir: Path | None = None,
+    timeout: int = 300,
+) -> PersistenceVerification:
+    """Verify a placeable catalog, or only registration when the catalog is genuinely empty."""
+
+    result = verify_persistent_library(
+        dblib,
+        driver=driver,
+        workdir=workdir,
+        timeout=timeout,
+    )
+    if (
+        result.status == "not-placeable"
+        and result.detail == "The generated Altium data source has no parts."
+    ):
+        return verify_registered_library(
+            dblib,
+            driver=driver,
+            workdir=workdir,
+            timeout=timeout,
+        )
+    return result
+
+
+def verify_registered_library(
+    dblib: Path,
+    *,
+    driver: AltiumDriverLike | None = None,
+    workdir: Path | None = None,
+    timeout: int = 300,
+) -> PersistenceVerification:
+    """Prove an empty Catalog DbLib is registered in a fresh Altium session."""
+
+    target = Path(dblib)
+    result = verify_libraries_absent(
+        (),
+        driver=driver,
+        workdir=workdir,
+        timeout=timeout,
+    )
+    if not result.ok:
+        return PersistenceVerification(
+            result.status,
+            result.detail,
+            installed_paths=result.installed_paths,
+            altium_log=result.altium_log,
+            verification_kind="registration",
+        )
+    drv = driver or AltiumDriver()
+    if not is_installed(result.installed_paths, drv.host.to_windows_path(str(target))):
+        return PersistenceVerification(
+            "not-installed",
+            f"{target.name} was absent from Altium's Installed list in a fresh process.",
+            installed_paths=result.installed_paths,
+            altium_log=result.altium_log,
+            verification_kind="registration",
+        )
+    return PersistenceVerification(
+        "ok",
+        f"A fresh Altium session lists the empty Catalog registration {target.name}.",
+        installed_paths=result.installed_paths,
+        altium_log=result.altium_log,
+        verification_kind="registration",
+    )
+
+
 def verify_libraries_absent(
     dblibs: tuple[Path, ...],
     *,
@@ -690,7 +761,10 @@ def _owned_receipts(path: Path) -> tuple[_OwnedReceipt, ...]:
             or not isinstance(evidence, dict)
             or evidence.get("status") != "ok"
             or not isinstance(evidence.get("component_key"), str)
-            or not evidence.get("component_key")
+            or (
+                not evidence.get("component_key")
+                and evidence.get("verification_kind") != "registration"
+            )
         ):
             continue
         candidate = Path(raw)
@@ -718,6 +792,22 @@ def _receipt_matches(path: Path, dblib: Path, driver: AltiumDriverLike) -> bool:
     target = _normalized(dblib)
     identity = _x2_identity(driver)
     return any(item.dblib_key == target and item.x2 == identity for item in _owned_receipts(path))
+
+
+def convergence_receipt_matches(
+    dblib: Path,
+    *,
+    receipt_path: Path | None = None,
+    driver: AltiumDriverLike | None = None,
+) -> bool:
+    """Revalidate one generated DbLib against Stockroom's machine receipt without launching Altium."""
+
+    target = Path(dblib)
+    return target.is_file() and _receipt_matches(
+        receipt_path or default_receipt_path(),
+        target,
+        driver or AltiumDriver(),
+    )
 
 
 def _replace_receipt_payload(path: Path, payload: dict) -> None:
@@ -1241,9 +1331,10 @@ def converge_altium_library(
         if obsolete
         else ""
     )
+    proof = verification.component_key or "the empty Catalog registration"
     return AltiumConvergenceResult(
         "verified",
-        f"Installed {target.name} and verified {verification.component_key} in a fresh Altium "
+        f"Installed {target.name} and verified {proof} in a fresh Altium "
         f"session.{cleanup_detail} No manual library setup is required.",
         dblib=str(target),
         component_key=verification.component_key,

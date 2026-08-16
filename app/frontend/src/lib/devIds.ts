@@ -33,6 +33,7 @@ export const DEV_IDS: DevIdEntry[] = [
   { id: "rail.theme-toggle", label: "Theme toggle", area: "rail" },
   { id: "about.root", label: "About settings content", area: "about" },
   { id: "onboarding.gate", label: "Onboarding gate", area: "onboarding" },
+  { id: "onboarding.setup-error", label: "Setup connection error", area: "onboarding" },
   { id: "toast.status", label: "Toast status", area: "toast" },
   { id: "capture.status", label: "Guided capture status", area: "capture" },
   { id: "about.icon", label: "About logo tile", area: "about" },

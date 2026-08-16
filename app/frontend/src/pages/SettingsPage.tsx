@@ -127,8 +127,7 @@ export function SettingsPage() {
   // query a section also uses, so this adds no extra request load. Each group panel below resolves
   // the rest of what it needs from the same cached keys.
   const settingsQ = useSettings();
-  const odbc = useOdbcStatus();
-  const syncQ = useSyncStatus();
+  const onboardingQ = useOnboarding();
   const { query: updateQ, view: updateStanding } = useUpdateStanding();
   // A toast takes a resolved string, so every sentence one of them says is read here. The paths and
   // credential names inside the holes are values off the machine and are not ours to reword.
@@ -187,51 +186,28 @@ export function SettingsPage() {
   }, []);
 
   const s = settingsQ.data;
-  const odbcInstalled = odbc.data?.installed;
-  const githubAccounts = syncQ.data?.github_auth?.accounts ?? [];
-  // A legacy app-owned token may still exist on an upgraded machine. It remains a temporary
-  // compatibility signal, but the UI creates no new tokens and GCM is the durable authority.
-  const githubConnected = githubAccounts.length > 0 || Boolean(s?.github_token_set);
+  const setup = onboardingQ.data;
 
-  // -- the Machine Setup verdict: is THIS machine fully set up? ---------------
+  // -- the Machine Setup verdict: consume the same live authority as Guided Setup. ---------
   const steps: SetupStep[] = [];
-  if (s) {
+  if (setup) {
+    const selected = setup.eda_tools.find((tool) => tool.key === setup.primary_eda);
     steps.push({
-      id: "kicad",
-      label: "Wire KiCad",
-      labelId: "settings.machine.step-kicad",
-      metLabel: "KiCad Wired",
-      metLabelId: "settings.machine.step-kicad-met",
-      met: s.kicad_wired,
-      target: "settings.kicad",
-    });
-    if (odbcInstalled !== null && odbcInstalled !== undefined) {
-      steps.push({
-        id: "odbc",
-        label: "Install The ODBC Driver",
-        labelId: "settings.machine.step-odbc",
-        metLabel: "ODBC Driver Installed",
-        metLabelId: "settings.machine.step-odbc-met",
-        met: odbcInstalled,
-        target: "settings.altium",
-      });
-    }
-    steps.push({
-      id: "key",
-      label: "Add A Distributor Credential",
-      labelId: "settings.machine.step-key",
-      metLabel: "Distributor Credential Saved",
-      metLabelId: "settings.machine.step-key-met",
-      met: s.mouser_api_key_set || s.digikey_client_secret_set,
-      target: "settings.distributor",
+      id: "cad-tool",
+      label: "Connect The Selected CAD Tool",
+      labelId: "settings.machine.step-cad",
+      metLabel: "Selected CAD Tool Connected",
+      metLabelId: "settings.machine.step-cad-met",
+      met: setup.guided_setup.tool_connection.connected,
+      target: selected?.settings_target ?? (setup.primary_eda === "altium" ? "settings.altium" : "settings.kicad"),
     });
     steps.push({
       id: "github",
-      label: "Connect GitHub",
+      label: "Connect The Catalog Repository",
       labelId: "settings.machine.step-github",
-      metLabel: "GitHub Connected",
+      metLabel: "Catalog Repository Connected",
       metLabelId: "settings.machine.step-github-met",
-      met: githubConnected,
+      met: setup.guided_setup.repository_ready && setup.guided_setup.github.online,
       target: "settings.github",
     });
   }

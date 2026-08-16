@@ -837,16 +837,24 @@ describe("SettingsPage - flat IA + Machine Setup band", () => {
     expect(await screen.findByText("This Machine Is Prepared")).toBeInTheDocument();
   });
 
-  it("counts unmet setup steps and focuses the exact owning card", async () => {
+  it("counts unmet authoritative setup steps and focuses the selected tool card", async () => {
     const scrollIntoView = vi.fn();
     Element.prototype.scrollIntoView = scrollIntoView;
+    mockApi.getOnboarding.mockResolvedValue({
+      ...BASE_ONBOARDING,
+      guided_setup: {
+        ...GUIDED_SETUP_READY,
+        repository_ready: false,
+        github: { ...GUIDED_SETUP_READY.github, online: false },
+        tool_connection: { ...GUIDED_SETUP_READY.tool_connection, connected: false },
+      },
+    });
     renderPage();
     expect(await screen.findByText("2 Setup Steps Need Attention")).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: /add a distributor credential/i }));
-    const section = document.querySelector<HTMLElement>('[data-dev-id="settings.distributor"]');
+    await userEvent.click(screen.getByRole("button", { name: /connect the selected cad tool/i }));
+    const section = document.querySelector<HTMLElement>('[data-dev-id="settings.kicad"]');
     expect(scrollIntoView).toHaveBeenCalledWith({ block: "start", behavior: "smooth" });
     expect(section).toHaveFocus();
-    expect(screen.getByLabelText(/mouser api credential/i)).toBeInTheDocument();
   });
 
   it("shows both EDA integrations immediately when KiCad needs attention", async () => {
@@ -857,7 +865,7 @@ describe("SettingsPage - flat IA + Machine Setup band", () => {
     expect(await screen.findByText(/not wired so far/i)).toBeInTheDocument();
   });
 
-  it("shows the ODBC driver step only when the probe answers (never off-Windows null)", async () => {
+  it("keeps optional provider and non-selected tool checks out of readiness", async () => {
     mockApi.altiumOdbcStatus.mockResolvedValue({
       installed: null,
       driver: "SQLite3 ODBC Driver",
@@ -871,6 +879,7 @@ describe("SettingsPage - flat IA + Machine Setup band", () => {
     renderPage();
     expect(await screen.findByText("This Machine Is Prepared")).toBeInTheDocument();
     expect(screen.queryByText(/install the odbc driver/i)).toBeNull();
+    expect(screen.queryByText(/distributor credential/i)).toBeNull();
   });
 });
 
@@ -882,11 +891,10 @@ describe("SettingsPage - critique fixes", () => {
       github_token_set: true,
     });
     renderPage();
-    expect(await screen.findByText("KiCad Wired")).toBeInTheDocument();
-    expect(screen.getByText("ODBC Driver Installed")).toBeInTheDocument();
-    expect(screen.getByText("Distributor Credential Saved")).toBeInTheDocument();
-    expect(screen.getByText("GitHub Connected")).toBeInTheDocument();
+    expect(await screen.findByText("Selected CAD Tool Connected")).toBeInTheDocument();
+    expect(screen.getByText("Catalog Repository Connected")).toBeInTheDocument();
     expect(screen.queryByText("Wire KiCad")).toBeNull();
+    expect(screen.queryByText(/Distributor Credential Saved/i)).toBeNull();
   });
 
   it("presents both EDA integrations without a second reveal", async () => {

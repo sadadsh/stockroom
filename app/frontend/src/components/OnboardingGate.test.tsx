@@ -95,10 +95,10 @@ describe("OnboardingGate", () => {
     const progress = screen.getByRole("list", { name: "Setup Progress" });
     expect(within(progress).getAllByRole("listitem").map((item) => item.textContent)).toEqual([
       "1.Choose CAD Tool",
-      "2.Catalog Git Checkout",
+      "2.Catalog Repository",
       "3.Connect The Tool",
       "4.Improve Source Data",
-      "5.Prepared",
+      "5.Ready",
     ]);
     expect(screen.getByRole("heading", { name: "Connect The Tool" })).toBeInTheDocument();
   });

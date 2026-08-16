@@ -210,7 +210,7 @@ class GitHubCli:
         return status.version
 
     def authenticated(self) -> bool:
-        """Read local gh credential state without exposing or printing the credential."""
+        """Read local gh credential state while distinguishing sign-out from transport failure."""
 
         if self._executable is None:
             return False
@@ -224,7 +224,22 @@ class GitHubCli:
             check=False,
             timeout=10.0,
         )
-        return result.returncode == 0
+        if result.returncode == 0:
+            return True
+        # gh uses exit 1 for both an absent/invalid credential and operational failures. Inspect
+        # only fixed diagnostic classes; never return, log, or persist the potentially sensitive
+        # process output. Unknown failures remain outages rather than prompting a needless login.
+        diagnostic = f"{result.stdout}\n{result.stderr}".casefold()
+        signed_out_markers = (
+            "not logged into any github hosts",
+            "not logged into github.com",
+            "authentication token is invalid",
+            "failed to authenticate to github.com",
+            "no oauth token",
+        )
+        if any(marker in diagnostic for marker in signed_out_markers):
+            return False
+        raise GitHubCliError("GitHub sign-in status check failed.")
 
     def login_browser(self) -> GitHubViewer:
         self._run(

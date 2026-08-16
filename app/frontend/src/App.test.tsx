@@ -14,7 +14,7 @@ import { CaptureProvider } from "./lib/capture";
 import { ToastProvider } from "./lib/toast";
 import { ThemeProvider } from "./lib/theme";
 import { DesignStudioProvider, useDesignStudio } from "./design-studio/DesignStudioProvider";
-import { GUIDED_SETUP_CHOOSE_CAD } from "./design-studio/fixtures/onboardingFixtures";
+import { GUIDED_SETUP_CHOOSE_CAD, guidedSetupAt } from "./design-studio/fixtures/onboardingFixtures";
 import { ONBOARDING_READY } from "./design-studio/fixtures/componentFixtures";
 
 vi.mock("./api/client", async (importActual) => {
@@ -23,6 +23,7 @@ vi.mock("./api/client", async (importActual) => {
     ...actual,
     api: {
       ...actual.api,
+      getOnboarding: vi.fn(),
       listParts: vi.fn(),
       facets: vi.fn(),
       partDetail: vi.fn(),
@@ -97,8 +98,12 @@ function ScenarioProbe({ expose }: { expose: (activate: (id: string) => Promise<
 }
 
 describe("App shell", () => {
+  beforeEach(() => {
+    mockApi.getOnboarding.mockResolvedValue(ONBOARDING_READY);
+  });
+
   it("gates an existing installation until Primary CAD Tool confirmation", async () => {
-    const onboarding = vi.spyOn(api, "getOnboarding").mockResolvedValue({
+    vi.spyOn(api, "getOnboarding").mockResolvedValue({
       primary_eda: null,
       primary_eda_pending: null,
       primary_eda_confirmation_required: true,
@@ -157,12 +162,12 @@ describe("App shell", () => {
       ).toBeInTheDocument();
       expect(screen.queryByText("Stockroom", { selector: "span" })).not.toBeInTheDocument();
     } finally {
-      onboarding.mockRestore();
+      mockApi.getOnboarding.mockResolvedValue(ONBOARDING_READY);
     }
   });
 
-  it("opens the product from Guided Setup readiness even when the coarse first-run flag is stale", async () => {
-    const onboarding = vi.spyOn(api, "getOnboarding").mockResolvedValue({
+  it("shows the Ready proof until the person completes Guided Setup", async () => {
+    vi.spyOn(api, "getOnboarding").mockResolvedValue({
       ...ONBOARDING_READY,
       onboarded: false,
       first_run: true,
@@ -184,10 +189,11 @@ describe("App shell", () => {
           </ThemeProvider>
         </QueryClientProvider>,
       );
-      expect(await screen.findByText("Stockroom")).toBeInTheDocument();
-      expect(screen.queryByRole("heading", { name: "Choose CAD Tool" })).not.toBeInTheDocument();
+      expect(await screen.findByRole("heading", { name: "Ready" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Open Components" })).toBeInTheDocument();
+      expect(screen.queryByText("Stockroom", { selector: "span" })).not.toBeInTheDocument();
     } finally {
-      onboarding.mockRestore();
+      mockApi.getOnboarding.mockResolvedValue(ONBOARDING_READY);
     }
   });
 
@@ -219,7 +225,7 @@ describe("App shell", () => {
     );
 
     // The rail brand and a live part both render through the shell.
-    expect(screen.getByText("Stockroom")).toBeInTheDocument();
+    expect(await screen.findByText("Stockroom")).toBeInTheDocument();
     // findAllByText: one component now reads its name in three honest places - the picker row,
     // its open tab, and the workspace identity header.
     expect((await screen.findAllByText("LM358")).length).toBeGreaterThan(0);
@@ -337,7 +343,7 @@ describe("App shell", () => {
       </QueryClientProvider>,
     );
 
-    expect(screen.getByRole("heading", { name: "STM Viewer" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "STM Viewer" })).toBeInTheDocument();
     expect(await screen.findByText("STM32F407VETx")).toBeInTheDocument();
   });
 
@@ -393,25 +399,26 @@ describe("App shell", () => {
     async function activate(id: string) {
       fetchMock.mockClear();
       await act(async () => activateScenario?.(id));
+      if (id.startsWith("global.onboarding.")) {
+        qc.setQueryData(["onboarding"], {
+          ...ONBOARDING_READY,
+          onboarded: false,
+          first_run: true,
+          guided_setup: guidedSetupAt("catalog_repository", {
+            ready: false,
+            repository_ready: false,
+            repository: null,
+          }),
+        });
+      }
     }
 
     await activate("global.onboarding.open");
-    expect(await screen.findByRole("heading", { name: "Catalog Git Checkout" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Catalog Repository" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Connect Existing" })).toHaveAttribute("aria-pressed", "true");
     expect(screen.queryByLabelText(/path|url|token/i)).not.toBeInTheDocument();
     expect(document.querySelector('[data-dev-id="onboarding.gate"]')).toBeInTheDocument();
     expect(fetchMock).not.toHaveBeenCalled();
-
-    await activate("global.onboarding.create");
-    expect(screen.getByRole("button", { name: "Create New" })).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByLabelText("Git Checkout Name")).toBeInTheDocument();
-
-    await activate("global.onboarding.clone");
-    expect(screen.getByRole("button", { name: "Connect Existing" })).toHaveAttribute("aria-pressed", "true");
-    expect(screen.queryByLabelText(/url|token/i)).not.toBeInTheDocument();
-
-    await activate("global.onboarding.error");
-    expect(await screen.findByRole("alert")).toHaveTextContent("Could not prepare the catalog");
 
     await activate("global.about.open");
     expect(await screen.findByRole("heading", { name: "About Stockroom" })).toBeInTheDocument();

@@ -69,6 +69,18 @@ def record_source_decision(config, *, skipped: bool) -> None:
     _save(config, source_data={"decided": True, "skipped": bool(skipped)})
 
 
+def completed(config) -> bool:
+    """Return only explicit completion of this Guided Setup contract, never legacy onboarding."""
+
+    return _state(config).get("completed") is True
+
+
+def record_completion(config) -> None:
+    """Persist the person's explicit Ready-screen completion separately from legacy state."""
+
+    _save(config, completed=True)
+
+
 def clear_after_primary_change(config) -> None:
     """Keep repository/source choices but require a fresh connection receipt for the new tool."""
 
@@ -125,17 +137,25 @@ def _kicad_connection(ctx) -> dict[str, object]:
 
 
 def _altium_connection(ctx, state: dict[str, object]) -> dict[str, object]:
+    from stockroom.altium.convergence import convergence_receipt_matches
     from stockroom.altium.driver import AltiumDriver
 
     driver = AltiumDriver()
     odbc = odbc_status()
     recorded = state.get("tool_connection")
     receipt = recorded.get("receipt") if isinstance(recorded, dict) else None
+    target = Path(ctx.profile.root) / "altium" / "Stockroom.DbLib"
+    result = receipt.get("result") if isinstance(receipt, dict) else None
     verified = bool(
         isinstance(recorded, dict)
         and recorded.get("tool") == "altium"
         and isinstance(receipt, dict)
         and receipt.get("verified") is True
+        and isinstance(result, dict)
+        and result.get("status") in {"verified", "already-verified"}
+        and Path(str(result.get("dblib", ""))).resolve(strict=False)
+        == target.resolve(strict=False)
+        and convergence_receipt_matches(target)
     )
     installed = bool(driver.installed)
     driver_ready = odbc.get("installed") is True

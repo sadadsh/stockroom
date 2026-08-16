@@ -31,13 +31,13 @@ function StepName({ step }: { step: GuidedSetupStep }) {
     case "choose_cad_tool":
       return <Text id="onboarding.step.cad">Choose CAD Tool</Text>;
     case "catalog_repository":
-      return <Text id="onboarding.step.catalog">Catalog Git Checkout</Text>;
+      return <Text id="onboarding.step.catalog">Catalog Repository</Text>;
     case "connect_the_tool":
       return <Text id="onboarding.step.connect">Connect The Tool</Text>;
     case "improve_source_data":
       return <Text id="onboarding.step.sources">Improve Source Data</Text>;
     case "ready":
-      return <Text id="onboarding.step.prepared">Prepared</Text>;
+      return <Text id="onboarding.step.prepared">Ready</Text>;
   }
 }
 
@@ -273,12 +273,30 @@ function CatalogRepository({ status }: { status: OnboardingStatus }) {
   }
 
   const github = status.guided_setup.github;
+  if (!github.online && github.error) {
+    return (
+      <>
+        <StepIntro
+          eyebrow={<Text id="onboarding.catalog.eyebrow">Step Two</Text>}
+          title={<Text id="onboarding.catalog.title">Catalog Repository</Text>}
+        >
+          <Text id="onboarding.catalog.reconnecting-lede">
+            Stockroom needs GitHub to prepare and confirm the Catalog Git checkout. Stockroom reconnects in the background.
+          </Text>
+        </StepIntro>
+        <InlineError>{github.error}</InlineError>
+        <p role="status" className="mt-4 text-sm text-t2">
+          <Text id="onboarding.catalog.reconnecting">Waiting For GitHub...</Text>
+        </p>
+      </>
+    );
+  }
   if (!github.authenticated) {
     return (
       <>
         <StepIntro
           eyebrow={<Text id="onboarding.catalog.eyebrow">Step Two</Text>}
-          title={<Text id="onboarding.catalog.title">Catalog Git Checkout</Text>}
+          title={<Text id="onboarding.catalog.title">Catalog Repository</Text>}
         >
           <Text id="onboarding.catalog.login-lede">
             Sign in through the GitHub browser flow. Stockroom does not request or store a GitHub token.
@@ -303,7 +321,7 @@ function CatalogRepository({ status }: { status: OnboardingStatus }) {
     <>
       <StepIntro
         eyebrow={<Text id="onboarding.catalog.eyebrow">Step Two</Text>}
-        title={<Text id="onboarding.catalog.title">Catalog Git Checkout</Text>}
+        title={<Text id="onboarding.catalog.title">Catalog Repository</Text>}
       >
         <Text id="onboarding.catalog.lede">
           Create a GitHub-backed Component Catalog or connect one that is present. Select its managed local folder through Explorer.
@@ -548,22 +566,32 @@ function Prepared({ status }: { status: OnboardingStatus }) {
     <>
       <StepIntro
         eyebrow={<Text id="onboarding.prepared.eyebrow">Step Five</Text>}
-        title={<Text id="onboarding.prepared.title">Setup Is Complete</Text>}
+        title={<Text id="onboarding.prepared.title">Ready</Text>}
       >
         <Text id="onboarding.prepared.lede">
           The Component Catalog and selected CAD tool passed the required setup checks. Open Components to add the first part.
         </Text>
       </StepIntro>
       <dl className="mt-5 grid grid-cols-[auto_1fr] gap-x-5 gap-y-3 rounded-control border border-line bg-field p-4 text-sm">
-        <dt className="text-t3"><Text id="onboarding.prepared.catalog">Catalog Git Checkout</Text></dt>
+        <dt className="text-t3"><Text id="onboarding.prepared.catalog">Catalog Repository</Text></dt>
         <dd className="text-t1">{repository ? `${repository.owner}/${repository.name}` : ""}</dd>
         <dt className="text-t3"><Text id="onboarding.prepared.tool">Selected CAD Tool</Text></dt>
         <dd className="text-t1">{primary?.label ?? status.primary_eda}</dd>
         <dt className="text-t3"><Text id="onboarding.prepared.connection">Tool Connection</Text></dt>
         <dd className="text-t1">{status.guided_setup.tool_connection.detail}</dd>
-        <dt className="text-t3"><Text id="onboarding.prepared.sources">Source Data</Text></dt>
+        {status.guided_setup.tool_connection.restart_required ? (
+          <>
+            <dt className="text-t3"><Text id="onboarding.prepared.restart">CAD Restart</Text></dt>
+            <dd className="text-t1"><Text id="onboarding.prepared.restart-required">Required</Text></dd>
+          </>
+        ) : null}
+        <dt className="text-t3"><Text id="onboarding.prepared.mouser">Mouser</Text></dt>
         <dd className="text-t1">
-          {status.guided_setup.source_data.skipped ? <Text id="onboarding.prepared.sources-skipped">Skipped</Text> : <Text id="onboarding.prepared.sources-connected">Connected</Text>}
+          {status.guided_setup.source_data.skipped ? <Text id="onboarding.prepared.sources-skipped">Skipped</Text> : status.guided_setup.source_data.mouser_connected ? <Text id="onboarding.prepared.source-connected">Connected</Text> : <Text id="onboarding.prepared.source-not-connected">Not Connected</Text>}
+        </dd>
+        <dt className="text-t3"><Text id="onboarding.prepared.digikey">DigiKey</Text></dt>
+        <dd className="text-t1">
+          {status.guided_setup.source_data.skipped ? <Text id="onboarding.prepared.sources-skipped">Skipped</Text> : status.guided_setup.source_data.digikey_connected ? <Text id="onboarding.prepared.source-connected">Connected</Text> : <Text id="onboarding.prepared.source-not-connected">Not Connected</Text>}
         </dd>
         <dt className="text-t3"><Text id="onboarding.prepared.first-action">First Action</Text></dt>
         <dd className="text-t1"><Text id="onboarding.prepared.add">Add A Component</Text></dd>

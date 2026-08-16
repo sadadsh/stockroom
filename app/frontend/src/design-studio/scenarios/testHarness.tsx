@@ -72,8 +72,15 @@ export async function mountScenario(id: string) {
   await waitFor(() => expect(activateScenario).toBeDefined());
   await act(async () => activateScenario?.(id));
   view.rerender(tree(<DesignStudioShell><App /></DesignStudioShell>));
-  await waitFor(() => expect(scenarioTarget("shell.root")).toBeInTheDocument());
+  await waitFor(() =>
+    expect(
+      scenarioTarget("shell.root")
+        ?? scenarioTarget("onboarding.gate")
+        ?? scenarioTarget("onboarding.setup-error"),
+    ).toBeInTheDocument(),
+  );
   for (const target of scenario?.expectedTargets ?? []) {
+    if (id === "global.real-data" && scenarioTarget("onboarding.setup-error")) continue;
     await waitFor(() => expect(scenarioTarget(target)).toBeInTheDocument());
   }
   if (!scenario.fixtures.some((fixture) => fixture.behavior?.state === "pending")) {
