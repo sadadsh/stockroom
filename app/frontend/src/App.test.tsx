@@ -14,6 +14,8 @@ import { CaptureProvider } from "./lib/capture";
 import { ToastProvider } from "./lib/toast";
 import { ThemeProvider } from "./lib/theme";
 import { DesignStudioProvider, useDesignStudio } from "./design-studio/DesignStudioProvider";
+import { GUIDED_SETUP_CHOOSE_CAD } from "./design-studio/fixtures/onboardingFixtures";
+import { ONBOARDING_READY } from "./design-studio/fixtures/componentFixtures";
 
 vi.mock("./api/client", async (importActual) => {
   const actual = await importActual<typeof import("./api/client")>();
@@ -130,6 +132,7 @@ describe("App shell", () => {
       under_git: true,
       default_dir: "C:/Stockroom",
       libraries: [],
+      guided_setup: GUIDED_SETUP_CHOOSE_CAD,
     });
     try {
       const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -150,9 +153,39 @@ describe("App shell", () => {
       );
 
       expect(
-        await screen.findByRole("heading", { name: "Choose Your CAD Tool" }),
+        await screen.findByRole("heading", { name: "Choose CAD Tool" }),
       ).toBeInTheDocument();
       expect(screen.queryByText("Stockroom", { selector: "span" })).not.toBeInTheDocument();
+    } finally {
+      onboarding.mockRestore();
+    }
+  });
+
+  it("opens the product from Guided Setup readiness even when the coarse first-run flag is stale", async () => {
+    const onboarding = vi.spyOn(api, "getOnboarding").mockResolvedValue({
+      ...ONBOARDING_READY,
+      onboarded: false,
+      first_run: true,
+    });
+    mockApi.listParts.mockResolvedValue({ parts: [], count: 0 });
+    mockApi.facets.mockResolvedValue({ by_category: {}, by_manufacturer: {}, complete: 0, incomplete: 0 });
+    try {
+      const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+      render(
+        <QueryClientProvider client={qc}>
+          <ThemeProvider>
+            <ToastProvider>
+              <RouterProvider initial="components">
+                <CaptureProvider>
+                  <AddPartProvider><App /></AddPartProvider>
+                </CaptureProvider>
+              </RouterProvider>
+            </ToastProvider>
+          </ThemeProvider>
+        </QueryClientProvider>,
+      );
+      expect(await screen.findByText("Stockroom")).toBeInTheDocument();
+      expect(screen.queryByRole("heading", { name: "Choose CAD Tool" })).not.toBeInTheDocument();
     } finally {
       onboarding.mockRestore();
     }
@@ -331,6 +364,7 @@ describe("App shell", () => {
         onboarded: true,
         first_run: false,
         libraries: [],
+        guided_setup: ONBOARDING_READY.guided_setup,
       }),
     });
     vi.stubGlobal("fetch", fetchMock);
@@ -362,22 +396,22 @@ describe("App shell", () => {
     }
 
     await activate("global.onboarding.open");
-    expect(await screen.findByRole("heading", { name: "Set Up Your Components" })).toBeInTheDocument();
-    expect(screen.getByLabelText("Components Folder")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Catalog Git Checkout" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Connect Existing" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.queryByLabelText(/path|url|token/i)).not.toBeInTheDocument();
     expect(document.querySelector('[data-dev-id="onboarding.gate"]')).toBeInTheDocument();
     expect(fetchMock).not.toHaveBeenCalled();
 
     await activate("global.onboarding.create");
     expect(screen.getByRole("button", { name: "Create New" })).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByLabelText(/New Components Folder/)).toBeInTheDocument();
+    expect(screen.getByLabelText("Git Checkout Name")).toBeInTheDocument();
 
     await activate("global.onboarding.clone");
-    expect(screen.getByRole("button", { name: "Clone From Git" })).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByLabelText("Git URL")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Connect Existing" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.queryByLabelText(/url|token/i)).not.toBeInTheDocument();
 
     await activate("global.onboarding.error");
-    expect(await screen.findByRole("status")).toHaveTextContent("Could not set up the catalog");
-    expect(document.querySelector('[data-dev-id="toast.status"]')).toBeInTheDocument();
+    expect(await screen.findByRole("alert")).toHaveTextContent("Could not prepare the catalog");
 
     await activate("global.about.open");
     expect(await screen.findByRole("heading", { name: "About Stockroom" })).toBeInTheDocument();

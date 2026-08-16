@@ -8,6 +8,7 @@ import { AstryxThemeBridge, ThemeProvider } from "../lib/theme";
 import { DevModeProvider } from "../lib/devMode";
 import { resetUpdateClocksForTests } from "../lib/useUpdateStanding";
 import { SettingsPage } from "./SettingsPage";
+import { GUIDED_SETUP_READY } from "../design-studio/fixtures/onboardingFixtures";
 
 // The revision THIS bundle was built at. A backend revision that disagrees with the running bundle
 // is a standing of its own now ("Restart Required", C8), so the update cases below have to state
@@ -111,6 +112,7 @@ const BASE_ONBOARDING: OnboardingStatus = {
       under_git: true,
     },
   ],
+  guided_setup: GUIDED_SETUP_READY,
 };
 
 function renderPage() {

@@ -21,6 +21,7 @@ import { DesignStudioProvider, useDesignStudio } from "./DesignStudioProvider";
 import { registerScenarios, type ScenarioRegistry } from "./scenarioRegistry";
 import type { DesignScenario } from "./scenario";
 import { runtimeDesignId } from "../lib/designIdentity";
+import { guidedSetupAt } from "./fixtures/onboardingFixtures";
 
 vi.mock("../api/client", async (importActual) => {
   const actual = await importActual<typeof import("../api/client")>();
@@ -85,6 +86,11 @@ const ONBOARDING_STATUS: OnboardingStatus = {
   under_git: true,
   default_dir: "C:\\Stockroom\\Components",
   libraries: [],
+  guided_setup: guidedSetupAt("catalog_repository", {
+    ready: false,
+    repository_ready: false,
+    repository: null,
+  }),
 };
 
 const DUPLICATE_ONBOARDING_SCENARIO: DesignScenario = {
@@ -796,17 +802,17 @@ describe("DesignStudioProvider", () => {
     const studio = renderStudio({ includeOnboardingGate: true });
     const user = userEvent.setup();
 
-    await user.click(screen.getByRole("button", { name: "Clone From Git" }));
-    expect(screen.getByRole("button", { name: "Clone From Git" })).toHaveAttribute("aria-pressed", "true");
+    await user.click(screen.getByRole("button", { name: "Create New" }));
+    expect(screen.getByRole("button", { name: "Create New" })).toHaveAttribute("aria-pressed", "true");
 
     await studio.activateScenario("global.onboarding.open");
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: "Open Existing" })).toHaveAttribute("aria-pressed", "true"),
+      expect(screen.getByRole("button", { name: "Connect Existing" })).toHaveAttribute("aria-pressed", "true"),
     );
 
     await studio.exitScenario();
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: "Clone From Git" })).toHaveAttribute("aria-pressed", "true"),
+      expect(screen.getByRole("button", { name: "Create New" })).toHaveAttribute("aria-pressed", "true"),
     );
   });
 

@@ -1,5 +1,7 @@
 import type { ScenarioFixture } from "./scenario";
 import type {
+  GuidedRepositoryBody,
+  GuidedSourceDataBody,
   OnboardingStatus,
   ParametricFacet,
   ParametricFacets,
@@ -61,6 +63,54 @@ export function isPrimaryEdaInfo(value: Record<string, unknown>): boolean {
   );
 }
 
+function isGitHubRepository(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    typeof value.owner === "string" &&
+    typeof value.name === "string" &&
+    typeof value.url === "string" &&
+    (value.visibility === "public" || value.visibility === "private" || value.visibility === "internal") &&
+    (value.permission === "admin" || value.permission === "maintain" || value.permission === "write" || value.permission === "triage" || value.permission === "read") &&
+    typeof value.writable === "boolean"
+  );
+}
+
+function isGuidedSetup(value: unknown): boolean {
+  if (!isRecord(value)) return false;
+  const steps = ["choose_cad_tool", "catalog_repository", "connect_the_tool", "improve_source_data", "ready"];
+  const repository = value.repository;
+  const github = value.github;
+  const tool = value.tool_connection;
+  const source = value.source_data;
+  return (
+    value.schema === 1 &&
+    typeof value.step === "string" && steps.includes(value.step) &&
+    Array.isArray(value.steps) && value.steps.length === steps.length && value.steps.every((step, index) => step === steps[index]) &&
+    typeof value.ready === "boolean" &&
+    typeof value.repository_ready === "boolean" &&
+    (repository === null || (isRecord(repository) && typeof repository.owner === "string" && typeof repository.name === "string" && typeof repository.url === "string")) &&
+    isRecord(github) &&
+    typeof github.available === "boolean" &&
+    (github.version === null || typeof github.version === "string") &&
+    typeof github.authenticated === "boolean" &&
+    typeof github.online === "boolean" &&
+    (github.viewer === null || (isRecord(github.viewer) && typeof github.viewer.login === "string" && (github.viewer.name === null || typeof github.viewer.name === "string"))) &&
+    Array.isArray(github.owners) && github.owners.every((owner) => isRecord(owner) && typeof owner.login === "string" && (owner.kind === "personal" || owner.kind === "organization")) &&
+    (github.verified_repository === undefined || isGitHubRepository(github.verified_repository)) &&
+    isRecord(tool) &&
+    (tool.tool === null || typeof tool.tool === "string") &&
+    typeof tool.installed === "boolean" &&
+    typeof tool.connected === "boolean" &&
+    typeof tool.restart_required === "boolean" &&
+    typeof tool.detail === "string" &&
+    isRecord(source) &&
+    typeof source.decided === "boolean" &&
+    typeof source.skipped === "boolean" &&
+    typeof source.mouser_connected === "boolean" &&
+    typeof source.digikey_connected === "boolean"
+  );
+}
+
 function isOnboardingLibrary(value: unknown): boolean {
   return (
     isRecord(value) &&
@@ -83,7 +133,8 @@ function isOnboardingResponse(value: unknown): value is OnboardingStatus {
     isStringArray(value.profiles) &&
     typeof value.under_git === "boolean" &&
     typeof value.default_dir === "string" &&
-    Array.isArray(value.libraries) && value.libraries.every(isOnboardingLibrary)
+    Array.isArray(value.libraries) && value.libraries.every(isOnboardingLibrary) &&
+    isGuidedSetup(value.guided_setup)
   );
 }
 
@@ -98,10 +149,38 @@ function isSetLibraryBody(value: unknown): value is SetLibraryBody {
 }
 
 function isOnboardingMutation(fixture: ScenarioFixture): boolean {
+  return isSetLibraryBody(fixture.body) && isOnboardingResponse(fixture.response);
+}
+
+function hasOnlyKeys(value: Record<string, unknown>, keys: readonly string[]): boolean {
+  return Object.keys(value).every((key) => keys.includes(key));
+}
+
+function isGuidedRepositoryBody(value: unknown): value is GuidedRepositoryBody {
   return (
-    isSetLibraryBody(fixture.body) &&
-    isOnboardingResponse(fixture.response)
+    isRecord(value) &&
+    hasOnlyKeys(value, ["mode", "owner", "name", "visibility", "path"]) &&
+    (value.mode === "create" || value.mode === "connect") &&
+    typeof value.owner === "string" &&
+    typeof value.name === "string" &&
+    (value.visibility === undefined || value.visibility === "public" || value.visibility === "private") &&
+    typeof value.path === "string"
   );
+}
+
+function isGuidedSourceDataBody(value: unknown): value is GuidedSourceDataBody {
+  return (
+    isRecord(value) &&
+    hasOnlyKeys(value, ["skipped", "mouser_api_key", "digikey_client_id", "digikey_client_secret"]) &&
+    (value.skipped === undefined || typeof value.skipped === "boolean") &&
+    isOptionalString(value.mouser_api_key) &&
+    isOptionalString(value.digikey_client_id) &&
+    isOptionalString(value.digikey_client_secret)
+  );
+}
+
+function isJobRef(value: unknown): boolean {
+  return isRecord(value) && typeof value.job_id === "string";
 }
 
 /** Endpoint owner for GET /api/update/check, checked against UpdateCheck. */
@@ -190,7 +269,11 @@ export function createScenarioFixtureValidatorRegistry(
 ): ScenarioFixtureValidatorRegistry {
   return {
     validate: (fixture) => {
-      const validator = validators[`${fixture.method.toUpperCase()} ${fixture.path}`];
+      const rawKey = `${fixture.method.toUpperCase()} ${fixture.path}`;
+      const key = /^GET \/api\/onboarding\/github\/repositories\/[^/]+$/.test(rawKey)
+        ? "GET /api/onboarding/github/repositories/{owner}"
+        : rawKey;
+      const validator = validators[key];
       return validator ? validator(fixture) : fallback?.validate(fixture) === true;
     },
   };
@@ -199,6 +282,12 @@ export function createScenarioFixtureValidatorRegistry(
 export const bootstrapFixtureValidators = createScenarioFixtureValidatorRegistry({
   "GET /api/onboarding": (fixture) => fixture.body === undefined && isOnboardingResponse(fixture.response),
   "POST /api/onboarding/library": isOnboardingMutation,
+  "POST /api/onboarding/github/login": (fixture) => fixture.body === undefined && isJobRef(fixture.response),
+  "GET /api/onboarding/github/repositories/{owner}": (fixture) => fixture.body === undefined && isRecord(fixture.response) && Array.isArray(fixture.response.repositories) && fixture.response.repositories.every(isGitHubRepository),
+  "POST /api/onboarding/repository": (fixture) => isGuidedRepositoryBody(fixture.body) && isOnboardingResponse(fixture.response),
+  "POST /api/onboarding/tool/connect": (fixture) => fixture.body === undefined && isJobRef(fixture.response),
+  "POST /api/onboarding/source-data": (fixture) => isGuidedSourceDataBody(fixture.body) && isOnboardingResponse(fixture.response),
+  "POST /api/onboarding/complete": (fixture) => fixture.body === undefined && isOnboardingResponse(fixture.response),
   "GET /api/update/check": (fixture) => fixture.body === undefined && isUpdateResponse(fixture.response),
   "GET /api/library/search": (fixture) => fixture.body === undefined && isSearchResponse(fixture.response),
   "GET /api/library/facets/parametric": (fixture) => fixture.body === undefined && isParametricFacets(fixture.response),

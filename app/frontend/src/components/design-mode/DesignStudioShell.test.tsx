@@ -41,6 +41,17 @@ vi.mock("../../api/client", async (importActual) => {
         under_git: true,
         default_dir: "C:\\Stockroom\\Components",
         libraries: [],
+        guided_setup: {
+          schema: 1,
+          step: "ready",
+          steps: ["choose_cad_tool", "catalog_repository", "connect_the_tool", "improve_source_data", "ready"],
+          ready: true,
+          repository_ready: true,
+          repository: { owner: "engineer", name: "stockroom-catalog", url: "https://github.com/engineer/stockroom-catalog.git" },
+          github: { available: true, version: "2.80.0", authenticated: true, online: true, viewer: { login: "engineer", name: null }, owners: [{ login: "engineer", kind: "personal" }] },
+          tool_connection: { tool: "kicad", installed: true, connected: true, restart_required: false, detail: "KiCad is connected." },
+          source_data: { decided: true, skipped: true, mouser_connected: false, digikey_connected: false },
+        },
       }),
       designStudioGet: vi.fn().mockRejectedValue(new Error("No personal design fixture")),
       devStatus: vi.fn().mockResolvedValue({

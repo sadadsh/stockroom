@@ -14,6 +14,11 @@ import {
 import type {
   DiscoveredProject,
   EnrichmentResult,
+  GuidedRepositoryBody,
+  GuidedSourceDataBody,
+  GuidedToolConnectionResult,
+  GitHubOwner,
+  GitHubViewer,
   PartDetail,
   ProjectReviewCandidate,
   SetLibraryBody,
@@ -362,8 +367,6 @@ export function useCompleteAssembly(projectId: string) {
   });
 }
 
-// First-run library onboarding (M9c). Set/complete repoint the running engine at a
-// different library, so EVERY server query is invalidated.
 export function useOnboarding() {
   return useQuery({
     queryKey: ["onboarding"],
@@ -380,11 +383,65 @@ export function useSetLibrary() {
   });
 }
 
+export function useOnboardingGitHubRepositories(owner: string, enabled: boolean) {
+  return useQuery({
+    queryKey: ["onboarding", "github-repositories", owner],
+    queryFn: () => api.getOnboardingGitHubRepositories(owner),
+    enabled: enabled && owner.length > 0,
+    retry: false,
+  });
+}
+
+export function useOnboardingGitHubLogin() {
+  const qc = useQueryClient();
+  const job = useJob<{ viewer: GitHubViewer; owners: GitHubOwner[] }>();
+  const start = useCallback(async () => {
+    const terminal = await job.start(() => api.startOnboardingGitHubLogin());
+    if (terminal.status === "done") {
+      await qc.invalidateQueries({ queryKey: ["onboarding"] });
+    }
+    return terminal;
+  }, [job, qc]);
+  return { ...job, start };
+}
+
+export function useSetGuidedRepository() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: GuidedRepositoryBody) => api.setGuidedRepository(body),
+    onSuccess: async (status) => {
+      qc.setQueryData(["onboarding"], status);
+      await qc.invalidateQueries();
+    },
+  });
+}
+
+export function useConnectGuidedTool() {
+  const qc = useQueryClient();
+  const job = useJob<GuidedToolConnectionResult>();
+  const start = useCallback(async () => {
+    const terminal = await job.start(() => api.connectGuidedTool());
+    if (terminal.status === "done") {
+      await qc.invalidateQueries({ queryKey: ["onboarding"] });
+    }
+    return terminal;
+  }, [job, qc]);
+  return { ...job, start };
+}
+
+export function useSaveGuidedSourceData() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: GuidedSourceDataBody) => api.saveGuidedSourceData(body),
+    onSuccess: (status) => qc.setQueryData(["onboarding"], status),
+  });
+}
+
 export function useCompleteOnboarding() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: () => api.completeOnboarding(),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["onboarding"] }),
+    onSuccess: (status) => qc.setQueryData(["onboarding"], status),
   });
 }
 

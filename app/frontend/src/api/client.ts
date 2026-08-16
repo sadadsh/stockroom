@@ -53,6 +53,9 @@ import type {
   SearchResponse,
   HistoryResponse,
   JobRef,
+  GuidedRepositoryBody,
+  GuidedSourceDataBody,
+  GitHubRepositoriesResponse,
   PartDetail,
   PassiveAddBody,
   PassivePreview,
@@ -1224,15 +1227,34 @@ export const api = {
     });
   },
 
-  // First-run library onboarding (M9b/M9c): point the app at a library (open an existing
-  // one, clone a git URL, or create a fresh one) and repoint the running engine at it live.
-  // A set/complete changes which library EVERY other query reads, so callers invalidate all.
   getOnboarding(): Promise<OnboardingStatus> {
     return apiGet<OnboardingStatus>("/api/onboarding");
   },
 
   setLibrary(body: SetLibraryBody): Promise<OnboardingStatus> {
     return request<OnboardingStatus>("POST", "/api/onboarding/library", { body });
+  },
+
+  startOnboardingGitHubLogin(): Promise<JobRef> {
+    return request<JobRef>("POST", "/api/onboarding/github/login");
+  },
+
+  getOnboardingGitHubRepositories(owner: string): Promise<GitHubRepositoriesResponse> {
+    return apiGet<GitHubRepositoriesResponse>(
+      `/api/onboarding/github/repositories/${encodeURIComponent(owner)}`,
+    );
+  },
+
+  setGuidedRepository(body: GuidedRepositoryBody): Promise<OnboardingStatus> {
+    return request<OnboardingStatus>("POST", "/api/onboarding/repository", { body });
+  },
+
+  connectGuidedTool(): Promise<JobRef> {
+    return request<JobRef>("POST", "/api/onboarding/tool/connect");
+  },
+
+  saveGuidedSourceData(body: GuidedSourceDataBody): Promise<OnboardingStatus> {
+    return request<OnboardingStatus>("POST", "/api/onboarding/source-data", { body });
   },
 
   completeOnboarding(): Promise<OnboardingStatus> {

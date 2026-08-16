@@ -6,6 +6,7 @@ import {
 } from "../scenarioFixtureValidation";
 import { COMPONENT_FACETS } from "./componentFixtures";
 import { stmFixtureValidators } from "./stmFixtures";
+import { GUIDED_SETUP_READY } from "./onboardingFixtures";
 
 export const SETTINGS_READY: SettingsInfo = {
   primary_eda: "kicad", primary_eda_pending: null,
@@ -33,6 +34,7 @@ export const SETTINGS_ONBOARDING: OnboardingStatus = {
     { name: "Main", path: "C:\\Stockroom\\Main", active: true, available: true, under_git: true },
     { name: "Archive", path: "C:\\Stockroom\\Archive", active: false, available: true, under_git: true },
   ],
+  guided_setup: GUIDED_SETUP_READY,
 };
 
 export const SETTINGS_UPDATE = {

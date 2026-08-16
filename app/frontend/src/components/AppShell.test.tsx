@@ -9,6 +9,7 @@ import { CaptureProvider } from "../lib/capture";
 import { ThemeProvider } from "../lib/theme";
 import { ToastProvider } from "../lib/toast";
 import { resetUpdateClocksForTests } from "../lib/useUpdateStanding";
+import { GUIDED_SETUP_READY } from "../design-studio/fixtures/onboardingFixtures";
 
 vi.mock("../api/client", async (importActual) => {
   const actual = await importActual<typeof import("../api/client")>();
@@ -70,6 +71,7 @@ beforeEach(() => {
         under_git: true,
       },
     ],
+    guided_setup: GUIDED_SETUP_READY,
   } as never);
   mockApi.checkUpdate.mockResolvedValue({
     update_available: false,

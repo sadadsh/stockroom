@@ -721,8 +721,67 @@ export interface ActivateResponse {
   part_count: number;
 }
 
-// GET /api/onboarding (M9b/M9c): where the library lives + whether the one-time
-// first-run welcome should show. A frozen exe ships no library, so this is the gate.
+export type GuidedSetupStep =
+  | "choose_cad_tool"
+  | "catalog_repository"
+  | "connect_the_tool"
+  | "improve_source_data"
+  | "ready";
+
+export interface GitHubViewer {
+  login: string;
+  name: string | null;
+}
+
+export interface GitHubOwner {
+  login: string;
+  kind: "personal" | "organization";
+}
+
+export interface GitHubRepository {
+  owner: string;
+  name: string;
+  url: string;
+  visibility: "public" | "private" | "internal";
+  permission: "admin" | "maintain" | "write" | "triage" | "read";
+  writable: boolean;
+}
+
+export interface GuidedSetupStatus {
+  schema: 1;
+  step: GuidedSetupStep;
+  steps: GuidedSetupStep[];
+  ready: boolean;
+  repository_ready: boolean;
+  repository: Pick<GitHubRepository, "owner" | "name" | "url"> | null;
+  github: {
+    available: boolean;
+    version: string | null;
+    authenticated: boolean;
+    online: boolean;
+    viewer: GitHubViewer | null;
+    owners: GitHubOwner[];
+    error?: string;
+    verified_repository?: GitHubRepository;
+  };
+  tool_connection: {
+    tool: string | null;
+    installed: boolean;
+    connected: boolean;
+    restart_required: boolean;
+    detail: string;
+    odbc_installed?: boolean | null;
+    busy?: string;
+  };
+  source_data: {
+    decided: boolean;
+    skipped: boolean;
+    mouser_connected: boolean;
+    digikey_connected: boolean;
+  };
+}
+
+// GET /api/onboarding: server-owned Guided Setup readiness plus compatibility catalog facts.
 export interface OnboardingStatus extends PrimaryEdaInfo {
   onboarded: boolean;
   first_run: boolean;
@@ -737,6 +796,7 @@ export interface OnboardingStatus extends PrimaryEdaInfo {
     available: boolean;
     under_git: boolean;
   }>;
+  guided_setup: GuidedSetupStatus;
 }
 
 export interface ProjectSummary {
@@ -1373,6 +1433,30 @@ export interface SetLibraryBody {
   path?: string;
   url?: string;
   dest?: string;
+}
+
+export interface GuidedRepositoryBody {
+  mode: "create" | "connect";
+  owner: string;
+  name: string;
+  visibility?: "public" | "private";
+  path: string;
+}
+
+export interface GuidedSourceDataBody {
+  skipped?: boolean;
+  mouser_api_key?: string;
+  digikey_client_id?: string;
+  digikey_client_secret?: string;
+}
+
+export interface GitHubRepositoriesResponse {
+  repositories: GitHubRepository[];
+}
+
+export interface GuidedToolConnectionResult {
+  tool_connection: GuidedSetupStatus["tool_connection"];
+  receipt: Record<string, unknown>;
 }
 
 // GET /api/sync/status

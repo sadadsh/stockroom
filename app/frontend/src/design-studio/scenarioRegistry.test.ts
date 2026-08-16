@@ -13,6 +13,8 @@ import {
   settingsFixtureValidators,
 } from "./fixtures/settingsFixtures";
 import { defineScenarioStateContracts } from "./scenarioStateContracts";
+import { GUIDED_SETUP_READY } from "./fixtures/onboardingFixtures";
+import { bootstrapFixtureValidators } from "./scenarioFixtureValidation";
 
 function scenario(id: string): DesignScenario {
   return {
@@ -42,6 +44,7 @@ function scenario(id: string): DesignScenario {
           under_git: true,
           default_dir: "C:\\Stockroom",
           libraries: [],
+          guided_setup: GUIDED_SETUP_READY,
         },
       } satisfies ScenarioFixture,
     ],
@@ -198,6 +201,14 @@ describe("registerScenarios", () => {
           localOutcome: { state: "succeeded", target: "onboarding.gate" },
         }],
       },
+      {
+        ...scenario("global.invalid-guided-setup"),
+        fixtures: [{ method: "GET", path: "/api/onboarding", params: {}, body: undefined, response: { ...validOnboarding, guided_setup: { ready: true } } }],
+      },
+      {
+        ...scenario("global.invalid-guided-repository-url"),
+        fixtures: [{ method: "POST", path: "/api/onboarding/repository", params: {}, body: { mode: "connect", owner: "engineer", name: "catalog", path: "D:/Catalog", url: "https://example.invalid" }, response: validOnboarding }],
+      },
     ] as unknown as DesignScenario[];
 
     const result = registerScenarios(invalidScenarios);
@@ -207,6 +218,24 @@ describe("registerScenarios", () => {
         expect.objectContaining({ code: "invalid-fixture-shape", scenarioId: invalidScenario.id }),
       );
     }
+  });
+
+  it("validates Guided Setup job, listing, repository, source, and completion fixtures", () => {
+    const validOnboarding = scenario("global.valid-guided-actions").fixtures[0]?.response as OnboardingStatus;
+    const repository = {
+      owner: "engineer", name: "stockroom-catalog",
+      url: "https://github.com/engineer/stockroom-catalog.git",
+      visibility: "private", permission: "admin", writable: true,
+    };
+    const fixtures: ScenarioFixture[] = [
+      { method: "POST", path: "/api/onboarding/github/login", params: {}, body: undefined, response: { job_id: "login-1" } },
+      { method: "GET", path: "/api/onboarding/github/repositories/engineer", params: {}, body: undefined, response: { repositories: [repository] } },
+      { method: "POST", path: "/api/onboarding/repository", params: {}, body: { mode: "create", owner: "engineer", name: "stockroom-catalog", visibility: "private", path: "D:/Catalog" }, response: validOnboarding },
+      { method: "POST", path: "/api/onboarding/tool/connect", params: {}, body: undefined, response: { job_id: "tool-1" } },
+      { method: "POST", path: "/api/onboarding/source-data", params: {}, body: { skipped: true }, response: validOnboarding },
+      { method: "POST", path: "/api/onboarding/complete", params: {}, body: undefined, response: validOnboarding },
+    ];
+    expect(fixtures.every((fixture) => bootstrapFixtureValidators.validate(fixture))).toBe(true);
   });
 
   it("accepts the shipped typed fixtures through their endpoint-owned validators", () => {

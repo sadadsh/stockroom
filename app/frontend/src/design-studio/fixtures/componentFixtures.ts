@@ -18,6 +18,7 @@ import type {
 } from "../../api/types";
 import type { ScenarioFixture } from "../scenario";
 import type { CadVariantDocument } from "../../api/cadVariantClient";
+import { GUIDED_SETUP_READY } from "./onboardingFixtures";
 import {
   bootstrapFixtureValidators,
   createScenarioFixtureValidatorRegistry,
@@ -46,6 +47,7 @@ export const ONBOARDING_READY: OnboardingStatus = {
     available: true,
     under_git: true,
   }],
+  guided_setup: GUIDED_SETUP_READY,
 };
 
 export const FULL_COMPONENT_SUMMARY: PartSummary = {

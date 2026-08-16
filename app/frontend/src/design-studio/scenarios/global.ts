@@ -1,5 +1,6 @@
 import type { DesignScenario, ScenarioFixture, ScenarioUiState } from "../scenario";
 import { settingsReadFixtures, SETTINGS_ONBOARDING } from "../fixtures/settingsFixtures";
+import { guidedSetupAt } from "../fixtures/onboardingFixtures";
 
 export const globalScenarioIds = [
   "global.real-data", "global.onboarding.open", "global.onboarding.create", "global.onboarding.clone",
@@ -18,7 +19,18 @@ export const globalScenarioIds = [
 
 type GlobalScenarioId = typeof globalScenarioIds[number];
 
-const firstRun = { ...SETTINGS_ONBOARDING, onboarded: false, first_run: true, libraries: [], profiles: [] };
+const firstRun = {
+  ...SETTINGS_ONBOARDING,
+  onboarded: false,
+  first_run: true,
+  libraries: [],
+  profiles: [],
+  guided_setup: guidedSetupAt("catalog_repository", {
+    ready: false,
+    repository_ready: false,
+    repository: null,
+  }),
+};
 const searchRows = [{ id: "fixture-part", display_name: "LM358", category: "Integrated Circuits", mpn: "LM358DR", manufacturer: "Texas Instruments", is_complete: true, missing: [], specs: { channels: 2 }, stock: 1200, unit_price: 0.42, currency: "USD" }];
 
 function fixture(method: string, path: string, response: unknown, behavior?: ScenarioFixture["behavior"]): ScenarioFixture {
@@ -68,7 +80,13 @@ function globalFixtures(id: GlobalScenarioId): ScenarioFixture[] {
 function uiFor(id: GlobalScenarioId): Readonly<ScenarioUiState> {
   if (id.startsWith("global.onboarding.")) {
     const mode = id.includes("clone") ? "clone" : id.includes("create") ? "create" : "open";
-    const setupError = id.includes("error") ? "Could not set up the catalog." : undefined;
+    const setupError = !id.includes("error")
+      ? undefined
+      : id.includes("create-error")
+        ? "Could not create the catalog."
+        : id.includes("clone-error")
+          ? "Could not connect the catalog."
+          : "Could not prepare the catalog.";
     return { onboarding: { mode, setupError } };
   }
   if (id.startsWith("global.about.")) return {
@@ -94,7 +112,7 @@ function uiFor(id: GlobalScenarioId): Readonly<ScenarioUiState> {
 }
 
 function targetFor(id: GlobalScenarioId): string {
-  if (id.startsWith("global.onboarding.")) return id.includes("error") ? "toast.status" : "onboarding.gate";
+  if (id.startsWith("global.onboarding.")) return "onboarding.gate";
   if (id.startsWith("global.about.")) return "about.root";
   if (id.startsWith("global.add-parts.")) return "addpart.root";
   if (id.startsWith("global.search.")) return "search.root";

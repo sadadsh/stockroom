@@ -11,6 +11,9 @@ import {
   useRefreshSourcing,
   useRestoreDeletedPart,
   useResumeWorkSession,
+  useSetGuidedRepository,
+  useSaveGuidedSourceData,
+  useCompleteOnboarding,
   useSetSpecs,
   useUpdateSettings,
   useValidateProjectReview,
@@ -18,6 +21,7 @@ import {
 import { api } from "./client";
 import type { PartDetail, SettingsInfo } from "./types";
 import { makePartDetail } from "../test/partFixture";
+import { ONBOARDING_READY } from "../design-studio/fixtures/componentFixtures";
 
 const PART_DETAIL: PartDetail = makePartDetail({
   id: "lm358",
@@ -76,6 +80,38 @@ describe("Primary CAD Tool reconciliation", () => {
     expect(invalidatedKeys(spy)).toEqual(
       expect.arrayContaining(["settings", "onboarding"]),
     );
+  });
+});
+
+describe("Guided Setup cache reconciliation", () => {
+  it("replaces onboarding from repository, source, and complete action responses", async () => {
+    const actions = [
+      {
+        hook: useSetGuidedRepository,
+        invoke: (mutation: ReturnType<typeof useSetGuidedRepository>) => mutation.mutate({ mode: "create", owner: "engineer", name: "stockroom-catalog", visibility: "private", path: "D:/Catalog" }),
+        method: "setGuidedRepository" as const,
+      },
+      {
+        hook: useSaveGuidedSourceData,
+        invoke: (mutation: ReturnType<typeof useSaveGuidedSourceData>) => mutation.mutate({ skipped: true }),
+        method: "saveGuidedSourceData" as const,
+      },
+      {
+        hook: useCompleteOnboarding,
+        invoke: (mutation: ReturnType<typeof useCompleteOnboarding>) => mutation.mutate(),
+        method: "completeOnboarding" as const,
+      },
+    ];
+
+    for (const action of actions) {
+      const qc = new QueryClient();
+      vi.spyOn(api, action.method).mockResolvedValue(ONBOARDING_READY);
+      const { result, unmount } = renderHook(() => action.hook(), { wrapper: wrapperWith(qc) });
+      action.invoke(result.current as never);
+      await waitFor(() => expect(result.current.isSuccess).toBe(true));
+      expect(qc.getQueryData(["onboarding"])).toEqual(ONBOARDING_READY);
+      unmount();
+    }
   });
 });
 
