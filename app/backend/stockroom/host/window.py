@@ -12,6 +12,7 @@ and its pure helpers remain importable on every supported platform.
 
 from __future__ import annotations
 
+import importlib
 import json
 import logging
 import math
@@ -58,8 +59,11 @@ _WINDOW_CHROME = None
 _PROVIDER_SURFACE = None
 _NATIVE_DOWNLOAD_GUARD = threading.RLock()
 _NATIVE_DOWNLOAD_LEASE: str | None = None
+_NATIVE_DOWNLOAD_STAGING_ROOT: Path | None = None
+_NATIVE_DOWNLOAD_AUTHOR: object | None = None
 _NATIVE_DOWNLOAD_SEQUENCE = 0
 _NATIVE_DOWNLOAD_EVENTS: list["InAppProviderDownloadEvent"] = []
+_NATIVE_DOWNLOAD_OPERATIONS: dict[str, object] = {}
 
 UNPACKAGED_APP_USER_MODEL_ID = "Stockroom.Desktop.Unpackaged"
 DEVELOPMENT_APP_USER_MODEL_ID = "Stockroom.Development.Unpackaged"
@@ -218,6 +222,9 @@ class InAppProviderDownloadEvent:
     uri: str
     suggested_file_name: str
     result_file_path: str
+    total_bytes: int = -1
+    bytes_received: int = 0
+    interrupt_reason: str = ""
 
 
 @dataclass(slots=True)
@@ -233,8 +240,10 @@ class InAppProviderBrowserLease:
     _hide: Callable[[], None]
     _navigate: Callable[[str], None]
     _current_url: Callable[[], str]
+    _state: Callable[[], dict[str, object]]
     _security_state: Callable[[], dict[str, object]]
     _document_state: Callable[[tuple[str, ...], tuple[str, ...]], dict[str, object]]
+    _cancel_downloads: Callable[[], int]
     _download_events: Callable[[int], tuple[InAppProviderDownloadEvent, ...]]
 
     def show(self) -> None:
@@ -255,6 +264,9 @@ class InAppProviderBrowserLease:
 
         self._navigate(url)
 
+    def state(self) -> dict[str, object]:
+        return self._state()
+
     def security_state(self) -> dict[str, object]:
         """Read the minimum native page state needed to wait out a visible security gate.
 
@@ -274,6 +286,11 @@ class InAppProviderBrowserLease:
         """Return only native readiness/security signals for a detached navigation."""
 
         return self._document_state(ready_selectors, ready_texts)
+
+    def cancel_downloads(self) -> int:
+        """Cancel only operations owned by this source-host lease."""
+
+        return self._cancel_downloads()
 
     def download_events(
         self,
@@ -355,6 +372,8 @@ class InAppProviderBrowserSurface:
                 provider.hide()
             self._provider_visible = False
             return False
+        if self._provider_visible and self._last_provider_viewport == viewport:
+            return True
         self._last_provider_viewport = dict(viewport)
         # React often measures and publishes the pane before the durable capture worker has
         # acquired its native provider lease. Retaining that valid rectangle is success: the
@@ -446,10 +465,24 @@ class InAppProviderBrowserSurface:
         provider.evaluate_js(script)
         return True
 
-    def __call__(self):
-        """Open one provider lease; keeps the surface itself available to the API."""
+    def __call__(
+        self,
+        *,
+        staging_root: str = "",
+        component_id: str = "",
+        manufacturer: str = "",
+        mpn: str = "",
+        provider_id: str = "",
+    ):
+        """Open one task-bound provider lease; identity fields mirror the production host."""
 
-        return self.lease()
+        return self.lease(
+            staging_root=staging_root,
+            component_id=component_id,
+            manufacturer=manufacturer,
+            mpn=mpn,
+            provider_id=provider_id,
+        )
 
     def show_active_provider_browser(self) -> None:
         """Restore the provider route hidden by Return to Stockroom."""
@@ -460,16 +493,30 @@ class InAppProviderBrowserSurface:
         show()
 
     @contextmanager
-    def lease(self):
+    def lease(
+        self,
+        *,
+        staging_root: str = "",
+        component_id: str = "",
+        manufacturer: str = "",
+        mpn: str = "",
+        provider_id: str = "",
+    ):
         """Yield one observed provider lease and always hide its native surface afterward."""
 
+        del component_id, manufacturer, mpn, provider_id
         with self._lock:
             if active_window() is None:
                 raise RuntimeError("the Stockroom provider browser is not ready")
             window = self._provider_window()
             if window is None:
                 raise RuntimeError("the Stockroom provider browser is not ready")
-            lease_token = _begin_native_webview_download_lease()
+            native = getattr(window, "native", None)
+            download_author = getattr(native, "browser", None)
+            lease_token = _begin_native_webview_download_lease(
+                staging_root,
+                author=download_author,
+            )
             self._active_provider_window = window
 
             chrome = window_chrome()
@@ -510,6 +557,23 @@ class InAppProviderBrowserSurface:
                     return str(window.get_current_url() or "")
                 except Exception:  # noqa: BLE001 - a navigating page has no stable URL yet
                     return ""
+
+            def browser_state() -> dict[str, object]:
+                try:
+                    history = window.evaluate_js(
+                        "({ canGoBack: window.history.length > 1 })"
+                    )
+                except Exception:  # noqa: BLE001 - history state is optional source-host evidence
+                    history = {}
+                return {
+                    "url": current_url(),
+                    "loading": False,
+                    "navigation_error": "",
+                    "can_go_back": bool(
+                        history.get("canGoBack") if isinstance(history, dict) else False
+                    ),
+                    "can_go_forward": False,
+                }
 
             def document_state(
                 ready_selectors: tuple[str, ...],
@@ -588,6 +652,7 @@ class InAppProviderBrowserSurface:
                     "ready": bool(state.get("ready")),
                     "challenge": bool(state.get("challenge")),
                     "account_verification": bool(state.get("account_verification")),
+                    "provider_error": bool(state.get("provider_error")),
                 }
 
             def download_events(after_sequence: int) -> tuple[InAppProviderDownloadEvent, ...]:
@@ -617,8 +682,10 @@ class InAppProviderBrowserSurface:
                     _hide=hide,
                     _navigate=navigate,
                     _current_url=current_url,
+                    _state=browser_state,
                     _security_state=security_state,
                     _document_state=document_state,
+                    _cancel_downloads=_cancel_native_webview_downloads,
                     _download_events=download_events,
                 )
             finally:
@@ -627,6 +694,11 @@ class InAppProviderBrowserSurface:
                 self._active_component_id = None
                 self._last_provider_viewport = None
                 self._provider_visible = False
+                _cancel_native_webview_downloads()
+                try:
+                    window.load_url("about:blank")
+                except Exception:  # noqa: BLE001 - lease fencing still cancels its operations
+                    _log.debug("could not clear the released provider page", exc_info=True)
                 _end_native_webview_download_lease(lease_token)
                 if chrome is not None:
                     chrome.close_provider_route()
@@ -1323,50 +1395,96 @@ def _webview_start_kwargs(start_fn, profile_dir) -> dict:
     return kwargs
 
 
-def _begin_native_webview_download_lease() -> str:
-    """Mark the one WebView whose downloads are owned by the browser-domain broker."""
+def _begin_native_webview_download_lease(
+    staging_root: str | Path = "",
+    *,
+    author: object | None = None,
+) -> str:
+    """Bind the source-host WebView to one private provider staging directory."""
 
-    global _NATIVE_DOWNLOAD_LEASE, _NATIVE_DOWNLOAD_SEQUENCE
+    global _NATIVE_DOWNLOAD_AUTHOR, _NATIVE_DOWNLOAD_LEASE
+    global _NATIVE_DOWNLOAD_SEQUENCE, _NATIVE_DOWNLOAD_STAGING_ROOT
+    root = None
+    if str(staging_root):
+        raw_root = Path(staging_root)
+        if not raw_root.is_absolute():
+            raise ValueError("provider download staging root must be absolute")
+        root = raw_root.resolve(strict=False)
+        if root.exists() and (root.is_symlink() or not root.is_dir()):
+            raise ValueError("provider download staging root must be a real directory")
+        root.mkdir(parents=True, exist_ok=True)
     token = os.urandom(16).hex()
     with _NATIVE_DOWNLOAD_GUARD:
         if _NATIVE_DOWNLOAD_LEASE is not None:
             raise RuntimeError("a native provider download lease is already active")
         _NATIVE_DOWNLOAD_LEASE = token
+        _NATIVE_DOWNLOAD_STAGING_ROOT = root
+        _NATIVE_DOWNLOAD_AUTHOR = author
         _NATIVE_DOWNLOAD_SEQUENCE = 0
         _NATIVE_DOWNLOAD_EVENTS.clear()
     return token
 
 
+def _cancel_native_webview_downloads() -> int:
+    """Cancel every operation owned by the active source-host lease."""
+
+    with _NATIVE_DOWNLOAD_GUARD:
+        operations = tuple(_NATIVE_DOWNLOAD_OPERATIONS.values())
+    cancelled = 0
+    for operation in operations:
+        cancel = getattr(operation, "Cancel", None)
+        if not callable(cancel):
+            cancel = getattr(operation, "cancel", None)
+        if not callable(cancel):
+            continue
+        try:
+            cancel()
+            cancelled += 1
+        except Exception:  # noqa: BLE001 - terminal state can race this bounded cancel
+            continue
+    return cancelled
+
+
 def _end_native_webview_download_lease(lease_token: str) -> None:
     """Release the host-side Save-As suppression for one provider task."""
 
-    global _NATIVE_DOWNLOAD_LEASE
+    global _NATIVE_DOWNLOAD_AUTHOR, _NATIVE_DOWNLOAD_LEASE, _NATIVE_DOWNLOAD_STAGING_ROOT
     with _NATIVE_DOWNLOAD_GUARD:
         if _NATIVE_DOWNLOAD_LEASE == lease_token:
             _NATIVE_DOWNLOAD_LEASE = None
+            _NATIVE_DOWNLOAD_STAGING_ROOT = None
+            _NATIVE_DOWNLOAD_AUTHOR = None
+            _NATIVE_DOWNLOAD_OPERATIONS.clear()
 
 
 def _discard_native_webview_downloads() -> None:
     """Clear provider Save-As suppression during host teardown."""
 
-    global _NATIVE_DOWNLOAD_LEASE
+    global _NATIVE_DOWNLOAD_AUTHOR, _NATIVE_DOWNLOAD_LEASE, _NATIVE_DOWNLOAD_STAGING_ROOT
     with _NATIVE_DOWNLOAD_GUARD:
         _NATIVE_DOWNLOAD_LEASE = None
+        _NATIVE_DOWNLOAD_STAGING_ROOT = None
+        _NATIVE_DOWNLOAD_AUTHOR = None
         _NATIVE_DOWNLOAD_EVENTS.clear()
+        _NATIVE_DOWNLOAD_OPERATIONS.clear()
 
 
 def _record_in_app_download(
     *,
+    lease_token: str,
     operation_id: str,
     phase: str,
     state: str,
     uri: str,
     result_file_path: str,
     suggested_file_name: str = "",
+    total_bytes: int = -1,
+    bytes_received: int = 0,
+    interrupt_reason: str = "",
 ) -> None:
     global _NATIVE_DOWNLOAD_SEQUENCE
     with _NATIVE_DOWNLOAD_GUARD:
-        if _NATIVE_DOWNLOAD_LEASE is None:
+        if _NATIVE_DOWNLOAD_LEASE != lease_token:
             return
         _NATIVE_DOWNLOAD_SEQUENCE += 1
         _NATIVE_DOWNLOAD_EVENTS.append(
@@ -1378,6 +1496,9 @@ def _record_in_app_download(
                 uri=uri,
                 suggested_file_name=suggested_file_name or Path(result_file_path).name,
                 result_file_path=result_file_path,
+                total_bytes=total_bytes,
+                bytes_received=bytes_received,
+                interrupt_reason=interrupt_reason,
             )
         )
 
@@ -1389,6 +1510,16 @@ def _in_app_download_state(operation) -> str:
     if "interrupted" in name:
         return "interrupted"
     return "in_progress"
+
+
+def _in_app_download_total(operation) -> int:
+    value = getattr(operation, "TotalBytesToReceive", None)
+    return int(value) if type(value) is int and 0 <= value <= 2**63 - 1 else -1
+
+
+def _in_app_download_received(operation) -> int:
+    value = getattr(operation, "BytesReceived", 0)
+    return int(value) if type(value) is int and value >= 0 else 0
 
 
 def _in_app_download_name(operation, result_file_path: str) -> str:
@@ -1406,6 +1537,23 @@ def _in_app_download_name(operation, result_file_path: str) -> str:
     if path_name and Path(path_name).suffix:
         return path_name
     return Path(result_file_path).name or "cad-download"
+
+
+def _private_provider_download_path(operation_id: str, suggested_name: str) -> Path | None:
+    """Resolve one opaque operation beneath the active source-host lease root."""
+
+    with _NATIVE_DOWNLOAD_GUARD:
+        root = _NATIVE_DOWNLOAD_STAGING_ROOT
+    if root is None or not operation_id:
+        return None
+    name = Path(suggested_name or "cad-download").name
+    safe = "".join(
+        "_" if character in '<>:"/\\|?*' or ord(character) < 32 else character
+        for character in name
+    ).strip(" .")
+    safe = safe or "cad-download"
+    destination = (root / f"{operation_id}-{safe}").resolve(strict=False)
+    return destination if destination.parent == root else None
 
 
 def _install_silent_webview2_download_handler(
@@ -1435,18 +1583,64 @@ def _install_silent_webview2_download_handler(
 
     settings = webview_module.settings
     original_handler = edge_cls.on_download_starting
+    original_ready_handler = getattr(edge_cls, "on_webview_ready", None)
+
+    def on_webview_ready(self, sender, args) -> None:
+        ready_handler = original_ready_handler
+        if not callable(ready_handler):
+            return
+        ready_handler(self, sender, args)
+        try:
+            permission_event = sender.CoreWebView2.PermissionRequested
+        except AttributeError:
+            return
+
+        def on_permission_requested(_core, event_args) -> None:
+            kind = "".join(character for character in str(event_args.PermissionKind).lower() if character.isalnum())
+            with _NATIVE_DOWNLOAD_GUARD:
+                author = _NATIVE_DOWNLOAD_AUTHOR
+                task_bound = (
+                    _NATIVE_DOWNLOAD_LEASE is not None
+                    and _NATIVE_DOWNLOAD_STAGING_ROOT is not None
+                    and (author is None or author is self)
+                )
+            allow = task_bound and kind.endswith("multipleautomaticdownloads")
+            try:
+                core_module = importlib.import_module("Microsoft.Web.WebView2.Core")
+                permission_state = getattr(core_module, "CoreWebView2PermissionState")
+                event_args.State = (
+                    permission_state.Allow
+                    if allow
+                    else permission_state.Deny
+                )
+            except (AttributeError, ImportError, ModuleNotFoundError):
+                # Lightweight host tests do not load pythonnet's WebView2 assembly.
+                event_args.State = "Allow" if allow else "Deny"
+            if hasattr(event_args, "SavesInProfile"):
+                event_args.SavesInProfile = False
+
+        permission_event += on_permission_requested
+        # pythonnet event delegates must remain strongly referenced for the life of the WebView.
+        self._stockroom_provider_permission_handler = on_permission_requested
 
     def on_download_starting(self, sender, args) -> None:
         with _NATIVE_DOWNLOAD_GUARD:
             lease_token = _NATIVE_DOWNLOAD_LEASE
+            author = _NATIVE_DOWNLOAD_AUTHOR
         if lease_token is None:
             original_handler(self, sender, args)
+            return
+        if author is not None and author is not self:
+            setter = getattr(args, "set_Handled", None)
+            if callable(setter):
+                setter(True)
+            else:
+                args.Handled = True
+            args.Cancel = True
             return
         if not bool(settings["ALLOW_DOWNLOADS"]):
             args.Cancel = True
             return
-        # Do not touch ResultFilePath. Browser.setDownloadBehavior already selected the task's
-        # private GUID path, and its terminal event is the single completion authority.
         setter = getattr(args, "set_Handled", None)
         if callable(setter):
             setter(True)
@@ -1461,21 +1655,58 @@ def _install_silent_webview2_download_handler(
                 close_download_dialog()
             except Exception:  # noqa: BLE001 - a missing/closing flyout is already the goal
                 pass
-        operation = getattr(args, "DownloadOperation", None)
-        if operation is None:
-            return
+        operation = getattr(args, "DownloadOperation", args)
         operation_id = os.urandom(16).hex()
-        result_file_path = str(getattr(args, "ResultFilePath", "") or "")
+        with _NATIVE_DOWNLOAD_GUARD:
+            _NATIVE_DOWNLOAD_OPERATIONS[operation_id] = operation
+        original_path = str(getattr(args, "ResultFilePath", "") or "")
+        suggested_name = _in_app_download_name(operation, original_path)
+        destination = _private_provider_download_path(operation_id, suggested_name)
+        if destination is None:
+            args.Cancel = True
+            return
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        args.ResultFilePath = str(destination)
+        result_file_path = str(destination)
         uri = str(getattr(operation, "Uri", "") or "")
         _record_in_app_download(
+            lease_token=lease_token,
             operation_id=operation_id,
             phase="started",
             state=_in_app_download_state(operation),
             uri=uri,
             result_file_path=result_file_path,
-            suggested_file_name=_in_app_download_name(operation, result_file_path),
+            suggested_file_name=suggested_name,
+            total_bytes=_in_app_download_total(operation),
+            bytes_received=_in_app_download_received(operation),
         )
         terminal_recorded = False
+        last_progress_at = 0.0
+        last_progress_bytes = -1
+
+        def record_progress(*, force: bool = False) -> None:
+            nonlocal last_progress_at, last_progress_bytes
+            now = time.monotonic()
+            received = _in_app_download_received(operation)
+            if (
+                not force
+                and now - last_progress_at < 0.25
+                and received - last_progress_bytes < 1024 * 1024
+            ):
+                return
+            last_progress_at = now
+            last_progress_bytes = received
+            _record_in_app_download(
+                lease_token=lease_token,
+                operation_id=operation_id,
+                phase="progress",
+                state=_in_app_download_state(operation),
+                uri=uri,
+                result_file_path=result_file_path,
+                suggested_file_name=suggested_name,
+                total_bytes=_in_app_download_total(operation),
+                bytes_received=received,
+            )
 
         def state_changed(_sender, _event_args) -> None:
             nonlocal terminal_recorded
@@ -1483,26 +1714,43 @@ def _install_silent_webview2_download_handler(
             if state not in {"completed", "interrupted"} or terminal_recorded:
                 return
             terminal_recorded = True
+            with _NATIVE_DOWNLOAD_GUARD:
+                _NATIVE_DOWNLOAD_OPERATIONS.pop(operation_id, None)
             try:
                 operation.StateChanged -= state_changed
+                operation.BytesReceivedChanged -= bytes_changed
             except Exception:  # noqa: BLE001 - terminal evidence is already retained
                 pass
+            record_progress(force=True)
             _record_in_app_download(
+                lease_token=lease_token,
                 operation_id=operation_id,
                 phase="terminal",
                 state=state,
                 uri=uri,
                 result_file_path=result_file_path,
-                suggested_file_name=_in_app_download_name(operation, result_file_path),
+                suggested_file_name=suggested_name,
+                total_bytes=_in_app_download_total(operation),
+                bytes_received=_in_app_download_received(operation),
+                interrupt_reason=str(getattr(operation, "InterruptReason", "") or ""),
             )
 
+        def bytes_changed(_sender, _event_args) -> None:
+            if not terminal_recorded:
+                record_progress()
+
         try:
+            bytes_hook = getattr(operation, "BytesReceivedChanged", None)
+            if bytes_hook is not None:
+                bytes_hook += bytes_changed
             operation.StateChanged += state_changed
-        except Exception:  # noqa: BLE001 - browser-domain events remain the primary path
+        except Exception:  # noqa: BLE001 - the native journal remains the primary path
             return
         state_changed(operation, None)
 
     edge_cls.on_download_starting = on_download_starting
+    if callable(original_ready_handler):
+        edge_cls.on_webview_ready = on_webview_ready
     setattr(edge_cls, "_stockroom_silent_downloads", True)
 
 
@@ -1629,19 +1877,24 @@ def _mount_window_chrome(window) -> None:
 
 
 def _attach_window_chrome_page(window) -> None:
-    """Follow the WebView's navigation so Back / Forward / the address describe the real page."""
+    """Follow navigation without touching WebView2 COM objects from a loaded-event worker."""
 
     chrome = _WINDOW_CHROME
     if chrome is None:
         return
-    core = None
-    try:
-        core = window.native.browser.webview.CoreWebView2
-    except Exception:  # noqa: BLE001 - a backend without WebView2 simply has no page controls
-        _log.debug("window chrome found no WebView2 to follow", exc_info=True)
-    if core is None:
-        return
-    chrome.dispatch(lambda: chrome.attach_core(core))
+
+    def attach_on_window_thread() -> None:
+        try:
+            core = window.native.browser.webview.CoreWebView2
+        except Exception:  # noqa: BLE001 - a backend without WebView2 has no page controls
+            _log.debug("window chrome found no WebView2 to follow", exc_info=True)
+            return
+        if core is not None:
+            chrome.attach_core(core)
+
+    # pywebview emits `loaded` from a worker. Even reading CoreWebView2 there can synchronously
+    # marshal into WinForms while WinForms waits for the handler, deadlocking first paint.
+    chrome.dispatch(attach_on_window_thread)
 
 
 class ManagedWindowController:

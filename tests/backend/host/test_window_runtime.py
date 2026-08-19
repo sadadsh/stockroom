@@ -125,6 +125,10 @@ class _Client:
         self.commands.append(f"provider-lease-release:{lease_id}:{generation}")
         return True
 
+    def cancel_provider_downloads(self, lease_id: str, generation: int) -> int:
+        self.commands.append(f"provider-download-cancel:{lease_id}:{generation}")
+        return 2
+
     def provider_download_events(
         self,
         lease_id: str,
@@ -169,6 +173,16 @@ class _Client:
 
     def navigate_provider(self, lease_id: str, generation: int, url: str) -> None:
         self.commands.append(f"provider-navigate:{lease_id}:{generation}:{url}")
+
+    def provider_state(self, lease_id: str, generation: int) -> dict[str, object]:
+        self.commands.append(f"provider-state:{lease_id}:{generation}")
+        return {
+            "url": "https://provider.example.test/next",
+            "loading": False,
+            "navigation_error": "",
+            "can_go_back": True,
+            "can_go_forward": False,
+        }
 
     def provider_document_state(
         self,
@@ -371,6 +385,17 @@ def test_provider_browser_surface_is_one_scoped_in_app_lease(
         )
         assert lease.current_url() == "https://provider.example.test/part"
         lease.navigate("https://provider.example.test/next")
+        assert lease.state() == {
+            "url": "https://provider.example.test/next",
+            "loading": False,
+            "navigation_error": "",
+            "can_go_back": True,
+            "can_go_forward": False,
+        }
+        assert lease.cancel_downloads() == 2
+        assert old.commands[-1] == (
+            "provider-download-cancel:11111111-1111-4111-8111-111111111111:7"
+        )
         state = lease.document_state(
             ready_selectors=("#download",),
             ready_texts=("download",),

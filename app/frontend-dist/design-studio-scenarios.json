@@ -462,6 +462,16 @@
       ]
     },
     {
+      "id": "assets.landing",
+      "title": "Assets Landing",
+      "area": "assets",
+      "group": "Assets",
+      "route": "assets",
+      "expectedTargets": [
+        "assets.root"
+      ]
+    },
+    {
       "id": "components.full-data",
       "title": "Full Data",
       "area": "components",
@@ -709,9 +719,9 @@
     {
       "id": "components.manage-models-ready",
       "title": "Manage Models Ready",
-      "area": "components",
-      "group": "Components",
-      "route": "components",
+      "area": "assets",
+      "group": "Asset Sources",
+      "route": "assets",
       "expectedTargets": [
         "component-browser.manage-models",
         "component-browser.eda-selection",
@@ -721,9 +731,9 @@
     {
       "id": "components.manage-models-partial",
       "title": "Manage Models Partial",
-      "area": "components",
-      "group": "Components",
-      "route": "components",
+      "area": "assets",
+      "group": "Asset Sources",
+      "route": "assets",
       "expectedTargets": [
         "component-browser.manage-models",
         "component-browser.provider-list"
@@ -732,22 +742,12 @@
     {
       "id": "components.manage-models-blocked",
       "title": "Manage Models Blocked",
-      "area": "components",
-      "group": "Components",
-      "route": "components",
+      "area": "assets",
+      "group": "Asset Sources",
+      "route": "assets",
       "expectedTargets": [
         "component-browser.manage-models",
         "component-browser.provider-status"
-      ]
-    },
-    {
-      "id": "components.bulk-import",
-      "title": "Bulk Import",
-      "area": "components",
-      "group": "Components",
-      "route": "components",
-      "expectedTargets": [
-        "ingest.bulk"
       ]
     },
     {
@@ -763,9 +763,9 @@
     {
       "id": "components.manage-models-attached",
       "title": "Manage Models Attached",
-      "area": "components",
-      "group": "Components",
-      "route": "components",
+      "area": "assets",
+      "group": "Asset Sources",
+      "route": "assets",
       "expectedTargets": [
         "component-browser.manage-models",
         "component-browser.provider-status"
@@ -774,9 +774,9 @@
     {
       "id": "components.manage-models-invalid",
       "title": "Manage Models Invalid Files",
-      "area": "components",
-      "group": "Components",
-      "route": "components",
+      "area": "assets",
+      "group": "Asset Sources",
+      "route": "assets",
       "expectedTargets": [
         "component-browser.manage-models",
         "component-browser.provider-import"
@@ -815,9 +815,9 @@
     {
       "id": "provider.loading",
       "title": "Loading",
-      "area": "components",
+      "area": "assets",
       "group": "Provider Download",
-      "route": "components",
+      "route": "assets",
       "expectedTargets": [
         "component-browser.manage-models",
         "component-browser.provider-viewport"
@@ -826,9 +826,9 @@
     {
       "id": "provider.ready",
       "title": "Ready",
-      "area": "components",
+      "area": "assets",
       "group": "Provider Download",
-      "route": "components",
+      "route": "assets",
       "expectedTargets": [
         "component-browser.manage-models",
         "component-browser.provider-viewport"
@@ -837,9 +837,9 @@
     {
       "id": "provider.sign-in",
       "title": "Sign In",
-      "area": "components",
+      "area": "assets",
       "group": "Provider Download",
-      "route": "components",
+      "route": "assets",
       "expectedTargets": [
         "component-browser.manage-models",
         "component-browser.provider-viewport"
@@ -848,9 +848,9 @@
     {
       "id": "provider.waiting-for-person",
       "title": "Waiting For Person",
-      "area": "components",
+      "area": "assets",
       "group": "Provider Download",
-      "route": "components",
+      "route": "assets",
       "expectedTargets": [
         "component-browser.manage-models",
         "component-browser.provider-viewport"
@@ -859,9 +859,9 @@
     {
       "id": "provider.format-selection",
       "title": "Format Selection",
-      "area": "components",
+      "area": "assets",
       "group": "Provider Download",
-      "route": "components",
+      "route": "assets",
       "expectedTargets": [
         "component-browser.manage-models",
         "component-browser.provider-viewport"
@@ -870,9 +870,9 @@
     {
       "id": "provider.download-armed",
       "title": "Download Armed",
-      "area": "components",
+      "area": "assets",
       "group": "Provider Download",
-      "route": "components",
+      "route": "assets",
       "expectedTargets": [
         "component-browser.manage-models",
         "component-browser.provider-viewport"
@@ -881,9 +881,9 @@
     {
       "id": "provider.one-file",
       "title": "One File",
-      "area": "components",
+      "area": "assets",
       "group": "Provider Download",
-      "route": "components",
+      "route": "assets",
       "expectedTargets": [
         "component-browser.manage-models",
         "component-browser.provider-viewport"
@@ -892,9 +892,9 @@
     {
       "id": "provider.multiple-files",
       "title": "Multiple Files",
-      "area": "components",
+      "area": "assets",
       "group": "Provider Download",
-      "route": "components",
+      "route": "assets",
       "expectedTargets": [
         "component-browser.manage-models",
         "component-browser.provider-viewport"
@@ -903,9 +903,9 @@
     {
       "id": "provider.partial-retained",
       "title": "Partial Retained",
-      "area": "components",
+      "area": "assets",
       "group": "Provider Download",
-      "route": "components",
+      "route": "assets",
       "expectedTargets": [
         "component-browser.manage-models",
         "component-browser.provider-viewport"
@@ -914,9 +914,9 @@
     {
       "id": "provider.unavailable",
       "title": "Unavailable",
-      "area": "components",
+      "area": "assets",
       "group": "Provider Download",
-      "route": "components",
+      "route": "assets",
       "expectedTargets": [
         "component-browser.manage-models",
         "component-browser.provider-viewport"
@@ -925,9 +925,9 @@
     {
       "id": "provider.timeout",
       "title": "Timeout",
-      "area": "components",
+      "area": "assets",
       "group": "Provider Download",
-      "route": "components",
+      "route": "assets",
       "expectedTargets": [
         "component-browser.manage-models",
         "component-browser.provider-viewport"
@@ -936,9 +936,9 @@
     {
       "id": "provider.canceled",
       "title": "Canceled",
-      "area": "components",
+      "area": "assets",
       "group": "Provider Download",
-      "route": "components",
+      "route": "assets",
       "expectedTargets": [
         "component-browser.manage-models",
         "component-browser.provider-viewport"
@@ -947,9 +947,9 @@
     {
       "id": "provider.error",
       "title": "Error",
-      "area": "components",
+      "area": "assets",
       "group": "Provider Download",
-      "route": "components",
+      "route": "assets",
       "expectedTargets": [
         "component-browser.manage-models",
         "component-browser.provider-viewport"
@@ -958,9 +958,9 @@
     {
       "id": "provider.selected-file-recovery",
       "title": "Selected File Recovery",
-      "area": "components",
+      "area": "assets",
       "group": "Provider Download",
-      "route": "components",
+      "route": "assets",
       "expectedTargets": [
         "component-browser.manage-models",
         "component-browser.provider-viewport"
@@ -969,9 +969,9 @@
     {
       "id": "provider.returned-to-stockroom",
       "title": "Returned To Stockroom",
-      "area": "components",
+      "area": "assets",
       "group": "Provider Download",
-      "route": "components",
+      "route": "assets",
       "expectedTargets": [
         "component-browser.manage-models",
         "component-browser.provider-viewport"
@@ -980,9 +980,9 @@
     {
       "id": "provider.complete",
       "title": "Complete",
-      "area": "components",
+      "area": "assets",
       "group": "Provider Download",
-      "route": "components",
+      "route": "assets",
       "expectedTargets": [
         "component-browser.manage-models",
         "component-browser.provider-viewport"

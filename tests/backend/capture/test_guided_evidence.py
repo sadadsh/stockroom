@@ -15,6 +15,7 @@ from stockroom.capture import evidence as evidence_module
 from stockroom.capture.cross_eda import CrossEdaVerificationError
 from stockroom.capture.evidence import (
     BROWSER_CAPTURE_ADAPTER_VERSION,
+    record_browser_altium_evidence,
     record_browser_cad_evidence,
 )
 from stockroom.capture.guided import GuidedCaptureSource
@@ -23,7 +24,7 @@ from stockroom.evidence import EvidenceStore
 from stockroom.ingest.staging import StagingCandidate
 from stockroom.model.asset import Asset, AssetOrigin, AssetRef, EdaAssets
 from stockroom.model.cad_variant import CadVariantSelections
-from stockroom.planning import KICAD_CAD_OPERATION, ExactPartIdentity
+from stockroom.planning import ALTIUM_CAD_OPERATION, KICAD_CAD_OPERATION, ExactPartIdentity
 
 _CFB_MAGIC = b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"
 _DETAIL_URL = "https://www.snapeda.com/parts/S1M/ON%20Semiconductor/view-part/"
@@ -141,6 +142,37 @@ def _altium_pair(tmp_path: Path) -> tuple[Path, Path]:
     symbol.write_bytes(_CFB_MAGIC + b"symbol")
     footprint.write_bytes(_CFB_MAGIC + b"footprint")
     return symbol, footprint
+
+
+def test_browser_altium_evidence_is_complete_without_a_kicad_bundle(tmp_path: Path) -> None:
+    store = EvidenceStore(tmp_path / "Evidence")
+    schlib = tmp_path / "S1M.SchLib"
+    pcblib = tmp_path / "S1M.PcbLib"
+    shutil.copy2(_ALTIUM_FIXTURES / "sample.SchLib", schlib)
+    shutil.copy2(_ALTIUM_FIXTURES / "sample.PcbLib", pcblib)
+
+    digest, symbol_entry, footprint_entry = record_browser_altium_evidence(
+        store=store,
+        record=_Record(),
+        provider_key="ultralibrarian",
+        detail_url=_DETAIL_URL,
+        altium_sources=(schlib, pcblib),
+    )
+
+    assert symbol_entry == "S1M"
+    assert footprint_entry == "DIOM5227X270N"
+    store.verify_provider_success(
+        digest,
+        identity=ExactPartIdentity("ON Semiconductor", "S1M"),
+        operation=ALTIUM_CAD_OPERATION,
+        provider_key="ultralibrarian",
+        adapter_version=BROWSER_CAPTURE_ADAPTER_VERSION,
+    )
+    assert len(list_cad_variants(
+        store,
+        identity=ExactPartIdentity("ON Semiconductor", "S1M"),
+        tool="altium",
+    )) == 1
 
 
 def test_browser_cad_installs_exact_actual_files_with_provider_per_artifact(
@@ -759,6 +791,13 @@ def test_verified_sibling_kicad_and_altium_files_activate_as_one_coherent_varian
         )(),
     )
     evidence_store = EvidenceStore(tmp_path / "Evidence")
+    proposals: list[dict[str, object]] = []
+    cleared: list[str] = []
+
+    def publish_proposal(proposal: dict[str, object]) -> str:
+        proposals.append(proposal)
+        return f"proposal-{len(proposals)}"
+
     source = GuidedCaptureSource(
         lambda: _Pipeline(),
         vendor="snapmagic",
@@ -776,6 +815,9 @@ def test_verified_sibling_kicad_and_altium_files_activate_as_one_coherent_varian
             },
         },
         projection_verifier=lambda _record, _resolved: None,
+        publish_attachment_proposal=publish_proposal,
+        attachment_confirmed=lambda _token: True,
+        clear_attachment_proposal=cleared.append,
     )
 
     outcome = source._attach(
@@ -797,6 +839,9 @@ def test_verified_sibling_kicad_and_altium_files_activate_as_one_coherent_varian
     }, outcome.error
     assert outcome.error == ""
     assert len(pair_calls) == 1
+    assert proposals[0]["primary_tool"] == "both"
+    assert len(proposals[0]["attachments"]) == 5
+    assert cleared == ["proposal-1"]
     _, _, _, _, _, _, kicad_variant, altium_variant, preferred_footprint = pair_calls[0]
     assert preferred_footprint == "DIOM5227X270N"
     assert kicad_variant.manifest_digest == altium_variant.manifest_digest

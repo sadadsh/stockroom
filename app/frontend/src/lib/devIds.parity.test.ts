@@ -78,6 +78,7 @@ const KNOWN_DERIVED: readonly string[] = [
   // Rail.tsx: <RailItem data-dev-id={`rail.nav-${item.route}`}> over lib/nav.ts routes,
   // which are exactly components, STM Viewer, and settings.
   "rail.nav-components",
+  "rail.nav-assets",
   "rail.nav-projects",
   "rail.nav-stm",
   "rail.nav-settings",
@@ -207,6 +208,7 @@ const KNOWN_PROP_PASSED: readonly string[] = [
   // native details shell while every exact id stays source-spelled at its call site.
   "component-browser.offer-details",
   "component-browser.offer-failures",
+  "component-browser.all-price-breaks",
   // component-workspace/SheetParts.tsx: the exhaustive sourcing sheet shares one section and one
   // table shell, so a section's or a table's id arrives as a `devId` string prop. Spelled out in
   // full at each call site for the same reason as the regions above.

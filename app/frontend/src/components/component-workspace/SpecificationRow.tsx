@@ -20,6 +20,7 @@ import type { SourceCandidate, SpecificationRecord } from "../../api/dossierType
 import type { SpecificationWrite } from "../../api/queries";
 import { Text, useCopyFormatter, useText } from "../../lib/copy";
 import { formatTimestamp } from "../../lib/formatValue";
+import { Icon } from "../Icon";
 import { Button, StatusText } from "../primitives";
 import { ExternalIcon } from "../icons";
 import {
@@ -172,18 +173,7 @@ export function SpecificationRow({
             title={stateText.conflicting}
             className="flex-none text-warn"
           >
-            <svg
-              viewBox="0 0 16 16"
-              aria-hidden
-              className="h-3 w-3"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.6"
-              strokeLinecap="round"
-            >
-              <path d="M8 2.5 15 14H1z" />
-              <path d="M8 6.5v3.2M8 11.8v.2" />
-            </svg>
+            <Icon id="status.warn" className="h-3 w-3" />
           </span>
         ) : (
           <StatusText tone={specRowTone(state)} className="flex-none">
@@ -219,20 +209,12 @@ export function SpecificationRow({
                 {"{count} other"}
               </Text>
             ) : (
-              <svg
-                viewBox="0 0 16 16"
-                aria-hidden
+              <Icon
+                id="detail.chevron-right"
                 className={
                   "h-3 w-3 transition-transform duration-150 " + (open ? "rotate-90" : "")
                 }
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.6"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M6 3l5 5-5 5" />
-              </svg>
+              />
             )}
           </button>
         ) : null}

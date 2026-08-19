@@ -1,7 +1,7 @@
 import { captureRequirementsForEdas } from "./captureRequirements";
 
 describe("captureRequirementsForEdas", () => {
-  it("requests each selected EDA and one shared 3D model", () => {
+  it("requests only the selected EDA formats", () => {
     expect(captureRequirementsForEdas(["altium", "kicad"])).toEqual([
       "kicad_symbol",
       "kicad_footprint",
@@ -12,7 +12,6 @@ describe("captureRequirementsForEdas", () => {
     expect(captureRequirementsForEdas(["altium"])).toEqual([
       "altium_symbol",
       "altium_footprint",
-      "kicad_model",
     ]);
   });
 

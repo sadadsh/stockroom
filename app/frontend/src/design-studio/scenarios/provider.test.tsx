@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import { bootstrapScenarioRegistry } from ".";
 import { providerScenarioIds } from "./provider";
 import { mountScenario } from "./testHarness";
@@ -49,26 +49,23 @@ describe("provider-download Design Studio scenarios", () => {
     expect(within(browser).getByRole("button", { name: "Back" })).toBeEnabled();
     expect(within(browser).getByRole("button", { name: "Forward" })).toBeEnabled();
     expect(within(browser).getByRole("button", { name: "Reload" })).toBeEnabled();
-    expect(within(workspace).getByRole("button", { name: "Choose Downloaded Files" })).toBeEnabled();
+    expect(within(workspace).queryByRole("button", { name: "Use Downloaded Files" })).toBeNull();
     await user.click(within(browser).getByRole("button", { name: "Reload" }));
     expect(document.querySelector('[data-dev-id="shell.root"]')).toBeInTheDocument();
     expect(liveRequest).not.toHaveBeenCalled();
   });
 
-  it("blocks selected-file recovery before the real host chooser while previewing", async () => {
+  it("keeps selected-file recovery out of the active browser surface", async () => {
     const host = window as unknown as {
       __STOCKROOM_HOST__?: { pickFiles: (purpose: string) => Promise<string[]> };
     };
     const pickFiles = vi.fn().mockResolvedValue(["C:\\Downloads\\LM358DR.zip"]);
     host.__STOCKROOM_HOST__ = { pickFiles };
     try {
-      const { user, liveRequest } = await mountScenario("provider.selected-file-recovery");
+      const { liveRequest } = await mountScenario("provider.selected-file-recovery");
       const workspace = await screen.findByTestId("manage-models-workspace");
-      await user.click(within(workspace).getByRole("button", { name: "Choose Downloaded Files" }));
+      expect(within(workspace).queryByRole("button", { name: "Use Downloaded Files" })).toBeNull();
       expect(pickFiles).not.toHaveBeenCalled();
-      await waitFor(() => expect(document.querySelector('[data-dev-id="toast.status"]')).toHaveTextContent(
-        /Fixture preview blocked choosing CAD recovery files/i,
-      ));
       expect(document.querySelector('[data-dev-id="shell.root"]')).toBeInTheDocument();
       expect(liveRequest).not.toHaveBeenCalled();
     } finally {

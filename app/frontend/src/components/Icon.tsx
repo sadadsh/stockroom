@@ -50,9 +50,8 @@ export function Icon({ id, className, title }: IconProps) {
   const override = resolveIconOverride(id);
   const accessibleTitle = override?.a11yLabel || title;
   const inner = sanitizeIconMarkup(body, accessibleTitle);
-  // A titled icon is announced (role="img" + aria-label); an untitled one is decorative. Primary
-  // glyphs default to aria-hidden (as the source `Svg` helper did); the bespoke/art/brand sources
-  // set no aria attribute, so an untitled non-primary icon stays bare - a faithful refactor.
+  // A titled icon is announced (role="img" + aria-label); every untitled icon is decorative,
+  // regardless of category. Interactive consequences belong to the enclosing control's label.
   const namedA11y = accessibleTitle ? ({ role: "img" as const, "aria-label": accessibleTitle }) : {};
   const presentationStyle = {
     verticalAlign: override?.alignment,
@@ -105,6 +104,7 @@ export function Icon({ id, className, title }: IconProps) {
       strokeLinecap={entry.strokeLinecap}
       strokeLinejoin={entry.strokeLinejoin}
       style={{ ...entry.style, ...presentationStyle }}
+      aria-hidden={accessibleTitle ? undefined : true}
       {...namedA11y}
       data-design-id={designId}
       {...devId}

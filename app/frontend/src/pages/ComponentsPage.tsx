@@ -458,6 +458,9 @@ export function ComponentsPage() {
  * here, where everywhere else it is a compact toolbar action.
  */
 function EmptyLibrary({ onAddParts }: { onAddParts: () => void }) {
+  // Keep the only action in a new catalog free of Design Studio geometry wrappers. A saved toolbar
+  // label override must never move this required first action outside its button.
+  const addParts = useText("components.add-parts", "Add Parts");
   return (
     <div data-dev-id="components.root" className="flex min-h-0 flex-1">
       <div
@@ -479,12 +482,12 @@ function EmptyLibrary({ onAddParts }: { onAddParts: () => void }) {
           </p>
           <Button
             variant="accent"
-            data-dev-id="components.add-parts"
+            data-dev-id="components.empty-add"
             icon={<AddPartIcon />}
             onClick={onAddParts}
             className="mt-4"
           >
-            <Text id="components.add-parts">Add Parts</Text>
+            {addParts}
           </Button>
         </div>
       </div>
@@ -625,29 +628,17 @@ function PickerColumn({
   onRetry: () => void;
   hasSearchOrFilter: boolean;
 }) {
+  // Keep the required toolbar action immune to stale personal geometry from earlier layouts.
+  const addParts = useText("components.add-parts", "Add Parts");
   return (
         <div
           data-dev-id="components.picker"
           className="flex flex-none flex-col"
           style={{ width: COMPONENT_PICKER_WIDTH }}
         >
-          {/* Add Parts is a compact TOOLBAR action on the title strip. It used to be a
-              full-width 36px tile above the search, which made the loudest control in the picker
-              the one nobody presses twice; the large form survives only in the empty-library
-              state, where adding a part genuinely is the whole screen's purpose. */}
           <RouteHeader
             data-dev-id="components.list-title"
             right={count ? count.toLocaleString() : undefined}
-            actions={
-              <Button
-                small
-                data-dev-id="components.add-parts"
-                icon={<AddPartIcon />}
-                onClick={onAddParts}
-              >
-                <Text id="components.add-parts">Add Parts</Text>
-              </Button>
-            }
           >
             <Text id="components.list-title">Components</Text>
           </RouteHeader>
@@ -665,6 +656,15 @@ function PickerColumn({
               duplicateCount={duplicateIds.size}
               onOpenSearch={onOpenSearch}
             />
+            <Button
+              variant="accent"
+              data-dev-id="components.toolbar-add"
+              icon={<AddPartIcon />}
+              onClick={onAddParts}
+              className="mt-2 w-full justify-center"
+            >
+              {addParts}
+            </Button>
           </div>
           <div
             ref={onScrollElement}

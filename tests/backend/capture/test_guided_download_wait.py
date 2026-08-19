@@ -168,7 +168,7 @@ def _install_adapter(monkeypatch, browser, *, on_drive=None):
 
 
 @contextmanager
-def _null_provider_surface():
+def _null_provider_surface(_author_key):
     """A lease that answers commands and reports no downloads. Nothing attaches to it."""
 
     yield SimpleNamespace(
@@ -279,12 +279,12 @@ def test_person_driven_route_uses_the_embedded_provider_surface(monkeypatch, tmp
             return ()
 
     @contextmanager
-    def provider_surface():
-        surface_events.append("prepared-hidden")
+    def provider_surface(author_key):
+        surface_events.append(f"prepared-hidden:{author_key}")
         try:
             yield _Lease()
         finally:
-            surface_events.append("hidden")
+            surface_events.append(f"hidden:{author_key}")
 
     source = guided.GuidedCaptureSource(
         lambda: None,
@@ -298,15 +298,29 @@ def test_person_driven_route_uses_the_embedded_provider_surface(monkeypatch, tmp
         _FakeBrowser(),
         on_drive=lambda _: None,
     )
-    session = source._ensure_session()
+    session = source._ensure_session("faketron")
 
     # The lease is held and nothing is attached to it. In particular the surface is NOT shown at
     # session time: it becomes visible only once a route has armed its task-bound broker.
     assert isinstance(session.browser, guided.ProviderSurfaceCapture)
     assert session.browser._native_surface is not None
-    assert surface_events == ["prepared-hidden"]
+    assert surface_events == ["prepared-hidden:faketron"]
+
+    replacement = source._ensure_session("faketron-second-author")
+    assert replacement is not session
+    assert surface_events == [
+        "prepared-hidden:faketron",
+        "hidden:faketron",
+        "prepared-hidden:faketron-second-author",
+    ]
+
     source.close()
-    assert surface_events == ["prepared-hidden", "hidden"]
+    assert surface_events == [
+        "prepared-hidden:faketron",
+        "hidden:faketron",
+        "prepared-hidden:faketron-second-author",
+        "hidden:faketron-second-author",
+    ]
 
 
 def test_a_download_consumed_by_the_session_handler_still_counts_as_delivered(
@@ -482,6 +496,8 @@ def test_user_driven_guided_supply_never_discards_captured_files(
     assert captured_call["options"] == {
         "should_finish": finished,
         "should_cancel": cancelled,
+        "on_progress": None,
+        "on_navigation_state": None,
         "timeout_s": 5,
     }
     assert pipeline.inputs == [landed]
@@ -740,9 +756,19 @@ def test_the_default_vendor_chain_uses_digikeys_multi_author_surface_then_fallba
     ]
 
 
-def test_user_driven_try_another_advances_to_the_next_digikey_author(
+@pytest.mark.parametrize(
+    ("single_provider_attempt", "expected_attempts", "expected_statuses"),
+    [
+        (False, ["digikey-ultralibrarian", "digikey-snapmagic"], ["unavailable", "succeeded-retained"]),
+        (True, ["digikey-ultralibrarian"], ["unavailable", "not-attempted"]),
+    ],
+)
+def test_user_driven_provider_route_choice_stops_after_one_explicit_attempt(
     monkeypatch,
     tmp_path,
+    single_provider_attempt,
+    expected_attempts,
+    expected_statuses,
 ):
     def make_capability(label: str) -> VendorCapability:
         return VendorCapability(
@@ -790,14 +816,26 @@ def test_user_driven_try_another_advances_to_the_next_digikey_author(
         vendor="digikey",
         download_root=tmp_path / "Downloads",
         collect_variants=True,
+        single_provider_attempt=single_provider_attempt,
+        requested_requirements=frozenset({Requirement.KICAD_SYMBOL}),
     )
     source._session = guided._Session(
         browser=_FakeBrowser(),
         ctx_manager=None,
     )
+    monkeypatch.setattr(source, "_ensure_session", lambda _author: source._session)
     attempted: list[str] = []
 
-    def capture_route(_record, _session, route, *_args):
+    def capture_route(
+        _record,
+        _session,
+        route,
+        _manufacturer,
+        _mpn,
+        _url,
+        route_formats,
+    ):
+        assert route_formats == ["kicad"]
         attempted.append(route.evidence_provider_key)
         if route is routes[0]:
             return SourceOutcome(skipped="left for another provider", blocked=False)
@@ -807,12 +845,11 @@ def test_user_driven_try_another_advances_to_the_next_digikey_author(
 
     outcome = source.supply(_Record())
 
-    assert attempted == ["digikey-ultralibrarian", "digikey-snapmagic"]
-    assert [row.status for row in outcome.provider_outcomes] == [
-        "unavailable",
-        "succeeded-retained",
-    ]
-    assert all(row.attempted for row in outcome.provider_outcomes)
+    assert attempted == expected_attempts
+    assert [row.status for row in outcome.provider_outcomes] == expected_statuses
+    assert [row.attempted for row in outcome.provider_outcomes] == (
+        [True, True] if not single_provider_attempt else [True, False]
+    )
 
 
 def test_close_after_supply_releases_the_provider_before_control_returns(
@@ -899,7 +936,7 @@ def test_ultra_librarian_native_altium_is_sourceable_without_a_dom_selector(tmp_
     assert guided._provider_formats(
         guided.get_adapter("ultralibrarian"),
         [Requirement.ALTIUM_SYMBOL],
-    ) == ["kicad", "model", "altium"]
+    ) == ["altium"]
     assert guided._provider_hud_labels(
         guided.get_adapter("ultralibrarian"),
         ["kicad", "model", "altium"],

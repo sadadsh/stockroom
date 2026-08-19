@@ -474,39 +474,27 @@ describe("the distributor offers ledger", () => {
     },
   });
 
-  it("keeps every price break visible as a line-free pill and puts secondary facts in one disclosure", async () => {
+  it("keeps one even compact ladder open and retains omitted tiers under All Price Breaks", async () => {
     const { user } = await open(offersDossier);
     const ledger = screen.getByRole("list", { name: "Distributor offers" });
     const offer = region("component-browser.offer-row");
-    const ladder = region("component-browser.offer-price-ladder");
+    const provider = document.querySelector<HTMLElement>('[data-sourcing-provider="mouser"]')!;
 
     expect(ledger).not.toHaveClass("overflow-x-auto");
     expect(ledger.querySelector("table")).toBeNull();
-    const pills = ladder.querySelectorAll<HTMLElement>("[data-price-break-pill]");
-    expect(pills).toHaveLength(2);
-    for (const pill of pills) {
+    expect(provider.querySelector('[data-price-break-pill] dd')).toHaveTextContent("USD0.42");
+    expect(within(provider).getByText("USD0.22")).not.toBeVisible();
+    expect(provider.querySelectorAll(':scope > ul > [data-offer-provider]')).toHaveLength(1);
+
+    await user.click(within(provider).getByText("All Price Breaks"));
+    expect(within(provider).getByText("USD0.22")).toBeVisible();
+    for (const pill of provider.querySelectorAll<HTMLElement>("[data-price-break-pill]")) {
       expect(pill).toHaveClass("rounded-full");
       expect(pill.className).not.toMatch(/border|divide/);
     }
-    expect(within(ladder).getByText("USD0.42")).toBeVisible();
-    expect(within(ladder).getByText("USD0.22")).toBeVisible();
     expect(within(offer).getByText("Stock")).not.toBeVisible();
-    expect(within(offer).getByText("1,240")).not.toBeVisible();
-    expect(within(offer).getByText("20 weeks")).not.toBeVisible();
-
     await user.click(within(offer).getByText("Details"));
-
-    for (const label of [
-      "Stock",
-      "Quote Code",
-      "MOQ",
-      "Lead Time",
-      "Manufacturer Lead Time",
-      "Product Status",
-      "Last Checked",
-    ]) {
-      expect(within(offer).getByText(label)).toBeVisible();
-    }
+    expect(within(offer).getByText("Stock")).toBeVisible();
     expect(within(offer).getByText("20 weeks")).toBeVisible();
     expect(within(offer).getByText("NRND")).toBeVisible();
     expect(within(offer).getByText(/Stale$/)).toBeVisible();
@@ -529,20 +517,18 @@ describe("the distributor offers ledger", () => {
       />,
     );
 
-    expect([...document.querySelectorAll<HTMLElement>("[data-offer-provider]")].map(
+    expect([...document.querySelectorAll<HTMLElement>("[data-sourcing-provider] > ul > [data-offer-provider]")].map(
       (row) => within(row).getByTitle(/^(MOUSER|DK)-/).textContent,
-    )).toEqual(["MOUSER-1", "MOUSER-2", "DK-1", "DK-2"]);
+    )).toEqual(["MOUSER-1", "DK-1"]);
   });
 
   it("right-aligns the figures that are compared down a column", async () => {
     await open(offersDossier);
     const row = region("component-browser.offer-row");
-    // Stock, price, break and MOQ all opt into `.ui-numeric`, which is tabular figures plus
-    // right alignment. A provider name does not, because names are read, not compared.
+    // Stock and the inline first tier opt into `.ui-numeric`; provider names do not.
     expect(within(row).getByText("1,240")).toHaveClass("ui-numeric");
-    expect(within(row).getAllByText("USD0.42").every((value) => value.classList.contains("ui-numeric"))).toBe(true);
-    expect(within(row).getByText("USD0.22")).toHaveClass("ui-numeric");
     const provider = document.querySelector<HTMLElement>('[data-sourcing-provider="mouser"]')!;
+    expect(provider.querySelector('[data-price-break-pill] dd')).toHaveClass("ui-numeric");
     expect(within(provider).getByText("Mouser")).not.toHaveClass("ui-numeric");
   });
 
@@ -550,8 +536,8 @@ describe("the distributor offers ledger", () => {
     await open(offersDossier);
     // `ui-key-fact` is 11/600 primary; `ui-row-secondary` is 11/400 secondary. The engineering
     // datum outranks the brand, which is the whole point of a comparison table.
-    expect(within(region("component-browser.offer-price-ladder")).getByText("USD0.42")).toHaveClass("ui-key-fact");
     const provider = document.querySelector<HTMLElement>('[data-sourcing-provider="mouser"]')!;
+    expect(provider.querySelector('[data-price-break-pill] dd')).toHaveClass("ui-key-fact");
     expect(within(provider).getByText("Mouser")).toHaveClass("ui-row-secondary");
   });
 

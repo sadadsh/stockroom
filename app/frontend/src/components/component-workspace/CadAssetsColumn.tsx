@@ -31,12 +31,12 @@ import { Text, useText } from "../../lib/copy";
 import { useToast } from "../../lib/toast";
 import type { PiecePartProps, RegionChromeProps } from "../../layout/LayoutRenderer";
 import { useWorkspaceRender } from "../../layout/workspaceRenderContext";
+import { BoardIcon } from "../icons";
 import { Button } from "../primitives";
 import { CadAssetModule } from "./CadAssetModule";
 import { REPRESENTATION_KINDS } from "./cadAssetSet";
 import { hasPreferredSourceInformation } from "./cadPreference";
 import { PreferredSourceControl } from "./PreferredSourceControl";
-import { CadWorkspaceTabs } from "./ManageModelsWorkspace";
 import {
   WorkspaceColumnFrame,
   WorkspaceColumnTitleStrip,
@@ -145,9 +145,7 @@ export function CadColumnChrome({ children }: RegionChromeProps) {
   );
 }
 
-/**
- * `CAD Assets  [Models] [Manage Models]  2/3` - one direct route for viewing and acquisition.
- */
+/** `CAD Assets  2/3` — inspection stays here; acquisition lives in Assets. */
 export function CadTitleStripPart() {
   const workspace = useWorkspaceRender();
   const state = useContext(CadColumnContext);
@@ -155,9 +153,9 @@ export function CadTitleStripPart() {
   return (
     <WorkspaceColumnTitleStrip
       title={
-        <span className="flex items-center gap-2">
+        <span className="flex items-center gap-1.5">
+          <BoardIcon className="h-3.5 w-3.5 text-t3" />
           <Text id="component-browser.column-cad">CAD Assets</Text>
-          <CadWorkspaceTabs view={workspace.cad.view} onView={workspace.cad.onView} />
         </span>
       }
       meta={`${state.attached}/${REPRESENTATION_KINDS.length}`}

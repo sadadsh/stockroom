@@ -485,6 +485,8 @@ def _evidence_identity(record):
 
 
 def _row(provider: ProviderRecord, record, grid: _Grid, notes, urls) -> dict[str, Any]:
+    from stockroom.capture.vendors import get_adapter
+
     counts = dict.fromkeys(COVERAGE_STATUSES, 0)
     columns: dict[str, Any] = {}
     for artifact in COVERAGE_ARTIFACTS:
@@ -507,6 +509,7 @@ def _row(provider: ProviderRecord, record, grid: _Grid, notes, urls) -> dict[str
         "needsLogin": provider.needs_login,
         "aggregator": provider.aggregator,
         "distributor": provider.distributor,
+        "captureAvailable": get_adapter(provider.key) is not None,
         "statusCounts": counts,
         "complete": all(
             columns[artifact]["status"] in SUPPLIED_STATUSES for artifact in COVERAGE_ARTIFACTS

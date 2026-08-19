@@ -6,6 +6,7 @@ import type { ReactNode } from "react";
 import { StmViewerPage } from "./StmViewerPage";
 import { ApiError, api } from "../api/client";
 import type { McuSpecRow } from "../api/types";
+import { defaultUiSession, readUiSession, resetUiSessionForTests } from "../lib/uiSession";
 
 // The page reads its server state through these hooks; mock the module so the page (and its
 // FamilyPicker child, which reads useStmFamilies) renders deterministically without a backend.
@@ -127,6 +128,7 @@ const PINOUT: PinoutDTO = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  resetUiSessionForTests();
   mockBuild.mockReturnValue(IDLE_BUILD);
   mockFamilies.mockReturnValue(
     query({ data: { families: [{ family: "STM32F4", lines: [], mcu_count: 1, packages: [] }] } }),
@@ -214,10 +216,8 @@ describe("StmViewerPage", () => {
     expect(screen.getByText("Part")).toBeInTheDocument();
     expect(screen.getByText("STM32F407VETx")).toBeInTheDocument();
     expect(screen.queryByText("STM32F407V(E-G)Tx")).toBeNull();
-    // the reserved pinout region shows its empty state until a part is picked, through the SHARED
-    // product-state primitive rather than this route's own paragraph
-    const prompt = screen.getByText("Select a part to see its pinout.");
-    expect(prompt.closest('[data-product-state="empty"]')).not.toBeNull();
+    // The list owns the whole workspace until a part is picked; there is no side inspector.
+    expect(document.querySelector('[data-dev-id="stm.focused"]')).toBeNull();
   });
 
   it("renders its failure through the shared error state, with a written sentence and one retry", () => {
@@ -251,6 +251,30 @@ describe("StmViewerPage", () => {
     expect(mockMcus).toHaveBeenLastCalledWith({ family: "STM32F4" });
   });
 
+  it("restores and checkpoints the focused MCU, pin, scope, and pinout view", async () => {
+    const restored = defaultUiSession();
+    restored.selected_ids.stm_part = ROW.part;
+    restored.selected_ids.stm_pin = "1";
+    restored.stm.families = ["STM32F4"];
+    restored.stm.lines = ["STM32F407"];
+    restored.stm.pin_view = "table";
+    resetUiSessionForTests(restored);
+    mockStatus.mockReturnValue(query({ data: { built: true, mcu_count: 1, family_count: 1 } }));
+    mockMcus.mockReturnValue(query({ data: { mcus: [ROW], count: 1, facets: {} } }));
+    mockPinout.mockReturnValue(query({ data: PINOUT }));
+
+    wrap(<StmViewerPage />);
+
+    expect(screen.getByRole("button", { name: "Back To MCU List" })).toBeVisible();
+    expect(screen.getByRole("grid")).toBeVisible();
+    expect(screen.getByTestId("pin-inspector")).toBeVisible();
+    await userEvent.click(screen.getByRole("radio", { name: "Map" }));
+    await waitFor(() => expect(readUiSession().stm.pin_view).toBe("map"));
+    await userEvent.click(screen.getByRole("button", { name: "Back To MCU List" }));
+    await userEvent.click(screen.getByText("STM32F407VETx"));
+    expect(screen.getByRole("radio", { name: "Map" })).toHaveAttribute("aria-checked", "true");
+  });
+
   it("selecting a part renders the pinout map + legend; a pad click opens the inspector", async () => {
     mockStatus.mockReturnValue(query({ data: { built: true, mcu_count: 1, family_count: 1 } }));
     mockMcus.mockReturnValue(query({ data: { mcus: [ROW], count: 1, facets: {} } }));
@@ -262,11 +286,14 @@ describe("StmViewerPage", () => {
     );
 
     const { container } = wrap(<StmViewerPage />);
-    // before a part is picked, the chamber empty state shows
-    expect(screen.getByText("Select a part to see its pinout.")).toBeInTheDocument();
+    expect(document.querySelector('[data-dev-id="stm.focused"]')).toBeNull();
 
     await userEvent.click(screen.getByText("STM32F407VETx"));
 
+    // Selecting replaces the family/matrix workspace with the focused MCU view.
+    expect(screen.getByRole("button", { name: "Back To MCU List" })).toBeInTheDocument();
+    expect(document.querySelector('[data-dev-id="stm.focused"]')).toBeInTheDocument();
+    expect(screen.queryByText("Part")).not.toBeInTheDocument();
     // the map + legend render for the active part
     expect(screen.getByTestId("pinout-map-svg")).toBeInTheDocument();
     expect(screen.getByTestId("pinout-legend")).toBeInTheDocument();

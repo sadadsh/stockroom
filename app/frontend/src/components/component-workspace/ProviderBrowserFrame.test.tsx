@@ -43,14 +43,20 @@ describe("ProviderBrowserFrame", () => {
         componentId="part-1"
         providerLabel="DigiKey"
         url="https://www.digikey.com/en/products/detail/example"
+        canGoBack
+        canGoForward={false}
       />
     );
     const rendered = render(view);
 
-    expect(screen.getByRole("button", { name: "Back" })).toBeVisible();
-    expect(screen.getByRole("button", { name: "Forward" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Back" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Forward" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Reload" })).toBeVisible();
-    expect(screen.getByRole("textbox", { name: "Provider Address" })).toBeVisible();
+    expect(screen.queryByRole("textbox", { name: "Provider Address" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Go" })).toBeNull();
+    expect(screen.getByLabelText("Current provider address")).toHaveTextContent(
+      "digikey.com/en/products/detail/example",
+    );
     expect(setProviderViewport).toHaveBeenLastCalledWith({
       componentId: "part-1",
       visible: true,
@@ -59,6 +65,17 @@ describe("ProviderBrowserFrame", () => {
       width: 900,
       height: 560,
     });
+    const stableCallCount = setProviderViewport.mock.calls.length;
+    rendered.rerender(
+      <ProviderBrowserFrame
+        componentId="part-1"
+        providerLabel="DigiKey"
+        url="https://www.digikey.com/en/products/detail/example"
+        canGoBack
+        canGoForward={false}
+      />,
+    );
+    expect(setProviderViewport).toHaveBeenCalledTimes(stableCallCount);
 
     // Width and height are unchanged, so ResizeObserver cannot explain this publication. A parent
     // modal geometry commit must still move the native provider surface.

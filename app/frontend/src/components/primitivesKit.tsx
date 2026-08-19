@@ -125,7 +125,7 @@ export function Button({
       className={cx(base, size, BUTTON_VARIANTS[variant], className)}
       {...rest}
     >
-      {icon}
+      {icon ? <span className="flex h-3.5 w-3.5 flex-none items-center justify-center [&>svg]:h-full [&>svg]:w-full">{icon}</span> : null}
       {children}
     </button>
   );
@@ -261,7 +261,7 @@ function CompactIconButton({
         className,
       )}
     >
-      {icon}
+      <span className="flex h-3.5 w-3.5 flex-none items-center justify-center [&>svg]:h-full [&>svg]:w-full">{icon}</span>
     </button>
   );
 }

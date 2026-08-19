@@ -6,24 +6,15 @@ import {
   ICON_REGISTRY,
 } from "./iconRegistry";
 
-// The registry is the single source of truth for the icon set (lifted from the blueprint inventory of
-// 58 icons: primary 21, bespoke 31, art 3, brand 3). These assertions lock its shape without reaching
-// outside src/ - the inventory JSON lives under the gitignored .planning/ and is not present in CI.
+// The registry is the single source of truth for product icons. These assertions lock its current
+// source-owned shape without reaching outside src/ or depending on Design Studio runtime state.
 
 describe("iconRegistry", () => {
-  it("has 63 application icons with a matching by-id map", () => {
-    // 62 as of Batch 4c: +action.view (an eye, replacing the literal word "View" on an asset tile)
-    // and +detail.datasheet-link (the document glyph that lets the datasheet row carry the same
-    // anatomy as Filing). Deliberate re-baseline, which is what this gate is for.
-    // 69 as of the 3D icon-chip move (+6 view/shading glyphs, 2026-07-26).
-    // 63 as of the rail-collapse move: +nav.collapse-rail, replacing the raw mono guillemet that was
-    // the only control in the app drawing its own text glyph instead of a registry icon.
-    // The Projects frontend removal drops its two navigation glyphs and card thumbnail. Component
-    // identities now live in the separate electrical-symbol library, removing seven generic glyphs.
-    // The owner-selected missing-CAD question mark is semantically distinct from the three
-    // attached/unreadable asset drawings, so it receives its own stable id.
-    expect(ICON_REGISTRY).toHaveLength(63);
-    expect(ICON_BY_ID.size).toBe(63);
+  it("has 74 application icons with a matching by-id map", () => {
+    // The deliberate re-baseline includes the reusable provider, preview, media, and Settings
+    // semantics that replaced hand-drawn interface glyphs during the product-wide icon migration.
+    expect(ICON_REGISTRY).toHaveLength(74);
+    expect(ICON_BY_ID.size).toBe(74);
     for (const entry of ICON_REGISTRY) {
       expect(ICON_BY_ID.get(entry.id), entry.id).toBe(entry);
     }
@@ -40,14 +31,32 @@ describe("iconRegistry", () => {
     }
   });
 
-  it("has the expected per-category counts (primary 30 / bespoke 27 / art 3 / brand 3)", () => {
-    // primary 22 -> 23 with nav.collapse-rail, the panel glyph that replaced the rail's raw mono
-    // guillemet when the collapse control moved into the wordmark bar. Deliberate re-baseline.
+  it("has the expected per-category counts (primary 41 / bespoke 27 / art 3 / brand 3)", () => {
+    // New reusable interface semantics stay primary so `.ico` owns their stroke and optical weight.
     const counts = ICON_REGISTRY.reduce<Record<string, number>>((acc, entry) => {
       acc[entry.category] = (acc[entry.category] ?? 0) + 1;
       return acc;
     }, {});
-    expect(counts).toEqual({ primary: 30, bespoke: 27, art: 3, brand: 3 });
+    expect(counts).toEqual({ primary: 41, bespoke: 27, art: 3, brand: 3 });
+  });
+
+  it("keeps migrated interface semantics on the shared 24px primary preset", () => {
+    const migrated = [
+      "action.measure",
+      "action.maximize",
+      "action.contract",
+      "action.zoom-in",
+      "action.zoom-out",
+      "action.rotate",
+      "media.photo",
+      "detail.provider",
+      "nav.assets",
+      "settings.cad-tools",
+      "settings.sources",
+    ];
+    for (const id of migrated) {
+      expect(ICON_BY_ID.get(id), id).toMatchObject({ category: "primary", viewBox: "0 0 24 24" });
+    }
   });
 
   it("only uses the four declared categories", () => {

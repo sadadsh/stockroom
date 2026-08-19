@@ -7,6 +7,7 @@ and in-window navigation safety but mounts no global tabs or page controls.
 from __future__ import annotations
 
 import inspect
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -185,6 +186,43 @@ def test_mount_keeps_the_provider_controller_without_global_window_controls():
     assert "Controls.Add" not in source
 
 
+def test_loaded_event_marshals_before_reading_the_webview2_com_object(monkeypatch):
+    core = object()
+
+    class Chrome:
+        in_dispatch = False
+        attached = None
+
+        def dispatch(self, callback):
+            self.in_dispatch = True
+            try:
+                callback()
+            finally:
+                self.in_dispatch = False
+
+        def attach_core(self, value):
+            assert self.in_dispatch is True
+            self.attached = value
+
+    chrome = Chrome()
+
+    class Window:
+        @property
+        def native(self):
+            assert chrome.in_dispatch is True
+            return SimpleNamespace(
+                browser=SimpleNamespace(
+                    webview=SimpleNamespace(CoreWebView2=core),
+                )
+            )
+
+    monkeypatch.setattr(host_window, "_WINDOW_CHROME", chrome)
+
+    host_window._attach_window_chrome_page(Window())
+
+    assert chrome.attached is core
+
+
 # --- nothing reaches the operating system's browser -----------------------------------------
 
 
@@ -358,7 +396,7 @@ class _Core:
         self.closed_download_dialog += 1
 
 
-def test_a_download_still_lands_in_staging_after_the_new_window_change(app_origin):
+def test_a_download_still_lands_in_staging_after_the_new_window_change(app_origin, tmp_path):
     """The new-window fix must not touch DownloadStarting, staging, or the journal."""
 
     edge = _edge_double()
@@ -371,7 +409,8 @@ def test_a_download_still_lands_in_staging_after_the_new_window_change(app_origi
     browser = edge("https://componentsearchengine.com/parts/LM317")
     args = _DownloadArgs()
     core = _Core()
-    lease_token = _begin_native_webview_download_lease()
+    staging = (tmp_path / "Provider Staging").resolve()
+    lease_token = _begin_native_webview_download_lease(staging)
     try:
         # A link that wants a new window, then the download that page starts. Both in one window.
         browser.on_new_window_request(SimpleNamespace(Source=browser.url), _Args(
@@ -381,14 +420,15 @@ def test_a_download_still_lands_in_staging_after_the_new_window_change(app_origi
         args.DownloadOperation.State = "Completed"
         args.DownloadOperation.StateChanged.fire(args.DownloadOperation)
 
-        # The browser-domain broker's own path is preserved verbatim, and the journal still
-        # carries the exact start/terminal pair capture waits for.
+        # The source host rewrites the destination into the task-private root, and the journal
+        # still carries the exact start/progress/terminal sequence capture waits for.
         assert args.Cancel is False
         assert args.Handled is True
-        assert args.ResultFilePath == r"C:\Staging\lease\browser-domain-guid"
+        assert Path(args.ResultFilePath).parent == staging
         assert core.closed_download_dialog == 1
         assert [(event.phase, event.state) for event in _NATIVE_DOWNLOAD_EVENTS] == [
             ("started", "in_progress"),
+            ("progress", "completed"),
             ("terminal", "completed"),
         ]
         assert _NATIVE_DOWNLOAD_EVENTS[-1].suggested_file_name == "LM317.zip"

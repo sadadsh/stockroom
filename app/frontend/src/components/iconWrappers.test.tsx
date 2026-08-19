@@ -79,42 +79,42 @@ const CASES: Array<{ name: string; el: React.ReactElement; svg: string }> = [
     name: "SearchIcon (bespoke, lucide search)",
     el: <SearchIcon className="text-t3" />,
     svg:
-      '<svg class="text-t3" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+      '<svg class="text-t3" aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
       '<path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>',
   },
   {
     name: "UploadIcon (bespoke, weight 1.4, lucide upload)",
     el: <UploadIcon className="up" />,
     svg:
-      '<svg class="up" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">' +
+      '<svg class="up" aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">' +
       '<path d="M12 3v12"/><path d="m17 8-5-5-5 5"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/></svg>',
   },
   {
     name: "CloseIcon (bespoke, lucide x)",
     el: <CloseIcon className="cl" />,
     svg:
-      '<svg class="cl" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' +
+      '<svg class="cl" aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' +
       '<path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>',
   },
   {
     name: "WarnIcon (bespoke, lucide triangle-alert)",
     el: <WarnIcon className="text-warn" />,
     svg:
-      '<svg class="text-warn" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+      '<svg class="text-warn" aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
       '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>',
   },
   {
     name: "ExternalIcon (owner-selected filled circle arrow)",
     el: <ExternalIcon className="ext" />,
     svg:
-      '<svg class="ext" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+      '<svg class="ext" aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
       '<g transform="translate(0 0) scale(1)" fill="currentColor" stroke="none"><path fill="currentColor" d="M17 3.34a10 10 0 1 1-14.995 8.984L2 12l.005-.324A10 10 0 0 1 17 3.34M15 8H9l-.117.007A1 1 0 0 0 8 9l.007.117A1 1 0 0 0 9 10h3.584l-4.291 4.293l-.083.094a1 1 0 0 0 1.497 1.32L14 11.414V15l.007.117A1 1 0 0 0 16 15V9l-.007-.117l-.029-.149l-.035-.105l-.054-.113l-.071-.111a1 1 0 0 0-.097-.112l-.09-.08l-.096-.067l-.098-.052l-.11-.044l-.112-.03l-.126-.017z"/></g></svg>',
   },
   {
     name: "SymbolArt (art, inner-group style)",
     el: <SymbolArt />,
     svg:
-      '<svg viewBox="0 0 132 94" width="132" height="94">' +
+      '<svg viewBox="0 0 132 94" width="132" height="94" aria-hidden="true">' +
       '<g style="stroke:var(--c-icon-line)" stroke-width="1.5" fill="none">' +
       '<rect x="40" y="20" width="52" height="54" rx="3"/>' +
       '<path d="M40 33H24M40 47H24M40 61H24M92 33h16M92 47h16M92 61h16"/></g></svg>',
@@ -123,7 +123,7 @@ const CASES: Array<{ name: string; el: React.ReactElement; svg: string }> = [
     name: "FootprintArt (art, pads + edge rect)",
     el: <FootprintArt />,
     svg:
-      '<svg viewBox="0 0 132 94" width="132" height="94">' +
+      '<svg viewBox="0 0 132 94" width="132" height="94" aria-hidden="true">' +
       '<g style="fill:var(--c-icon-fill)">' +
       '<rect x="34" y="26" width="9" height="7" rx="1"/><rect x="48" y="26" width="9" height="7" rx="1"/>' +
       '<rect x="62" y="26" width="9" height="7" rx="1"/><rect x="76" y="26" width="9" height="7" rx="1"/>' +
@@ -136,7 +136,7 @@ const CASES: Array<{ name: string; el: React.ReactElement; svg: string }> = [
     name: "CubeArt (art, root style)",
     el: <CubeArt />,
     svg:
-      '<svg viewBox="0 0 90 90" width="70" height="70" fill="none" style="stroke:var(--c-icon-cube)" stroke-width="1.4">' +
+      '<svg viewBox="0 0 90 90" width="70" height="70" fill="none" style="stroke:var(--c-icon-cube)" stroke-width="1.4" aria-hidden="true">' +
       '<path d="M45 12l30 17v32L45 78 15 61V29z"/>' +
       '<path d="M45 12v18M45 30l30-17M45 30L15 13" opacity="0.5"/></svg>',
   },

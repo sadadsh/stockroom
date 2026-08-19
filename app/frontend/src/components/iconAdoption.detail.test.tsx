@@ -11,9 +11,8 @@ import { Icon } from "./Icon";
 //
 // Two attributes are excluded from the appearance compare because neither is a visual property:
 //   - `style`      : jsdom's CSSOM mangles var() (mirrors iconWrappers.test.tsx).
-//   - `aria-hidden`: an a11y hint, not appearance. detail.select-chevron's source svg was aria-hidden;
-//                    a bespoke <Icon> without a title carries no aria attribute, and per the registry
-//                    note (D-03) dropping it is acceptable. It is asserted separately below.
+//   - `aria-hidden`: an a11y hint, not appearance. Untitled icons are decorative across every
+//                    category; that canonical behavior is asserted separately below.
 function canonical(el: Element): string {
   const attrs = Array.from(el.attributes)
     .map((a) => [a.name.toLowerCase(), a.value] as const)
@@ -64,8 +63,7 @@ const CASES: Array<{ name: string; el: React.ReactElement; svg: string }> = [
       '<path d="M20 6 9 17l-5-5"/></svg>',
   },
   {
-    // DetailPanel: the category-select caret. The source carried aria-hidden="true"; the adopted <Icon>
-    // drops it (excluded from the compare, asserted separately).
+    // DetailPanel: the category-select caret. It remains decorative and is asserted separately.
     name: "detail.select-chevron",
     el: (
       <Icon
@@ -100,8 +98,8 @@ describe("non-modal <Icon> adoption - render-diff", () => {
     expect(svg.getAttribute("stroke")).toBe("var(--c-ok)");
   });
 
-  it("drops aria-hidden on detail.select-chevron (accepted per the D-03 registry note)", () => {
+  it("hides untitled detail.select-chevron from assistive technology", () => {
     const svg = rendered(<Icon id="detail.select-chevron" className="h-3 w-3" />);
-    expect(svg.hasAttribute("aria-hidden")).toBe(false);
+    expect(svg).toHaveAttribute("aria-hidden", "true");
   });
 });

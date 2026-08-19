@@ -44,6 +44,7 @@ import { cloneCoreBringUpPolicy } from "./coreBringUpPolicy";
 import { BenchScopeRail } from "./BenchScopeRail";
 import { BenchStepper } from "./BenchStepper";
 import { benchSets, packagesForScope } from "./benchModel";
+import { Icon } from "../Icon";
 import { Button, ErrorState } from "../primitives";
 import { Text, useCopyFormatter, useText } from "../../lib/copy";
 import { downloadTextFile } from "../../lib/stmTargetExport";
@@ -419,7 +420,7 @@ function SetStrip({
               onClick={() => onDropPart(r.ref)}
               className="text-t3 hover:text-t1"
             >
-              ×
+              <Icon id="action.close" className="h-3 w-3" />
             </button>
           ) : null}
         </span>

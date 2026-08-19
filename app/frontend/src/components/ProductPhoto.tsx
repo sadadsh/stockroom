@@ -12,6 +12,7 @@ import { useProductImage } from "../api/queries";
 import { useModalDismiss } from "../lib/useModalDismiss";
 import { useObjectUrl } from "../lib/useObjectUrl";
 import { Text, useCopyFormatter, useText } from "../lib/copy";
+import { Icon } from "./Icon";
 import type { PartPhoto } from "./partPhotos";
 
 interface ProductPhotoProps {
@@ -124,19 +125,13 @@ export function PhotoTrigger({
               value-right neighbours, and in light theme its label measured rgb(90,90,90) against the
               rgb(18,18,36) of the STATUS word beside it - so the one ACTION in the stack was the
               quietest text in it. */}
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true" className="flex-none text-t3 transition-colors group-hover:text-t1">
-            <rect x="3" y="5" width="18" height="14" rx="2" />
-            <circle cx="9" cy="11" r="2" />
-            <path d="m21 15-3.5-3.5L13 16l-2-2-5 5" />
-          </svg>
+          <Icon id="media.photo" className="h-3.5 w-3.5 flex-none text-t3 transition-colors group-hover:text-t1" />
           {count > 1 ? (
             <Text id="photo.view-many" values={{ count }}>{"View {count} Photos"}</Text>
           ) : (
             <Text id="photo.view-one">View Photo</Text>
           )}
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true" className="ml-auto flex-none text-t3 transition-colors group-hover:text-t1">
-            <path d="M9 18l6-6-6-6" />
-          </svg>
+          <Icon id="detail.chevron-right" className="ml-auto h-3.5 w-3.5 flex-none text-t3 transition-colors group-hover:text-t1" />
         </button>
         {card}
       </>
@@ -152,11 +147,7 @@ export function PhotoTrigger({
         aria-label={viewOneName({ part: partName || thisPart })}
         className="inline-flex flex-none items-center gap-1.5 rounded-control border border-line bg-raise px-2 py-1 text-2xs font-medium text-t2 transition-colors hover:border-line2 hover:text-t1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
       >
-        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-          <rect x="3" y="5" width="18" height="14" rx="2" />
-          <circle cx="9" cy="11" r="2" />
-          <path d="m21 15-3.5-3.5L13 16l-2-2-5 5" />
-        </svg>
+        <Icon id="media.photo" className="h-3 w-3 flex-none" />
         {label}
       </button>
       {card}
@@ -291,9 +282,7 @@ function PhotoStage({
             aria-label={closeLabel}
             className="flex h-7 w-7 flex-none items-center justify-center rounded-control text-t3 transition-colors hover:bg-raise2 hover:text-t1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-focus"
           >
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-              <path d="M18 6 6 18M6 6l12 12" />
-            </svg>
+            <Icon id="action.close" className="h-3.5 w-3.5" />
           </button>
         </div>
         <div className="relative flex min-h-[280px] items-center justify-center bg-stage p-6">
@@ -366,9 +355,10 @@ function CarouselArrow({
         (side === "left" ? "left-2" : "right-2")
       }
     >
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-        <path d={side === "left" ? "M15 18l-6-6 6-6" : "M9 18l6-6-6-6"} />
-      </svg>
+      <Icon
+        id="detail.chevron-right"
+        className={`h-3.5 w-3.5 ${side === "left" ? "rotate-180" : ""}`}
+      />
     </button>
   );
 }

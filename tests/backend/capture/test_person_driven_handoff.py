@@ -134,7 +134,7 @@ def test_the_guided_source_fails_closed_without_the_embedded_provider_surface(tm
         guided.CaptureBrowserError,
         match="embedded provider browser is unavailable",
     ):
-        source._ensure_session()
+        source._ensure_session("ultralibrarian")
 
 
 def test_the_guided_source_takes_no_standalone_browser_option(tmp_path):
@@ -156,7 +156,7 @@ def test_the_leased_surface_capture_attaches_nothing_and_is_not_the_os_handoff(t
     )
 
     @contextmanager
-    def surface():
+    def surface(_author_key):
         yield lease
 
     source = guided.GuidedCaptureSource(
@@ -165,7 +165,7 @@ def test_the_leased_surface_capture_attaches_nothing_and_is_not_the_os_handoff(t
         download_root=tmp_path / "dl",
         provider_surface=surface,
     )
-    session = source._ensure_session()
+    session = source._ensure_session("ultralibrarian")
     try:
         assert isinstance(session.browser, guided.ProviderSurfaceCapture)
         assert not isinstance(session.browser, DefaultBrowserCapture)
@@ -187,7 +187,7 @@ def test_the_transport_choice_is_traced(tmp_path, monkeypatch):
         download_root=tmp_path / "dl",
     )
     with pytest.raises(guided.CaptureBrowserError):
-        source._ensure_session()
+        source._ensure_session("digikey")
     reset_for_tests()
 
     written = log.read_text(encoding="utf-8")

@@ -87,7 +87,7 @@ export function DatasheetButton({
         <StatusText tone="warn" data-dev-id="component-browser.datasheet-missing">
           <Text id="component-browser.datasheet-missing">Datasheet Missing</Text>
         </StatusText>
-        <Button small data-dev-id="component-browser.datasheet-find" onClick={onFindDatasheet}>
+        <Button small data-dev-id="component-browser.datasheet-find" icon={<Icon id="action.search" className="h-3.5 w-3.5" />} onClick={onFindDatasheet}>
           <Text id="component-browser.datasheet-find">Find Datasheet</Text>
         </Button>
       </span>
@@ -99,6 +99,7 @@ export function DatasheetButton({
       <Button
         small
         data-dev-id="component-browser.header-datasheet"
+        icon={<Icon id="detail.datasheet-link" className="h-3.5 w-3.5" />}
         onClick={() => onOpen(preferred)}
       >
         <Text id="component-browser.header-datasheet">Datasheet</Text>

@@ -100,6 +100,8 @@ class WindowClientPort(Protocol):
 
     def release_provider_lease(self, lease_id: str, generation: int) -> bool: ...
 
+    def cancel_provider_downloads(self, lease_id: str, generation: int) -> int: ...
+
     def provider_download_events(
         self,
         lease_id: str,
@@ -207,6 +209,7 @@ class ProviderBrowserLease:
     _navigate: Callable[[str, int, str], None]
     _refresh: Callable[[str, int], None]
     _state: Callable[[str, int], dict[str, object]]
+    _cancel_downloads: Callable[[str, int], int]
     _document_state: Callable[..., dict[str, object]]
     _download_events: Callable[..., tuple[ProviderDownloadEvent, ...]]
     _retained: bool = False
@@ -250,12 +253,24 @@ class ProviderBrowserLease:
         )
 
     def security_state(self) -> dict[str, object]:
-        state = self.document_state()
+        document = self.document_state()
+        try:
+            navigation = self.state()
+        except AttributeError:
+            # An older managed host can still supply document signals during an in-place upgrade.
+            navigation = {}
         return {
-            "ready": bool(state.get("ready")),
-            "challenge": bool(state.get("challenge")),
-            "account_verification": bool(state.get("account_verification")),
+            "ready": bool(document.get("ready")),
+            "challenge": bool(document.get("challenge")),
+            "account_verification": bool(document.get("account_verification")),
+            "provider_error": bool(document.get("provider_error")),
+            "navigation_error": str(navigation.get("navigation_error", "") or ""),
         }
+
+    def cancel_downloads(self) -> int:
+        """Cancel only downloads stamped with this lease generation."""
+
+        return self._cancel_downloads(self.lease_id, self.generation)
 
     def download_events(
         self,
@@ -625,6 +640,15 @@ class SupervisorWindowHandoffPorts(WindowHandoffPorts):
         if client is None or not client.active:
             return False
         return client.release_provider_lease(lease_id, generation)
+
+    def cancel_provider_downloads(self, lease_id: str, generation: int) -> int:
+        with self._lock:
+            client = self._active
+        if client is None or not client.active:
+            raise ReleaseWindowRuntimeError(
+                "active native provider browser is unavailable"
+            )
+        return client.cancel_provider_downloads(lease_id, generation)
 
     def provider_download_events(
         self,
@@ -1022,6 +1046,7 @@ class ProductionWindowReplacement:
                 _navigate=self._ports.navigate_provider_browser,
                 _refresh=self._ports.refresh_provider_browser,
                 _state=self._ports.provider_browser_state,
+                _cancel_downloads=self._ports.cancel_provider_downloads,
                 _document_state=self._ports.provider_document_state,
                 _download_events=self._ports.provider_download_events,
             )

@@ -1,5 +1,6 @@
 import { registerScenarios } from "../scenarioRegistry";
 import { settingsFixtureValidators } from "../fixtures/settingsFixtures";
+import { assetsScenarios } from "./assets";
 import { componentScenarios } from "./components";
 import { globalScenarios } from "./global";
 import { projectScenarios } from "./projects";
@@ -8,6 +9,7 @@ import { stmScenarios } from "./stm";
 import { settingsScenarios } from "./settings";
 import { bootstrapStateContracts } from "./contracts";
 
+export { assetsScenarios } from "./assets";
 export { globalScenarios } from "./global";
 export { componentScenarios } from "./components";
 export { projectScenarios } from "./projects";
@@ -17,7 +19,7 @@ export { settingsScenarios } from "./settings";
 
 /** The shipped scenario set. Domain-specific scenarios are added by their owning feature. */
 export const bootstrapScenarioRegistry = registerScenarios(
-  [...globalScenarios, ...componentScenarios, ...providerScenarios, ...projectScenarios, ...stmScenarios, ...settingsScenarios],
+  [...globalScenarios, ...assetsScenarios, ...componentScenarios, ...providerScenarios, ...projectScenarios, ...stmScenarios, ...settingsScenarios],
   settingsFixtureValidators,
   bootstrapStateContracts,
 );

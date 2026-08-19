@@ -100,6 +100,7 @@ function ScenarioProbe({ expose }: { expose: (activate: (id: string) => Promise<
 describe("App shell", () => {
   beforeEach(() => {
     mockApi.getOnboarding.mockResolvedValue(ONBOARDING_READY);
+    mockApi.getStmFamilies.mockResolvedValue({ families: [] });
   });
 
   it("gates an existing installation until Primary CAD Tool confirmation", async () => {
@@ -231,13 +232,9 @@ describe("App shell", () => {
     expect((await screen.findAllByText("LM358")).length).toBeGreaterThan(0);
     // The opened component states what the part IS on its identity line.
     expect((await screen.findAllByText(/Dual Operational Amplifier/)).length).toBeGreaterThan(0);
-    // The only in-product tabs belong to CAD Models. Provider navigation no longer creates a
-    // second, window-level tab system.
-    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual([
-      "Models",
-      "Manage Models",
-    ]);
-    expect(screen.getAllByRole("tablist")).toHaveLength(1);
+    // Components inspects CAD evidence; acquisition is handed to the Assets route.
+    expect(screen.queryAllByRole("tab")).toHaveLength(0);
+    expect(screen.getByRole("button", { name: "Manage CAD Assets" })).toBeVisible();
   });
 
   it("reaches Add Parts as a full-screen wizard from the Parts toolbar", async () => {
@@ -283,7 +280,7 @@ describe("App shell", () => {
     expect(within(dialog).getByRole("button", { name: "Close" })).toBeInTheDocument();
   });
 
-  it("renders the STM Viewer page for the stm route", async () => {
+  it("renders the Tools page for the stm route", async () => {
     window.history.replaceState({}, "", "/#route=stm");
     mockApi.getStmStatus.mockResolvedValue({
       built: true,
@@ -343,7 +340,7 @@ describe("App shell", () => {
       </QueryClientProvider>,
     );
 
-    expect(await screen.findByRole("heading", { name: "STM Viewer" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Tools" })).toBeInTheDocument();
     expect(await screen.findByText("STM32F407VETx")).toBeInTheDocument();
   });
 

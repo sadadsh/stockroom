@@ -206,6 +206,7 @@ describe("IngestPage network-only Add A Part", () => {
     expect(screen.queryByRole("button", { name: /browse/i })).not.toBeInTheDocument();
     expect(screen.queryByText(/vendor zip/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/drop.*zip/i)).not.toBeInTheDocument();
+    expect(screen.queryByText("Import A List")).not.toBeInTheDocument();
   });
 
   it("routes a bare part number through exact MPN lookup", async () => {

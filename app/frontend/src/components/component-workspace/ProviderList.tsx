@@ -1,21 +1,6 @@
 import { Text, useText } from "../../lib/copy";
-import { Badge } from "../primitives";
+import { Icon } from "../Icon";
 import type { ManageModelsProvider } from "./manageModelsModel";
-
-const ARTIFACT_LABELS = {
-  symbol: "Symbol",
-  footprint: "Footprint",
-  model: "3D Model",
-} as const;
-
-function artifactSummary(provider: ManageModelsProvider): string {
-  const supplied = new Set(provider.supplied);
-  return (Object.keys(ARTIFACT_LABELS) as Array<keyof typeof ARTIFACT_LABELS>)
-    .map((artifact) =>
-      `${ARTIFACT_LABELS[artifact]} ${supplied.has(artifact) ? "✓" : "—"}`,
-    )
-    .join(" · ");
-}
 
 export function ProviderList({
   providers,
@@ -34,24 +19,17 @@ export function ProviderList({
   );
 
   return (
-    <aside
+    <div
       data-dev-id="component-browser.provider-list"
-      className="flex min-h-0 w-[280px] flex-none flex-col border-r border-line bg-band"
+      className="flex flex-none items-center gap-2 border-b border-line bg-band px-2 py-1.5"
     >
-      <div className="border-b border-line px-3 py-2">
-        <div className="ui-section-title">
-          <Text id="component-browser.manage-models-providers">Provider Quick Links</Text>
-        </div>
-        <p className="mt-0.5 text-xs text-t3">
-          <Text id="component-browser.manage-models-provider-help">
-            Complete sets include Symbol, Footprint, and 3D Model.
-          </Text>
-        </p>
-      </div>
+      <span className="ui-section-title flex-none">
+        <Text id="component-browser.manage-models-providers">Providers</Text>
+      </span>
       <div
         role="radiogroup"
         aria-label={providerListLabel}
-        className="min-h-0 flex-1 space-y-1 overflow-y-auto p-2"
+        className="flex min-w-0 flex-1 items-stretch gap-1 overflow-x-auto"
       >
         {providers.map((provider) => (
           <button
@@ -61,38 +39,48 @@ export function ProviderList({
             data-dev-role="component-browser.provider-row"
             aria-checked={provider.row.id === selectedId}
             disabled={disabled || !provider.reachable}
+            tabIndex={
+              provider.row.id === selectedId
+                || (!selectedId && provider.row.id === providers.find((item) => item.reachable)?.row.id)
+                ? 0
+                : -1
+            }
             className={
-              "w-full rounded-control border px-2.5 py-2 text-left " +
+              "flex h-8 flex-none items-center gap-1.5 rounded-control border px-3 text-left " +
               (provider.row.id === selectedId
                 ? "border-acc bg-control-pressed"
                 : "border-transparent hover:bg-control-hover")
             }
             onClick={() => onSelect(provider.row.id)}
+            onKeyDown={(event) => {
+              if (!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End"].includes(event.key)) {
+                return;
+              }
+              const enabledProviders = providers.filter((item) => item.reachable);
+              if (enabledProviders.length === 0) return;
+              event.preventDefault();
+              const currentIndex = Math.max(
+                0,
+                enabledProviders.findIndex((item) => item.row.id === provider.row.id),
+              );
+              const targetIndex = event.key === "Home"
+                ? 0
+                : event.key === "End"
+                  ? enabledProviders.length - 1
+                  : (currentIndex + (event.key === "ArrowLeft" || event.key === "ArrowUp" ? -1 : 1) + enabledProviders.length)
+                    % enabledProviders.length;
+              onSelect(enabledProviders[targetIndex].row.id);
+              const buttons = event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>(
+                'button[role="radio"]:not(:disabled)',
+              );
+              buttons?.[targetIndex]?.focus();
+            }}
           >
-            <span className="flex items-center justify-between gap-2">
-              <span className="truncate text-sm font-medium text-t1">{provider.row.label}</span>
-              {provider.complete ? (
-                <Badge tone="ok">
-                  <Text id="component-browser.manage-models-complete">Complete Set</Text>
-                </Badge>
-              ) : null}
-            </span>
-            <span className="mt-1 block text-xs text-t3">
-              {!provider.reachable ? (
-                <Text id="component-browser.manage-models-unavailable">Unavailable</Text>
-              ) : provider.complete ? (
-                artifactSummary(provider)
-              ) : (
-                <>
-                  {artifactSummary(provider)} ·{" "}
-                  <Text id="component-browser.manage-models-missing">Missing</Text>{" "}
-                  {provider.missing.map((artifact) => ARTIFACT_LABELS[artifact]).join(", ")}
-                </>
-              )}
-            </span>
+            <Icon id="detail.provider" className="h-3.5 w-3.5 flex-none text-t3" />
+            <span className="whitespace-nowrap text-xs font-medium text-t1">{provider.row.label}</span>
           </button>
         ))}
       </div>
-    </aside>
+    </div>
   );
 }

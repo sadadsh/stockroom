@@ -34,6 +34,11 @@ from stockroom.update.trusted_repository import (
     VerifiedReleaseSet,
 )
 
+# These lifecycle checks intentionally enforce one-second cooperative-cancellation bounds. Running
+# them beside four full backend workers can starve the supervisor thread and measure xdist load
+# instead of broker behavior, so the repository gate owns them on its serialized timing lane.
+pytestmark = pytest.mark.serial_only
+
 _SID = "S-1-5-21-1111111111-2222222222-3333333333-1001"
 
 

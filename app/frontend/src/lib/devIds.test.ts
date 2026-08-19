@@ -196,7 +196,7 @@ import { DEV_IDS, DEV_ID_AREAS, DEV_ID_BY_ID } from "./devIds";
 // Moving About from a rail modal into Settings retires three modal-only targets and adds one
 // settings card target. The legacy rail target remains registered so personal design documents do
 // not become invalid merely because the product control moved.
-const EXPECTED_ENTRIES = 503;
+const EXPECTED_ENTRIES = 508;
 
 describe("devIds catalogue", () => {
   // The count is asserted from a single constant so bumping it is one edit, and so the test NAME can
@@ -223,13 +223,14 @@ describe("devIds catalogue", () => {
     expect(seen.size).toBe(EXPECTED_ENTRIES);
   });
 
-  it("enumerates the 21 areas in first-appearance order, and every entry is a member", () => {
+  it("enumerates the 22 areas in first-appearance order, and every entry is a member", () => {
     expect(DEV_ID_AREAS).toEqual([
       "rail",
       "about",
       "onboarding",
       "toast",
       "capture",
+      "assets",
       "components",
       "stm",
       "projects",
@@ -249,7 +250,7 @@ describe("devIds catalogue", () => {
       // first-appearance order rather than a taxonomy.
       "design",
     ]);
-    expect(DEV_ID_AREAS).toHaveLength(21);
+    expect(DEV_ID_AREAS).toHaveLength(22);
 
     // Every catalogued area is declared in DEV_ID_AREAS...
     const declared = new Set(DEV_ID_AREAS);

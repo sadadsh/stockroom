@@ -25,6 +25,7 @@ import uuid
 from pathlib import Path
 
 from stockroom.capture.complete import (
+    CompletionEvidence,
     complete_library,
     iter_incomplete,
 )
@@ -452,7 +453,7 @@ def run_guided_capture(
             ctx.profile,
             ctx.repo,
             ctx.cli,
-            auto_embed_altium_models=True,
+            auto_embed_altium_models=False,
         )
 
     evidence_store = EvidenceStore(_capture_evidence_root(ctx))
@@ -476,13 +477,15 @@ def run_guided_capture(
             ),
         )
 
+    selected_record = None
     if person_driven_capture:
         from stockroom.capture.evidence import exact_identity
 
         # Fail before constructing a provider runtime or opening a page. A search-only MPN or a
         # manufacturer-free record is not an exact collection task.
         assert exact_part_id is not None
-        exact_identity(ctx.ops.load_record(exact_part_id))
+        selected_record = ctx.ops.load_record(exact_part_id)
+        exact_identity(selected_record)
         for key in provider_keys:
             if get_adapter(key) is None:
                 raise ValueError(f"no network capture adapter for provider {key!r}")
@@ -508,10 +511,27 @@ def run_guided_capture(
         learn_models_ids_for_library(ctx, store=models_ids)
 
     def make_guided_source(key: str):
+        download_root = _capture_downloads(ctx, key).resolve(strict=False)
+        bound_provider_surface = None
+        if provider_surface is not None and selected_record is not None:
+            def bound_provider_surface(
+                evidence_provider_key: str,
+                *,
+                _download_root=download_root,
+                _record=selected_record,
+            ):
+                return provider_surface(
+                    staging_root=str(_download_root),
+                    component_id=str(_record.id),
+                    manufacturer=str(_record.manufacturer),
+                    mpn=str(_record.mpn),
+                    provider_id=evidence_provider_key,
+                )
+
         return GuidedCaptureSource(
             make_pipeline,
             vendor=key,
-            download_root=_capture_downloads(ctx, key),
+            download_root=download_root,
             # Both the direct and DigiKey-aggregated Ultra Librarian routes can deliver legacy
             # P-CAD/script packages when native Altium libraries are unavailable. Inject the
             # content-recognizing converter at the provider-surface boundary: it returns ``None``
@@ -521,11 +541,13 @@ def run_guided_capture(
                 if key in {"digikey", "ultralibrarian"}
                 else None
             ),
-            # One selected part is collected exhaustively: every registered author route is
-            # offered, and an extra complete set is retained as a variant rather than silently
-            # replacing the active pair.
+            # A selected provider can retain a complete alternative without replacing the active
+            # pair. The explicit-provider flag below limits the visit to that one chosen route.
             collect_variants=True,
             preserve_active_pair=True,
+            # A provider row is an exact owner choice. Even an empty or failed visit returns to
+            # Assets instead of walking that provider's hidden fallback-author ladder.
+            single_provider_attempt=vendor is not None,
             close_after_supply=True,
             run_write=ctx.jobs.run_write,
             now_iso=_utc_now_iso,
@@ -548,35 +570,54 @@ def run_guided_capture(
             # provider tab to land on. It carries the opaque id learned from the person's own
             # navigation so their SECOND visit to a part skips the search they already did.
             models_ids=models_ids if key == "digikey" else None,
-            # Configured Product Information V4 credentials make DigiKey's exact ProductDetails
-            # and Media response authoritative. Do not silently replace a missing exact route
-            # with a provider-wide search page; surface the missing route to the operator.
+            # A direct provider choice may use that provider's measured MPN search when DigiKey
+            # has no exact media link; validation still binds every downloaded file to this task.
+            # Only the legacy unchosen provider chain keeps strict DigiKey-media routing.
             strict_catalog_urls=bool(
-                getattr(ctx.config, "digikey_client_id", "")
+                vendor is None
+                and getattr(ctx.config, "digikey_client_id", "")
                 and getattr(ctx.config, "digikey_client_secret", "")
             ),
-            provider_surface=provider_surface,
+            provider_surface=bound_provider_surface,
             publish_active_route=person_intent.set_active_route,
             clear_active_route=person_intent.clear_active_route,
             take_selected_files=person_intent.take_selected_files,
+            publish_download_progress=person_intent.set_download_progress,
+            publish_browser_state=person_intent.set_browser_state,
+            publish_attachment_proposal=person_intent.set_attachment_proposal,
+            attachment_confirmed=person_intent.take_attachment_apply,
+            clear_attachment_proposal=person_intent.clear_attachment_proposal,
             requested_requirements=requested,
         )
 
     guided_sources = [make_guided_source(key) for key in provider_keys]
     _trace_provider_routing(vendor=vendor, provider_keys=provider_keys)
-    # Verified local evidence is the zero-interaction first lane. If it fills the remaining
-    # requirements, GuidedCaptureSource is never asked and no provider window opens.
-    sources = [
-        *build_sources(
-            ctx,
-            run_write=ctx.jobs.run_write,
-            paced=False,
-            evidence_store=evidence_store,
-            preserve_active_pair=person_driven_capture,
-        ),
-        *guided_sources,
-    ]
+    retained_sources = build_sources(
+        ctx,
+        run_write=ctx.jobs.run_write,
+        paced=False,
+        evidence_store=evidence_store,
+        preserve_active_pair=person_driven_capture,
+    )
+    # Clicking a provider is navigation, not a request to spend seconds proving retained evidence
+    # first. The selected person-driven surface opens before retained-source evaluation; bulk and
+    # automatic work remain evidence-first and open no provider surface.
+    sources = [*guided_sources, *retained_sources] if person_driven_capture else retained_sources
     load_record = ctx.ops.load_record
+    initial_observations: set[str] = set()
+
+    def prompt_evidence_resolver(record):
+        record_id = str(getattr(record, "id", ""))
+        if record_id not in initial_observations:
+            initial_observations.add(record_id)
+            return CompletionEvidence.unverified(
+                "retained evidence evaluation follows the selected provider navigation"
+            )
+        return completion_evidence_resolver(record)
+
+    active_evidence_resolver = (
+        prompt_evidence_resolver if person_driven_capture else completion_evidence_resolver
+    )
 
     if part_ids is None:
         work = iter_incomplete(
@@ -610,7 +651,7 @@ def run_guided_capture(
                 breaker=CircuitBreaker(threshold=_BREAKER_THRESHOLD),
                 collect_variants=person_driven_capture,
                 exhaustive=person_driven_capture,
-                evidence_resolver=completion_evidence_resolver,
+                evidence_resolver=active_evidence_resolver,
             )
     finally:
         for source in guided_sources:

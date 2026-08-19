@@ -37,6 +37,7 @@ from __future__ import annotations
 
 import hashlib
 import tempfile
+import time
 from collections.abc import Callable
 from contextlib import ExitStack, contextmanager
 from dataclasses import dataclass
@@ -44,6 +45,7 @@ from pathlib import Path
 from typing import Protocol, cast
 from urllib.parse import parse_qs, urlparse
 
+from stockroom.cad_variants import resolve_cad_variant
 from stockroom.capture.browser import (
     CaptureBrowserError,
     ProviderHudSpec,
@@ -62,6 +64,7 @@ from stockroom.capture.download_broker import DownloadBroker, DownloadTask
 from stockroom.capture.evidence import (
     BROWSER_CAPTURE_ADAPTER_VERSION,
     exact_identity,
+    record_browser_altium_evidence,
     record_browser_cad_evidence,
 )
 from stockroom.capture.identity import (
@@ -122,7 +125,6 @@ def _captured_file_digest(item: object) -> str:
         return f"sha256:{hashlib.file_digest(stream, 'sha256').hexdigest()}"
 
 
-_COHERENT_CAD_FORMATS = ("kicad", "model", "altium")
 _CAD_AUTHOR_LABELS = {
     "ultralibrarian": "Ultra Librarian",
     "snapmagic": "SnapMagic",
@@ -339,18 +341,10 @@ def _receipt_binding_issue(
 
 
 def _provider_formats(adapter, needs) -> list[str]:
-    """Request one coherent bundle when a provider can supply every cross-EDA artifact.
+    """Request only formats required by the confirmed Primary CAD Tool."""
 
-    Evidence proves a relationship between actual bytes, not between old library references and
-    one newly downloaded side. Therefore an Altium-only (or any other partial) repair through a
-    complete-bundle provider downloads KiCad symbol/footprint, STEP, and native Altium from that
-    SAME provider. Verification runs before any existing asset can be replaced.
-    """
     selectable = set(adapter.capability.supported_formats)
-    requested = [fmt for fmt in formats_for(needs) if fmt in selectable]
-    if requested and set(_COHERENT_CAD_FORMATS) <= selectable:
-        return list(_COHERENT_CAD_FORMATS)
-    return requested
+    return [fmt for fmt in formats_for(needs) if fmt in selectable]
 
 
 def _resolved_provider_url_issue(
@@ -635,6 +629,11 @@ class GuidedCaptureSource:
         publish_active_route: Callable[[str, str, str], str] | None = None,
         clear_active_route: Callable[[str, str, str, str], None] | None = None,
         take_selected_files: Callable[[str, str, str, str], tuple[Path, ...]] | None = None,
+        publish_download_progress: Callable[[dict[str, object]], None] | None = None,
+        publish_browser_state: Callable[[dict[str, object]], None] | None = None,
+        publish_attachment_proposal: Callable[[dict[str, object]], str] | None = None,
+        attachment_confirmed: Callable[[str], bool] | None = None,
+        clear_attachment_proposal: Callable[[str], None] | None = None,
         requested_requirements: frozenset[Requirement] | None = None,
     ) -> None:
         self._make_pipeline = make_pipeline
@@ -685,23 +684,39 @@ class GuidedCaptureSource:
         self._publish_active_route = publish_active_route
         self._clear_active_route = clear_active_route
         self._take_selected_files = take_selected_files
+        self._publish_download_progress = publish_download_progress
+        self._publish_browser_state = publish_browser_state
+        self._publish_attachment_proposal = publish_attachment_proposal
+        self._attachment_confirmed = attachment_confirmed
+        self._clear_attachment_proposal = clear_attachment_proposal
         self._requested_requirements = requested_requirements
         self._session: _Session | None = None
+        self._session_author_key: str | None = None
 
     # -- lifecycle -------------------------------------------------------------------------
 
-    def _ensure_session(self) -> _Session:
-        """Lease the provider surface once, on the first part that actually needs it.
+    def _ensure_session(self, evidence_provider_key: str) -> _Session:
+        """Lease the provider surface for one exact author route.
 
         Lazy on purpose: a run whose parts are all already complete must not flash a provider
         window at the owner for nothing.
 
         Every visible route uses the one Stockroom-owned embedded provider surface, and nothing
-        is attached to it. Silently switching to an installed browser would lose the task-bound
-        download broker and create two contradictory workflows.
+        is attached to it. A different author route receives a fresh native lease generation before
+        it can accept bytes, so a late export from the previous page cannot inherit the next
+        route's evidence identity. The WebView profile remains persistent across leases.
         """
-        if self._session is not None:
+        if type(evidence_provider_key) is not str or not evidence_provider_key:
+            raise ValueError("evidence_provider_key must be exact non-empty text")
+        if self._session is not None and self._session_author_key is None:
+            # Tests and bounded adapters may inject a browser session before the first route.
+            # Adopt it once; sessions created by this class always carry an immutable author key.
+            self._session_author_key = evidence_provider_key
             return self._session
+        if self._session is not None and self._session_author_key == evidence_provider_key:
+            return self._session
+        if self._session is not None:
+            self.close()
         adapter = get_adapter(self._vendor_key)
         if adapter is not None:
             # Trace what actually happens. The provider page opens in Stockroom's OWN embedded
@@ -722,7 +737,9 @@ class GuidedCaptureSource:
             )
         stack = ExitStack()
         try:
-            provider_lease = stack.enter_context(self._provider_surface())
+            provider_lease = stack.enter_context(
+                self._provider_surface(evidence_provider_key)
+            )
             browser = ProviderSurfaceCapture(
                 download_dir=self._download_root,
                 provider_key=self._vendor_key,
@@ -732,6 +749,7 @@ class GuidedCaptureSource:
             stack.close()
             raise
         self._session = _Session(browser=browser, ctx_manager=stack)
+        self._session_author_key = evidence_provider_key
         return self._session
 
     def close(self) -> None:
@@ -739,6 +757,7 @@ class GuidedCaptureSource:
         failed run never leaves a window open."""
         session = self._session
         self._session = None
+        self._session_author_key = None
         if session is None:
             return
         try:
@@ -765,6 +784,39 @@ class GuidedCaptureSource:
                     evidence_provider_key,
                     route_token,
                 )
+
+    def _primary_attachment_tool(self) -> str | None:
+        requested = self._requested_requirements
+        if not requested:
+            return None
+        kicad = bool(
+            requested & {Requirement.KICAD_SYMBOL, Requirement.KICAD_FOOTPRINT}
+        )
+        altium = bool(
+            requested & {Requirement.ALTIUM_SYMBOL, Requirement.ALTIUM_FOOTPRINT}
+        )
+        if kicad == altium:
+            return None
+        return "kicad" if kicad else "altium"
+
+    def _confirm_attachment_proposal(self, proposal: dict[str, object]) -> bool:
+        publish = self._publish_attachment_proposal
+        confirmed = self._attachment_confirmed
+        clear = self._clear_attachment_proposal
+        if not callable(publish) or not callable(confirmed) or not callable(clear):
+            raise RuntimeError("Assets attachment confirmation is unavailable")
+        proposal_token = publish(proposal)
+        deadline = time.monotonic() + self._user_capture_timeout_s
+        try:
+            while time.monotonic() < deadline:
+                if confirmed(proposal_token):
+                    return True
+                if self._user_cancelled is not None and self._user_cancelled():
+                    return False
+                time.sleep(0.1)
+            return False
+        finally:
+            clear(proposal_token)
 
     def attach_selected_files(
         self,
@@ -1018,7 +1070,6 @@ class GuidedCaptureSource:
                 stage="resolved-url-identity",
             )
 
-        session = self._ensure_session()
         outcomes: list[tuple[str, SourceOutcome]] = []
         for route_index, route in enumerate(routes):
             if self._user_cancelled is not None and self._user_cancelled():
@@ -1037,10 +1088,12 @@ class GuidedCaptureSource:
                         )
                     )
                 break
-            route_formats = _provider_formats(
-                route,
-                self.provides() if self._collect_variants else needs,
+            route_needs = (
+                self.provides()
+                if self._collect_variants and self._requested_requirements is None
+                else needs
             )
+            route_formats = _provider_formats(route, route_needs)
             trace(
                 "capture.route.start",
                 provider=self._vendor_key,
@@ -1064,6 +1117,8 @@ class GuidedCaptureSource:
                     status="not-attempted",
                 )
             else:
+                author_key = _author_key(self._vendor_key, route)
+                session = self._ensure_session(author_key)
                 raw_outcome = self._supply_user_driven_route(
                     record,
                     session,
@@ -1080,10 +1135,10 @@ class GuidedCaptureSource:
                     label=route.capability.label,
                 )
             outcomes.append((route.capability.label, outcome))
-            if self._single_provider_attempt and (outcome.satisfied or outcome.retained):
+            if self._single_provider_attempt:
                 reason = (
-                    f"not attempted because {route.capability.label} owns this one-provider "
-                    "attempt"
+                    f"not attempted because {route.capability.label} was the provider route "
+                    "the person selected"
                 )
                 for later_route in routes[route_index + 1 :]:
                     outcomes.append(
@@ -1454,6 +1509,8 @@ class GuidedCaptureSource:
                         ),
                         should_finish=self._user_finished,
                         should_cancel=self._user_cancelled,
+                        on_progress=self._publish_download_progress,
+                        on_navigation_state=self._publish_browser_state,
                         timeout_s=self._user_capture_timeout_s,
                     )
                 except Exception as exc:  # noqa: BLE001 - an accepted inbox must still drain
@@ -1716,7 +1773,10 @@ class GuidedCaptureSource:
             if callable(load_current):
                 record = load_current(record.id)
             preserve_active_pair = (
-                (self._preserve_active_pair or self._collect_variants)
+                (
+                    self._preserve_active_pair
+                    or (self._collect_variants and self._requested_requirements is None)
+                )
                 and self._evidence_store is not None
                 and self._projection_verifier is not None
                 and active_pair_is_verified(
@@ -1793,6 +1853,7 @@ class GuidedCaptureSource:
                 catalog_identity_authorized=catalog_identity_authorized,
             )
             candidate = selection.candidate
+            primary_tool = self._primary_attachment_tool()
             trace(
                 "capture.attach.selection",
                 provider=self._vendor_key,
@@ -1800,6 +1861,120 @@ class GuidedCaptureSource:
                 exact_candidate=candidate is not None,
                 why=selection.error,
             )
+            if primary_tool == "altium" and altium_sources:
+                if self._evidence_store is None:
+                    return SourceOutcome(
+                        error=(
+                            "a complete Altium provider set landed, but immutable evidence "
+                            "storage is unavailable; nothing was activated"
+                        )
+                    )
+                try:
+                    evidence_digest, symbol_entry, footprint_entry = (
+                        record_browser_altium_evidence(
+                            store=self._evidence_store,
+                            record=record,
+                            provider_key=evidence_provider_key,
+                            detail_url=detail_url,
+                            altium_sources=tuple(altium_sources),
+                            source_receipts=tuple(item.path for item in landed),
+                        )
+                    )
+                    resolved = resolve_cad_variant(
+                        self._evidence_store,
+                        identity=exact_identity(record),
+                        tool="altium",
+                        manifest_digest=evidence_digest,
+                    )
+                except Exception as exc:  # noqa: BLE001 - proposal remains non-activating
+                    return SourceOutcome(error=f"Altium evidence verification failed: {exc}")
+                proposal = {
+                    "part_id": record.id,
+                    "provider": evidence_provider_key,
+                    "primary_tool": "altium",
+                    "attachments": [
+                        {
+                            "role": "Symbol",
+                            "file_name": next(
+                                (
+                                    path.name
+                                    for path in altium_sources
+                                    if path.suffix.casefold() == ".schlib"
+                                ),
+                                altium_sources[0].name,
+                            ),
+                            "target": f"Active Altium Symbol ({symbol_entry})",
+                        },
+                        {
+                            "role": "Footprint",
+                            "file_name": next(
+                                (
+                                    path.name
+                                    for path in altium_sources
+                                    if path.suffix.casefold() == ".pcblib"
+                                ),
+                                altium_sources[0].name,
+                            ),
+                            "target": f"Active Altium Footprint ({footprint_entry})",
+                        },
+                    ],
+                    "inactive_evidence": [
+                        {"tool": "kicad", "file_name": item.path.name}
+                        for item in landed
+                        if item.path.suffix.casefold()
+                        in {".kicad_sym", ".kicad_mod", ".step", ".stp"}
+                    ],
+                }
+                try:
+                    approved = self._confirm_attachment_proposal(proposal)
+                except RuntimeError as exc:
+                    return SourceOutcome(error=str(exc))
+                if not approved:
+                    return SourceOutcome(
+                        retained=2,
+                        skipped="attachment proposal was not applied; verified evidence retained",
+                    )
+                if preserve_active_pair:
+                    return SourceOutcome(
+                        retained=2,
+                        skipped=(
+                            f"retained a complete {evidence_provider_key} Altium variant; "
+                            "the active Altium assets are unchanged"
+                        ),
+                    )
+                origin = AssetOrigin(
+                    vendor=evidence_provider_key,
+                    url=url,
+                    captured_at=self._now_iso() if self._now_iso else "",
+                    extra={
+                        "evidence_adapter_version": BROWSER_CAPTURE_ADAPTER_VERSION,
+                        "evidence_manifest_digest": evidence_digest,
+                        "evidence_operation": resolved.descriptor.operation,
+                        "evidence_set": evidence_digest,
+                    },
+                )
+                try:
+                    updated = self._run_write(
+                        lambda: pipeline.attach_altium_assets(
+                            record.id,
+                            *altium_sources,
+                            origin=origin,
+                            now_iso=self._now_iso() if self._now_iso else "",
+                            active_variant=resolved.pointer,
+                            preferred_footprint=footprint_entry,
+                        )
+                    )
+                except Exception as exc:  # noqa: BLE001 - transaction is all-or-nothing
+                    return SourceOutcome(error=f"could not apply the Altium attachments: {exc}")
+                bundle = updated.assets_for("altium")
+                if not all((asset_present(bundle.symbol), asset_present(bundle.footprint))):
+                    return SourceOutcome(
+                        error="the attachment transaction returned without both Altium assets"
+                    )
+                return SourceOutcome(
+                    satisfied=(Requirement.ALTIUM_SYMBOL, Requirement.ALTIUM_FOOTPRINT),
+                )
+
             if selection.error:
                 return SourceOutcome(error=selection.error)
             if candidate is None:
@@ -1823,6 +1998,135 @@ class GuidedCaptureSource:
                 missing_kicad.append("KiCad footprint")
             if candidate.model_path is None:
                 missing_kicad.append("STEP model")
+            if primary_tool == "kicad" and not missing_kicad:
+                symbol_path = candidate.symbol_lib_path
+                footprint_path = candidate.chosen_footprint
+                model_path = candidate.model_path
+                assert symbol_path is not None
+                assert footprint_path is not None
+                assert model_path is not None
+                if self._evidence_store is None:
+                    return SourceOutcome(
+                        error=(
+                            "a complete KiCad provider set landed, but immutable evidence "
+                            "storage is unavailable; nothing was activated"
+                        )
+                    )
+                try:
+                    evidence_digest, _ = record_browser_cad_evidence(
+                        store=self._evidence_store,
+                        record=record,
+                        candidate=candidate,
+                        provider_key=evidence_provider_key,
+                        detail_url=detail_url,
+                        source_receipt_digests=tuple(
+                            sorted({_captured_file_digest(item) for item in landed})
+                        ),
+                        source_receipts=tuple(item.path for item in landed),
+                        catalog_identity_authorized=catalog_identity_authorized,
+                    )
+                    resolved = resolve_cad_variant(
+                        self._evidence_store,
+                        identity=exact_identity(record),
+                        tool="kicad",
+                        manifest_digest=evidence_digest,
+                    )
+                except Exception as exc:  # noqa: BLE001 - proposal remains non-activating
+                    return self._retain_incomplete_cad_set(
+                        record,
+                        landed,
+                        detail_url=detail_url,
+                        evidence_provider_key=evidence_provider_key,
+                        catalog_identity_authorized=catalog_identity_authorized,
+                        reason=f"KiCad evidence verification failed: {exc}",
+                    )
+                proposal = {
+                    "part_id": record.id,
+                    "provider": evidence_provider_key,
+                    "primary_tool": "kicad",
+                    "attachments": [
+                        {
+                            "role": "Symbol",
+                            "file_name": symbol_path.name,
+                            "target": "Active KiCad Symbol",
+                        },
+                        {
+                            "role": "Footprint",
+                            "file_name": footprint_path.name,
+                            "target": "Active KiCad Footprint",
+                        },
+                        {
+                            "role": "3D Model",
+                            "file_name": model_path.name,
+                            "target": "Shared 3D Model",
+                        },
+                    ],
+                    "inactive_evidence": [
+                        {"tool": "altium", "file_name": path.name}
+                        for path in altium_sources
+                    ],
+                }
+                try:
+                    approved = self._confirm_attachment_proposal(proposal)
+                except RuntimeError as exc:
+                    return SourceOutcome(error=str(exc))
+                if not approved:
+                    return SourceOutcome(
+                        retained=3 + len(altium_sources),
+                        skipped="attachment proposal was not applied; verified evidence retained",
+                    )
+                if preserve_active_pair:
+                    return SourceOutcome(
+                        retained=3 + len(altium_sources),
+                        skipped=(
+                            f"retained a complete {evidence_provider_key} KiCad variant; "
+                            "the active KiCad assets are unchanged"
+                        ),
+                    )
+                origin = AssetOrigin(
+                    vendor=evidence_provider_key,
+                    url=url,
+                    captured_at=self._now_iso() if self._now_iso else "",
+                    extra={
+                        "evidence_adapter_version": BROWSER_CAPTURE_ADAPTER_VERSION,
+                        "evidence_manifest_digest": evidence_digest,
+                        "evidence_operation": resolved.descriptor.operation,
+                        "evidence_set": evidence_digest,
+                    },
+                )
+                try:
+                    updated = self._run_write(
+                        lambda: pipeline.attach_assets(
+                            record.id,
+                            candidate,
+                            origin=origin,
+                            now_iso=self._now_iso() if self._now_iso else "",
+                            active_variant=resolved.pointer,
+                            replace_existing=True,
+                        )
+                    )
+                except Exception as exc:  # noqa: BLE001 - transaction is all-or-nothing
+                    return SourceOutcome(error=f"could not apply the KiCad attachments: {exc}")
+                bundle = updated.assets_for("kicad")
+                if not all(
+                    (
+                        asset_present(bundle.symbol),
+                        asset_present(bundle.footprint),
+                        asset_present(bundle.model),
+                    )
+                ):
+                    return SourceOutcome(
+                        error="the attachment transaction returned without all KiCad assets"
+                    )
+                return SourceOutcome(
+                    satisfied=(
+                        Requirement.KICAD_SYMBOL,
+                        Requirement.KICAD_FOOTPRINT,
+                        Requirement.KICAD_MODEL,
+                    ),
+                    retained=len(altium_sources),
+                )
+
             if missing_kicad or not altium_sources:
                 absent = [
                     *missing_kicad,
@@ -1905,6 +2209,77 @@ class GuidedCaptureSource:
                 altium_resolved = verified_pair.altium
             except Exception as exc:  # noqa: BLE001 - never attach an unbound projection
                 return SourceOutcome(error=f"CAD evidence pointer resolution failed: {exc}")
+
+            proposal_callbacks = (
+                self._publish_attachment_proposal,
+                self._attachment_confirmed,
+                self._clear_attachment_proposal,
+            )
+            if any(callable(callback) for callback in proposal_callbacks):
+                symbol_path = candidate.symbol_lib_path
+                footprint_path = candidate.chosen_footprint
+                model_path = candidate.model_path
+                assert symbol_path is not None
+                assert footprint_path is not None
+                assert model_path is not None
+                proposal = {
+                    "part_id": record.id,
+                    "provider": evidence_provider_key,
+                    "primary_tool": "both",
+                    "attachments": [
+                        {
+                            "role": "KiCad Symbol",
+                            "file_name": symbol_path.name,
+                            "target": "Active KiCad Symbol",
+                        },
+                        {
+                            "role": "KiCad Footprint",
+                            "file_name": footprint_path.name,
+                            "target": "Active KiCad Footprint",
+                        },
+                        {
+                            "role": "3D Model",
+                            "file_name": model_path.name,
+                            "target": "Shared 3D Model",
+                        },
+                        {
+                            "role": "Altium Symbol",
+                            "file_name": next(
+                                (
+                                    path.name
+                                    for path in altium_sources
+                                    if path.suffix.casefold() == ".schlib"
+                                ),
+                                altium_sources[0].name,
+                            ),
+                            "target": "Active Altium Symbol",
+                        },
+                        {
+                            "role": "Altium Footprint",
+                            "file_name": next(
+                                (
+                                    path.name
+                                    for path in altium_sources
+                                    if path.suffix.casefold() == ".pcblib"
+                                ),
+                                altium_sources[0].name,
+                            ),
+                            "target": "Active Altium Footprint",
+                        },
+                    ],
+                    "inactive_evidence": [],
+                }
+                try:
+                    approved = self._confirm_attachment_proposal(proposal)
+                except RuntimeError as exc:
+                    return SourceOutcome(error=str(exc))
+                if not approved:
+                    return SourceOutcome(
+                        retained=5,
+                        skipped=(
+                            "attachment proposal was not confirmed; verified evidence retained"
+                        ),
+                    )
 
             if preserve_active_pair:
                 return SourceOutcome(

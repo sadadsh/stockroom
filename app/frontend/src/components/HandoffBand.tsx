@@ -26,6 +26,7 @@ import { Text, useCopyFormatter, useText } from "../lib/copy";
 import { instanceDevId } from "../lib/componentDevIds";
 import { EditableText } from "./EditableText";
 import { AdaptiveChoice } from "./AdaptiveChoice";
+import { Icon } from "./Icon";
 import { EYEBROW_DENSE } from "./primitives";
 import { handoffFields } from "./handoffFields";
 
@@ -321,10 +322,7 @@ function HandoffValue({
           title={value.full}
           className="flex-none rounded-control p-0.5 text-t3 transition-colors hover:text-t1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
         >
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-            <path d="M15 3h6v6M10 14 21 3" />
-          </svg>
+          <Icon id="action.external" className="h-3 w-3" />
         </a>
       </div>
     );

@@ -849,8 +849,8 @@ describe("the previews are drawn from the file", () => {
         runtimeDesignId("icon", "status.cad-missing"),
       );
       expect(icon).toHaveClass("opacity-40");
-      expect(icon).toHaveClass(kind === "model" ? "h-10" : "h-[55px]");
-      expect(icon).toHaveClass(kind === "model" ? "w-10" : "w-[55px]");
+      expect(icon).toHaveClass("h-14");
+      expect(icon).toHaveClass("w-14");
     }
   });
 

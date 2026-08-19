@@ -354,6 +354,43 @@ public sealed class WindowHostSessionTests
     }
 
     [Fact]
+    public void ProviderDownloadCancellationIsLeaseGatedAndReturnsTheCancelledCount()
+    {
+        const string leaseId = "33333333-3333-4333-8333-333333333333";
+        var incoming = Concatenate(
+            Frame(HandoffProtocolTests.PythonCanonicalBootstrap()),
+            HandoffProtocolTests.BuildMessage(
+                2,
+                "provider-download-cancel",
+                Now + 30_000,
+                new Dictionary<string, object?>
+                {
+                    ["lease_id"] = leaseId,
+                    ["generation"] = 7,
+                }),
+            HandoffProtocolTests.BuildMessage(
+                3,
+                "shutdown",
+                Now + 30_000,
+                new Dictionary<string, object?>()));
+        using var stream = new ScriptedDuplexStream(incoming);
+        using var channel = new HandoffChannel(stream, () => Now);
+        using var bootstrap = BootstrapParser.Parse(channel.Receive("bootstrap"));
+        var controller = new FakeController();
+
+        new WindowHostSession(channel, bootstrap, controller, 111, 222).Run();
+
+        Assert.Equal(
+            [$"provider-download-cancel:{leaseId}:7", "shutdown"],
+            controller.Operations);
+        var responses = DecodeFrames(stream.Written);
+        Assert.Equal("provider-download-cancelled", responses[1].Name);
+        Assert.Equal(
+            2,
+            responses[1].Payload.GetProperty("result").GetProperty("cancelled").GetInt32());
+    }
+
+    [Fact]
     public void ProviderRefreshAndStateAreLeaseGatedManualChromeCommands()
     {
         const string leaseId = "22222222-2222-4222-8222-222222222222";
@@ -429,6 +466,8 @@ public sealed class WindowHostSessionTests
         Assert.Equal(
             string.Empty,
             state.GetProperty("navigation_error").GetString());
+        Assert.True(state.GetProperty("can_go_back").GetBoolean());
+        Assert.False(state.GetProperty("can_go_forward").GetBoolean());
     }
 
     [Fact]
@@ -649,6 +688,12 @@ public sealed class WindowHostSessionTests
             return true;
         }
 
+        public int CancelProviderDownloads(string leaseId, long generation)
+        {
+            Operations.Add($"provider-download-cancel:{leaseId}:{generation}");
+            return 2;
+        }
+
         public IReadOnlyList<ProviderDownloadEvent> ProviderDownloadEvents(
             string leaseId,
             long generation,
@@ -706,6 +751,8 @@ public sealed class WindowHostSessionTests
                 ["url"] = "https://provider.example.test/part",
                 ["loading"] = false,
                 ["navigation_error"] = string.Empty,
+                ["can_go_back"] = true,
+                ["can_go_forward"] = false,
             };
         }
 

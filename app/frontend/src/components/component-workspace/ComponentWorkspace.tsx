@@ -42,9 +42,11 @@ import type { RepresentationKind } from "../../api/dossierTypes";
 import { WorkspaceDocumentView } from "../../layout/workspaceBindings";
 import type { WorkspaceRenderContext } from "../../layout/workspaceRenderContext";
 import { Text, useText } from "../../lib/copy";
+import { useOptionalRouter } from "../../lib/router";
 import { useToast } from "../../lib/toast";
 import {
   componentView,
+  openComponentInSession,
   setComponentViewInSession,
   updateUiSession,
   useUiSession,
@@ -55,7 +57,6 @@ import type { PreviewKind } from "../PreviewModal";
 import { ErrorState, LoadingState } from "../primitives";
 import { WorkspaceShellDialogs, type ShellDialog } from "./ShellActions";
 import { WorkspaceSurfaces, type WorkspaceSurface } from "./WorkspaceSurfaces";
-import { ManageModelsWorkspace } from "./ManageModelsWorkspace";
 import { previewKindFor } from "./cadAssetSet";
 import { manageMenuItems, shellManageItems } from "./manageActions";
 import { cadFocusKind, type QualitySegmentKind } from "./componentIdentity";
@@ -81,6 +82,7 @@ export function ComponentWorkspace({
   initialCadView?: import("../../lib/uiSession").CadWorkspaceView;
 }) {
   const session = useUiSession();
+  const router = useOptionalRouter();
   const view = componentView(session, componentId);
   const [previewCadView, setPreviewCadView] = useState(initialCadView);
   useEffect(() => setPreviewCadView(initialCadView), [initialCadView]);
@@ -186,6 +188,15 @@ export function ComponentWorkspace({
     [componentId, failure, revealFailed, revealFiles, shell.data],
   );
 
+  const manageAssets = useCallback(() => {
+    updateUiSession((snapshot) => {
+      const opened = openComponentInSession(snapshot, componentId);
+      const marked = setComponentViewInSession(opened, componentId, { cad_view: "manage-models" });
+      return { ...marked, selected_ids: { ...marked.selected_ids, component: componentId } };
+    });
+    router?.navigate("assets");
+  }, [componentId, router]);
+
   const manageItems = useMemo(
     () =>
       manageMenuItems({
@@ -197,7 +208,6 @@ export function ComponentWorkspace({
         },
         onRefresh: () => refresh.run(),
         refreshing,
-        onReviewCadSources: () => setCadView("manage-models"),
         onViewProvenance: () => setSurface("provenance"),
         onDelete: () => setConfirmDelete(true),
         shellItems,
@@ -241,6 +251,7 @@ export function ComponentWorkspace({
       onQualitySegment,
       onOpenDatasheet: setDatasheet,
       onFindDatasheet: () => setSurface("provenance"),
+      onManageAssets: manageAssets,
     },
     cad: {
       view: activeCadView,
@@ -281,17 +292,6 @@ export function ComponentWorkspace({
   return (
     <WorkspaceDocumentView
       context={context}
-      bodyOverride={
-        activeCadView === "manage-models" ? (
-          <ManageModelsWorkspace
-            key={componentId}
-            componentId={componentId}
-            dossier={dossier}
-            onView={setCadView}
-            onAttached={() => void query.refetch()}
-          />
-        ) : undefined
-      }
       overlays={
         <>
           <WorkspaceShellDialogs

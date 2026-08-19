@@ -16,7 +16,15 @@
  * DEFAULT for a per-surface id, which is how a rewording stays possible without letting a rewording
  * change what a file IS.
  */
-import type { CompletionEvidence, ProviderOutcome, Requirement } from "../api/types";
+import type {
+  CaptureAttachmentProposal,
+  CaptureBrowserState,
+  CaptureDownloadProgress,
+  CaptureHandoff,
+  CompletionEvidence,
+  ProviderOutcome,
+  Requirement,
+} from "../api/types";
 
 export type GuidedStatus =
   | "idle"
@@ -64,7 +72,7 @@ export function captureRequirementsForEdas(edas: readonly CaptureEda[]): Require
   if (selected.has("kicad")) {
     return selected.has("altium") ? [...KICAD_REQS, ...ALTIUM_REQS] : [...KICAD_REQS];
   }
-  return [...ALTIUM_REQS, "kicad_model"];
+  return [...ALTIUM_REQS];
 }
 
 export const REQ_LABELS: Record<Requirement, string> = {
@@ -86,6 +94,11 @@ export interface CaptureState {
   url: string | null;
   routeToken: string | null;
   vendor: string | null;
+  authorRoute?: string | null;
+  handoff?: CaptureHandoff | null;
+  downloadProgress?: CaptureDownloadProgress | null;
+  browserState?: CaptureBrowserState | null;
+  attachmentProposal?: CaptureAttachmentProposal | null;
   needs: Requirement[];
   received: Received;
   backgrounded: boolean;

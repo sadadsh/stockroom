@@ -50,6 +50,7 @@ describe("Icon - default rendering", () => {
     expect(svg?.getAttribute("width")).toBe("14");
     expect(svg?.getAttribute("height")).toBe("14");
     expect(svg?.getAttribute("stroke-width")).toBe("2");
+    expect(svg).toHaveAttribute("aria-hidden", "true");
     expect(svg?.querySelector("circle")?.getAttribute("r")).toBe("8");
   });
 

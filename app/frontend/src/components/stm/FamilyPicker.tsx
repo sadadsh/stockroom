@@ -15,14 +15,10 @@ import type { StmScope } from "../../pages/StmViewerPage";
 import { instanceDevId } from "../../lib/componentDevIds";
 import { Badge, EmptyState, ErrorState, Eyebrow, LoadingState } from "../primitives";
 import { Text, useCopyFormatter, useText } from "../../lib/copy";
+import { Icon } from "../Icon";
 
-// A small disclosure chevron (no shared icon for it); rotates 90deg when the family is expanded.
 function ChevronIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className={className}>
-      <path d="M9 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
+  return <Icon id="detail.chevron-right" className={className} />;
 }
 
 interface Props {
@@ -205,7 +201,7 @@ function CheckBox({ checked, small = false }: { checked: boolean; small?: boolea
         (checked ? "border-acc bg-acc text-acc-on" : "border-line2 text-transparent")
       }
     >
-      {checked ? "✓" : ""}
+      <Icon id="modal.check" className={small ? "h-2.5 w-2.5" : "h-3 w-3"} />
     </span>
   );
 }

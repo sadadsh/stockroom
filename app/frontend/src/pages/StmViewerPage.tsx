@@ -24,6 +24,7 @@ import { PinoutTable } from "../components/stm/PinoutTable";
 import { BuildIndexGate } from "../components/stm/BuildIndexGate";
 import { CompatibilityWorkbench } from "../components/stm/CompatibilityWorkbench";
 import {
+  Button,
   EmptyState,
   ErrorState,
   Eyebrow,
@@ -35,6 +36,7 @@ import {
   type TabItem,
 } from "../components/primitives";
 import { Text, useText } from "../lib/copy";
+import { readUiSession, updateUiSession } from "../lib/uiSession";
 import { useScenarioUiState } from "../design-studio/scenarioState";
 
 export interface StmScope extends StmMcusArgs {
@@ -60,42 +62,81 @@ function scopeToArgs(scope: StmScope): StmMcusArgs {
 
 export function StmViewerPage() {
   const preview = useScenarioUiState().stm;
-  const [tab, setTab] = useState<StmTab>(preview?.tab ?? "explorer");
-  const priorScenarioTab = useRef<StmTab | null>(null);
+  const restored = useMemo(() => readUiSession(), []);
+  const [tab, setTab] = useState<StmTab>(preview?.tab ?? restored.stm.tab);
+  const priorScenario = useRef<{ tab: StmTab; scope: StmScope; activePart: string | null; selectedPosition: string | null; pinView: "map" | "table" } | null>(null);
   const [scope, setScope] = useState<StmScope>(() => ({
-    families: preview?.explorerScope?.families ?? [],
-    mcus: preview?.explorerScope?.mcus ?? [],
+    families: preview?.explorerScope?.families ?? restored.stm.families,
+    mcus: preview?.explorerScope?.mcus ?? restored.stm.lines,
   }));
-  const [activePart, setActivePart] = useState<string | null>(preview?.activePart ?? null);
-  const [selectedPosition, setSelectedPosition] = useState<string | null>(preview?.selectedPosition ?? null);
+  const [activePart, setActivePart] = useState<string | null>(preview?.activePart ?? restored.selected_ids.stm_part);
+  const [selectedPosition, setSelectedPosition] = useState<string | null>(preview?.selectedPosition ?? restored.selected_ids.stm_pin);
+  const [pinView, setPinView] = useState<"map" | "table">(preview?.pinoutView ?? restored.stm.pin_view);
   const priorActivePart = useRef(activePart);
 
   const status = useStmStatus();
-  const sectionsAria = useText("stm.viewer.sections-aria", "STM Viewer sections");
+  const sectionsAria = useText("stm.viewer.sections-aria", "Tools sections");
   const args = useMemo(() => scopeToArgs(scope), [scope]);
   const mcus = useStmMcus(args);
   const pinout = useStmPinout(activePart);
 
   useEffect(() => {
     if (!preview) {
-      if (priorScenarioTab.current !== null) setTab(priorScenarioTab.current);
-      priorScenarioTab.current = null;
+      const prior = priorScenario.current;
+      if (prior) {
+        priorActivePart.current = prior.activePart;
+        setTab(prior.tab);
+        setScope(prior.scope);
+        setActivePart(prior.activePart);
+        setSelectedPosition(prior.selectedPosition);
+        setPinView(prior.pinView);
+      }
+      priorScenario.current = null;
       return;
     }
-    if (priorScenarioTab.current === null) priorScenarioTab.current = tab;
+    if (priorScenario.current === null) {
+      priorScenario.current = { tab, scope, activePart, selectedPosition, pinView };
+    }
     setTab(preview.tab ?? "explorer");
     const nextActivePart = preview.activePart ?? null;
     priorActivePart.current = nextActivePart;
     setActivePart(nextActivePart);
     setSelectedPosition(preview.selectedPosition ?? null);
+    setPinView(preview.pinoutView ?? "map");
     setScope({
       families: preview.explorerScope?.families ?? [],
       mcus: preview.explorerScope?.mcus ?? [],
     });
-    // Each preview object is an explicit registry transition. `tab` is deliberately excluded so
-    // owner interaction inside a preview cannot replace the real-data tab restored on exit.
+    // Each preview object is an explicit registry transition. Real state is restored on exit.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [preview]);
+
+  useEffect(() => {
+    if (preview) return;
+    updateUiSession((snapshot) => {
+      if (
+        snapshot.selected_ids.stm_part === activePart
+        && snapshot.selected_ids.stm_pin === selectedPosition
+        && snapshot.stm.tab === tab
+        && snapshot.stm.families.join("\0") === scope.families.join("\0")
+        && snapshot.stm.lines.join("\0") === scope.mcus.join("\0")
+      ) return snapshot;
+      return {
+        ...snapshot,
+        selected_ids: {
+          ...snapshot.selected_ids,
+          stm_part: activePart,
+          stm_pin: selectedPosition,
+        },
+        stm: {
+          ...snapshot.stm,
+          tab,
+          families: scope.families,
+          lines: scope.mcus,
+        },
+      };
+    });
+  }, [activePart, preview, scope.families, scope.mcus, selectedPosition, tab]);
 
   // A new part clears any pin selection (the previous pin does not exist on the new package).
   useEffect(() => {
@@ -125,6 +166,9 @@ export function StmViewerPage() {
     if (lines.size) r = r.filter((row) => lines.has(row.line));
     return r;
   }, [mcus.data, scope.families, scope.mcus]);
+  const activeRow = activePart
+    ? (mcus.data?.mcus.find((row) => row.part === activePart) ?? null)
+    : null;
 
   if (indexNotBuilt) {
     return (
@@ -149,42 +193,46 @@ export function StmViewerPage() {
 
       {tab === "explorer" ? (
         <TabPanel idBase="stm-view" tab="explorer" className="flex min-h-0 min-w-0 flex-1">
-          {/* scope */}
-          <div className="flex w-[236px] flex-none flex-col overflow-hidden px-3 pt-1">
-            <FamilyPicker scope={scope} onScopeChange={setScope} />
-          </div>
-
-          {/* matrix */}
-          <div className="flex min-w-0 flex-1 flex-col border-l border-line px-4 pt-1">
-            {mcus.isLoading ? (
-              <LoadingState className="mt-4" id="stm.matrix-loading">
-                Loading the STM32 specification matrix...
-              </LoadingState>
-            ) : mcusError ? (
-              <MatrixError error={mcusError} onRetry={() => mcus.refetch()} />
-            ) : (
-              <SpecMatrixTable
-                rows={rows}
-                activePart={activePart}
-                onSelectPart={setActivePart}
-              />
-            )}
-          </div>
-
-          {/* pinout map + legend + inspector */}
-          <aside className="flex w-[384px] flex-none flex-col overflow-hidden border-l border-line px-4 pt-1">
-            <PinoutRegion
+          {activePart ? (
+            <FocusedMcuWorkspace
+              row={activeRow}
               activePart={activePart}
               pinout={pinout.data ?? null}
-              isLoading={pinout.isLoading && !!activePart}
+              isLoading={pinout.isLoading}
               error={pinout.error}
               selectedPosition={selectedPosition}
               onSelectPosition={setSelectedPosition}
               inspectedPin={inspectedPin}
+              onBack={() => setActivePart(null)}
               onRetry={() => pinout.refetch()}
-              initialView={preview?.pinoutView}
+              initialView={pinView}
+              onViewChange={(view) => {
+                setPinView(view);
+                if (preview) return;
+                updateUiSession((snapshot) => ({
+                  ...snapshot,
+                  stm: { ...snapshot.stm, pin_view: view },
+                }));
+              }}
             />
-          </aside>
+          ) : (
+            <>
+              <div className="flex w-[236px] flex-none flex-col overflow-hidden px-3 pt-1">
+                <FamilyPicker scope={scope} onScopeChange={setScope} />
+              </div>
+              <div className="flex min-w-0 flex-1 flex-col border-l border-line px-4 pt-1">
+                {mcus.isLoading ? (
+                  <LoadingState className="mt-4" id="stm.matrix-loading">
+                    Loading the STM32 specification matrix...
+                  </LoadingState>
+                ) : mcusError ? (
+                  <MatrixError error={mcusError} onRetry={() => mcus.refetch()} />
+                ) : (
+                  <SpecMatrixTable rows={rows} activePart={null} onSelectPart={setActivePart} />
+                )}
+              </div>
+            </>
+          )}
         </TabPanel>
       ) : (
         <TabPanel idBase="stm-view" tab="compatibility" className="flex min-h-0 min-w-0 flex-1">
@@ -192,6 +240,97 @@ export function StmViewerPage() {
         </TabPanel>
       )}
     </PageShell>
+  );
+}
+
+function FocusedMcuWorkspace({
+  row,
+  activePart,
+  pinout,
+  isLoading,
+  error,
+  selectedPosition,
+  onSelectPosition,
+  inspectedPin,
+  onBack,
+  onRetry,
+  initialView,
+  onViewChange,
+}: {
+  row: import("../api/types").McuSpecRow | null;
+  activePart: string;
+  pinout: import("../api/types").PinoutDTO | null;
+  isLoading: boolean;
+  error: Error | null;
+  selectedPosition: string | null;
+  onSelectPosition: (position: string) => void;
+  inspectedPin: import("../api/types").PinDTO | null;
+  onBack: () => void;
+  onRetry: () => void;
+  initialView?: "map" | "table";
+  onViewChange: (view: "map" | "table") => void;
+}) {
+  const facts = row ? [
+    ["Core", row.core],
+    ["Package", row.package],
+    ["Pins", row.pin_count],
+    ["I/O", row.io_count],
+    ["Flash", `${row.flash_kb} KB`],
+    ["RAM", `${row.ram_kb} KB`],
+    ["Maximum Frequency", `${row.max_freq_mhz} MHz`],
+    ["Supply", `${row.vdd_min}–${row.vdd_max} V`],
+    ["Temperature", `${row.temp_min_c}–${row.temp_max_c} °C`],
+  ] as const : [];
+  return (
+    <div data-dev-id="stm.focused" className="min-h-0 min-w-0 flex-1 overflow-y-auto">
+      <header className="sticky top-0 z-10 flex items-center gap-3 border-b border-line bg-band px-4 py-2">
+        <Button small onClick={onBack}><Text id="stm.viewer.back-to-list">Back To MCU List</Text></Button>
+        <div className="min-w-0">
+          <h2 className="truncate text-sm font-semibold text-t1">{row?.mpn_example ?? activePart}</h2>
+          {row ? <p className="truncate text-xs text-t3">{row.series} · {row.line}</p> : null}
+        </div>
+      </header>
+      <div className="grid gap-4 p-4 xl:grid-cols-[minmax(0,1fr)_minmax(18rem,0.42fr)]">
+        <section className="min-w-0 rounded-card border border-line bg-surface p-4">
+          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-t2"><Text id="stm.viewer.summary">Overview</Text></h3>
+          <dl className="grid grid-cols-2 gap-x-5 gap-y-1.5 md:grid-cols-3">
+            {facts.map(([label, value]) => (
+              <div key={label} className="min-w-0 border-b border-line/60 py-1.5">
+                <dt className="text-xs text-t3">{label}</dt>
+                <dd className="mt-0.5 truncate text-sm font-medium text-t1">{value}</dd>
+              </div>
+            ))}
+          </dl>
+        </section>
+        <section className="min-w-0 rounded-card border border-line bg-surface p-4">
+          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-t2"><Text id="stm.viewer.peripherals">Peripherals</Text></h3>
+          {row && Object.keys(row.peripherals).length > 0 ? (
+            <dl className="grid grid-cols-2 gap-x-4 gap-y-1.5">
+              {Object.entries(row.peripherals).sort(([a], [b]) => a.localeCompare(b)).map(([name, count]) => (
+                <div key={name} className="flex items-baseline justify-between gap-2 border-b border-line/60 py-1">
+                  <dt className="text-xs text-t3">{name}</dt>
+                  <dd className="text-sm font-semibold tabular-nums text-t1">{count}</dd>
+                </div>
+              ))}
+            </dl>
+          ) : <EmptyState dense id="stm.peripherals-empty">No peripheral data is available.</EmptyState>}
+        </section>
+        <section className="flex min-h-[720px] min-w-0 flex-col rounded-card border border-line bg-surface p-4 xl:col-span-2">
+          <PinoutRegion
+            activePart={activePart}
+            pinout={pinout}
+            isLoading={isLoading}
+            error={error}
+            selectedPosition={selectedPosition}
+            onSelectPosition={onSelectPosition}
+            inspectedPin={inspectedPin}
+            onRetry={onRetry}
+            initialView={initialView}
+            onViewChange={onViewChange}
+          />
+        </section>
+      </div>
+    </div>
   );
 }
 
@@ -208,6 +347,7 @@ function PinoutRegion({
   inspectedPin,
   onRetry,
   initialView,
+  onViewChange,
 }: {
   activePart: string | null;
   pinout: import("../api/types").PinoutDTO | null;
@@ -218,8 +358,10 @@ function PinoutRegion({
   inspectedPin: import("../api/types").PinDTO | null;
   onRetry: () => void;
   initialView?: "map" | "table";
+  onViewChange: (view: "map" | "table") => void;
 }) {
   const [view, setView] = useState<"map" | "table">(initialView ?? "map");
+  useEffect(() => setView(initialView ?? "map"), [initialView]);
   const viewAria = useText("stm.viewer.pinout-view-aria", "Pinout view");
   // The legend's category lens: highlighted buckets dim every other pad on the map. The lens
   // describes ONE part's pins, so it is stored WITH the part it was picked on and read back only
@@ -248,7 +390,10 @@ function PinoutRegion({
           <SegmentedControl
             options={PINOUT_VIEWS}
             value={view}
-            onChange={setView}
+            onChange={(next) => {
+              setView(next);
+              onViewChange(next);
+            }}
             size="small"
             aria-label={viewAria}
           />
@@ -398,7 +543,7 @@ function PageShell({
           ) : null
         }
       >
-        <Text id="stm.viewer.title">STM Viewer</Text>
+        <Text id="stm.viewer.title">Tools</Text>
       </RouteHeader>
       {children}
     </div>

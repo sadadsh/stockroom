@@ -38,6 +38,16 @@ def test_ui_session_api_is_token_protected_and_returns_a_canonical_default(
     assert response.json() == default_snapshot()
 
 
+def test_ui_session_put_round_trips_the_assets_route(client) -> None:
+    snapshot = default_snapshot()
+    snapshot["route"] = "assets"
+
+    response = client.put("/api/ui-session", json=snapshot)
+
+    assert response.status_code == 200
+    assert client.get("/api/ui-session").json()["route"] == "assets"
+
+
 def test_ui_session_put_persists_all_capability_state(client) -> None:
     snapshot = default_snapshot()
     snapshot.update(

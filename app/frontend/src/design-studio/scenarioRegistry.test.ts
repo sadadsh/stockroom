@@ -3,6 +3,7 @@ import type { OnboardingStatus } from "../api/types";
 import type { DesignScenario, ScenarioFixture } from "./scenario";
 import { registerScenarios } from "./scenarioRegistry";
 import { bootstrapScenarioRegistry, globalScenarios } from "./scenarios";
+import { assetsScenarios } from "./scenarios/assets";
 import { componentScenarios } from "./scenarios/components";
 import { projectScenarios } from "./scenarios/projects";
 import { providerScenarios } from "./scenarios/provider";
@@ -250,6 +251,7 @@ describe("registerScenarios", () => {
     expect(bootstrapScenarioRegistry.issues).toEqual([]);
     expect(bootstrapScenarioRegistry.scenarios.map((item) => item.id)).toEqual([
       ...globalScenarios.map((scenario) => scenario.id),
+      ...assetsScenarios.map((scenario) => scenario.id),
       ...componentScenarios.map((scenario) => scenario.id),
       ...providerScenarios.map((scenario) => scenario.id),
       ...projectScenarios.map((scenario) => scenario.id),

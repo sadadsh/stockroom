@@ -618,6 +618,12 @@ def test_a_stored_purchase_link_reaches_its_distributor():
     assert row["urlKind"] == "evidence"
 
 
+def test_provider_rows_distinguish_task_bound_capture_from_a_useful_url():
+    rows = _rows(provider_coverage(_record()))
+    assert rows["ultralibrarian"]["captureAvailable"] is True
+    assert rows["mouser"]["captureAvailable"] is False
+
+
 def test_every_provider_carries_its_own_instruction_and_sign_in_fact():
     document = provider_coverage(_record())
     for provider in all_providers():

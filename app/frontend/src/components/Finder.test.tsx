@@ -45,6 +45,7 @@ describe("the picker's inline search", () => {
     renderFinder({ onSearch, onOpenSearch });
 
     const input = screen.getByRole("textbox", { name: "Search Components" });
+    expect(input).toHaveAttribute("placeholder", "Search");
     await user.type(input, "L");
 
     expect(onSearch).toHaveBeenCalledWith("L");

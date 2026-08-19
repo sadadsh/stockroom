@@ -28,7 +28,7 @@ import { createContext, useContext, useMemo } from "react";
 import { Text, useCopyFormatter, useText } from "../../lib/copy";
 import { openExternalUrl } from "../../lib/externalNavigation";
 import { Button, StatusText } from "../primitives";
-import { ExternalIcon } from "../icons";
+import { BoardIcon, ExternalIcon } from "../icons";
 import { LayoutRuntimeScope, type RegionChromeProps } from "../../layout/LayoutRenderer";
 import { WORKSPACE_CONDITION } from "../../layout/defaultWorkspaceLayout";
 import { useWorkspaceRender } from "../../layout/workspaceRenderContext";
@@ -307,6 +307,14 @@ export function HeaderActionsPart() {
           <Text id="component-browser.header-manufacturer-page">Manufacturer Page</Text>
         </Button>
       ) : null}
+      <Button
+        small
+        data-dev-id="component-browser.header-manage-assets"
+        icon={<BoardIcon className="h-3.5 w-3.5" />}
+        onClick={header.onManageAssets}
+      >
+        <Text id="component-browser.header-manage-assets">Manage CAD Assets</Text>
+      </Button>
       <CopyMpnButton mpn={dossier.identity.mpn} />
       <ManageMenu items={header.manageItems} />
     </div>

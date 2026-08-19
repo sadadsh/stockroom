@@ -109,25 +109,58 @@ function FullRecordAction({ label, onClick }: { label: string; onClick: () => vo
 
 function ProviderGroup({ group }: { group: OfferGroup }) {
   const count = group.offers.length;
+  const primary = group.offers[0]!;
+  const firstTier = primary.priceBreaks[0] ?? null;
+  const candidates = primary.priceBreaks.slice(1, 5);
+  const compactTiers = candidates.length % 2 === 0 ? candidates : candidates.slice(0, -1);
+  const omittedPrimaryTiers = primary.priceBreaks.slice(compactTiers.length + (firstTier ? 1 : 0));
+  const hasOmitted = count > 1 || omittedPrimaryTiers.length > 0;
   return (
     <li data-sourcing-provider={group.provider} className="mb-1 last:mb-0">
-      <div className="flex min-h-[26px] items-center gap-2 bg-row-alt/45 px-2 py-1">
+      <div className="flex min-h-[30px] items-center gap-2 bg-row-alt/45 px-2 py-1">
         <span className="ui-row-secondary min-w-0 flex-1 truncate text-t1">{group.providerLabel}</span>
+        {firstTier ? (
+          <dl className="flex-none">
+            <PriceBreakPill entry={firstTier} currency={primary.currency} compact />
+          </dl>
+        ) : null}
         <span className="ui-component-metadata flex-none tabular-nums">
           {formatCount(count)} {count === 1 ? "offer" : "offers"}
         </span>
       </div>
-      <ul className="space-y-1">
-        {group.offers.map((offer) => (
-          <OfferPriceLadder key={`${offer.provider}:${offer.sku}`} offer={offer} />
-        ))}
+      <ul>
+        <OfferPriceLadder offer={primary} entries={compactTiers} />
       </ul>
+      {hasOmitted ? (
+        <SourcingDisclosure
+          devId="component-browser.all-price-breaks"
+          label={<Text id="component-browser.all-price-breaks">All Price Breaks</Text>}
+          icon={null}
+        >
+          <ul className="border-t border-line bg-field/20">
+            {omittedPrimaryTiers.length > 0 ? (
+              <OfferPriceLadder offer={primary} entries={omittedPrimaryTiers} showDetails={false} />
+            ) : null}
+            {group.offers.slice(1).map((offer) => (
+              <OfferPriceLadder key={`${offer.provider}:${offer.sku}:all`} offer={offer} />
+            ))}
+          </ul>
+        </SourcingDisclosure>
+      ) : null}
     </li>
   );
 }
 
 /** Price tiers are the one sourcing fact kept open. Everything else is one compact disclosure. */
-function OfferPriceLadder({ offer }: { offer: DistributorOffer }) {
+function OfferPriceLadder({
+  offer,
+  entries = offer.priceBreaks,
+  showDetails = true,
+}: {
+  offer: DistributorOffer;
+  entries?: readonly PriceBreak[];
+  showDetails?: boolean;
+}) {
   const noPriceBreaks = useText("component-browser.no-price-breaks", "No quoted price breaks");
   const noPrice = useText("component-browser.no-price", "No price");
   const stockUnknown = useText("component-browser.stock-unknown", "Not reported");
@@ -154,31 +187,18 @@ function OfferPriceLadder({ offer }: { offer: DistributorOffer }) {
       <div data-dev-id="component-browser.offer-price-ladder" className="mt-1">
         {offer.priceBreaks.length === 0 ? (
           <p className="ui-component-metadata py-0.5">{noPriceBreaks}</p>
-        ) : (
+        ) : entries.length > 0 ? (
           <dl
-            className="flex min-w-0 flex-wrap gap-1"
+            className="grid min-w-0 grid-cols-2 gap-1"
             aria-label={priceLadderLabel({ provider: offer.providerLabel })}
           >
-            {keyedPriceBreaks(offer.priceBreaks).map(({ entry, key }) => (
-              <div
-                key={key}
-                data-price-break-pill
-                className="inline-flex min-w-0 items-baseline gap-1.5 rounded-full bg-raise2 px-2 py-1"
-              >
-                <dt className="ui-component-metadata whitespace-nowrap">
-                  <span className="sr-only"><Text id="component-browser.price-col-qty">Count</Text>{" "}</span>
-                  {entry.qty === null ? emptyValue : formatCount(entry.qty)}
-                </dt>
-                <dd className="ui-key-fact ui-numeric whitespace-nowrap">
-                  <span className="sr-only"><Text id="component-browser.price-col-price">Unit Price</Text>{" "}</span>
-                  {entry.price === null ? emptyValue : formatPrice(entry.price, offer.currency)}
-                </dd>
-              </div>
+            {keyedPriceBreaks(entries).map(({ entry, key }) => (
+              <PriceBreakPill key={key} entry={entry} currency={offer.currency} />
             ))}
           </dl>
-        )}
+        ) : null}
       </div>
-      {hasOfferMetadata(offer, stamp) || offer.offerUrl ? (
+      {showDetails && (hasOfferMetadata(offer, stamp) || offer.offerUrl) ? (
         <SourcingDisclosure
           devId="component-browser.offer-details"
           label={<Text id="component-browser.offer-details">Details</Text>}
@@ -224,6 +244,36 @@ function OfferPriceLadder({ offer }: { offer: DistributorOffer }) {
         </SourcingDisclosure>
       ) : null}
     </li>
+  );
+}
+
+function PriceBreakPill({
+  entry,
+  currency,
+  compact = false,
+}: {
+  entry: PriceBreak;
+  currency: string;
+  compact?: boolean;
+}) {
+  const emptyValue = useText("component-browser.no-value", "None");
+  return (
+    <div
+      data-price-break-pill
+      className={
+        "grid min-w-0 grid-cols-[minmax(2.5rem,1fr)_auto] items-baseline gap-2 rounded-full bg-raise2 "
+        + (compact ? "px-2 py-0.5" : "px-2 py-1")
+      }
+    >
+      <dt className="ui-component-metadata min-w-0 whitespace-nowrap text-left">
+        <span className="sr-only"><Text id="component-browser.price-col-qty">Count</Text>{" "}</span>
+        {entry.qty === null ? emptyValue : formatCount(entry.qty)}
+      </dt>
+      <dd className="ui-key-fact ui-numeric whitespace-nowrap text-right">
+        <span className="sr-only"><Text id="component-browser.price-col-price">Unit Price</Text>{" "}</span>
+        {entry.price === null ? emptyValue : formatPrice(entry.price, currency)}
+      </dd>
+    </div>
   );
 }
 

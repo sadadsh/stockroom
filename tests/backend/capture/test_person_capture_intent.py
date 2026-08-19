@@ -47,7 +47,7 @@ def _isolated_trace(tmp_path, monkeypatch):
 
 def test_a_signal_for_a_part_with_no_running_capture_is_refused_not_remembered():
     with pytest.raises(PersonCaptureIntentError):
-        signal_person_capture("lm317", FINISH_ROUTE)
+        signal_person_capture("lm317", FINISH_ROUTE, route_token="route-not-running")
 
     # And nothing was stored, so the NEXT run for that part starts unsignalled.
     intent = PersonCaptureIntent()
@@ -80,7 +80,50 @@ def test_the_active_provider_route_is_visible_only_for_its_exact_running_capture
         assert active_person_capture("item-1", part_id="lm317") == {
             "vendor": "digikey",
             "detail_url": "https://www.digikey.com/en/products/detail/example",
+            "evidence_provider_key": "digikey-snapmagic",
             "route_token": route_token,
+            "download_progress": None,
+            "browser_state": None,
+        }
+        intent.set_download_progress({
+            "active": 1,
+            "completed": 0,
+            "bytes_received": 50,
+            "total_bytes": 100,
+            "files": [{
+                "name": "LM317.zip",
+                "state": "in_progress",
+                "bytes_received": 50,
+                "total_bytes": 100,
+            }],
+        })
+        intent.set_browser_state({
+            "url": "https://www.digikey.com/en/products/detail/example/redirected",
+            "loading": False,
+            "navigation_error": "",
+            "can_go_back": True,
+            "can_go_forward": False,
+        })
+        active = active_person_capture("item-1", part_id="lm317")
+        assert active is not None
+        assert active["browser_state"] == {
+            "url": "https://www.digikey.com/en/products/detail/example/redirected",
+            "loading": False,
+            "navigation_error": "",
+            "can_go_back": True,
+            "can_go_forward": False,
+        }
+        assert active["download_progress"] == {
+            "active": 1,
+            "completed": 0,
+            "bytes_received": 50,
+            "total_bytes": 100,
+            "files": [{
+                "name": "LM317.zip",
+                "state": "in_progress",
+                "bytes_received": 50,
+                "total_bytes": 100,
+            }],
         }
         intent.clear_active_route(
             "digikey",
@@ -118,7 +161,7 @@ def test_selected_files_wake_only_the_exact_capture_generation_and_author_route(
                 route_token="stale-route-token",
                 paths=(selected,),
             )
-        intent.finish_route()
+        intent.finish_route(route_token)
         queue_person_capture_files(
             "item-current",
             part_id="lm317",
@@ -198,7 +241,10 @@ def test_an_unknown_action_or_a_blank_part_is_a_caller_error():
 def test_finishing_a_route_is_consumed_by_the_one_route_that_is_open():
     intent = PersonCaptureIntent()
     with person_capture_intent("lm317", intent):
-        signal_person_capture("lm317", FINISH_ROUTE)
+        route_token = intent.set_active_route(
+            "digikey", "https://provider.example/part", "digikey-ultralibrarian"
+        )
+        signal_person_capture("lm317", FINISH_ROUTE, route_token=route_token)
 
         # The route that is open when the person says it takes the answer...
         assert intent.take_route_finish() is True
@@ -210,7 +256,10 @@ def test_finishing_a_route_is_consumed_by_the_one_route_that_is_open():
 def test_finishing_never_stops_the_part_so_files_already_adopted_keep_landing():
     intent = PersonCaptureIntent()
     with person_capture_intent("lm317", intent):
-        signal_person_capture("lm317", FINISH_ROUTE)
+        route_token = intent.set_active_route(
+            "digikey", "https://provider.example/part", "digikey-ultralibrarian"
+        )
+        signal_person_capture("lm317", FINISH_ROUTE, route_token=route_token)
 
         # Finish means "no more is coming", never "throw away what landed": the run's own stop
         # predicate is untouched, so the route drains and attaches what it already has.
@@ -236,7 +285,10 @@ def test_the_trace_records_a_person_driven_finish_a_skip_and_a_refusal(caplog):
     intent = PersonCaptureIntent()
     with caplog.at_level(logging.DEBUG, logger=LOGGER_NAME):
         with person_capture_intent("lm317", intent):
-            signal_person_capture("lm317", FINISH_ROUTE)
+            route_token = intent.set_active_route(
+                "digikey", "https://provider.example/part", "digikey-ultralibrarian"
+            )
+            signal_person_capture("lm317", FINISH_ROUTE, route_token=route_token)
             intent.take_route_finish()
             signal_person_capture("lm317", SKIP_PART)
         with pytest.raises(PersonCaptureIntentError):

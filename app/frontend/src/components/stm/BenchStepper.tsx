@@ -4,6 +4,7 @@
  * flow; this file is the one control band, and it resolves its own copy.
  */
 import { AdaptiveChoice } from "../AdaptiveChoice";
+import { Icon } from "../Icon";
 import { Button } from "../primitives";
 import { Text, useCopyFormatter, useText } from "../../lib/copy";
 import type { StmSocketExportKind } from "../../lib/stmSocketSolutionExport";
@@ -41,9 +42,12 @@ export function BenchStepper({
       className="flex flex-none items-center gap-2 border-b border-line px-3 py-1.5"
       data-testid="bench-stepper"
     >
-      <Button small onClick={() => onStepBy(-1)} aria-label={previousSetLabel}>
-        ←
-      </Button>
+      <Button
+        small
+        icon={<Icon id="nav.back" className="h-3.5 w-3.5" />}
+        onClick={() => onStepBy(-1)}
+        aria-label={previousSetLabel}
+      />
       <label className="flex min-w-0 items-center gap-2">
         <span className="text-xs text-t3">
           <Text id="stm.compat.target-set-label">Target set</Text>
@@ -70,9 +74,12 @@ export function BenchStepper({
           ]}
         />
       </label>
-      <Button small onClick={() => onStepBy(1)} aria-label={nextSetLabel}>
-        →
-      </Button>
+      <Button
+        small
+        icon={<Icon id="nav.back" className="h-3.5 w-3.5 rotate-180" />}
+        onClick={() => onStepBy(1)}
+        aria-label={nextSetLabel}
+      />
       <span className="min-w-0 flex-1 truncate font-mono text-2xs text-t3">
         <Text
           id="stm.compat.scope-summary"

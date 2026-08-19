@@ -11,6 +11,7 @@ import { useCapture } from "../lib/capture";
 import { useCopyFormatter, useText } from "../lib/copy";
 import { useRouter } from "../lib/router";
 import type { GuidedStatus } from "../lib/captureRequirements";
+import { Icon } from "./Icon";
 
 const STATUS_LABEL: Record<GuidedStatus, string> = {
   idle: "",
@@ -74,13 +75,9 @@ export function CaptureStatusPill() {
               }
             >
               {isDone ? (
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" className="h-3 w-3">
-                  <path d="M20 6 9 17l-5-5" />
-                </svg>
+                <Icon id="detail.ready-check" className="h-3.5 w-3.5" />
               ) : isAttention ? (
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5">
-                  <path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" />
-                </svg>
+                <Icon id="status.warn" className="h-3.5 w-3.5" />
               ) : (
                 <m.span
                   className="h-2.5 w-2.5 rounded-full bg-t1"
@@ -122,9 +119,7 @@ export function CaptureStatusPill() {
               aria-label={dismissLabel}
               className="grid h-7 w-7 flex-none place-items-center rounded-control border border-line2 bg-popover text-t3 shadow-pop hover:text-t1"
             >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" className="h-3.5 w-3.5">
-                <path d="M18 6 6 18M6 6l12 12" />
-              </svg>
+              <Icon id="action.close" className="h-3.5 w-3.5" />
             </button>
           ) : null}
         </m.div>

@@ -20,6 +20,7 @@ import { useObjectUrl } from "../../lib/useObjectUrl";
 import { usePanZoom } from "../../lib/usePanZoom";
 import { Badge, Button, SegmentedControl } from "../primitives";
 import { AdaptiveChoice } from "../AdaptiveChoice";
+import { Icon } from "../Icon";
 import { useScenarioUiState } from "../../design-studio/scenarioState";
 
 type PlacementStateByReference = Record<string, AssemblyPlacementState | undefined>;
@@ -1668,43 +1669,17 @@ function StageToolButton({
 }
 
 function MinusGlyph() {
-  return (
-    <svg aria-hidden viewBox="0 0 16 16" className="size-3.5">
-      <path d="M3 8h10" fill="none" stroke="currentColor" strokeWidth="1.5" />
-    </svg>
-  );
+  return <Icon id="action.zoom-out" className="h-3.5 w-3.5" />;
 }
 
 function PlusGlyph() {
-  return (
-    <svg aria-hidden viewBox="0 0 16 16" className="size-3.5">
-      <path d="M3 8h10M8 3v10" fill="none" stroke="currentColor" strokeWidth="1.5" />
-    </svg>
-  );
+  return <Icon id="action.zoom-in" className="h-3.5 w-3.5" />;
 }
 
 function ExpandGlyph() {
-  return (
-    <svg aria-hidden viewBox="0 0 16 16" className="size-3.5">
-      <path
-        d="M2.75 6V2.75H6M10 2.75h3.25V6M13.25 10v3.25H10M6 13.25H2.75V10"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.35"
-      />
-    </svg>
-  );
+  return <Icon id="action.maximize" className="h-3.5 w-3.5" />;
 }
 
 function ContractGlyph() {
-  return (
-    <svg aria-hidden viewBox="0 0 16 16" className="size-3.5">
-      <path
-        d="M6 2.75V6H2.75M13.25 6H10V2.75M10 13.25V10h3.25M2.75 10H6v3.25"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.35"
-      />
-    </svg>
-  );
+  return <Icon id="action.contract" className="h-3.5 w-3.5" />;
 }

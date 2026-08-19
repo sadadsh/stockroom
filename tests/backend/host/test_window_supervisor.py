@@ -309,6 +309,12 @@ class _Channel:
                 "lease_id": "11111111-1111-4111-8111-111111111111",
                 "generation": 7,
             }
+        if request.name == "provider-download-cancel":
+            return "provider-download-cancelled", {
+                "lease_id": request.payload["lease_id"],
+                "generation": request.payload["generation"],
+                "cancelled": 2,
+            }
         if request.name == "provider-download-events":
             return "provider-download-events", {
                 "lease_id": request.payload["lease_id"],
@@ -646,6 +652,7 @@ def test_launch_binds_exact_child_and_sends_secrets_only_in_bootstrap(
         ready_selectors=("#download",),
         ready_texts=("download",),
     )["provider_ready"] is True
+    assert client.cancel_provider_downloads(lease.lease_id, lease.generation) == 2
     events = client.provider_download_events(lease.lease_id, lease.generation)
     assert events[0].operation_id == "operation-1"
     assert events[0].result_file_path == r"C:\Capture\model.zip"
@@ -654,13 +661,14 @@ def test_launch_binds_exact_child_and_sends_secrets_only_in_bootstrap(
     assert events[0].mpn == "MPN-9"
     assert events[0].provider_id == "digikey"
     assert client.release_provider_lease(lease.lease_id, lease.generation) is True
-    assert [message.name for message in channel.sent[-8:]] == [
+    assert [message.name for message in channel.sent[-9:]] == [
         "provider-lease-begin",
         "provider-show",
         "provider-hide",
         "provider-current-url",
         "provider-navigate",
         "provider-document-state",
+        "provider-download-cancel",
         "provider-download-events",
         "provider-lease-release",
     ]

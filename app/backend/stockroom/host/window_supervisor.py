@@ -1203,6 +1203,27 @@ class WindowHostClient:
             payload={"lease_id": lease_id, "generation": generation},
         )
 
+    def cancel_provider_downloads(self, lease_id: str, generation: int) -> int:
+        def parse(response: HandoffMessage, sequence: int) -> int:
+            result = _strict_result(
+                response,
+                request_sequence=sequence,
+                keys=frozenset({"lease_id", "generation", "cancelled"}),
+            )
+            if result["lease_id"] != lease_id or result["generation"] != generation:
+                raise WindowSupervisorProtocolError("provider download lease identity changed")
+            cancelled = result["cancelled"]
+            if type(cancelled) is not int or cancelled < 0:
+                raise WindowSupervisorProtocolError("provider download cancel count is invalid")
+            return cancelled
+
+        return self._command(
+            "provider-download-cancel",
+            "provider-download-cancelled",
+            parse,
+            payload={"lease_id": lease_id, "generation": generation},
+        )
+
     def provider_download_events(
         self,
         lease_id: str,
@@ -1343,19 +1364,26 @@ class WindowHostClient:
         )
 
     def provider_state(self, lease_id: str, generation: int) -> dict[str, object]:
-        """The provider surface's honest navigation state: current URL, whether a page is
-        still loading, and the last navigation failure ("" when the page loaded)."""
+        """Return current URL, loading/error state, and exact history availability."""
 
         def parse(response: HandoffMessage, sequence: int) -> dict[str, object]:
             result = _strict_result(
                 response,
                 request_sequence=sequence,
-                keys=frozenset({"url", "loading", "navigation_error"}),
+                keys=frozenset({
+                    "url",
+                    "loading",
+                    "navigation_error",
+                    "can_go_back",
+                    "can_go_forward",
+                }),
             )
             if (
                 type(result["url"]) is not str
                 or type(result["loading"]) is not bool
                 or type(result["navigation_error"]) is not str
+                or type(result["can_go_back"]) is not bool
+                or type(result["can_go_forward"]) is not bool
             ):
                 raise WindowSupervisorProtocolError("provider browser state is invalid")
             return result

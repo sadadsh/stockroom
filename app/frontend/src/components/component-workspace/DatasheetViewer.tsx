@@ -27,6 +27,7 @@ import { api, ApiError } from "../../api/client";
 import type { DocumentView } from "../../api/dossierTypes";
 import { Text, useCopyFormatter, useText } from "../../lib/copy";
 import { openExternalUrl } from "../../lib/externalNavigation";
+import { Icon } from "../Icon";
 import { Button, ModalShell, StatusText } from "../primitives";
 import { ExternalIcon } from "../icons";
 import { openKindFor, type DatasheetTarget } from "./datasheetWorkflow";
@@ -365,6 +366,7 @@ function DatasheetToolbar({
           aria-label={previousLabel}
           title={previousLabel}
           disabled={page <= 1}
+          icon={<Icon id="nav.back" className="h-3.5 w-3.5" />}
           onClick={() => onPage(Math.max(1, page - 1))}
         >
           <Text id="component-browser.datasheet-previous-short">Back</Text>
@@ -383,6 +385,7 @@ function DatasheetToolbar({
           aria-label={nextLabel}
           title={nextLabel}
           disabled={pageCount > 0 && page >= pageCount}
+          icon={<Icon id="nav.back" className="h-3.5 w-3.5 rotate-180" />}
           onClick={() => onPage(Math.min(pageCount || page + 1, page + 1))}
         >
           <Text id="component-browser.datasheet-next-short">Forward</Text>
@@ -392,6 +395,7 @@ function DatasheetToolbar({
           data-dev-id="component-browser.datasheet-zoom-out"
           aria-label={zoomOutLabel}
           title={zoomOutLabel}
+          icon={<Icon id="action.zoom-out" className="h-3.5 w-3.5" />}
           onClick={onZoomOut}
         >
           <Text id="component-browser.datasheet-zoom-out-short">Smaller</Text>
@@ -407,6 +411,7 @@ function DatasheetToolbar({
           data-dev-id="component-browser.datasheet-zoom-in"
           aria-label={zoomInLabel}
           title={zoomInLabel}
+          icon={<Icon id="action.zoom-in" className="h-3.5 w-3.5" />}
           onClick={onZoomIn}
         >
           <Text id="component-browser.datasheet-zoom-in-short">Larger</Text>
@@ -416,6 +421,7 @@ function DatasheetToolbar({
           data-dev-id="component-browser.datasheet-rotate"
           aria-label={rotateLabel}
           title={rotateLabel}
+          icon={<Icon id="action.rotate" className="h-3.5 w-3.5" />}
           onClick={onRotate}
         >
           <Text id="component-browser.datasheet-rotate-short">Rotate</Text>

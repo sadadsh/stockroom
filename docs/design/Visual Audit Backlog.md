@@ -21,6 +21,45 @@ and `P2` meaningful fit, finish, or clarity debt.
 
 ## Acceptance Captures
 
+### 2026-08-16 — Explicit Provider Open And Asset Label Casing
+
+- Owner observations: **Supported and repaired**. **Open Provider** submitted the selected vendor with
+  the legacy default `automatic` mode, allowing retained evidence to bypass the explicit visit and
+  strand the control behind later publication. An explicit provider now carries `collect-all`, which
+  forces that exact person-selected provider visit even when retained evidence exists. Assets rows
+  format raw readiness kinds through the shared Title Case label authority: `Symbol`, `Footprint`,
+  and `3D Model`.
+- Capture layers: current source in the real pywebview / WebView2 Development host for the exact
+  Ultra Librarian detail page; current source in headless installed Microsoft Edge / Design Studio
+  for the Assets readiness row. The provider page's third-party advertisement is external content,
+  not Stockroom interface chrome. This proves provider opening and label composition, not a completed
+  multi-download or attachment commit.
+- Evidence: `work/Provider Open Fixed.png`, SHA-256 `1d7879c115c7`; and
+  `work/Assets Labels Fixed.png`, `cd8422cc2977`.
+
+### 2026-08-15 — Assets Ownership, Focused MCU, And Icon Cohesion
+
+- Owner observations: **Supported and repaired in the browser layer**. Add Parts is again a full-width
+  accent action directly below Component search. Components retains CAD inspection and links the exact
+  part into Assets. Assets owns the compact provider quick links, centered provider stage, explicit
+  Add Parts action, and the CAD tool selected in Settings. A selected MCU replaces the explorer with
+  a full-width overview, peripheral summary, and pinout workspace. Settings retains one scroller and
+  a sticky five-category navigation strip in both themes. Product controls now use the canonical
+  registry icon family: rail destinations, compact actions, status marks, provider and datasheet
+  toolbars, preview controls, carousel controls, and Settings anchors share 14 px toolbar geometry,
+  the shared primary stroke, and decorative accessibility behavior. The fixed-width Component picker
+  now shows the contextual `Search` placeholder without clipping while retaining `Search Components`
+  as the input's accessible name.
+- Capture layer: current source through Vite in headless installed Microsoft Edge, Design Studio
+  preview at 1,900 × 1,100. This proves browser composition and theme parity, not native WebView2,
+  DPI, or minimum-window behavior.
+- Evidence: `output/playwright/current-repair/components-dark.png`, SHA-256 `a4b7de5ea03f`;
+  `assets-dark.png`, `c806c22c44c0`; `assets-landing-dark.png`, `a06ac6c45569`;
+  `tools-mcu-dark.png`, `ea173f78a72b`; `settings-dark.png`, `ba55ff9e41e1`; and
+  `settings-light.png`, `5dbde8b46c70` (remaining paths share the same evidence directory).
+- Non-blocking follow-up: the centered provider stage is intentionally quiet before the person opens
+  a source. Native provider content, minimum width, DPI, and keyboard acceptance remain required.
+
 ### 2026-08-14 — ASTRYX Composition Audit And Settings Rhythm
 
 - Owner observation: **Supported**. The first component-level ASTRYX pass still looked assembled from
@@ -194,6 +233,41 @@ and `P2` meaningful fit, finish, or clarity debt.
   compact strip. Structural important widths now outrank that styling. Removing the compact band's
   hidden brand from flex flow and making the 35 px glyph wrapper non-shrinking moved the expand
   control from x=28 to the common x=33 centerline measured for the destination and utility controls.
+
+### 2026-08-17 — Direct Provider Choice And Assets Entry
+
+- Capture layer: current source in the real Windows pywebview/WebView2 Development host, using the
+  isolated Development configuration and `ADG714BRUZ-REEL`.
+- Evidence: `work/Assets Add Parts Prominent.png`, 1,400 × 900, SHA-256 `e126ded010e3`;
+  `work/Providers Clean Compact.png`, 1,400 × 900, SHA-256 `f07bc81f043c`;
+  `work/Ultra Direct Choice.png`, 1,400 × 900, SHA-256 `3fbea7df0509`; and
+  `work/SnapMagic Direct Switch.png`, 1,400 × 900, SHA-256 `0610ca6d9532`.
+- Intended claim: Add Parts is the first large Assets action; Import A List is absent; every
+  provider remains visible without availability badges or Symbol/Footprint/3D summaries; clicking
+  Ultra Librarian opens it directly; and clicking SnapMagic cancels the Ultra Librarian workflow
+  before opening SnapMagic rather than advancing hidden DigiKey author routes.
+- Acceptance result: pass in the current dark-theme Development host. The capture log records the
+  direct Ultra Librarian run at 02:02:29, durable cancellation at 02:02:53–02:02:56, and the direct
+  SnapMagic run at 02:03:02. No DigiKey route occurred between those choices. The selected provider
+  owns one visit, including when only a measured MPN search is available. Repeated identical native
+  viewport placements are suppressed in React and the host to remove polling-driven flashes.
+
+### 2026-08-16 — Guided Provider Browser Simplification
+
+- Capture layer: current source in the real Windows pywebview/WebView2 Development host, using the
+  isolated Development configuration and the `ADG714BRUZ-REEL` component.
+- Evidence: `work/Provider Browser Clean Guide Final.png`, 1,400 × 900, SHA-256
+  `d49ac7fdeccb60057e9b34bf05f1d4531aa59ea4493cf634d64e427174c6639a`.
+- Intended claim: the provider surface has one dynamic instruction instead of stacked workflow
+  copy and persistent completion controls. It names the exact required files, reports opening,
+  byte progress, files found, verification, interruption, navigation failure, and attachment
+  readiness, while the compact browser toolbar retains Back, Forward, Reload, truthful address,
+  and Hide.
+- Acceptance result: pass in the current dark-theme Development host. The visible active state says
+  `Download STEP and Altium Designer (Native)` and explains that Stockroom finds files in the
+  background. The editable address field, Go, Done, Skip, persistent recovery action, duplicate
+  center instructions, and redundant footer status are absent. Unit coverage exercises ready,
+  receiving, found, and interrupted states; complete frontend validation remains authoritative.
 
 ### 2026-08-14 — True In-Workspace Provider Browser
 

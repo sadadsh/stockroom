@@ -1,8 +1,7 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ComponentDossier } from "../../api/dossierTypes";
 import { useOptionalCapture } from "../../lib/capture";
 import {
-  CAPTURE_EDAS,
   captureInFlight,
   captureRequirementsForEdas,
   type CaptureEda,
@@ -11,67 +10,31 @@ import {
   recoverCaptureFiles,
   type CaptureRecoveryResult,
 } from "../../lib/captureRecovery";
-import { Text, useText } from "../../lib/copy";
+import { Text } from "../../lib/copy";
 import type { CadWorkspaceView } from "../../lib/uiSession";
+import { BackIcon, BoardIcon, DownloadIcon, ExternalIcon } from "../icons";
 import { Button } from "../primitives";
 import { useScenarioUiState } from "../../design-studio/scenarioState";
 import { bestCompleteProvider, orderedManageModelsProviders } from "./manageModelsModel";
 import { ProviderList } from "./ProviderList";
 import { ProviderBrowserFrame } from "./ProviderBrowserFrame";
-
-export function CadWorkspaceTabs({
-  view,
-  onView,
-}: {
-  view: CadWorkspaceView;
-  onView: (view: CadWorkspaceView) => void;
-}) {
-  const label = useText("component-browser.cad-model-tabs", "CAD Models");
-  return (
-    <div role="tablist" aria-label={label} className="flex items-center gap-1">
-      <button
-        type="button"
-        role="tab"
-        aria-selected={view === "models"}
-        data-dev-id="component-browser.cad-tab-models"
-        className={
-          "ui-control-label rounded-control px-2 py-0.5 " +
-          (view === "models" ? "bg-control-pressed text-t1" : "text-t2 hover:bg-control-hover")
-        }
-        onClick={() => onView("models")}
-      >
-        <Text id="component-browser.cad-tab-models">Models</Text>
-      </button>
-      <button
-        type="button"
-        role="tab"
-        aria-selected={view === "manage-models"}
-        data-dev-id="component-browser.cad-tab-manage-models"
-        className={
-          "ui-control-label rounded-control px-2 py-0.5 " +
-          (view === "manage-models"
-            ? "bg-control-pressed text-t1"
-            : "text-t2 hover:bg-control-hover")
-        }
-        onClick={() => onView("manage-models")}
-      >
-        <Text id="component-browser.cad-tab-manage">Manage Models</Text>
-      </button>
-    </div>
-  );
-}
+import { ProviderCaptureGuide } from "./ProviderCaptureGuide";
 
 export function ManageModelsWorkspace({
   componentId,
   dossier,
-  onView,
+  onView: _onView,
+  primaryEda = "kicad",
+  onBack,
   onOpenProvider,
   onRecoverFiles,
   onAttached,
 }: {
   componentId: string;
   dossier: ComponentDossier;
-  onView: (view: CadWorkspaceView) => void;
+  onView?: (view: CadWorkspaceView) => void;
+  primaryEda?: CaptureEda;
+  onBack?: () => void;
   onOpenProvider?: (providerId: string, needs: ReturnType<typeof captureRequirementsForEdas>) => void | Promise<void>;
   onRecoverFiles?: () => Promise<CaptureRecoveryResult>;
   onAttached?: () => void;
@@ -83,19 +46,58 @@ export function ManageModelsWorkspace({
     [dossier.cadSourceCoverage],
   );
   const bestProvider = bestCompleteProvider(providers);
-  const initialProviderId = bestProvider?.row.id ?? providers[0]?.row.id ?? null;
+  const initialProviderId = bestProvider?.row.id
+    ?? providers.find((provider) => provider.reachable && provider.row.captureAvailable)?.row.id
+    ?? providers[0]?.row.id
+    ?? null;
   const [selectedProviderId, setSelectedProviderId] = useState<string | null>(initialProviderId);
   const [activityMessage, setActivityMessage] = useState<string | null>(null);
   const [recovering, setRecovering] = useState(false);
-  const [selectedEdas, setSelectedEdas] = useState<CaptureEda[]>(() => CAPTURE_EDAS.map((eda) => eda.key));
-  const [selectionLocked, setSelectionLocked] = useState(false);
+  const [openingProviderId, setOpeningProviderId] = useState<string | null>(null);
+  const openingProviderRef = useRef<string | null>(null);
+  const [queuedProviderId, setQueuedProviderId] = useState<string | null>(null);
+  const [applying, setApplying] = useState(false);
+  const [hiddenRouteToken, setHiddenRouteToken] = useState<string | null>(null);
   const ownsCapture = capture?.active.partId === componentId;
+
+  useEffect(() => {
+    const activeProvider = ownsCapture ? capture?.active.vendor : null;
+    if (
+      !queuedProviderId
+      && activeProvider
+      && providers.some((provider) => provider.row.id === activeProvider)
+    ) {
+      setSelectedProviderId(activeProvider);
+    }
+  }, [capture?.active.vendor, ownsCapture, providers, queuedProviderId]);
+
+  useEffect(() => {
+    setActivityMessage(null);
+  }, [
+    capture?.active.status,
+    capture?.active.message,
+    capture?.active.downloadProgress?.bytes_received,
+  ]);
+
+  useEffect(() => {
+    if (!ownsCapture || !capture?.active.routeToken) return;
+    openingProviderRef.current = null;
+    setOpeningProviderId(null);
+    setActivityMessage((current) => current?.startsWith("Opening ") ? null : current);
+  }, [capture?.active.routeToken, ownsCapture]);
 
   const openProvider = useCallback(
     async (providerId: string) => {
-      setActivityMessage(null);
-      const needs = captureRequirementsForEdas(selectedEdas);
-      setSelectionLocked(true);
+      if (openingProviderRef.current) return;
+      const provider = providers.find((candidate) => candidate.row.id === providerId);
+      if (!provider?.row.captureAvailable) {
+        setActivityMessage("This source has no task-bound Provider Visit. Open its listing instead.");
+        return;
+      }
+      const needs = captureRequirementsForEdas([primaryEda]);
+      openingProviderRef.current = providerId;
+      setOpeningProviderId(providerId);
+      setActivityMessage(`Opening ${provider.row.label}...`);
       try {
         if (onOpenProvider) {
           await onOpenProvider(providerId, needs);
@@ -111,10 +113,11 @@ export function ManageModelsWorkspace({
       } catch (error) {
         setActivityMessage(error instanceof Error ? error.message : "Could not open provider");
       } finally {
-        setSelectionLocked(false);
+        openingProviderRef.current = null;
+        setOpeningProviderId(null);
       }
     },
-    [capture, componentId, dossier.identity.displayName, onOpenProvider, selectedEdas],
+    [capture, componentId, dossier.identity.displayName, onOpenProvider, primaryEda, providers],
   );
 
   const selectedProvider =
@@ -125,9 +128,9 @@ export function ManageModelsWorkspace({
   const captureProviderKey = ownsCapture && capture?.active.vendor
     ? `${componentId}:${capture.active.vendor}`
     : null;
-  // Browser chrome is evidence of a REAL task-bound native route, never an optimistic loading
-  // shell. A provider that declines before leasing the native surface stays inline with its exact
-  // reason instead of opening the fake `Provider Page` placeholder the owner caught.
+  // A click shows browser chrome immediately, like an ordinary browser tab, while the exact
+  // task-bound native route is leased. Controls remain disabled until that real route exists, so
+  // the prompt shell cannot navigate or accept downloads outside Stockroom's staging fence.
   const activeNativeRoute = Boolean(
     captureProviderKey
       && selectedProviderKey === captureProviderKey
@@ -135,8 +138,27 @@ export function ManageModelsWorkspace({
       && capture.active.routeToken
       && capture.active.url,
   );
-  const browserOpen = Boolean(selectedProviderKey && (scenarioProviderState || activeNativeRoute));
-  const captureBusy = Boolean(ownsCapture && capture && captureInFlight(capture.active));
+  const browserOpen = Boolean(
+    selectedProviderKey
+      && (scenarioProviderState || (activeNativeRoute && hiddenRouteToken !== capture?.active.routeToken)),
+  );
+  const browserPreparing = Boolean(
+    selectedProviderKey
+      && !activeNativeRoute
+      && openingProviderId === selectedProvider?.row.id
+      && selectedProvider?.row.captureAvailable,
+  );
+  const anyCaptureBusy = Boolean(capture && captureInFlight(capture.active));
+  const captureBusy = Boolean(ownsCapture && anyCaptureBusy);
+  const anotherCaptureBusy = Boolean(anyCaptureBusy && !ownsCapture);
+
+  useEffect(() => {
+    if (!queuedProviderId || anyCaptureBusy) return;
+    const nextProviderId = queuedProviderId;
+    setQueuedProviderId(null);
+    void openProvider(nextProviderId);
+  }, [anyCaptureBusy, openProvider, queuedProviderId]);
+
   const previewStatus = scenarioProviderState
     ? {
         loading: "Loading provider",
@@ -151,40 +173,39 @@ export function ManageModelsWorkspace({
         unavailable: "Provider unavailable",
         timeout: "Download not observed",
         canceled: "Download canceled",
-        error: "Models were not attached",
-        "selected-file-recovery": "Choose downloaded files",
+        error: "CAD assets were not attached",
+        "selected-file-recovery": "Use downloaded files",
         "returned-to-stockroom": "Provider running in background",
-        complete: "Models attached",
+        complete: "CAD assets attached",
       }[scenarioProviderState] ?? scenarioProviderState
     : null;
-  const captureStatus = previewStatus ?? (ownsCapture && capture
-    ? capture.active.message || {
-        resolving: "Checking provider",
-        "window-open": "Provider ready",
-        receiving: "Downloading models",
-        attaching: "Validating models",
-        done: "Models attached",
-        "timed-out": "Download not observed",
-        unavailable: "Provider unavailable",
-        error: "Models were not attached",
-        idle: "Select a provider to get models",
-      }[capture.active.status]
-    : "Select a provider to get models");
+  function hideActiveProvider() {
+    if (!activeNativeRoute || !capture?.active.routeToken) return;
+    setHiddenRouteToken(capture.active.routeToken);
+    setActivityMessage("Provider hidden. Stockroom keeps listening for this task's downloads.");
+  }
 
-  async function closeActiveProvider() {
+  async function showActiveProvider() {
     if (!activeNativeRoute || !capture) return;
-    setActivityMessage("Closing provider page...");
+    setActivityMessage("Showing provider...");
     try {
-      await capture.closeProvider();
-      setSelectionLocked(false);
-      setActivityMessage("Provider closed. Select another provider when ready.");
+      await capture.showProvider();
+      setHiddenRouteToken(null);
+      setActivityMessage("Provider ready");
     } catch (error) {
-      setActivityMessage(error instanceof Error ? error.message : "Could not close provider");
-      try {
-        await capture.showProvider();
-      } catch {
-        // The active route and inline browser remain mounted; its status carries the exact failure.
-      }
+      setActivityMessage(error instanceof Error ? error.message : "Could not show provider");
+    }
+  }
+
+  async function applyAttachments() {
+    if (!capture?.active.attachmentProposal) return;
+    setApplying(true);
+    setActivityMessage("Applying the confirmed CAD attachments...");
+    try {
+      await capture.applyAttachments();
+    } catch (error) {
+      setActivityMessage(error instanceof Error ? error.message : "Could not apply attachments");
+      setApplying(false);
     }
   }
 
@@ -201,7 +222,7 @@ export function ManageModelsWorkspace({
       setActivityMessage(
         result.accepted > 0
           ? result.outcome === "queued"
-            ? `${result.accepted} files added to the provider download`
+            ? `${result.accepted} CAD ${result.accepted === 1 ? "file" : "files"} queued for this Provider Visit`
             : `${result.accepted} CAD roles attached`
           : "No matching CAD files were found",
       );
@@ -213,6 +234,26 @@ export function ManageModelsWorkspace({
     }
   }
 
+  const edaLabel = primaryEda === "altium" ? "Altium Designer" : "KiCad";
+  const attachmentProposal = ownsCapture ? capture?.active.attachmentProposal ?? null : null;
+  const handoffRoutes = ownsCapture ? capture?.active.handoff?.routes ?? [] : [];
+  const activeGuidance = handoffRoutes.find((route) =>
+    capture?.active.authorRoute ? route.route.endsWith(`:${capture.active.authorRoute}`) : false,
+  ) ?? handoffRoutes[0] ?? null;
+  const guideMessage = activityMessage
+    ?? previewStatus
+    ?? (anotherCaptureBusy
+      ? `Finish the active Provider Visit for ${capture?.active.partName || "the other component"} first.`
+      : selectedProvider && !selectedProvider.row.captureAvailable
+        ? "This source has no task-bound Provider Visit. Open its listing instead."
+        : null);
+  const showActionBar = Boolean(
+    (selectedProvider && !selectedProvider.row.captureAvailable && selectedProvider.row.url)
+      || (activeNativeRoute && !browserOpen)
+      || attachmentProposal
+      || !captureBusy,
+  );
+
   return (
     <section
       data-testid="manage-models-workspace"
@@ -220,117 +261,182 @@ export function ManageModelsWorkspace({
       data-component-id={componentId}
       className="flex min-h-0 flex-1 flex-col bg-surface"
     >
-      <header className="flex h-[32px] flex-none items-center gap-3 border-b border-line bg-band px-3">
-        <h2 className="ui-section-title">
-          <Text id="component-browser.manage-models-title">CAD Models</Text>
-        </h2>
-        <CadWorkspaceTabs view="manage-models" onView={onView} />
+      <header className="flex h-[38px] flex-none items-center gap-2 border-b border-line bg-band px-3">
+        {onBack ? (
+          <Button small icon={<BackIcon className="h-3.5 w-3.5" />} onClick={onBack}>
+            <Text id="component-browser.manage-models-back-assets">Back To Assets</Text>
+          </Button>
+        ) : null}
+        <BoardIcon className="h-4 w-4 text-t3" />
+        <h2 className="ui-section-title">{dossier.identity.mpn || dossier.identity.displayName}</h2>
+        <span className="ml-auto text-xs text-t3" data-dev-id="component-browser.eda-selection">
+          <Text id="component-browser.manage-models-eda-prefix">Downloads follow</Text> {edaLabel} · <Text id="component-browser.manage-models-eda-settings">selected in Settings</Text>
+        </span>
       </header>
-      <div className="flex min-h-0 flex-1">
-        <ProviderList
-          providers={providers}
-          selectedId={selectedProvider?.row.id ?? null}
-          disabled={captureBusy}
-          onSelect={(providerId) => {
-            // Selection is inert. A provider page opens only through the explicit Open Provider
-            // action after the person has reviewed the provider and EDA choices.
-            setSelectedProviderId(providerId);
-            setActivityMessage(null);
-          }}
+
+      <ProviderList
+        providers={providers}
+        selectedId={selectedProvider?.row.id ?? null}
+        disabled={anotherCaptureBusy || openingProviderId !== null}
+        onSelect={(providerId) => {
+          setSelectedProviderId(providerId);
+          const provider = providers.find((candidate) => candidate.row.id === providerId);
+          if (!provider?.row.captureAvailable) {
+            setActivityMessage("This source has no task-bound Provider Visit. Open its listing instead.");
+            return;
+          }
+          if (captureBusy && capture) {
+            if (providerId === capture.active.vendor) {
+              if (hiddenRouteToken === capture.active.routeToken) void showActiveProvider();
+              return;
+            }
+            setQueuedProviderId(providerId);
+            setOpeningProviderId(providerId);
+            setActivityMessage(`Switching to ${provider.row.label}...`);
+            const endCurrentRoute = capture.skipProvider();
+            void endCurrentRoute.catch((error: unknown) => {
+              setQueuedProviderId(null);
+              setOpeningProviderId(null);
+              setActivityMessage(error instanceof Error ? error.message : "Could not switch provider");
+            });
+            return;
+          }
+          setActivityMessage(null);
+          void openProvider(providerId);
+        }}
+      />
+
+      {selectedProvider ? (
+        <ProviderCaptureGuide
+          providerLabel={selectedProvider.row.label}
+          preparing={browserPreparing}
+          ready={Boolean(activeNativeRoute || scenarioProviderState)}
+          requiredFiles={activeGuidance?.required_files ?? []}
+          progress={ownsCapture ? capture?.active.downloadProgress : null}
+          navigationError={ownsCapture ? capture?.active.browserState?.navigation_error : ""}
+          attachmentCount={attachmentProposal?.attachments.length ?? 0}
+          message={guideMessage}
         />
-        <div className="flex min-w-0 flex-1 flex-col">
-          <fieldset
-            data-dev-id="component-browser.eda-selection"
-            className="flex flex-none items-center gap-4 border-b border-line bg-band px-4 py-2"
-          >
-            <legend className="sr-only">
-              <Text id="component-browser.manage-models-selected-edas">Selected EDAs</Text>
-            </legend>
-            <span className="text-xs font-semibold text-t2">
-              <Text id="component-browser.manage-models-edas">EDAs</Text>
-            </span>
-            {CAPTURE_EDAS.map((eda) => {
-              const checked = selectedEdas.includes(eda.key);
-              const onlySelection = checked && selectedEdas.length === 1;
-              return (
-                <label key={eda.key} className="flex items-center gap-1.5 text-xs text-t2">
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    disabled={selectionLocked || captureBusy || onlySelection}
-                    onChange={() => setSelectedEdas((current) =>
-                      current.includes(eda.key)
-                        ? current.filter((candidate) => candidate !== eda.key)
-                        : [...current, eda.key]
-                    )}
-                  />
-                  {eda.label}
-                </label>
-              );
-            })}
-            <span className="text-xs text-t3">
-              <Text id="component-browser.manage-models-eda-help">
-                Collect files for selected EDAs.
-              </Text>
-            </span>
-          </fieldset>
-          {selectedProvider ? (
-            browserOpen ? (
-              <ProviderBrowserFrame
-                componentId={componentId}
-                providerLabel={selectedProvider.row.label}
-                url={activeNativeRoute ? capture!.active.url! : selectedProvider.row.url}
-                onClose={() => void closeActiveProvider()}
-              />
-            ) : (
-              <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 px-6 text-center">
-                <h3 className="text-sm font-semibold text-t1">{selectedProvider.row.label}</h3>
-                <p className="max-w-[420px] text-xs text-t3">
-                  <Text id="component-browser.manage-models-provider-modal-help">
-                    Choose EDAs, then open this provider in the workspace.
-                  </Text>
+      ) : null}
+
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-technical">
+        {attachmentProposal ? (
+          <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-4 px-6 py-5">
+            <div className="w-full max-w-2xl rounded-panel border border-line bg-surface p-4 shadow-panel">
+              <p className="ui-eyebrow mb-1">
+                <Text id="component-browser.manage-models-proposal-eyebrow">Attachment Proposal</Text>
+              </p>
+              <h3 className="text-sm font-semibold text-t1">
+                <Text id="component-browser.manage-models-proposal-title">Review attachments for</Text>{" "}
+                {attachmentProposal.primary_tool === "both"
+                  ? "KiCad And Altium"
+                  : attachmentProposal.primary_tool === "altium"
+                    ? "Altium Designer"
+                    : "KiCad"}
+              </h3>
+              <p className="mt-1 text-xs text-t3">
+                <Text id="component-browser.manage-models-proposal-help">
+                  Verified files remain inactive until attachment confirmation.
+                </Text>
+              </p>
+              <dl className="mt-3 divide-y divide-line border-y border-line">
+                {attachmentProposal.attachments.map((item) => (
+                  <div key={`${item.role}:${item.file_name}`} className="grid grid-cols-[7rem_1fr_1fr] gap-3 py-2 text-xs">
+                    <dt className="font-semibold text-t1">{item.role}</dt>
+                    <dd className="truncate font-mono text-t2">{item.file_name}</dd>
+                    <dd className="text-t2">{item.target}</dd>
+                  </div>
+                ))}
+              </dl>
+              {attachmentProposal.inactive_evidence.length > 0 ? (
+                <p className="mt-3 text-xs text-t3">
+                  <Text id="component-browser.manage-models-proposal-inactive">
+                    Other-tool files retained as inactive evidence:
+                  </Text>{" "}
+                  {attachmentProposal.inactive_evidence.length}
                 </p>
-              </div>
-            )
-          ) : (
-            <div className="flex min-h-0 flex-1 items-center justify-center text-sm text-t3">
-              <Text id="component-browser.manage-models-no-providers">No providers found</Text>
+              ) : null}
             </div>
-          )}
-          <div
-            role="status"
-            aria-live="polite"
-            data-dev-id="component-browser.provider-status"
-            data-provider-state={scenarioProviderState}
-            className="flex min-h-[44px] flex-none items-center gap-2 border-t border-line bg-band px-3"
-          >
-            <span className="min-w-0 flex-1 truncate text-xs text-t2">
-              {activityMessage ??
-                captureStatus}
-            </span>
-            {!browserOpen ? (
-              <Button
-                type="button"
-                small
-                data-dev-id="component-browser.provider-open"
-                disabled={!selectedProvider || captureBusy}
-                onClick={() => selectedProvider && void openProvider(selectedProvider.row.id)}
-              >
-                <Text id="component-browser.manage-models-open">Open Provider</Text>
-              </Button>
-            ) : null}
-            <Button
-              type="button"
-              small
-              data-dev-id="component-browser.provider-import"
-              disabled={recovering}
-              onClick={() => void recoverFiles()}
-            >
-              <Text id="component-browser.manage-models-choose-files">Choose Downloaded Files</Text>
-            </Button>
           </div>
-        </div>
+        ) : selectedProvider ? (
+          browserOpen || browserPreparing ? (
+            <ProviderBrowserFrame
+              componentId={componentId}
+              providerLabel={selectedProvider.row.label}
+              url={activeNativeRoute
+                ? capture?.active.browserState?.url ?? capture!.active.url!
+                : selectedProvider.row.url}
+              ready={Boolean(activeNativeRoute || scenarioProviderState)}
+              canGoBack={capture?.active.browserState?.can_go_back}
+              canGoForward={capture?.active.browserState?.can_go_forward}
+              loading={browserPreparing || capture?.active.browserState?.loading}
+              navigationError={capture?.active.browserState?.navigation_error}
+              onClose={activeNativeRoute ? hideActiveProvider : undefined}
+            />
+          ) : (
+            <div className="flex min-h-0 flex-1 items-center justify-center" aria-hidden="true">
+              <BoardIcon className="h-9 w-9 text-t4" />
+            </div>
+          )
+        ) : (
+          <div className="flex min-h-0 flex-1 items-center justify-center text-sm text-t3">
+            <Text id="component-browser.manage-models-no-providers">No providers found</Text>
+          </div>
+        )}
       </div>
+
+      {showActionBar ? (
+      <footer
+        data-dev-id="component-browser.provider-status"
+        data-provider-state={scenarioProviderState}
+        className="flex min-h-[40px] flex-none items-center justify-end gap-2 border-t border-line bg-band px-3"
+      >
+        {selectedProvider && !selectedProvider.row.captureAvailable && selectedProvider.row.url ? (
+          <a
+            href={selectedProvider.row.url}
+            target="_blank"
+            rel="noreferrer"
+            className="ui-control-label inline-flex items-center gap-1.5 rounded-control border border-line2 bg-control px-2 py-1 text-t2 hover:bg-control-hover hover:text-t1"
+          >
+            <ExternalIcon className="h-3.5 w-3.5" />
+            <Text id="component-browser.manage-models-open-listing">Open Listing</Text>
+          </a>
+        ) : null}
+        {activeNativeRoute && !browserOpen ? (
+          <Button
+            type="button"
+            small
+            icon={<ExternalIcon className="h-3.5 w-3.5" />}
+            onClick={() => void showActiveProvider()}
+          >
+            <Text id="component-browser.manage-models-show">Show Provider</Text>
+          </Button>
+        ) : null}
+        {attachmentProposal ? (
+          <Button
+            type="button"
+            small
+            variant="accent"
+            disabled={applying}
+            onClick={() => void applyAttachments()}
+          >
+            <Text id="component-browser.manage-models-apply-attachments">Commit Attachments</Text>
+          </Button>
+        ) : null}
+        {!captureBusy && !attachmentProposal ? (
+          <Button
+            type="button"
+            small
+            icon={<DownloadIcon className="h-3.5 w-3.5" />}
+            data-dev-id="component-browser.provider-import"
+            disabled={recovering || anotherCaptureBusy}
+            onClick={() => void recoverFiles()}
+          >
+            <Text id="component-browser.manage-models-choose-files">Import Existing CAD Files</Text>
+          </Button>
+        ) : null}
+      </footer>
+      ) : null}
     </section>
   );
 }

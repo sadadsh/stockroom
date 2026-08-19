@@ -34,14 +34,15 @@ export function setProviderViewport(viewport: ProviderViewport): void {
   bridge(viewport);
 }
 
-export function sendProviderCommand(componentId: string, command: ProviderCommand, url?: string): void {
+export function sendProviderCommand(componentId: string, command: ProviderCommand, url?: string): boolean {
   const bridge = (window as unknown as { __STOCKROOM_HOST__?: ManagedHostApi })
     .__STOCKROOM_HOST__?.providerCommand;
-  if (!bridge) return;
+  if (!bridge) return false;
   guardPreviewEffect({
     kind: "provider-viewport",
     action: `using provider browser ${command}`,
     instruction: `use provider browser ${command}`,
   });
   bridge({ componentId, command, ...(url === undefined ? {} : { url }) });
+  return true;
 }

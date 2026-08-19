@@ -9,6 +9,7 @@ may drive a provider page, and nothing may re-appear behind a flag.
 from __future__ import annotations
 
 import inspect
+from contextlib import contextmanager
 from types import SimpleNamespace
 
 import pytest
@@ -138,11 +139,11 @@ def test_one_selected_part_visits_every_registered_provider_person_driven(monkey
 
     assert result == {"items": [], "counts": {}}
     assert [source.key for source in source_batches[0]] == [
+        "guided",
+        "guided",
+        "guided",
+        "guided",
         "verified-cache",
-        "guided",
-        "guided",
-        "guided",
-        "guided",
     ]
     assert [options["vendor"] for options in constructed] == list(runner._VENDOR_CHAIN)
     # Every provider is worked by the person, so every source is built the same way. No option
@@ -161,17 +162,49 @@ def test_one_selected_part_visits_every_registered_provider_person_driven(monkey
     assert complete_options[0]["exhaustive"] is True
     assert complete_options[0]["collect_variants"] is True
     assert callable(complete_options[0]["evidence_resolver"])
+    # Provider completion only attaches verified files. Altium embedding belongs to a separately
+    # confirmed Assets Catalog Build and must never launch from this person-driven visit.
+    pipeline = source_batches[0][0].make_pipeline()
+    assert pipeline.options["auto_embed_altium_models"] is False
     assert closed == [True] * len(constructed)
+
+
+def test_provider_surface_is_bound_to_the_exact_task_and_private_staging_root(monkeypatch, tmp_path):
+    ctx, constructed, _source_batches, _options, _closed = _runner_context(tmp_path, monkeypatch)
+    leases: list[dict[str, str]] = []
+
+    @contextmanager
+    def provider_surface(**context):
+        leases.append(context)
+        yield object()
+
+    ctx.provider_browser_surface = provider_surface
+    runner.run_guided_capture(ctx, part_ids=["part-a"], vendor="digikey")
+
+    bound_surface = constructed[0]["provider_surface"]
+    with bound_surface("digikey-ultralibrarian"):
+        pass
+    assert leases == [{
+        "staging_root": str((tmp_path / "digikey-downloads").resolve()),
+        "component_id": "part-a",
+        "manufacturer": "Texas Instruments",
+        "mpn": "BQ24074",
+        "provider_id": "digikey-ultralibrarian",
+    }]
 
 
 def test_a_preferred_provider_narrows_the_run_to_that_one_surface(monkeypatch, tmp_path):
     ctx, constructed, source_batches, _options, _closed = _runner_context(tmp_path, monkeypatch)
+    ctx.config.digikey_client_id = "configured"
+    ctx.config.digikey_client_secret = "configured"
 
     runner.run_guided_capture(ctx, part_ids=["part-a"], vendor="digikey")
 
     assert [options["vendor"] for options in constructed] == ["digikey"]
     assert constructed[0]["convert_altium"] is runner._convert_ul_altium_package
-    assert [source.key for source in source_batches[0]] == ["verified-cache", "guided"]
+    assert constructed[0]["single_provider_attempt"] is True
+    assert constructed[0]["strict_catalog_urls"] is False
+    assert [source.key for source in source_batches[0]] == ["guided", "verified-cache"]
 
 
 def test_an_unknown_provider_choice_fails_honestly(monkeypatch, tmp_path):
@@ -394,7 +427,12 @@ def test_the_person_can_finish_a_route_and_skip_the_part_while_the_run_is_live(
         observed["quiet_finish"] = finished()
         observed["quiet_stop"] = should_stop()
 
-        signal_person_capture("part-a", FINISH_ROUTE)
+        route_token = constructed[-1]["publish_active_route"](
+            "digikey",
+            "https://provider.example/part",
+            "digikey-ultralibrarian",
+        )
+        signal_person_capture("part-a", FINISH_ROUTE, route_token=route_token)
         # The route that is open takes the answer, and only that route: one click must not close
         # all five of DigiKey's author routes.
         observed["finish_open_route"] = finished()

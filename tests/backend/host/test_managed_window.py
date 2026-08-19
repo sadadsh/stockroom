@@ -114,7 +114,10 @@ def test_in_app_provider_surface_never_navigates_the_stockroom_window(monkeypatc
         surface.show_active_provider_browser()
         assert provider_window.show_calls == 0
 
-    assert provider_window.loaded_urls == ["https://www.snapeda.com/parts/ABC/Maker/view-part/"]
+    assert provider_window.loaded_urls == [
+        "https://www.snapeda.com/parts/ABC/Maker/view-part/",
+        "about:blank",
+    ]
     assert provider_window.hidden_calls == 2
     assert app_window.loaded_urls == []
 
@@ -147,6 +150,16 @@ def test_in_app_provider_surface_applies_modal_viewport_and_commands(monkeypatch
         assert provider_window.move_calls == [(228, 174)]
         assert provider_window.resize_calls == [(1024, 570)]
         assert provider_window.focus_calls == 0, "layout updates must not steal a React drag"
+        assert surface.set_provider_viewport({
+            "componentId": "part-1",
+            "visible": True,
+            "x": 128,
+            "y": 114,
+            "width": 1024,
+            "height": 570,
+        }) is True
+        assert provider_window.move_calls == [(228, 174)]
+        assert provider_window.resize_calls == [(1024, 570)]
         app_window.x = 300
         app_window.y = 180
         assert surface.reapply_provider_viewport() is True

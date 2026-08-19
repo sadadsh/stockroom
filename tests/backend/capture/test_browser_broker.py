@@ -750,6 +750,9 @@ def _native_event(
     path: Path | None = None,
     name: str = "Part.zip",
     uri: str = "https://provider.example.test/download",
+    bytes_received: int = 0,
+    total_bytes: int = -1,
+    interrupt_reason: str = "",
 ) -> SimpleNamespace:
     """One journal entry shaped exactly like ``ProviderDownloadEvent``."""
 
@@ -761,6 +764,9 @@ def _native_event(
         result_file_path=str(path or ""),
         suggested_file_name=name,
         uri=uri,
+        bytes_received=bytes_received,
+        total_bytes=total_bytes,
+        interrupt_reason=interrupt_reason,
     )
 
 
@@ -775,6 +781,7 @@ class _NativeSurface:
         self.script = list(script)
         self.redirect_to = ""
         self.retained = False
+        self.cancelled_downloads = 0
 
     def show(self) -> None:
         self.calls.append("show")
@@ -789,11 +796,24 @@ class _NativeSurface:
     def current_url(self) -> str:
         return self.url
 
+    def state(self) -> dict[str, object]:
+        return {
+            "url": self.url,
+            "loading": False,
+            "navigation_error": "",
+            "can_go_back": bool(self.calls),
+            "can_go_forward": False,
+        }
+
     def security_state(self) -> dict[str, object]:
         return dict(self.document)
 
     def retain(self) -> None:
         self.retained = True
+
+    def cancel_downloads(self) -> int:
+        self.cancelled_downloads += 1
+        return 1
 
     def download_events(self, *, after_sequence: int = 0):
         batch = self.script.pop(0) if self.script else ()
@@ -854,6 +874,108 @@ def test_a_native_download_reaches_the_exact_broker_with_no_driver_attached(tmp_
     assert surface.calls == ["show", "navigate:https://www.ultralibrarian.com/part"]
     # The host's own copy is removed once the bytes are staged under the task.
     assert not landed.exists()
+
+
+def test_native_progress_is_reported_without_exposing_the_staging_path(tmp_path):
+    landed = _cad_zip(tmp_path / "Part.zip")
+    surface = _NativeSurface([
+        (_native_event(1, phase="started", state="in_progress", name="Part.zip", bytes_received=0, total_bytes=100),),
+        (_native_event(2, phase="progress", state="in_progress", name="Part.zip", bytes_received=40, total_bytes=100),),
+        (_native_event(3, phase="terminal", state="completed", path=landed, name="Part.zip", bytes_received=100, total_bytes=100),),
+    ])
+    capture = _surface_capture(tmp_path, surface)
+    broker = _surface_broker(tmp_path)
+    updates: list[dict[str, object]] = []
+    navigation_updates: list[dict[str, object]] = []
+
+    result = capture.capture_user_downloads(
+        "https://www.ultralibrarian.com/part",
+        broker,
+        hud=_provider_hud_spec(),
+        on_progress=updates.append,
+        on_navigation_state=navigation_updates.append,
+        poll_interval_s=0.01,
+        settle_seconds=0.01,
+        auto_finish_seconds=0.01,
+        timeout_s=5.0,
+    )
+
+    assert result.status == "completed"
+    assert any(update["bytes_received"] == 40 for update in updates)
+    assert updates[-1] == {
+        "active": 0,
+        "completed": 1,
+        "bytes_received": 100,
+        "total_bytes": 100,
+        "files": [{
+            "name": "Part.zip",
+            "state": "completed",
+            "bytes_received": 100,
+            "total_bytes": 100,
+        }],
+    }
+    assert all("path" not in file for update in updates for file in update["files"])
+    assert navigation_updates[-1] == {
+        "url": "https://www.ultralibrarian.com/part",
+        "loading": False,
+        "navigation_error": "",
+        "can_go_back": True,
+        "can_go_forward": False,
+    }
+
+
+def test_an_interrupted_native_download_fails_immediately_with_retry_guidance(tmp_path):
+    surface = _NativeSurface([
+        (_native_event(
+            1,
+            state="interrupted",
+            interrupt_reason=r"NetworkFailed C:\private\provider\Part.zip",
+        ),),
+    ])
+    capture = _surface_capture(tmp_path, surface)
+    broker = _surface_broker(tmp_path)
+
+    with pytest.raises(CaptureBrowserError, match="interrupted.*retry the download") as failure:
+        capture.capture_user_downloads(
+            "https://www.ultralibrarian.com/part",
+            broker,
+            hud=_provider_hud_spec(),
+            poll_interval_s=0.01,
+            timeout_s=5.0,
+        )
+
+    assert "C:" not in str(failure.value)
+    assert "private" not in str(failure.value)
+
+
+def test_a_stuck_native_download_is_cancelled_at_the_bounded_route_deadline(tmp_path):
+    surface = _NativeSurface([
+        (_native_event(
+            1,
+            phase="started",
+            state="in_progress",
+            name="Part.zip",
+            bytes_received=10,
+            total_bytes=100,
+        ),),
+    ])
+    capture = _surface_capture(tmp_path, surface)
+    broker = _surface_broker(tmp_path)
+
+    started = time.monotonic()
+    result = capture.capture_user_downloads(
+        "https://www.ultralibrarian.com/part",
+        broker,
+        hud=_provider_hud_spec(),
+        poll_interval_s=0.01,
+        timeout_s=0.03,
+        termination_grace_seconds=0.02,
+    )
+
+    assert result.status == "timed_out"
+    assert result.files == ()
+    assert surface.cancelled_downloads == 1
+    assert time.monotonic() - started < 1.0
 
 
 def test_a_native_download_that_begins_without_a_task_binding_is_refused(tmp_path):
@@ -937,6 +1059,25 @@ def test_each_task_keeps_its_own_receipts_when_two_routes_run_in_sequence(tmp_pa
 def test_a_terminal_provider_error_page_advances_to_the_next_author_route(tmp_path):
     surface = _NativeSurface()
     surface.document = {"provider_error": True}
+    capture = _surface_capture(tmp_path, surface)
+    broker = _surface_broker(tmp_path)
+
+    result = capture.capture_user_downloads(
+        "https://www.ultralibrarian.com/part",
+        broker,
+        hud=_provider_hud_spec(),
+        poll_interval_s=0.01,
+        settle_seconds=0.01,
+        timeout_s=5.0,
+    )
+
+    assert result.status == "try_another"
+    assert result.files == ()
+
+
+def test_a_native_navigation_failure_advances_without_waiting_for_timeout(tmp_path):
+    surface = _NativeSurface()
+    surface.document = {"navigation_error": "Connection failed"}
     capture = _surface_capture(tmp_path, surface)
     broker = _surface_broker(tmp_path)
 

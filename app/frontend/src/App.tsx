@@ -3,6 +3,7 @@ import { OnboardingGate } from "./components/OnboardingGate";
 import { ErrorState, LoadingState } from "./components/productState";
 import { CaptureStatusPill } from "./components/CaptureStatusPill";
 import { LibraryPage } from "./pages/LibraryPage";
+import { AssetsPage } from "./pages/AssetsPage";
 import { ProjectsPage } from "./pages/ProjectsPage";
 import { StmViewerPage } from "./pages/StmViewerPage";
 import { SettingsPage } from "./pages/SettingsPage";
@@ -75,6 +76,8 @@ function renderRoute(route: Route) {
       // The Components flagship is just the Parts view now: Duplicates is a Parts
       // filter, and Doctor is in Settings.
       return <LibraryPage />;
+    case "assets":
+      return <AssetsPage />;
     case "projects":
       return <ProjectsPage />;
     case "stm":

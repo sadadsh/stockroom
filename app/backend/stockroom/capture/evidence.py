@@ -636,6 +636,147 @@ def record_installed_kicad_role_evidence(
     return digest, (symbol, footprint, model)
 
 
+def record_browser_altium_evidence(
+    *,
+    store: EvidenceStore,
+    record: object,
+    provider_key: str,
+    detail_url: str,
+    altium_sources: tuple[Path, ...],
+    source_receipts: tuple[Path, ...] = (),
+) -> tuple[str, str, str]:
+    """Verify and retain one native Altium pair without requiring a KiCad bundle."""
+
+    from stockroom.altium.extract import normalize_altium_source
+    from stockroom.altium.oleread import pick_entry, read_footprint_names, read_symbol_names
+
+    identity = exact_identity(record)
+    mpn = str(getattr(record, "mpn", "") or "")
+
+    def read_pair(symbol_path: Path, footprint_path: Path) -> tuple[str, str, bytes, bytes]:
+        symbol = pick_entry(read_symbol_names(symbol_path), "symbol", prefer=mpn)
+        footprint = pick_entry(
+            read_footprint_names(footprint_path),
+            "footprint",
+            prefer=mpn,
+        )
+        if not symbol or not footprint:
+            raise ValueError("native Altium evidence has no exact symbol and footprint entry")
+        return symbol, footprint, symbol_path.read_bytes(), footprint_path.read_bytes()
+
+    schlibs = tuple(path for path in altium_sources if path.suffix.casefold() == ".schlib")
+    pcblibs = tuple(path for path in altium_sources if path.suffix.casefold() == ".pcblib")
+    if len(schlibs) == 1 and len(pcblibs) == 1:
+        symbol_entry, footprint_entry, symbol_data, footprint_data = read_pair(
+            schlibs[0],
+            pcblibs[0],
+        )
+    else:
+        with tempfile.TemporaryDirectory(prefix="sr-altium-evidence-") as directory:
+            symbol_path, footprint_path = normalize_altium_source(
+                *altium_sources,
+                out_dir=directory,
+            )
+            if symbol_path is None or footprint_path is None:
+                raise ValueError("native Altium evidence requires one SchLib and one PcbLib")
+            symbol_entry, footprint_entry, symbol_data, footprint_data = read_pair(
+                symbol_path,
+                footprint_path,
+            )
+    raw_by_digest: dict[str, Path] = {}
+    for path in source_receipts:
+        digest = "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest()
+        raw_by_digest.setdefault(digest, path)
+    receipt_digests = tuple(sorted(raw_by_digest))
+    receipt_set = _source_receipt_set(receipt_digests)
+    artifacts = (
+        EvidenceArtifact(
+            "altium_symbol",
+            symbol_data,
+            "application/vnd.altium.schlib",
+            f"{mpn}.SchLib",
+        ),
+        EvidenceArtifact(
+            "altium_footprint",
+            footprint_data,
+            "application/vnd.altium.pcblib",
+            f"{mpn}.PcbLib",
+        ),
+        EvidenceArtifact(
+            "validation_report",
+            json.dumps(
+                {
+                    "schema": "stockroom.cad-validation/1",
+                    "valid": True,
+                    "identity": {
+                        "authoritative_manufacturer_key": (
+                            identity.authoritative_manufacturer_key
+                        ),
+                        "mpn_canonical": identity.mpn_canonical,
+                    },
+                    "operation": ALTIUM_CAD_OPERATION.label,
+                    "provider": provider_key,
+                    "detail_url": detail_url,
+                    "altium_readback": {
+                        "symbol_entry": symbol_entry,
+                        "footprint_entry": footprint_entry,
+                    },
+                },
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode("utf-8"),
+            "application/json",
+            "Validation Report.json",
+        ),
+        *tuple(
+            EvidenceArtifact(
+                f"source_receipt_{index}",
+                path.read_bytes(),
+                "application/octet-stream",
+                path.name,
+            )
+            for index, path in enumerate(
+                (raw_by_digest[digest] for digest in receipt_digests),
+                start=1,
+            )
+        ),
+        *(
+            (
+                EvidenceArtifact(
+                    _SOURCE_RECEIPT_SET_ROLE,
+                    receipt_set,
+                    "application/json",
+                    "Source Receipt Set.json",
+                ),
+            )
+            if receipt_digests
+            else ()
+        ),
+    )
+    digest = store.record_provider_artifact_success(
+        identity=identity,
+        operation=ALTIUM_CAD_OPERATION,
+        provider_key=provider_key,
+        adapter_version=BROWSER_CAPTURE_ADAPTER_VERSION,
+        artifacts=artifacts,
+    )
+    store.verify_provider_success(
+        digest,
+        identity=identity,
+        operation=ALTIUM_CAD_OPERATION,
+        provider_key=provider_key,
+        adapter_version=BROWSER_CAPTURE_ADAPTER_VERSION,
+    )
+    roles = ["altium_symbol", "altium_footprint"]
+    roles.extend(
+        f"source_receipt_{index}" for index in range(1, len(receipt_digests) + 1)
+    )
+    if receipt_digests:
+        roles.append(_SOURCE_RECEIPT_SET_ROLE)
+    store.index_artifact_manifest(digest, identity=identity, roles=tuple(roles))
+    return digest, symbol_entry, footprint_entry
+
+
 def record_browser_cad_evidence(
     *,
     store: EvidenceStore,
@@ -847,6 +988,7 @@ __all__ = [
     "INSTALLED_KICAD_READBACK_ADAPTER_VERSION",
     "exact_identity",
     "proved_kicad_pad_allowance",
+    "record_browser_altium_evidence",
     "record_browser_cad_evidence",
     "record_installed_kicad_role_evidence",
 ]

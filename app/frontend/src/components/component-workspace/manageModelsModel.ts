@@ -33,15 +33,18 @@ function describeProvider(row: ProviderCoverageRow): ManageModelsProvider {
 export function orderedManageModelsProviders(
   coverage: ComponentProvidersView,
 ): ManageModelsProvider[] {
-  const providers = coverage.rows.map(describeProvider);
-  return [
-    ...providers.filter((provider) => provider.complete),
-    ...providers.filter((provider) => !provider.complete),
-  ];
+  return coverage.rows
+    .map(describeProvider)
+    .sort((left, right) =>
+      Number(right.row.captureAvailable) - Number(left.row.captureAvailable)
+      || left.row.order - right.row.order,
+    );
 }
 
 export function bestCompleteProvider(
   providers: readonly ManageModelsProvider[],
 ): ManageModelsProvider | null {
-  return providers.find((provider) => provider.complete && provider.reachable) ?? null;
+  return providers.find(
+    (provider) => provider.complete && provider.reachable && provider.row.captureAvailable,
+  ) ?? null;
 }

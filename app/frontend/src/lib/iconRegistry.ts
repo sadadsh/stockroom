@@ -1,11 +1,8 @@
 /**
  * The icon registry: the single source of truth for every glyph the app draws. One entry per icon
  * id (dot-namespaced, mirroring the copy/dev id schemes), each carrying the inner SVG markup as a
- * string so the glyph is reproduced pixel-for-pixel by <Icon id="...">. Built from
- * `.planning/phases/02-icon-editor/icons.json` (the 57-icon inventory) and the real SVG bodies
- * lifted verbatim from their source components (components/icons.tsx, Rail.tsx, PartsList.tsx,
- * DetailPanel.tsx, SearchOverlay.tsx, CompletePartModal.tsx, Finder.tsx,
- * DevPanel.tsx).
+ * string so the glyph is reproduced pixel-for-pixel by <Icon id="...">. Original source artwork
+ * and promoted product semantics live here; production call sites reference only stable IDs.
  *
  * Categories:
  *  - primary : the shared line-icon set (the icons.tsx `Svg` helper + the rail `svgProps` glyphs).
@@ -176,6 +173,83 @@ export const ICON_REGISTRY: IconEntry[] = [
     viewBox: "0 0 24 24",
     strokeWidth: 1.9,
     body: '<path d="M15 6a9 9 0 0 0-9 9V3"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/>',
+  },
+  {
+    id: "action.measure",
+    category: "primary",
+    viewBox: "0 0 24 24",
+    strokeWidth: 1.9,
+    body: '<path d="M3 15 15 3l6 6L9 21z"/><path d="m7 11 2 2m2-6 2 2m-4 8 2-2"/>',
+  },
+  {
+    id: "action.maximize",
+    category: "primary",
+    viewBox: "0 0 24 24",
+    strokeWidth: 1.9,
+    body: '<path d="M8 3H3v5m13-5h5v5m0 8v5h-5M3 16v5h5"/>',
+  },
+  {
+    id: "action.contract",
+    category: "primary",
+    viewBox: "0 0 24 24",
+    strokeWidth: 1.9,
+    body: '<path d="M8 3v5H3m18 0h-5V3m0 18v-5h5M3 16h5v5"/>',
+  },
+  {
+    id: "action.zoom-in",
+    category: "primary",
+    viewBox: "0 0 24 24",
+    strokeWidth: 1.9,
+    body: '<circle cx="11" cy="11" r="7"/><path d="m20 20-4-4M11 8v6M8 11h6"/>',
+  },
+  {
+    id: "action.zoom-out",
+    category: "primary",
+    viewBox: "0 0 24 24",
+    strokeWidth: 1.9,
+    body: '<circle cx="11" cy="11" r="7"/><path d="m20 20-4-4M8 11h6"/>',
+  },
+  {
+    id: "action.rotate",
+    category: "primary",
+    viewBox: "0 0 24 24",
+    strokeWidth: 1.9,
+    body: '<path d="M20 11a8 8 0 1 0-2.34 5.66L20 14"/><path d="M20 7v4h-4"/>',
+  },
+  {
+    id: "media.photo",
+    category: "primary",
+    viewBox: "0 0 24 24",
+    strokeWidth: 1.9,
+    body: '<rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="11" r="2"/><path d="m21 15-3.5-3.5L13 16l-2-2-5 5"/>',
+  },
+  {
+    id: "detail.provider",
+    category: "primary",
+    viewBox: "0 0 24 24",
+    strokeWidth: 1.9,
+    body: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.3 3 14.7 0 18M12 3c-3 3.3-3 14.7 0 18"/>',
+  },
+  {
+    id: "settings.cad-tools",
+    category: "primary",
+    viewBox: "0 0 24 24",
+    strokeWidth: 1.9,
+    body: '<rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 1v3m6-3v3M9 20v3m6-3v3M20 9h3m-3 6h3M1 9h3m-3 6h3"/><path d="M10 10h4v4h-4z"/>',
+  },
+  {
+    id: "settings.sources",
+    category: "primary",
+    viewBox: "0 0 24 24",
+    strokeWidth: 1.9,
+    body: '<path d="M10 13a5 5 0 0 0 7.54.54l2-2a5 5 0 0 0-7.07-7.07l-1.15 1.15"/><path d="M14 11a5 5 0 0 0-7.54-.54l-2 2a5 5 0 0 0 7.07 7.07l1.15-1.15"/>',
+  },
+  {
+    id: "nav.assets",
+    category: "primary",
+    viewBox: "0 0 24 24",
+    strokeWidth: 1.9,
+    body: '<path d="m21 8-9-5-9 5 9 5z"/><path d="m3 8 9 5v8l-9-5z"/><path d="m21 8-9 5v8l9-5z"/>',
   },
   {
     id: "nav.board",

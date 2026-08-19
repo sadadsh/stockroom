@@ -504,15 +504,11 @@ def test_mounted_guided_capture_is_one_reconnectable_workflow_item(
                 "kicad_symbol",
                 "kicad_footprint",
                 "kicad_model",
-                "altium_symbol",
-                "altium_footprint",
             ],
             "initial_needs": [
                 "kicad_symbol",
                 "kicad_footprint",
                 "kicad_model",
-                "altium_symbol",
-                "altium_footprint",
             ],
         },
     }
@@ -532,19 +528,16 @@ def test_mounted_guided_capture_is_one_reconnectable_workflow_item(
         "vendor": "ultralibrarian",
         "background": False,
         "active_route": None,
+        "attachment_proposal": None,
         "requested_requirements": [
             "kicad_symbol",
             "kicad_footprint",
             "kicad_model",
-            "altium_symbol",
-            "altium_footprint",
         ],
         "initial_needs": [
             "kicad_symbol",
             "kicad_footprint",
             "kicad_model",
-            "altium_symbol",
-            "altium_footprint",
         ],
         "report": None,
     }
@@ -593,6 +586,57 @@ def test_guided_capture_limits_download_requirements_to_selected_edas(
     ]
 
 
+def test_active_capture_applies_only_its_exact_attachment_proposal(
+    client,
+    app_ctx,
+    tmp_path,
+    monkeypatch,
+):
+    from stockroom.capture.intent import PersonCaptureIntent, person_capture_intent
+
+    _mount_completion_authority(app_ctx, tmp_path)
+    monkeypatch.setenv("STOCKROOM_CAPTURE_DIR", str(tmp_path / "Capture State"))
+    reference = client.post(
+        "/api/library/capture/run",
+        json={"part_ids": ["tps62130"], "vendor": "ultralibrarian"},
+    ).json()
+    intent = PersonCaptureIntent("tps62130")
+    with person_capture_intent(
+        "tps62130",
+        intent,
+        capture_id=reference["workflow_item_id"],
+    ):
+        proposal_token = intent.set_attachment_proposal({
+            "part_id": "tps62130",
+            "provider": "ultralibrarian",
+            "primary_tool": "kicad",
+            "attachments": [{
+                "role": "Symbol",
+                "file_name": "TPS62130.kicad_sym",
+                "target": "Active KiCad Symbol",
+            }],
+            "inactive_evidence": [],
+        })
+        stale = client.post(
+            "/api/library/capture/parts/tps62130/attachments/apply",
+            json={
+                "workflow_item_id": reference["workflow_item_id"],
+                "proposal_token": "stale-token",
+            },
+        )
+        assert stale.status_code == 409
+        applied = client.post(
+            "/api/library/capture/parts/tps62130/attachments/apply",
+            json={
+                "workflow_item_id": reference["workflow_item_id"],
+                "proposal_token": proposal_token,
+            },
+        )
+        assert applied.status_code == 200, applied.text
+        assert applied.json()["accepted"] is True
+        assert intent.take_attachment_apply(proposal_token) is True
+
+
 def test_active_capture_can_reveal_its_retained_provider_surface(
     client,
     app_ctx,
@@ -626,11 +670,46 @@ def test_active_capture_can_reveal_its_retained_provider_surface(
         intent,
         capture_id=reference["workflow_item_id"],
     ):
-        intent.set_active_route(
+        route_token = intent.set_active_route(
             "ultralibrarian",
             "https://app.ultralibrarian.com/details/catalog/TI/TPS62130",
             "ultralibrarian",
         )
+        intent.set_download_progress({
+            "active": 1,
+            "completed": 0,
+            "bytes_received": 512,
+            "total_bytes": 1024,
+            "files": [{
+                "name": "TPS62130.zip",
+                "state": "in_progress",
+                "bytes_received": 512,
+                "total_bytes": 1024,
+            }],
+        })
+        projected = client.get(
+            f"/api/library/capture/batches/{reference['workflow_batch_id']}"
+        )
+        assert projected.status_code == 200, projected.text
+        assert projected.json()["active_route"] == {
+            "vendor": "ultralibrarian",
+            "detail_url": "https://app.ultralibrarian.com/details/catalog/TI/TPS62130",
+            "evidence_provider_key": "ultralibrarian",
+            "route_token": route_token,
+            "download_progress": {
+                "active": 1,
+                "completed": 0,
+                "bytes_received": 512,
+                "total_bytes": 1024,
+                "files": [{
+                    "name": "TPS62130.zip",
+                    "state": "in_progress",
+                    "bytes_received": 512,
+                    "total_bytes": 1024,
+                }],
+            },
+            "browser_state": None,
+        }
         response = client.post(
             f"/api/library/capture/batches/{reference['workflow_batch_id']}/provider/show"
         )
@@ -1132,11 +1211,28 @@ def test_a_person_can_finish_the_open_route_or_skip_the_part_from_stockrooms_own
 
     intent = PersonCaptureIntent()
     with person_capture_intent("tps62130", intent, capture_id="item-person-capture"):
+        route_token = intent.set_active_route(
+            "digikey",
+            "https://www.digikey.com/en/products/detail/example/TPS62130",
+            "digikey-ultralibrarian",
+        )
+        stale = client.post(
+            "/api/library/capture/parts/tps62130/intent",
+            json={
+                "action": "finish-route",
+                "workflow_item_id": "item-person-capture",
+                "route_token": "stale-route-token",
+            },
+        )
+        assert stale.status_code == 409
+        assert intent.take_route_finish() is False
+
         finished = client.post(
             "/api/library/capture/parts/tps62130/intent",
             json={
                 "action": "finish-route",
                 "workflow_item_id": "item-person-capture",
+                "route_token": route_token,
             },
         )
         assert finished.status_code == 200
@@ -1165,7 +1261,11 @@ def test_a_person_driven_signal_for_a_component_with_no_running_capture_is_refus
     # Remembering it would silently end the next run the person started.
     response = client.post(
         "/api/library/capture/parts/tps62130/intent",
-        json={"action": "finish-route", "workflow_item_id": "item-no-longer-running"},
+        json={
+            "action": "finish-route",
+            "workflow_item_id": "item-no-longer-running",
+            "route_token": "route-no-longer-running",
+        },
     )
 
     assert response.status_code == 409

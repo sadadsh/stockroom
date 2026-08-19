@@ -29,7 +29,6 @@ import { SPEC_HIDDEN_KEYS } from "../lib/specSchema";
 import { distributorLabel } from "../lib/sourced";
 import { sv } from "../lib/sourced";
 import { Badge, Button, Card, Eyebrow } from "../components/primitives";
-import { BulkImportSection } from "../components/BulkImportSection";
 import { CandidateCard } from "../components/CandidateCard";
 import { EnrichStages } from "../components/EnrichStages";
 import { PassiveAddSection } from "../components/PassiveAddSection";
@@ -389,10 +388,6 @@ export function IngestPage() {
       ) : null}
 
       {nonPassive ? <NonPassiveCard result={result} /> : null}
-
-      {/* The many-at-once lane, below the one-at-a-time lane it complements: the single-part
-          flow stays the focal point of the page, and a whole sourcing document lands here. */}
-      <BulkImportSection />
     </div>
   );
 }

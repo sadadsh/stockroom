@@ -31,7 +31,6 @@ const EXPECTED_COMPONENT_CASES = [
   "components.manage-models-ready",
   "components.manage-models-partial",
   "components.manage-models-blocked",
-  "components.bulk-import",
   "components.offers-open",
   "components.manage-models-attached",
   "components.manage-models-invalid",
@@ -100,22 +99,19 @@ describe("Components Design Studio scenarios", () => {
     expect(liveRequest).not.toHaveBeenCalled();
   });
 
-  it("shows complete and partial provider choices together in Manage Models", async () => {
+  it("shows every provider as one compact choice in Manage Models", async () => {
     const { liveRequest } = await mountScenario("components.manage-models-ready");
     expect(screen.queryByRole("dialog")).toBeNull();
-    expect(screen.getByText("EDAs")).toBeVisible();
+    expect(screen.getByText(/Downloads follow (KiCad|Altium Designer)/)).toBeVisible();
     const providers = within(screen.getByRole("radiogroup", { name: "CAD model providers" }))
       .getAllByRole("radio");
     expect(providers.map((provider) => provider.textContent)).toEqual([
-      expect.stringContaining("Ultra Librarian"),
-      expect.stringContaining("SnapMagic"),
-      expect.stringContaining("SamacSys"),
-      expect.stringContaining("TraceParts"),
-      expect.stringContaining("CADENAS"),
+      "Ultra Librarian",
+      "SnapMagic",
+      "SamacSys",
+      "TraceParts",
+      "CADENAS",
     ]);
-    expect(providers[0]).toHaveTextContent("Complete Set");
-    expect(providers[1]).toHaveTextContent("Complete Set");
-    expect(providers[2]).toHaveTextContent("Missing 3D Model");
     expect(providers[4]).toBeDisabled();
     expect(liveRequest).not.toHaveBeenCalled();
   });

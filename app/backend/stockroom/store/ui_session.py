@@ -66,7 +66,7 @@ _CAD_VIEWS = {"models", "manage-models"}
 _REPRESENTATION_LAYOUTS = {"all", "model", "footprint", "symbol"}
 _REPRESENTATION_KINDS = ("symbol", "footprint", "model")
 
-_ROUTES = {"components", "projects", "stm", "settings"}
+_ROUTES = {"components", "assets", "projects", "stm", "settings"}
 _DETAIL_TABS = {"specs", "sourcing", "enrich", "history", "handoff"}
 _SETTINGS_GROUPS = {"general", "library", "eda", "sources", "maintenance"}
 _OPEN_SURFACES = {None, "search", "add_part", "complete_part"}

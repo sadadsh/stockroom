@@ -93,6 +93,7 @@ function providerRow(): ProviderCoverageRow {
     urlKind: "evidence",
     instruction: "Sign in if asked, select KiCad and Altium, then download the complete set.",
     needsLogin: true,
+    captureAvailable: true,
     aggregator: true,
     distributor: false,
     statusCounts,

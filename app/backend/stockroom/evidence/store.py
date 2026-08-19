@@ -29,6 +29,22 @@ _ARTIFACT_ROLE = re.compile(r"[a-z][a-z0-9_]{0,63}\Z")
 _MAX_OBJECT_BYTES = 512 * 1024 * 1024
 _CHUNK_BYTES = 1024 * 1024
 _CAD_REQUIRED_ROLES = frozenset({"symbol", "footprint", "model", "validation_report"})
+_ALTIUM_CAD_REQUIRED_ROLES = frozenset(
+    {"altium_symbol", "altium_footprint", "validation_report"}
+)
+
+
+def _cad_required_roles(
+    operation_label: str,
+    available_roles: set[str] | None = None,
+) -> frozenset[str]:
+    if (
+        operation_label == "cad:altium"
+        and available_roles is not None
+        and _ALTIUM_CAD_REQUIRED_ROLES.issubset(available_roles)
+    ):
+        return _ALTIUM_CAD_REQUIRED_ROLES
+    return _CAD_REQUIRED_ROLES
 DEFAULT_CAD_PROVIDER_PREFERENCE = ("ultralibrarian", "snapmagic")
 _SENSITIVE_KEYS = frozenset(
     {
@@ -981,7 +997,8 @@ class EvidenceStore:
         roles = [artifact.role for artifact in artifacts]
         if len(set(roles)) != len(roles):
             raise EvidenceError("artifact evidence roles must be unique")
-        missing = sorted(_CAD_REQUIRED_ROLES.difference(roles))
+        required_roles = _cad_required_roles(operation_label, set(roles))
+        missing = sorted(required_roles.difference(roles))
         if missing:
             raise EvidenceError(
                 "CAD artifact evidence is incomplete: missing " + ", ".join(missing)
@@ -1011,7 +1028,7 @@ class EvidenceStore:
             "objects": objects,
             "operation": operation_label,
             "provider": provider_key,
-            "required_roles": sorted(_CAD_REQUIRED_ROLES),
+            "required_roles": sorted(required_roles),
             "schema": "stockroom.provider-artifact-evidence/1",
         }
         return self.install_bytes(_canonical_json(manifest))
@@ -1496,8 +1513,14 @@ class EvidenceStore:
             raise EvidenceManifestMismatch(
                 "artifact evidence cannot satisfy a non-CAD provider operation"
             )
-        if manifest.get("required_roles") != sorted(_CAD_REQUIRED_ROLES):
+        declared_required = manifest.get("required_roles")
+        allowed_required = [sorted(_CAD_REQUIRED_ROLES)]
+        if operation_label == "cad:altium":
+            allowed_required.append(sorted(_ALTIUM_CAD_REQUIRED_ROLES))
+        if declared_required not in allowed_required:
             raise EvidenceCorruption("CAD artifact evidence required roles are invalid")
+        assert isinstance(declared_required, list)
+        required_roles = frozenset(str(role) for role in declared_required)
         objects = manifest.get("objects")
         if type(objects) is not list or not objects:
             raise EvidenceCorruption("CAD artifact evidence objects are invalid")
@@ -1524,7 +1547,7 @@ class EvidenceStore:
             ):
                 raise EvidenceCorruption("CAD artifact evidence object does not match stored bytes")
             roles.add(role)
-        if not _CAD_REQUIRED_ROLES.issubset(roles):
+        if not required_roles.issubset(roles):
             raise EvidenceCorruption("CAD artifact evidence is missing a required object")
         report_reference = next(
             reference

@@ -10,7 +10,7 @@ import { makePartDetail } from "../test/partFixture";
 import { makeDossier } from "../test/dossierFixture";
 import { ToastProvider } from "../lib/toast";
 import { ThemeProvider } from "../lib/theme";
-import { RouterProvider } from "../lib/router";
+import { RouterProvider, useRouter } from "../lib/router";
 import { AddPartProvider, useAddPart } from "../lib/addPart";
 import { CaptureProvider } from "../lib/capture";
 import {
@@ -122,9 +122,10 @@ const FACETS = {
 
 function wrap(ui: ReactNode) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  const state = { addPartOpen: false };
+  const state = { addPartOpen: false, route: "components" };
   function Probe() {
     state.addPartOpen = useAddPart().isOpen;
+    state.route = useRouter().route;
     return null;
   }
   const utils = render(
@@ -426,7 +427,11 @@ describe("ComponentsPage", () => {
     const user = userEvent.setup();
 
     expect(state.addPartOpen).toBe(false);
-    await user.click(await screen.findByRole("button", { name: "Add Parts" }));
+    const addParts = await screen.findByRole("button", { name: "Add Parts" });
+    const finder = document.querySelector<HTMLElement>('[data-dev-id="components.finder"]')!;
+    expect(addParts).toHaveClass("bg-acc", "w-full");
+    expect(finder.compareDocumentPosition(addParts) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    await user.click(addParts);
     expect(state.addPartOpen).toBe(true);
   });
 
@@ -538,6 +543,7 @@ describe("ComponentsPage", () => {
     expect(screen.getAllByText("No Components Yet")).toHaveLength(1);
     expect(screen.queryByText("Select a component to open it.")).not.toBeInTheDocument();
     const action = screen.getByRole("button", { name: "Add Parts" });
+    expect(action).toHaveAttribute("data-dev-id", "components.empty-add");
     await userEvent.click(action);
     expect(view.state.addPartOpen).toBe(true);
   });
@@ -590,14 +596,14 @@ describe("opening a component", () => {
     await user.click(await screen.findByRole("button", { name: new RegExp(`MPN-${index}\\b`) }));
   }
 
-  it("renders only the CAD Models tabs inside the selected component", async () => {
-    wrap(<ComponentsPage />);
+  it("keeps CAD inspection in Components and links the exact part to Assets", async () => {
+    const { state } = wrap(<ComponentsPage />);
     await screen.findByText("Description p0");
-    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual([
-      "Models",
-      "Manage Models",
-    ]);
-    expect(screen.getAllByRole("tablist")).toHaveLength(1);
+    expect(screen.queryAllByRole("tab")).toHaveLength(0);
+    await userEvent.setup().click(screen.getByRole("button", { name: "Manage CAD Assets" }));
+    expect(state.route).toBe("assets");
+    expect(readUiSession().selected_ids.component).toBe("p0");
+    expect(readUiSession().active_component).toBe("p0");
     expect(document.querySelector('[data-dev-id="components.workspace-band"]')).toBeNull();
   });
 

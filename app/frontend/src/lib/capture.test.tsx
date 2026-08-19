@@ -405,6 +405,13 @@ describe("CaptureProvider store", () => {
               vendor: "ultralibrarian",
               detail_url: "https://app.ultralibrarian.com/x",
               route_token: "route-active-handoff",
+              browser_state: {
+                url: "https://app.ultralibrarian.com/redirected",
+                loading: false,
+                navigation_error: "",
+                can_go_back: true,
+                can_go_forward: false,
+              },
             }
           : null,
         initial_needs: ["kicad_symbol"],
@@ -419,6 +426,12 @@ describe("CaptureProvider store", () => {
         part_id: "p1",
         visible: true,
       });
+      const providerIntent = vi.spyOn(api, "signalCaptureIntent").mockResolvedValue({
+        part_id: "p1",
+        workflow_item_id: "item-active-handoff",
+        action: "finish-route",
+        accepted: true,
+      });
       const { result } = renderHook(() => useCapture(), {
         wrapper: wrap(new QueryClient()),
       });
@@ -429,8 +442,23 @@ describe("CaptureProvider store", () => {
       });
       await waitFor(() => expect(result.current.active.status).toBe("window-open"));
       expect(result.current.active.routeToken).toBe("route-active-handoff");
+      expect(result.current.active.url).toBe("https://app.ultralibrarian.com/redirected");
+      expect(result.current.active.browserState?.can_go_back).toBe(true);
       await act(async () => result.current.showProvider());
       expect(showProvider).toHaveBeenCalledWith("batch-active-handoff");
+      await act(async () => result.current.finishProvider());
+      expect(providerIntent).toHaveBeenCalledWith({
+        partId: "p1",
+        workflowItemId: "item-active-handoff",
+        action: "finish-route",
+        routeToken: "route-active-handoff",
+      });
+      await act(async () => result.current.skipProvider());
+      expect(providerIntent).toHaveBeenLastCalledWith({
+        partId: "p1",
+        workflowItemId: "item-active-handoff",
+        action: "skip-part",
+      });
 
       await act(async () => result.current.closeProvider());
       expect(cancel).toHaveBeenCalledWith("batch-active-handoff");
@@ -727,6 +755,27 @@ describe("CaptureProvider store", () => {
     ).rejects.toThrow("Finish the active completion for Part One");
     expect(api.runCapture).toHaveBeenCalledTimes(1);
     expect(api.runCapture).toHaveBeenCalledWith(expect.objectContaining({ edas: ["kicad"] }));
+  });
+
+  it("forces an explicitly selected provider visit even when retained evidence exists", async () => {
+    mockSource();
+    const run = vi.spyOn(api, "runCapture").mockImplementation(() => new Promise(() => undefined));
+    const { result } = renderHook(() => useCapture(), { wrapper: wrap(new QueryClient()) });
+
+    await act(async () => {
+      void result.current.start(
+        "p1",
+        "Part One",
+        ["altium_symbol", "altium_footprint", "kicad_model"],
+        "ultralibrarian",
+      );
+      await Promise.resolve();
+    });
+
+    expect(run).toHaveBeenCalledWith(expect.objectContaining({
+      vendor: "ultralibrarian",
+      mode: "collect-all",
+    }));
   });
 
   it("leaves EDA selection unset for legacy model-only capture", async () => {

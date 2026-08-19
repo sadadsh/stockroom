@@ -997,17 +997,17 @@ class LibraryOps:
                 if locked_record.dumps() != record.dumps():
                     raise ValueError("the part changed while its Altium bundle was being verified")
                 record = locked_record
-                bound_kicad = compatible_kicad_variant or record.cad_variants.selection_for(
-                    "kicad"
-                )
-                if active_variant is not None:
-                    if bound_kicad is None or not _altium_pointer_accepts_kicad(
+                if (
+                    active_variant is not None
+                    and compatible_kicad_variant is not None
+                    and not _altium_pointer_accepts_kicad(
                         active_variant,
-                        bound_kicad,
-                    ):
-                        raise ValueError(
-                            "activate the exact compatible KiCad bundle before this Altium bundle"
-                        )
+                        compatible_kicad_variant,
+                    )
+                ):
+                    raise ValueError(
+                        "the Altium bundle is not bound to the supplied KiCad source manifest"
+                    )
                 if compatible_kicad_variant is not None:
                     _verify_kicad_projection_pointer(
                         self.lib,

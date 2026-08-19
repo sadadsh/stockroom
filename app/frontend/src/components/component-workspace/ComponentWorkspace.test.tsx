@@ -207,24 +207,21 @@ describe("the three-column workspace", () => {
   // arrives - is `layout/engineInvariants.test.tsx`, which holds it for arbitrary documents rather
   // than only for the one that ships today.
 
-  it("uses only the CAD Models tabs and has no information tab strip", async () => {
+  it("keeps acquisition controls out of the inspection column", async () => {
     await open();
-    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual([
-      "Models",
-      "Manage Models",
-    ]);
-    expect(document.querySelectorAll('[role="tablist"]')).toHaveLength(1);
+    expect(screen.queryAllByRole("tab")).toHaveLength(0);
+    expect(screen.getByRole("button", { name: "Manage CAD Assets" })).toBeVisible();
   });
 
-  it("opens Manage Models inside the component while keeping its identity", async () => {
+  it("marks the exact component for the Assets workspace", async () => {
     const user = userEvent.setup();
     await open();
 
-    await user.click(screen.getByRole("tab", { name: "Manage Models" }));
+    await user.click(screen.getByRole("button", { name: "Manage CAD Assets" }));
 
-    expect(screen.getByTestId("manage-models-workspace")).toBeVisible();
-    expect(columns()).toHaveLength(0);
-    expect(node("component-browser.header-mpn")).toBeVisible();
+    expect(columns()).toHaveLength(3);
+    expect(readUiSession().active_component).toBe(ID);
+    expect(readUiSession().selected_ids.component).toBe(ID);
     expect(readUiSession().component_views[ID]?.cad_view).toBe("manage-models");
   });
 
@@ -536,7 +533,7 @@ describe("the identity header", () => {
     expect(facts.textContent).not.toContain("0402");
   });
 
-  it("carries exactly the four header actions and none of the removed ones", async () => {
+  it("keeps the permanent Assets handoff in the compact header action set", async () => {
     await open(
       makeDossier({
         identity: {
@@ -564,10 +561,13 @@ describe("the identity header", () => {
     const actions = within(node("component-browser.header-actions"))
       .getAllByRole("button")
       .map((button) => button.textContent?.trim());
-    // The clipboard control's VISIBLE text is the object alone: a copy glyph carries the verb, and
-    // the complete phrase is on the control as its tooltip and its accessible name (asserted in the
-    // clipboard block below). The inventory is still exactly four actions and no more.
-    expect(actions).toEqual(["Datasheet", "Manufacturer Page", "MPN", "Manage"]);
+    expect(actions).toEqual([
+      "Datasheet",
+      "Manufacturer Page",
+      "Manage CAD Assets",
+      "MPN",
+      "Manage",
+    ]);
 
     for (const gone of [
       "Complete Component",
@@ -658,7 +658,6 @@ describe("the Manage menu", () => {
       "Edit Class and Classification...",
       "Review Missing Specifications...",
       "Refresh Component Data",
-      "Manage Models",
       "View Data Provenance...",
       "Delete Component...",
     ]);
@@ -675,12 +674,11 @@ describe("the Manage menu", () => {
       onReviewMissing: () => {},
       onRefresh: () => {},
       refreshing: false,
-      onReviewCadSources: () => {},
       onViewProvenance: () => {},
       onDelete: () => {},
     });
     expect(items.find((item) => item.id === "refresh")!.label).toBe("Refresh Component Data");
-    expect(items.filter((item) => item.label.endsWith("...")).length).toBe(items.length - 2);
+    expect(items.filter((item) => item.label.endsWith("...")).length).toBe(items.length - 1);
     expect(items[items.length - 1].id).toBe("delete");
     expect(items[items.length - 1].separated).toBe(true);
   });

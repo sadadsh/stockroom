@@ -231,6 +231,9 @@ export function SettingsPage() {
         data-dev-id="settings.content"
         className="@container min-h-0 flex-1 overflow-y-auto px-5 pb-4 pt-4"
       >
+        <SettingsCategoryNav />
+
+        <div className="mx-auto max-w-4xl">
         <MachineSetupBand
           loading={!s}
           steps={steps}
@@ -241,15 +244,46 @@ export function SettingsPage() {
           onOpenUpdates={() => revealSettings("settings.update", true)}
         />
 
-        <div className="mt-3 grid auto-rows-max grid-cols-1 gap-3 @3xl:grid-cols-2">
+        <div className="mt-3 grid auto-rows-max grid-cols-1 gap-3">
           <GeneralGroup />
           <LibraryGroup />
           <EdaGroup />
           <SourcesGroup />
           <MaintenanceGroup />
         </div>
+        </div>
       </div>
     </div>
+  );
+}
+
+const SETTINGS_CATEGORIES = [
+  ["General", "settings.appearance", "action.settings"],
+  ["Catalog", "settings.profiles", "nav.library"],
+  ["CAD Tools", "settings.kicad", "settings.cad-tools"],
+  ["Sources", "settings.distributor", "settings.sources"],
+  ["Maintenance", "settings.completion", "action.doctor"],
+] as const;
+
+function SettingsCategoryNav() {
+  const categoriesLabel = useText("settings.categories", "Settings categories");
+  return (
+    <nav
+      aria-label={categoriesLabel}
+      className="sticky top-0 z-20 mx-auto mb-3 flex max-w-4xl gap-1 border-b border-line bg-app/95 py-2 backdrop-blur"
+    >
+      {SETTINGS_CATEGORIES.map(([label, target, iconId]) => (
+        <button
+          key={target}
+          type="button"
+          onClick={() => revealSettings(target, true)}
+          className="inline-flex items-center gap-1.5 rounded-control px-3 py-1.5 text-xs font-medium text-t2 hover:bg-control-hover hover:text-t1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus"
+        >
+          <Icon id={iconId} className="h-3.5 w-3.5 flex-none" />
+          {label}
+        </button>
+      ))}
+    </nav>
   );
 }
 

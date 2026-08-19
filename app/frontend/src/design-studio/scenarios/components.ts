@@ -36,7 +36,6 @@ export const componentScenarioIds = [
   "components.manage-models-ready",
   "components.manage-models-partial",
   "components.manage-models-blocked",
-  "components.bulk-import",
   "components.offers-open",
   "components.manage-models-attached",
   "components.manage-models-invalid",
@@ -62,14 +61,16 @@ function scenario(
     listParams?: Readonly<Record<string, string | readonly string[]>>;
     listBehavior?: ReturnType<typeof componentReadFixtures>[number]["behavior"];
     dossierBehavior?: ReturnType<typeof componentReadFixtures>[number]["behavior"];
+    area?: "components" | "assets";
+    route?: "components" | "assets";
   },
 ): DesignScenario {
   return {
     id,
     title: options.title,
-    area: "components",
-    group: "Components",
-    route: "components",
+    area: options.area ?? "components",
+    group: options.area === "assets" ? "Asset Sources" : "Components",
+    route: options.route ?? "components",
     fixtures: componentReadFixtures(options),
     initialUi: options.initialUi ?? {},
     expectedTargets: options.expectedTargets ?? ["components.root"],
@@ -184,13 +185,12 @@ export const componentScenarios: readonly DesignScenario[] = [
   scenario("components.preview-3d", { title: "3D Preview", initialUi: { components: { preview: "model" } } }),
   scenario("components.preview-symbol", { title: "Symbol Preview", initialUi: { components: { preview: "symbol" } } }),
   scenario("components.preview-footprint", { title: "Footprint Preview", initialUi: { components: { preview: "footprint" } } }),
-  scenario("components.manage-models-ready", { title: "Manage Models Ready", initialUi: { components: { cadView: "manage-models" } }, expectedTargets: ["component-browser.manage-models", "component-browser.eda-selection", "component-browser.provider-list"] }),
-  scenario("components.manage-models-partial", { title: "Manage Models Partial", dossier: partialProvider, initialUi: { components: { cadView: "manage-models" }, provider: { state: "ready" } }, expectedTargets: ["component-browser.manage-models", "component-browser.provider-list"] }),
-  scenario("components.manage-models-blocked", { title: "Manage Models Blocked", dossier: blockedProvider, initialUi: { components: { cadView: "manage-models" }, provider: { state: "unavailable" } }, expectedTargets: ["component-browser.manage-models", "component-browser.provider-status"] }),
-  scenario("components.bulk-import", { title: "Bulk Import", initialUi: { addParts: { state: "empty" } }, expectedTargets: ["ingest.bulk"] }),
+  scenario("components.manage-models-ready", { title: "Manage Models Ready", area: "assets", route: "assets", initialUi: { components: { cadView: "manage-models" } }, expectedTargets: ["component-browser.manage-models", "component-browser.eda-selection", "component-browser.provider-list"] }),
+  scenario("components.manage-models-partial", { title: "Manage Models Partial", area: "assets", route: "assets", dossier: partialProvider, initialUi: { components: { cadView: "manage-models" }, provider: { state: "ready" } }, expectedTargets: ["component-browser.manage-models", "component-browser.provider-list"] }),
+  scenario("components.manage-models-blocked", { title: "Manage Models Blocked", area: "assets", route: "assets", dossier: blockedProvider, initialUi: { components: { cadView: "manage-models" }, provider: { state: "unavailable" } }, expectedTargets: ["component-browser.manage-models", "component-browser.provider-status"] }),
   scenario("components.offers-open", { title: "Price Breaks Open", initialUi: { components: { surface: "offers" } }, expectedTargets: ["component-browser.sourcing-sheet"] }),
-  scenario("components.manage-models-attached", { title: "Manage Models Attached", initialUi: { components: { cadView: "manage-models" }, provider: { state: "complete" }, capture: { status: "done", backgrounded: false } }, expectedTargets: ["component-browser.manage-models", "component-browser.provider-status"] }),
-  scenario("components.manage-models-invalid", { title: "Manage Models Invalid Files", initialUi: { components: { cadView: "manage-models" }, provider: { state: "error" }, capture: { status: "error", backgrounded: false } }, expectedTargets: ["component-browser.manage-models", "component-browser.provider-import"] }),
+  scenario("components.manage-models-attached", { title: "Manage Models Attached", area: "assets", route: "assets", initialUi: { components: { cadView: "manage-models" }, provider: { state: "complete" }, capture: { status: "done", backgrounded: false } }, expectedTargets: ["component-browser.manage-models", "component-browser.provider-status"] }),
+  scenario("components.manage-models-invalid", { title: "Manage Models Invalid Files", area: "assets", route: "assets", initialUi: { components: { cadView: "manage-models" }, provider: { state: "error" }, capture: { status: "error", backgrounded: false } }, expectedTargets: ["component-browser.manage-models", "component-browser.provider-import"] }),
   scenario("components.diff-open", { title: "Diff Open", initialUi: { components: { surface: "provenance", sourcesTab: "changes" } }, expectedTargets: ["component-browser.sources-sheet"] }),
   scenario("components.pinout-open", { title: "Pinout Open", initialUi: { components: { surface: "pinout" } }, expectedTargets: ["component-browser.pinout-table"] }),
   scenario("components.delete-confirm", { title: "Delete Confirmation", initialUi: { components: { confirmDelete: true } } }),

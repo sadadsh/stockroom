@@ -33,6 +33,7 @@ import tempfile
 import threading
 import time
 from collections.abc import Callable, Iterator, Mapping
+from concurrent.futures import Future, ThreadPoolExecutor
 from contextlib import contextmanager
 from dataclasses import dataclass, field, replace
 from pathlib import Path, PurePosixPath
@@ -553,6 +554,64 @@ class _CopyOnWriteContext:
         return None
 
 
+class _DeferredCopyOnWriteOps:
+    def __init__(self, owner: _DeferredCopyOnWriteContext):
+        self._owner = owner
+
+    def load_record(self, part_id: str):
+        future = self._owner._future
+        context = future.result() if future.done() else self._owner._live
+        return context.ops.load_record(part_id)
+
+
+class _DeferredCopyOnWriteJobs:
+    def __init__(self, owner: _DeferredCopyOnWriteContext):
+        self._owner = owner
+
+    def run_write(self, operation):
+        run_write = getattr(self._owner._resolved().jobs, "run_write", None)
+        if not callable(run_write):
+            raise ProductionWorkflowError("isolated capture context has no write runner")
+        return run_write(operation)
+
+
+class _DeferredCopyOnWriteContext:
+    """Open the selected page while its isolated mutation context prepares in parallel."""
+
+    def __init__(
+        self,
+        live: ProductionApplicationContext,
+        future: Future[_CopyOnWriteContext],
+    ) -> None:
+        self._live = live
+        self._future = future
+        self.ops = _DeferredCopyOnWriteOps(self)
+        self.jobs = _DeferredCopyOnWriteJobs(self)
+        self.config = getattr(live, "config", SimpleNamespace())
+        self.provider_browser_surface = getattr(live, "provider_browser_surface", None)
+
+    def _resolved(self) -> _CopyOnWriteContext:
+        return self._future.result()
+
+    @property
+    def profile(self) -> Profile:
+        return self._resolved().profile
+
+    @property
+    def repo(self) -> GitRepo:
+        return self._resolved().repo
+
+    @property
+    def cli(self) -> KiCadCli:
+        return self._resolved().cli
+
+    def rebuild_index(self) -> None:
+        self._resolved().rebuild_index()
+
+    def auto_push(self) -> None:
+        self._resolved().auto_push()
+
+
 def _copy_if_present(source: Path, destination: Path) -> None:
     if not source.is_file() or source.is_symlink():
         return
@@ -785,22 +844,33 @@ class StockroomAcquisitionProviderAdapter:
                 prefix=".Acquisition-",
                 dir=self.staging_root,
             ) as temporary:
-                isolated = _seed_copy_on_write_context(
-                    self.context,
-                    identity,
-                    Path(temporary) / "Repository",
-                )
-                part_id = make_part_id(identity.mpn_canonical)
-                # One capture mode: the person works the provider page. ``request.mode`` is a
-                # legacy field kept on the durable item and no longer selects a lane.
-                report = run_guided_capture(
-                    isolated,
-                    part_ids=[part_id],
-                    vendor=request.vendor,
-                    should_stop=request.should_stop,
-                    capture_id=request.report_item_id,
-                    requested_requirements=request.requested_requirements,
-                )
+                with ThreadPoolExecutor(
+                    max_workers=1,
+                    thread_name_prefix="stockroom-capture-staging",
+                ) as staging:
+                    isolated_future = staging.submit(
+                        _seed_copy_on_write_context,
+                        self.context,
+                        identity,
+                        Path(temporary) / "Repository",
+                    )
+                    prompt_context = _DeferredCopyOnWriteContext(
+                        self.context,
+                        isolated_future,
+                    )
+                    part_id = make_part_id(identity.mpn_canonical)
+                    # Navigation starts against read-only live identity while the isolated mutation
+                    # context prepares. The first file inspection waits for that context, so no
+                    # downloaded byte can mutate the live library.
+                    report = run_guided_capture(
+                        prompt_context,
+                        part_ids=[part_id],
+                        vendor=request.vendor,
+                        should_stop=request.should_stop,
+                        capture_id=request.report_item_id,
+                        requested_requirements=request.requested_requirements,
+                    )
+                    isolated = isolated_future.result()
                 if request.report_item_id is not None:
                     canonical_record = self.context.ops.load_record(part_id)
                     write_durable_capture_report(
@@ -908,15 +978,17 @@ class StockroomAcquisitionProviderAdapter:
         with self._lock:
             try:
                 request = self._capture_options(identity)
-                bundle = self._selection(identity)
-                # The normal one-click path is genuinely evidence-first: once one retained,
-                # exact-identity, same-download KiCad/Altium/STEP bundle passes native
-                # cross-verification, opening provider pages cannot improve completion and only
-                # makes the user repeat work. The explicitly exhaustive mode is the sole reason
-                # to keep collecting after a complete bundle already exists.
-                if bundle is None or request.mode == "collect-all":
+                # Explicit provider navigation must not wait for an evidence-store scan. Capture
+                # first, then evaluate the resulting retained selection. Evidence-first remains
+                # correct for non-interactive completion.
+                if request.mode == "collect-all":
                     self._acquire(identity, request)
                     bundle = self._selection(identity)
+                else:
+                    bundle = self._selection(identity)
+                    if bundle is None:
+                        self._acquire(identity, request)
+                        bundle = self._selection(identity)
                 if bundle is None:
                     return AdapterOutcome.failure(FailureClassification.NOT_FOUND_EXACT)
                 digest = self._provider_manifest(identity, operation, bundle)

@@ -57,6 +57,7 @@ export function SpecificationsColumn({
         onQualitySegment: noop,
         onOpenDatasheet: noop,
         onFindDatasheet: noop,
+        onManageAssets: noop,
       },
       cad: {
         view: "models",

@@ -19,7 +19,7 @@ import {
 } from "react";
 import { readUiSession, updateUiSession } from "./uiSession";
 
-export const PRODUCTION_ROUTES = ["components", "projects", "stm", "settings"] as const;
+export const PRODUCTION_ROUTES = ["components", "assets", "projects", "stm", "settings"] as const;
 export type Route = (typeof PRODUCTION_ROUTES)[number];
 
 interface RouterValue {
@@ -120,6 +120,10 @@ export function RouterProvider({
     [navigate, route],
   );
   return <RouterContext.Provider value={value}>{children}</RouterContext.Provider>;
+}
+
+export function useOptionalRouter(): RouterValue | null {
+  return useContext(RouterContext);
 }
 
 export function useRouter(): RouterValue {

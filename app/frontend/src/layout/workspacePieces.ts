@@ -182,7 +182,7 @@ export const WORKSPACE_PIECES: readonly PieceManifest[] = [
       "component-browser.edit-classification",
       "component-browser.review-missing",
       "component-browser.refresh",
-      "component-browser.manage-models",
+      "component-browser.header-manage-assets",
       "component-browser.view-provenance",
       "component-browser.export",
       "component-browser.open-in",
@@ -196,17 +196,13 @@ export const WORKSPACE_PIECES: readonly PieceManifest[] = [
 
   /* ------------------------------------------------------------- cad column */
 
-  // WorkspaceColumns.tsx `WorkspaceColumn` header: name, view tabs, and attached count.
+  // WorkspaceColumns.tsx `WorkspaceColumn` header: name and attached count.
   {
     id: "workspace.cad-title-strip",
     nameCopyId: "component-browser.column-cad",
-    devIds: [
-      "component-browser.column-cad",
-      "component-browser.cad-tab-models",
-      "component-browser.cad-tab-manage-models",
-    ],
+    devIds: ["component-browser.column-cad"],
     dataNeeds: ["dossier.cadAssets.kinds"],
-    actions: ["component-browser.manage-models"],
+    actions: [],
     preferredHeight: 24,
     scroll: { owns: false },
     home: { regionId: WORKSPACE_REGION.cadColumn, siblingGroup: GROUP.columnChrome },

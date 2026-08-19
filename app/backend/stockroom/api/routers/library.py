@@ -369,7 +369,13 @@ def _capture_command(
 
     from stockroom.capture.requirements import requirements_for_edas
 
-    raw_edas = payload.get("edas", ["kicad", "altium"])
+    configured_primary = str(
+        getattr(request.app.state.ctx.config, "primary_eda", "") or ""
+    ).strip()
+    raw_edas = payload.get(
+        "edas",
+        [configured_primary if configured_primary in {"kicad", "altium"} else "kicad"],
+    )
     if type(raw_edas) is not list:
         raise ValueError("edas must be a non-empty list of registered EDA keys")
     edas = tuple(raw_edas)
@@ -1842,7 +1848,7 @@ def library_router(require_token) -> APIRouter:
         if not is_valid_part_id(part_id):
             raise ValueError(f"invalid part identifier: {part_id!r}")
         payload = {} if body is None else body
-        expected = {"action", "workflow_item_id"}
+        expected = {"action", "workflow_item_id", "route_token"}
         unexpected = sorted(str(key) for key in payload if key not in expected)
         if unexpected:
             raise ValueError("unknown capture intent fields: " + ", ".join(unexpected))
@@ -1855,14 +1861,68 @@ def library_router(require_token) -> APIRouter:
             or _OPAQUE_WORKFLOW_REFERENCE.fullmatch(workflow_item_id) is None
         ):
             raise ValueError("workflow_item_id must name the exact running capture")
+        route_token = payload.get("route_token")
+        if action == "finish-route" and (
+            type(route_token) is not str
+            or not route_token
+            or len(route_token) > 128
+            or any(ord(character) < 33 or ord(character) > 126 for character in route_token)
+        ):
+            raise ValueError("route_token must name the exact active provider route")
+        if action == "skip-part" and route_token is not None:
+            raise ValueError("skip-part does not accept a route_token")
         try:
-            signal_person_capture(part_id, action, capture_id=workflow_item_id)
+            signal_person_capture(
+                part_id,
+                action,
+                capture_id=workflow_item_id,
+                route_token=route_token,
+            )
         except PersonCaptureIntentError as exc:
             raise ApiError(409, str(exc)) from exc
         return {
             "part_id": part_id,
             "workflow_item_id": workflow_item_id,
             "action": action,
+            "accepted": True,
+        }
+
+    @r.post("/capture/parts/{part_id}/attachments/apply")
+    def apply_capture_attachments(part_id: str, body: dict | None = None) -> dict:
+        """Confirm one exact validated mapping proposal; this is the mutation boundary."""
+
+        from stockroom.capture.intent import (
+            PersonCaptureIntentError,
+            apply_person_capture_attachments,
+        )
+
+        if not is_valid_part_id(part_id):
+            raise ValueError(f"invalid part identifier: {part_id!r}")
+        payload = {} if body is None else body
+        if set(payload) != {"workflow_item_id", "proposal_token"}:
+            raise ValueError("attachment apply fields are invalid")
+        workflow_item_id = payload.get("workflow_item_id")
+        proposal_token = payload.get("proposal_token")
+        if (
+            type(workflow_item_id) is not str
+            or _OPAQUE_WORKFLOW_REFERENCE.fullmatch(workflow_item_id) is None
+            or type(proposal_token) is not str
+            or not proposal_token
+            or len(proposal_token) > 128
+        ):
+            raise ValueError("attachment apply identity is invalid")
+        try:
+            apply_person_capture_attachments(
+                workflow_item_id,
+                part_id=part_id,
+                proposal_token=proposal_token,
+            )
+        except PersonCaptureIntentError as exc:
+            raise ApiError(409, str(exc)) from exc
+        return {
+            "part_id": part_id,
+            "workflow_item_id": workflow_item_id,
+            "proposal_token": proposal_token,
             "accepted": True,
         }
 
@@ -2001,7 +2061,10 @@ def library_router(require_token) -> APIRouter:
         """
 
         from stockroom.capture.handoff import handoff_guidance
-        from stockroom.capture.intent import active_person_capture
+        from stockroom.capture.intent import (
+            active_attachment_proposal,
+            active_person_capture,
+        )
         from stockroom.capture.runner import read_durable_capture_report
 
         if _OPAQUE_WORKFLOW_REFERENCE.fullmatch(batch_id) is None:
@@ -2038,6 +2101,10 @@ def library_router(require_token) -> APIRouter:
                 part_id=projection["part_id"],
             ),
             "handoff": handoff,
+            "attachment_proposal": active_attachment_proposal(
+                item.id,
+                part_id=projection["part_id"],
+            ),
             "report": report,
         }
 

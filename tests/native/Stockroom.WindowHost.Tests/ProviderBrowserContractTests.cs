@@ -130,6 +130,44 @@ public sealed class ProviderBrowserContractTests
     }
 
     [Fact]
+    public void ProviderFanOutAllowsOnlyTaskBoundMultipleDownloads()
+    {
+        var source = File.ReadAllText(
+            Path.Combine(
+                FindProjectDirectory(),
+                "WebViewWindowHost.cs")).Replace("\r\n", "\n", StringComparison.Ordinal);
+        var handlerStart = source.IndexOf(
+            "private void OnProviderPermissionRequested(",
+            StringComparison.Ordinal);
+        var handlerEnd = source.IndexOf(
+            "private void OnProviderProcessFailed(",
+            handlerStart,
+            StringComparison.Ordinal);
+        var handler = source[handlerStart..handlerEnd];
+
+        Assert.Contains(
+            "eventArguments.PermissionKind\n                == CoreWebView2PermissionKind.MultipleAutomaticDownloads",
+            handler,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "_providerLeases.TryGetActive(out _)",
+            handler,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "eventArguments.State = CoreWebView2PermissionState.Allow;",
+            handler,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "eventArguments.SavesInProfile = false;",
+            handler,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "eventArguments.State = CoreWebView2PermissionState.Deny;",
+            handler,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ProductionSourceStagesEveryProviderDownloadAndNeverFallsBackToDownloads()
     {
         var source = File.ReadAllText(
@@ -169,6 +207,26 @@ public sealed class ProviderBrowserContractTests
             "SpecialFolder",
             source,
             StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void BoundedCancellationRecordsTerminalInterruptionBeforeNativeCancel()
+    {
+        var source = File.ReadAllText(
+            Path.Combine(FindProjectDirectory(), "WebViewWindowHost.cs"));
+        var methodStart = source.IndexOf(
+            "private int CancelProviderDownloadsCore",
+            StringComparison.Ordinal);
+        var methodEnd = source.IndexOf(
+            "internal IReadOnlyList<ProviderDownloadEvent>",
+            methodStart,
+            StringComparison.Ordinal);
+        var method = source[methodStart..methodEnd];
+
+        var terminal = method.IndexOf("\"terminal\"", StringComparison.Ordinal);
+        var reason = method.IndexOf("\"CancelledByStockroom\"", StringComparison.Ordinal);
+        var cancel = method.IndexOf("operation.Cancel()", StringComparison.Ordinal);
+        Assert.True(terminal >= 0 && reason > terminal && cancel > reason);
     }
 
     private static string FindProjectDirectory()

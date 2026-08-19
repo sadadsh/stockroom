@@ -21,6 +21,7 @@ export const DEV_IDS: DevIdEntry[] = [
   { id: "rail.wordmark", label: "Wordmark tile", area: "rail" },
   { id: "rail.nav", label: "Primary nav group", area: "rail" },
   { id: "rail.nav-components", label: "Components nav item", area: "rail" },
+  { id: "rail.nav-assets", label: "Assets nav item", area: "rail" },
   { id: "rail.nav-projects", label: "Projects nav item", area: "rail" },
   { id: "rail.nav-stm", label: "STM Viewer nav item", area: "rail" },
   { id: "rail.footer", label: "Rail footer", area: "rail" },
@@ -40,17 +41,22 @@ export const DEV_IDS: DevIdEntry[] = [
   { id: "about.credit", label: "About credit line", area: "about" },
   { id: "about.stale", label: "About stale-frontend note", area: "about" },
   { id: "about.links", label: "About social links", area: "about" },
+  { id: "assets.root", label: "Assets workspace", area: "assets" },
+  { id: "assets.title", label: "Assets title", area: "assets" },
+  { id: "assets.add-parts", label: "Assets Add Parts action", area: "assets" },
   { id: "components.root", label: "Components page", area: "components" },
   { id: "components.picker", label: "Parts picker column", area: "components" },
   { id: "components.list-title", label: "Parts list title strip", area: "components" },
-  { id: "components.add-parts", label: "Add Parts button", area: "components" },
+  { id: "components.toolbar-add", label: "Toolbar Add Parts button", area: "components" },
   { id: "components.list-scroll", label: "Parts list scroll area", area: "components" },
   { id: "components.detail-pane", label: "Detail viewport column", area: "components" },
   { id: "components.empty", label: "Empty library state", area: "components" },
+  { id: "components.empty-add", label: "Empty library Add Parts button", area: "components" },
   { id: "components.list-loading", label: "Parts list loading state", area: "components" },
   { id: "components.list-failed", label: "Parts list failure state", area: "components" },
   { id: "components.list-unreachable", label: "Parts service unavailable state", area: "components" },
   { id: "stm.tabs", label: "STM sections", area: "stm" },
+  { id: "stm.focused", label: "Focused MCU workspace", area: "stm" },
   { id: "stm.tab-explorer", label: "STM explorer tab", area: "stm" },
   { id: "stm.tab-compatibility", label: "STM compatibility tab", area: "stm" },
   { id: "components.list-no-match", label: "Parts list no-match state", area: "components" },
@@ -127,6 +133,7 @@ export const DEV_IDS: DevIdEntry[] = [
   { id: "component-browser.header-key-facts", label: "Key facts line", area: "component-browser" },
   { id: "component-browser.header-actions", label: "Identity action group", area: "component-browser" },
   { id: "component-browser.header-manufacturer-page", label: "Manufacturer Page action", area: "component-browser" },
+  { id: "component-browser.header-manage-assets", label: "Manage CAD Assets handoff", area: "component-browser" },
   { id: "component-browser.datasheet-missing", label: "Datasheet Missing state", area: "component-browser" },
   { id: "component-browser.datasheet-find", label: "Find Datasheet action", area: "component-browser" },
   { id: "component-browser.datasheet-more", label: "Datasheet split-button menu trigger", area: "component-browser" },
@@ -184,6 +191,7 @@ export const DEV_IDS: DevIdEntry[] = [
   { id: "component-browser.lifecycle-details", label: "Secondary availability facts", area: "component-browser" },
   { id: "component-browser.manufacturer-status", label: "The manufacturer's own product status", area: "component-browser" },
   { id: "component-browser.offers", label: "Distributor offers region", area: "component-browser" },
+  { id: "component-browser.all-price-breaks", label: "All price breaks disclosure", area: "component-browser" },
   { id: "component-browser.offers-table", label: "The complete distributor offers ledger", area: "component-browser" },
   { id: "component-browser.total-stock", label: "Total stock across every offer", area: "component-browser" },
   { id: "component-browser.offer-failures", label: "Sources that could not be refreshed", area: "component-browser" },
@@ -310,14 +318,11 @@ export const DEV_IDS: DevIdEntry[] = [
   { id: "component-browser.diagnostics-raw", label: "Show or hide the canonical record", area: "component-browser" },
   // Manage Models: one component-scoped provider list, modal browser, and status strip.
   { id: "component-browser.manage-models", label: "Manage Models workspace", area: "component-browser" },
-  { id: "component-browser.cad-tab-models", label: "Models tab", area: "component-browser" },
-  { id: "component-browser.cad-tab-manage-models", label: "Manage Models tab", area: "component-browser" },
   { id: "component-browser.provider-list", label: "CAD provider list", area: "component-browser" },
   // The SHARED role every provider row declares (`data-dev-role`). Each row also carries its own
   // per-provider instance id, so one row can be tuned without touching the others; this row is what
   // an edit meant for ALL of them is keyed on.
   { id: "component-browser.provider-row", label: "Every provider coverage row", area: "component-browser" },
-  { id: "component-browser.provider-open", label: "Open one provider", area: "component-browser" },
   { id: "component-browser.provider-import", label: "Import downloaded files", area: "component-browser" },
   { id: "component-browser.eda-selection", label: "EDA selection", area: "component-browser" },
   { id: "component-browser.provider-back", label: "Provider browser Back", area: "component-browser" },
@@ -580,7 +585,7 @@ export const DEV_IDS: DevIdEntry[] = [
 ];
 
 // The areas in first-appearance order, for grouping the catalogue.
-export const DEV_ID_AREAS: readonly string[] = ["rail", "about", "onboarding", "toast", "capture", "components", "stm", "projects", "component-browser", "detail", "search", "addpart", "ingest", "settings", "altiumdb", "complete", "preview", "diff", "confirm", "shell", "design"];
+export const DEV_ID_AREAS: readonly string[] = ["rail", "about", "onboarding", "toast", "capture", "assets", "components", "stm", "projects", "component-browser", "detail", "search", "addpart", "ingest", "settings", "altiumdb", "complete", "preview", "diff", "confirm", "shell", "design"];
 
 // A by-id lookup so consumers resolve an entry in one call instead of re-scanning the list.
 export const DEV_ID_BY_ID: ReadonlyMap<string, DevIdEntry> = new Map(

@@ -24,7 +24,7 @@ export const stmScenarios: readonly DesignScenario[] = [
   scenario("stm.explorer-empty", "Explorer Empty", { mcus: { mcus: [], count: 0, facets: { family: {}, core: {}, package: {}, series: {} } } }),
   scenario("stm.explorer-matrix", "Explorer Matrix"),
   scenario("stm.explorer-selected-mcu", "Selected MCU", {}, { stm: { activePart: "STM32F407V(E-G)Tx" } }),
-  scenario("stm.explorer-selected-package", "Selected Package", {}, { stm: { activePart: "STM32F407V(E-G)Tx", pinoutView: "map", explorerScope: { families: ["STM32F4"] } } }),
+  scenario("stm.explorer-selected-package", "Selected Package", {}, { stm: { activePart: "STM32F407V(E-G)Tx", pinoutView: "table", selectedPosition: "24", explorerScope: { families: ["STM32F4"] } } }),
   scenario("stm.explorer-selected-pin", "Selected Pin", {}, { stm: { activePart: "STM32F407V(E-G)Tx", selectedPosition: "24" } }),
   scenario("stm.explorer-pinout", "Pinout", {}, { stm: { activePart: "STM32F407V(E-G)Tx", pinoutView: "table" } }),
   scenario("stm.explorer-af-options", "Alternate Functions", {}, { stm: { activePart: "STM32F407V(E-G)Tx", selectedPosition: "23" } }),

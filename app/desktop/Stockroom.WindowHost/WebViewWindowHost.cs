@@ -43,6 +43,11 @@ internal sealed class WebViewWindowHost : IDisposable
     private readonly Grid _providerSurface;
     private readonly Grid _providerContent;
     private readonly Dictionary<WebView2, ProviderLeaseIdentity> _providerPopups = [];
+    private readonly Dictionary<
+        CoreWebView2DownloadOperation,
+        (ProviderLeaseIdentity Lease, string OperationId, string SuggestedFileName)>
+        _providerDownloads = [];
+    private readonly HashSet<CoreWebView2DownloadOperation> _providerCancellationRecorded = [];
     private readonly ProviderLeaseJournal _providerLeases = new();
     private readonly WindowsShellSurface _shell = new();
     private readonly TaskCompletionSource<bool> _navigationCompletion =
@@ -340,25 +345,78 @@ internal sealed class WebViewWindowHost : IDisposable
             {
                 ThrowIfNotReady();
                 var lease = new ProviderLeaseIdentity(leaseId, generation);
+                _ = CancelProviderDownloadsCore(lease);
                 if (!_providerLeases.Release(lease))
                 {
                     return false;
                 }
-                foreach (var popup in _providerPopups
-                    .Where(item => item.Value == lease)
-                    .Select(static item => item.Key)
-                    .ToArray())
-                {
-                    RemoveProviderPopup(popup);
-                }
-                // The page is closed, so its tab is gone and the Stockroom tab is what is
-                // left selected. The strip itself stays exactly where it was.
-                _tabStrip.RemoveProviderTab();
-                _providerSurface.Visibility = Visibility.Collapsed;
-                _webView.Visibility = Visibility.Visible;
+                // A provider CoreWebView2 belongs to exactly one author-route generation.
+                // Dispose it before acknowledging release; the persistent profile keeps sign-in,
+                // while no old page or popup can start bytes under the next lease.
+                ResetProviderBrowser();
                 _webView.Focus();
                 return true;
             });
+    }
+
+    internal int CancelProviderDownloads(string leaseId, long generation)
+    {
+        return InvokeOnDispatcher(
+            () =>
+            {
+                ThrowIfNotReady();
+                var lease = _providerLeases.RequireActive(
+                    new ProviderLeaseIdentity(leaseId, generation));
+                return CancelProviderDownloadsCore(lease);
+            });
+    }
+
+    private int CancelProviderDownloadsCore(ProviderLeaseIdentity lease)
+    {
+        if (!_providerLeases.TryGetActive(out var active, out var context) || active != lease)
+        {
+            return 0;
+        }
+        var cancelled = 0;
+        foreach (var item in _providerDownloads
+            .Where(item => item.Value.Lease == lease)
+            .ToArray())
+        {
+            var operation = item.Key;
+            var owner = item.Value;
+            _providerCancellationRecorded.Add(operation);
+            _providerDownloads.Remove(operation);
+            RecordProviderDownload(
+                lease,
+                context,
+                owner.OperationId,
+                "progress",
+                operation,
+                owner.SuggestedFileName);
+            _providerLeases.Record(
+                lease,
+                context,
+                owner.OperationId,
+                "terminal",
+                "interrupted",
+                operation.Uri ?? string.Empty,
+                owner.SuggestedFileName,
+                operation.ResultFilePath ?? string.Empty,
+                operation.MimeType ?? string.Empty,
+                "CancelledByStockroom",
+                ProviderDownloadTotalBytes(operation),
+                checked((long)operation.BytesReceived));
+            cancelled += 1;
+            try
+            {
+                operation.Cancel();
+            }
+            catch (InvalidOperationException)
+            {
+                // The durable interruption already records the bounded cancellation decision.
+            }
+        }
+        return cancelled;
     }
 
     internal IReadOnlyList<ProviderDownloadEvent> ProviderDownloadEvents(
@@ -456,7 +514,7 @@ internal sealed class WebViewWindowHost : IDisposable
                 _providerLeases.RequireActive(
                     new ProviderLeaseIdentity(leaseId, generation));
                 await EnsureProviderBrowserReadyAsync().ConfigureAwait(true);
-                return _providerWebView?.Source?.AbsoluteUri ?? string.Empty;
+                return ActiveProviderWebView()?.Source?.AbsoluteUri ?? string.Empty;
             });
     }
 
@@ -509,6 +567,10 @@ internal sealed class WebViewWindowHost : IDisposable
                             ?? string.Empty,
                         ["loading"] = _providerLoading,
                         ["navigation_error"] = _providerNavigationError,
+                        ["can_go_back"] = ActiveProviderWebView()?.CoreWebView2?.CanGoBack
+                            ?? false,
+                        ["can_go_forward"] = ActiveProviderWebView()?.CoreWebView2?.CanGoForward
+                            ?? false,
                     };
             });
     }
@@ -1262,6 +1324,7 @@ internal sealed class WebViewWindowHost : IDisposable
             "started",
             operation,
             suggestedFileName);
+        _providerDownloads[operation] = (lease, operationId, suggestedFileName);
 
         var throttle = new ProviderDownloadProgressThrottle(Environment.TickCount64);
         var terminalRecorded = false;
@@ -1297,7 +1360,15 @@ internal sealed class WebViewWindowHost : IDisposable
             {
                 return;
             }
+            if (_providerCancellationRecorded.Remove(operation))
+            {
+                terminalRecorded = true;
+                operation.StateChanged -= stateChanged;
+                operation.BytesReceivedChanged -= bytesReceivedChanged;
+                return;
+            }
             terminalRecorded = true;
+            _providerDownloads.Remove(operation);
             operation.StateChanged -= stateChanged;
             operation.BytesReceivedChanged -= bytesReceivedChanged;
             // One last progress entry regardless of the throttle, so a reader always sees the
@@ -1414,10 +1485,23 @@ internal sealed class WebViewWindowHost : IDisposable
             _ => "unknown",
         };
 
-    private static void OnProviderPermissionRequested(
+    private void OnProviderPermissionRequested(
         object? sender,
         CoreWebView2PermissionRequestedEventArgs eventArguments)
     {
+        _ = sender;
+        // One explicit provider export commonly fans out into symbol, footprint, model, and
+        // metadata downloads. Allow that one permission only while an exact task-bound lease owns
+        // the journal and private staging root. Every other provider permission remains denied.
+        if (eventArguments.PermissionKind
+                == CoreWebView2PermissionKind.MultipleAutomaticDownloads
+            && _providerLeases.TryGetActive(out _))
+        {
+            eventArguments.State = CoreWebView2PermissionState.Allow;
+            eventArguments.SavesInProfile = false;
+            return;
+        }
+
         eventArguments.State = CoreWebView2PermissionState.Deny;
         eventArguments.SavesInProfile = false;
     }
@@ -1439,6 +1523,7 @@ internal sealed class WebViewWindowHost : IDisposable
         {
             return;
         }
+        _providerNavigationError = "Provider Browser Process Failed";
         _window.Dispatcher.BeginInvoke(ResetProviderBrowser);
     }
 
@@ -1451,11 +1536,13 @@ internal sealed class WebViewWindowHost : IDisposable
         {
             return;
         }
+        _providerNavigationError = "Provider Browser Process Exited";
         _window.Dispatcher.BeginInvoke(ResetProviderBrowser);
     }
 
     private void ResetProviderBrowser()
     {
+        _providerDownloads.Clear();
         _tabStrip.RemoveProviderTab();
         _providerSurface.Visibility = Visibility.Collapsed;
         _webView.Visibility = Visibility.Visible;

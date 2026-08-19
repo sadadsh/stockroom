@@ -26,6 +26,7 @@
  */
 import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { Text } from "../../lib/copy";
+import { Icon } from "../Icon";
 
 /** One switch in the panel: a real property of the file, named, with its state and its reason. */
 export interface AssetOption {
@@ -192,21 +193,7 @@ function OptionRow({ option }: { option: AssetOption }) {
 
 /** An eye: what is drawn and what is not. Inline, at the 14px this strip is drawn at. */
 function VisibilityGlyph() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      aria-hidden
-      className="h-3.5 w-3.5"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z" />
-      <circle cx="12" cy="12" r="3" />
-    </svg>
-  );
+  return <Icon id="action.view" className="h-3.5 w-3.5" />;
 }
 
 /**
@@ -244,20 +231,7 @@ export function MeasureButton({
         (pressed ? "bg-selected text-t1" : "text-t3")
       }
     >
-      {/* A ruler, laid diagonally with its graduations, so it reads at 14px. */}
-      <svg
-        viewBox="0 0 24 24"
-        aria-hidden
-        className="h-3.5 w-3.5"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <path d="M3 15l12-12 6 6-12 12z" />
-        <path d="M7 11l2 2M11 7l2 2M9 17l2-2" />
-      </svg>
+      <Icon id="action.measure" className="h-3.5 w-3.5" />
     </button>
   );
 }
@@ -277,16 +251,7 @@ export function MaximizeButton({ label, onClick }: { label: string; onClick: () 
         "focus-visible:outline-offset-1 focus-visible:outline-focus"
       }
     >
-      <svg
-        viewBox="0 0 16 16"
-        aria-hidden
-        className="h-3.5 w-3.5"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.4"
-      >
-        <path d="M6 2H2v4M10 14h4v-4M14 6V2h-4M2 10v4h4" />
-      </svg>
+      <Icon id="action.maximize" className="h-3.5 w-3.5" />
     </button>
   );
 }

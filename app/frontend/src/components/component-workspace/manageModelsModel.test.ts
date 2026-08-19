@@ -11,6 +11,7 @@ function row(id: string, complete: boolean, order: number): ProviderCoverageRow 
     urlKind: "evidence",
     instruction: "",
     needsLogin: false,
+    captureAvailable: true,
     aggregator: false,
     distributor: false,
     statusCounts: { unknown: 0, available: complete ? 3 : 2, not_available: complete ? 0 : 1, downloaded: 0, validated: 0 },
@@ -24,7 +25,7 @@ function row(id: string, complete: boolean, order: number): ProviderCoverageRow 
 }
 
 describe("Manage Models provider policy", () => {
-  it("keeps all providers while stably putting complete sets first", () => {
+  it("keeps all providers in stable provider order", () => {
     const providers = orderedManageModelsProviders({
       artifacts: ["symbol", "footprint", "model"],
       statuses: ["unknown", "available", "not_available", "downloaded", "validated"],
@@ -34,9 +35,9 @@ describe("Manage Models provider policy", () => {
     });
 
     expect(providers.map((provider) => provider.row.id)).toEqual([
+      "partial-a",
       "complete-b",
       "complete-c",
-      "partial-a",
       "partial-d",
     ]);
     expect(bestCompleteProvider(providers)?.row.id).toBe("complete-b");

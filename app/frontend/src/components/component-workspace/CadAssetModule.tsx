@@ -73,7 +73,7 @@ function assetArt(kind: RepresentationKind) {
  * three asset-art ids globally. Attached files that are loading or unreadable keep their own art;
  * a question mark means only that no file exists.
  */
-function MissingAssetArt({ kind }: { kind: RepresentationKind }) {
+function MissingAssetArt({ kind: _kind }: { kind: RepresentationKind }) {
   return (
     <span
       data-dev-id="component-browser.asset-missing-art"
@@ -82,9 +82,7 @@ function MissingAssetArt({ kind }: { kind: RepresentationKind }) {
     >
       <Icon
         id="status.cad-missing"
-        className={
-          "opacity-40 " + (kind === "model" ? "h-10 w-10" : "h-[55px] w-[55px]")
-        }
+        className="h-14 w-14 opacity-40"
       />
     </span>
   );

@@ -217,8 +217,10 @@ Refactor Add Component into a repeatable intake workspace:
 
 A new component may show **CAD Needed** in Components. It must not interrupt intake. Add **Assets**
 to the main rail. It lists all components with Missing required CAD Assets or absent/outdated primary
-EDA Catalog Projection records. Provide **Needs Assets** and **Build Now** as the only primary views,
-with built history available secondarily. Symbol and Footprint remain required; only 3D Model offers
+EDA Catalog Projection records. The Assets landing page starts with one large full-width **Add
+Parts** action; the retired **Import A List** island does not appear in Add Parts. Provide **Needs
+Assets** and **Build Now** as the only primary views, with built history available secondarily.
+Symbol and Footprint remain required; only 3D Model offers
 **Not Available**. Provide **Build Selected** and **Build All Ready**, safe machine batches,
 person-driven focused Provider Visits, and Catalog Build actions. Completing or skipping a Provider
 Visit returns to the same list position.
@@ -235,7 +237,27 @@ Add an acceptance test that adds 25 active components and proves:
 
 Change guided capture defaults from both tools to `PrimaryEdaPolicy.requirements()`. Guided capture
 remains person-started. Missing assets join Assets; it never opens a Provider Visit or CAD tool on
-its own.
+its own. Clicking a supported provider row is the person's start action: show browser chrome
+immediately and begin that exact task-bound Provider Visit without a separate **Open Provider**
+button. One row means one chosen provider visit: it never advances through that provider's hidden
+author or fallback ladder, even when no file lands. A Provider Visit settles automatically after
+its required downloads land; switching rows cancels the whole old provider workflow durably before
+opening the newly selected provider, with no manual **Done With Provider** or **Skip This Part**
+controls. A direct provider choice may use that provider's measured MPN search when no exact DigiKey
+media route exists; attachment validation still binds every accepted file to the exact component.
+Unsupported sources retain **Open Listing** because they cannot safely own captured bytes.
+Copy-on-write preparation and retained-evidence checks run behind navigation rather than
+delaying it. The provider surface has one live guide strip: before navigation it asks for a provider;
+when ready it names the exact files to download; during intake it shows the filename and progress;
+after intake it reports files found, verification, interruption, or attachment readiness. Browser
+chrome stays compact and read-only—Back, Forward, Reload, truthful current address, and Hide—with
+no duplicate instruction block or persistent recovery action during an active visit. Provider
+choices are compact names only; per-provider Complete Set and Symbol/Footprint/3D summaries are not
+part of this action strip. Repeated unchanged viewport reports are deduplicated before native HWND
+placement so workflow polling cannot flash the embedded browser. A confirmed Altium-only attachment
+updates the component's canonical Altium asset references and immutable evidence immediately; it does
+not embed or publish those assets into the CAD tool catalog. That remains a separate Assets Catalog
+Build.
 
 Track Catalog Build generations without starting work after Add. Each canonical component change
 increments the desired projection generation. Assets' **Build Now** updates only the selected

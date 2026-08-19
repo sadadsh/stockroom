@@ -3097,13 +3097,77 @@ export interface CaptureBatchWorklist {
   unreadable: string[];
 }
 
+export interface CaptureBrowserState {
+  url: string;
+  loading: boolean;
+  navigation_error: string;
+  can_go_back: boolean;
+  can_go_forward: boolean;
+}
+
+export interface CaptureDownloadProgressFile {
+  name: string;
+  state: "in_progress" | "completed" | "interrupted" | "unknown";
+  bytes_received: number;
+  total_bytes: number;
+}
+
+export interface CaptureDownloadProgress {
+  active: number;
+  completed: number;
+  bytes_received: number;
+  total_bytes: number;
+  files: CaptureDownloadProgressFile[];
+}
+
+export interface CaptureHandoffRoute {
+  route: string;
+  label: string;
+  author_route: string;
+  instruction: string;
+  required_files: string[];
+}
+
+export interface CaptureHandoff {
+  provider: string;
+  provider_label: string;
+  instruction: string;
+  manufacturer: string;
+  mpn: string;
+  routes: CaptureHandoffRoute[];
+}
+
+export interface CaptureAttachmentProposalItem {
+  role: string;
+  file_name: string;
+  target: string;
+}
+
+export interface CaptureAttachmentProposal {
+  proposal_token: string;
+  part_id: string;
+  provider: string;
+  primary_tool: "kicad" | "altium" | "both";
+  attachments: CaptureAttachmentProposalItem[];
+  inactive_evidence: Array<{ tool: "kicad" | "altium"; file_name: string }>;
+}
+
 export interface CaptureWorkflowSession {
   workflow_batch_id: string;
   workflow_item_id: string;
   part_id: string;
   vendor: string | null;
   background: boolean;
-  active_route?: { vendor: string; detail_url: string; route_token: string } | null;
+  active_route?: {
+    vendor: string;
+    detail_url: string;
+    evidence_provider_key?: string;
+    route_token: string;
+    download_progress?: CaptureDownloadProgress | null;
+    browser_state?: CaptureBrowserState | null;
+  } | null;
+  handoff?: CaptureHandoff | null;
+  attachment_proposal?: CaptureAttachmentProposal | null;
   initial_needs: Requirement[];
   report: CompletionResult | null;
 }

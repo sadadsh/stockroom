@@ -12,6 +12,7 @@ import {
   type ReactNode,
 } from "react";
 import * as m from "motion/react-m";
+import { Icon } from "../components/Icon";
 import { Dot } from "../components/primitives";
 import { useCopyFormatter } from "./copy";
 
@@ -111,7 +112,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               }}
               className="ml-0.5 rounded-control px-1 text-t3 transition-colors hover:bg-raise hover:text-t1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
             >
-              ×
+              <Icon id="action.close" className="h-3.5 w-3.5" />
             </button>
           </m.div>
         ))}

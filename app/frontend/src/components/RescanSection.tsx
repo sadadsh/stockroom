@@ -20,6 +20,7 @@ import { lastChecked } from "./rescanState";
 import { useToast } from "../lib/toast";
 import { Text, useText } from "../lib/copy";
 import { Badge, Button, Dot } from "./primitives";
+import { Icon } from "./Icon";
 import { RefreshIcon } from "./icons";
 
 // ISO 8601 -> a compact local date/time; fall back to the raw string if it does not parse
@@ -114,7 +115,7 @@ export function RescanSection() {
                 (force ? "border-acc bg-acc text-acc-on" : "border-line2 text-transparent")
               }
             >
-              {"✓"}
+              <Icon id="modal.check" className="h-3 w-3" />
             </span>
             <input
               type="checkbox"

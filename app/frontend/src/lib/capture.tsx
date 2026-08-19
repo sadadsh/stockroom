@@ -302,6 +302,9 @@ export interface CaptureApi {
   reset: () => void;
   keepWorking: () => void;
   showProvider: () => Promise<void>;
+  finishProvider: () => Promise<void>;
+  skipProvider: () => Promise<void>;
+  applyAttachments: () => Promise<void>;
   closeProvider: () => Promise<void>;
   /**
    * Register the surface that owns opening a part, and get its unsubscribe back.
@@ -549,11 +552,22 @@ export function CaptureProvider({
               : page.batch.status === "blocked"
                 ? "window-open"
                 : "receiving",
-            message: durableMessage(page.batch, page.events, vendor),
+            message: liveSession.active_route?.route_token
+              ? liveSession.active_route.browser_state?.loading
+                ? "Provider loading..."
+                : "Provider ready"
+              : durableMessage(page.batch, page.events, vendor),
             needs: durableNeeds,
             vendor: liveSession.active_route?.vendor ?? current.vendor,
-            url: liveSession.active_route?.detail_url ?? null,
+            url: liveSession.active_route?.browser_state?.url
+              ?? liveSession.active_route?.detail_url
+              ?? null,
+            authorRoute: liveSession.active_route?.evidence_provider_key ?? null,
             routeToken: liveSession.active_route?.route_token ?? null,
+            handoff: liveSession.handoff ?? null,
+            downloadProgress: liveSession.active_route?.download_progress ?? null,
+            browserState: liveSession.active_route?.browser_state ?? null,
+            attachmentProposal: liveSession.attachment_proposal ?? null,
           }));
 
           if (page.cursor.has_more) continue;
@@ -736,8 +750,7 @@ export function CaptureProvider({
         needs,
         vendor: sourceKey ?? "All Sources",
         status: "resolving",
-        message:
-          "Checking saved evidence and exact identity, then opening the provider page for you...",
+        message: "Opening the selected provider...",
       }));
 
       try {
@@ -750,6 +763,7 @@ export function CaptureProvider({
         const reference = await api.runCapture({
           partIds: [partId],
           vendor: sourceKey || undefined,
+          ...(sourceKey ? { mode: "collect-all" as const } : {}),
           ...(selectedEdas.length > 0 ? { edas: selectedEdas } : {}),
           idempotencyKey,
         });
@@ -786,8 +800,8 @@ export function CaptureProvider({
           workflowItemId: itemId,
           status: "receiving",
           message:
-            "Completion is running. Open the provider page when it appears, sign in if it asks, " +
-            "choose the formats you need, and download; Stockroom captures and validates each file as it lands.",
+            "Opening the selected provider. Sign in if it asks, choose the formats you need, and " +
+            "download; Stockroom captures and validates each file as it lands.",
         }));
         await followDurable({
           batchId,
@@ -857,6 +871,59 @@ export function CaptureProvider({
     },
     [runStart],
   );
+
+  const finishProvider = useCallback(async () => {
+    const partId = partIdRef.current;
+    const workflowItemId = itemIdRef.current;
+    if (!partId || !workflowItemId || !stateRef.current.routeToken) {
+      throw new Error("This completion has no active provider route to finish.");
+    }
+    await api.signalCaptureIntent({
+      partId,
+      workflowItemId,
+      action: "finish-route",
+      routeToken: stateRef.current.routeToken,
+    });
+    setState((current) => ({
+      ...current,
+      message: "Finishing this provider after current downloads settle...",
+    }));
+  }, []);
+
+  const skipProvider = useCallback(async () => {
+    const partId = partIdRef.current;
+    const workflowItemId = itemIdRef.current;
+    if (!partId || !workflowItemId) {
+      throw new Error("This completion has no active part to skip.");
+    }
+    await api.signalCaptureIntent({
+      partId,
+      workflowItemId,
+      action: "skip-part",
+    });
+    setState((current) => ({
+      ...current,
+      message: "Skipping this part after current downloads settle...",
+    }));
+  }, []);
+
+  const applyAttachments = useCallback(async () => {
+    const partId = partIdRef.current;
+    const workflowItemId = itemIdRef.current;
+    const proposal = stateRef.current.attachmentProposal;
+    if (!partId || !workflowItemId || !proposal) {
+      throw new Error("This completion has no attachment proposal to apply.");
+    }
+    await api.applyCaptureAttachments({
+      partId,
+      workflowItemId,
+      proposalToken: proposal.proposal_token,
+    });
+    setState((current) => ({
+      ...current,
+      message: "Applying the confirmed CAD attachments...",
+    }));
+  }, []);
 
   const closeProvider = useCallback(async () => {
     const batchId = batchIdRef.current;
@@ -1011,6 +1078,13 @@ export function CaptureProvider({
           url: "https://example.invalid/ultralibrarian/lm358dr",
           routeToken: "route-design-studio-preview",
           vendor: "ultralibrarian",
+          browserState: {
+            url: "https://example.invalid/ultralibrarian/lm358dr",
+            loading: scenarioProvider?.state === "loading",
+            navigation_error: "",
+            can_go_back: true,
+            can_go_forward: true,
+          },
           needs: ["kicad_symbol", "kicad_footprint", "kicad_model", "altium_symbol", "altium_footprint"],
           backgrounded: scenarioCapture?.backgrounded ?? scenarioProvider?.state === "returned-to-stockroom",
         }
@@ -1025,6 +1099,9 @@ export function CaptureProvider({
       reset,
       keepWorking,
       showProvider,
+      finishProvider,
+      skipProvider,
+      applyAttachments,
       closeProvider,
       onReopen,
       requestReopen,
@@ -1036,6 +1113,9 @@ export function CaptureProvider({
       reset,
       keepWorking,
       showProvider,
+      finishProvider,
+      skipProvider,
+      applyAttachments,
       closeProvider,
       onReopen,
       requestReopen,

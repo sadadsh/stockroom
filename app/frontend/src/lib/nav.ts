@@ -21,8 +21,9 @@ export interface NavEntry {
 
 export const NAV: NavEntry[] = [
   { route: "components", title: "Components", group: "primary", available: true },
+  { route: "assets", title: "Assets", group: "primary", available: true },
   { route: "projects", title: "Projects", group: "primary", available: true },
-  { route: "stm", title: "STM Viewer", group: "primary", available: true },
+  { route: "stm", title: "Tools", group: "primary", available: true },
   { route: "settings", title: "Settings", group: "foot", available: true },
 ];
 

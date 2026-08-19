@@ -7,6 +7,7 @@ import type {
   TargetDefinitionPosition,
 } from "../../api/types";
 import { Text, useCopyFormatter, useText } from "../../lib/copy";
+import { Icon } from "../Icon";
 import { Badge, Eyebrow } from "../primitives";
 import {
   TargetPackageMap,
@@ -448,7 +449,7 @@ export function SocketSolutionPanel({
                   {"{count} MCUs"}
                 </Text>
               </span>
-              <span aria-hidden="true">×</span>
+              <Icon id="action.close" className="h-3 w-3" />
             </button>
           ) : null}
         </div>

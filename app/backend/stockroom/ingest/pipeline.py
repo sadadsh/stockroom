@@ -331,6 +331,27 @@ class IngestPipeline:
                 txn.commit(f"Attach CAD assets to {part_id}")
         return record
 
+    def attach_altium_assets(
+        self,
+        part_id: str,
+        *sources: Path,
+        origin: AssetOrigin,
+        now_iso: str,
+        active_variant,
+        preferred_footprint: str = "",
+    ) -> PartRecord:
+        """Materialize one verified native Altium proposal without touching KiCad."""
+
+        return self.ops.attach_altium_assets(
+            part_id,
+            *sources,
+            origin=origin,
+            now_iso=now_iso,
+            active_variant=active_variant,
+            preferred_footprint=preferred_footprint,
+            auto_embed_model=False,
+        )
+
     def attach_coherent_cad_assets(
         self,
         part_id: str,

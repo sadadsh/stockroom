@@ -24,6 +24,8 @@ internal interface IWindowHostController
 
     bool ReleaseProviderLease(string leaseId, long generation);
 
+    int CancelProviderDownloads(string leaseId, long generation);
+
     IReadOnlyList<ProviderDownloadEvent> ProviderDownloadEvents(
         string leaseId,
         long generation,
@@ -93,6 +95,9 @@ internal sealed class WebViewWindowController : IWindowHostController
     public bool ReleaseProviderLease(string leaseId, long generation) =>
         _host.ReleaseProviderLease(leaseId, generation);
 
+    public int CancelProviderDownloads(string leaseId, long generation) =>
+        _host.CancelProviderDownloads(leaseId, generation);
+
     public IReadOnlyList<ProviderDownloadEvent> ProviderDownloadEvents(
         string leaseId,
         long generation,
@@ -149,6 +154,7 @@ internal sealed class WindowHostSession
         "export",
         "provider-lease-begin",
         "provider-lease-release",
+        "provider-download-cancel",
         "provider-download-events",
         "provider-show",
         "provider-hide",
@@ -302,6 +308,7 @@ internal sealed class WindowHostSession
             and not "provider-lease-begin"
             and not "provider-lease-release"
             and not "provider-download-events"
+            and not "provider-download-cancel"
             and not "provider-show"
             and not "provider-hide"
             and not "provider-current-url"
@@ -326,6 +333,7 @@ internal sealed class WindowHostSession
             "provider-lease-begin" => ProviderLeaseBegin(request),
             "provider-lease-release" => ProviderLeaseRelease(request),
             "provider-download-events" => ProviderDownloadEvents(request),
+            "provider-download-cancel" => ProviderDownloadCancel(request),
             "provider-show" => ProviderShow(request),
             "provider-hide" => ProviderHide(request),
             "provider-current-url" => ProviderCurrentUrl(request),
@@ -463,6 +471,24 @@ internal sealed class WindowHostSession
                 ["lease_id"] = lease.LeaseId,
                 ["generation"] = lease.Generation,
                 ["released"] = _controller.ReleaseProviderLease(
+                    lease.LeaseId,
+                    lease.Generation),
+            });
+    }
+
+    private (
+        string Name,
+        IReadOnlyDictionary<string, object?> Result)
+        ProviderDownloadCancel(HandoffMessage request)
+    {
+        var lease = ParseProviderLease(request.Payload, "provider download cancel");
+        return (
+            "provider-download-cancelled",
+            new Dictionary<string, object?>
+            {
+                ["lease_id"] = lease.LeaseId,
+                ["generation"] = lease.Generation,
+                ["cancelled"] = _controller.CancelProviderDownloads(
                     lease.LeaseId,
                     lease.Generation),
             });

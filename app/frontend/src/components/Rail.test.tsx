@@ -85,7 +85,8 @@ describe("Rail", () => {
   it("shows exactly the top-level destinations", () => {
     render(<Rail />);
     expect(screen.getByRole("button", { name: /Components/ })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /STM Viewer/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Assets/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Tools/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Settings/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Design Studio" })).toBeInTheDocument();
     // the folded Library tabs are not rail destinations anymore

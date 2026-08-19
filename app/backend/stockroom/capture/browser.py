@@ -43,7 +43,7 @@ from collections.abc import Callable
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal
+from typing import Literal, TypedDict
 from urllib.parse import urlsplit
 
 from stockroom.capture.classify import classify_asset
@@ -323,6 +323,13 @@ def _allow_automatic_downloads(profile_dir: Path) -> None:
         ) from exc
 
 
+class _DownloadProgressItem(TypedDict):
+    name: str
+    state: str
+    bytes_received: int
+    total_bytes: int
+
+
 @dataclass(slots=True)
 class _NativeSurfaceDownload:
     """One download the native host reported, tracked until its bytes are staged or refused."""
@@ -334,6 +341,9 @@ class _NativeSurfaceDownload:
     source_url: str
     result_path: Path
     state: str = "in_progress"
+    total_bytes: int = -1
+    bytes_received: int = 0
+    interrupt_reason: str = ""
     captured: bool = False
 
 
@@ -526,6 +536,7 @@ class ProviderSurfaceCapture:
         self._finalized_generations: set[int] = set()
         self._download_cursor = 0
         self._downloads: dict[str, _NativeSurfaceDownload] = {}
+        self._progress_items: dict[str, _DownloadProgressItem] = {}
 
     @property
     def captured(self) -> list[CapturedFile]:
@@ -560,6 +571,7 @@ class ProviderSurfaceCapture:
             generation = self._generation
             self._active_generation = generation
             self._active_broker = broker
+            self._progress_items = {}
         try:
             yield generation
         finally:
@@ -576,11 +588,14 @@ class ProviderSurfaceCapture:
         hud: ProviderHudSpec | None = None,
         should_finish: Callable[[], bool] | None = None,
         should_cancel: Callable[[], bool] | None = None,
+        on_progress: Callable[[dict[str, object]], None] | None = None,
+        on_navigation_state: Callable[[dict[str, object]], None] | None = None,
         timeout_s: float = 600.0,
         poll_interval_s: float = 0.1,
         settle_seconds: float = 0.75,
         auto_finish_seconds: float = 2.0,
         auto_finish_idle_seconds: float = 25.0,
+        termination_grace_seconds: float = 30.0,
     ) -> UserCaptureResult:
         """Open one provider page in the native surface and stage what the person downloads.
 
@@ -615,6 +630,8 @@ class ProviderSurfaceCapture:
         for callback, label in (
             (should_finish, "should_finish"),
             (should_cancel, "should_cancel"),
+            (on_progress, "on_progress"),
+            (on_navigation_state, "on_navigation_state"),
         ):
             if callback is not None and not callable(callback):
                 raise TypeError(f"{label} must be callable")
@@ -638,6 +655,11 @@ class ProviderSurfaceCapture:
             maximum=600.0,
             allow_zero=True,
         )
+        termination_grace = _bounded_seconds(
+            termination_grace_seconds,
+            "termination_grace_seconds",
+            maximum=60.0,
+        )
         trace(
             "capture.user-window.open",
             provider=self.provider_key,
@@ -656,11 +678,14 @@ class ProviderSurfaceCapture:
                 required_formats=required_formats,
                 should_finish=should_finish,
                 should_cancel=should_cancel,
+                on_progress=on_progress,
+                on_navigation_state=on_navigation_state,
                 timeout=timeout,
                 poll_interval=poll_interval,
                 settle=settle,
                 auto_finish=auto_finish,
                 idle=idle,
+                termination_grace=termination_grace,
             )
 
     def _watch(
@@ -671,11 +696,14 @@ class ProviderSurfaceCapture:
         required_formats: tuple[str, ...],
         should_finish: Callable[[], bool] | None,
         should_cancel: Callable[[], bool] | None,
+        on_progress: Callable[[dict[str, object]], None] | None,
+        on_navigation_state: Callable[[dict[str, object]], None] | None,
         timeout: float,
         poll_interval: float,
         settle: float,
         auto_finish: float,
         idle: float,
+        termination_grace: float,
     ) -> UserCaptureResult:
         deadline = time.monotonic() + timeout
         status: UserCaptureStatus = "timed_out"
@@ -696,13 +724,25 @@ class ProviderSurfaceCapture:
         quiet_since = time.monotonic()
         receipt_count = len(broker.receipts)
         completed_formats = _completed_provider_formats(broker.receipts, required_formats)
-        finish_requested = False
         requested_status: UserCaptureStatus | None = None
         requested_at: float | None = None
+        last_progress: dict[str, object] | None = None
+        last_navigation_state: dict[str, object] | None = None
         while True:
             pending, _ = self._drain_native_downloads()
+            progress = self._download_progress()
+            if on_progress is not None and progress != last_progress:
+                on_progress(progress)
+                last_progress = progress
             now = time.monotonic()
-            final_url = self._current_url(final_url)
+            navigation_state = self._navigation_state(final_url)
+            final_url = str(navigation_state["url"] or final_url)
+            if (
+                on_navigation_state is not None
+                and navigation_state != last_navigation_state
+            ):
+                on_navigation_state(navigation_state)
+                last_navigation_state = navigation_state
 
             errors = self.download_errors
             if len(errors) > error_mark:
@@ -727,9 +767,20 @@ class ProviderSurfaceCapture:
             if requested_status is None:
                 if should_cancel is not None and should_cancel():
                     requested_status = "cancelled"
+                elif should_finish is not None and should_finish():
+                    requested_status = "completed"
+                elif now >= deadline:
+                    requested_status = "timed_out"
                 else:
                     document = self._document_signals()
-                    if document.get("provider_error"):
+                    if document.get("navigation_error"):
+                        trace(
+                            "capture.user-window.navigation-error",
+                            provider=self.provider_key or "",
+                            url=url_note(final_url),
+                        )
+                        requested_status = "try_another"
+                    elif document.get("provider_error"):
                         # A known provider error document cannot become useful by continuing to
                         # poll it. Advance to the next independent author route immediately.
                         trace(
@@ -758,25 +809,19 @@ class ProviderSurfaceCapture:
                 if pending == 0 and self._finalize_native_downloads_if_idle():
                     status = requested_status
                     break
-                if now - requested_at >= 30.0:
-                    # A route is not terminal while the host still owns bytes, but a stuck
-                    # operation must not hold the run open forever either.
-                    if self._finalize_native_downloads_if_idle():
-                        status = requested_status
-                        break
+                if now - requested_at >= termination_grace:
+                    # Cancellation is task-owned and lease-scoped. It ends native operations
+                    # before this generation is sealed, so Finish, Skip, and timeout remain
+                    # bounded even when WebView2 never reports a terminal event on its own.
+                    self._cancel_native_downloads()
+                    pending, _ = self._drain_native_downloads()
+                    if pending > 0:
+                        self._abandon_active_native_downloads()
+                    status = requested_status
+                    break
                 time.sleep(poll_interval)
                 continue
 
-            if should_finish is not None and should_finish():
-                finish_requested = True
-            if (
-                finish_requested
-                and pending == 0
-                and (current_count == 0 or now - quiet_since >= settle)
-                and self._finalize_native_downloads_if_idle()
-            ):
-                status = "completed"
-                break
             if (
                 current_count > 0
                 and pending == 0
@@ -798,12 +843,6 @@ class ProviderSurfaceCapture:
                 # Wait out the long gap rather than finish early and lose a format still coming.
                 status = "completed"
                 break
-            if now >= deadline:
-                # Timeout is a terminal capture boundary, not permission to discard a native
-                # download that completed since the poll at the top of the loop.
-                if self._finalize_native_downloads_if_idle():
-                    status = "timed_out"
-                    break
             time.sleep(poll_interval)
 
         final_url = self._current_url(final_url)
@@ -819,6 +858,45 @@ class ProviderSurfaceCapture:
             files=broker.receipts,
             final_url=final_url,
         )
+
+    def _navigation_state(self, fallback_url: str) -> dict[str, object]:
+        """Read only native chrome state, never provider document content."""
+
+        state_reader = getattr(self._native_surface, "state", None)
+        if callable(state_reader):
+            try:
+                state = state_reader()
+            except Exception:  # noqa: BLE001 - transient navigation uses safe fallback state
+                state = None
+            if isinstance(state, dict):
+                url = state.get("url")
+                loading = state.get("loading")
+                navigation_error = state.get("navigation_error")
+                can_go_back = state.get("can_go_back")
+                can_go_forward = state.get("can_go_forward")
+                if (
+                    type(url) is str
+                    and len(url) <= 4096
+                    and type(loading) is bool
+                    and type(navigation_error) is str
+                    and len(navigation_error) <= 512
+                    and type(can_go_back) is bool
+                    and type(can_go_forward) is bool
+                ):
+                    return {
+                        "url": url or fallback_url,
+                        "loading": loading,
+                        "navigation_error": navigation_error,
+                        "can_go_back": can_go_back,
+                        "can_go_forward": can_go_forward,
+                    }
+        return {
+            "url": self._current_url(fallback_url),
+            "loading": False,
+            "navigation_error": "",
+            "can_go_back": False,
+            "can_go_forward": False,
+        }
 
     def _current_url(self, fallback: str) -> str:
         """The surface's own current URL. No provider content is read to obtain it."""
@@ -852,6 +930,25 @@ class ProviderSurfaceCapture:
         return {
             "provider_error": bool(state.get("provider_error")),
             "account_verification": bool(state.get("account_verification")),
+            "navigation_error": str(state.get("navigation_error", "") or ""),
+        }
+
+    def _download_progress(self) -> dict[str, object]:
+        """Return a path-free progress snapshot for Stockroom's own provider chrome."""
+
+        with self._lock:
+            files = [item.copy() for item in self._progress_items.values()]
+        known_totals = [
+            item["total_bytes"]
+            for item in files
+            if item["total_bytes"] >= 0
+        ]
+        return {
+            "active": sum(item["state"] in {"in_progress", "unknown"} for item in files),
+            "completed": sum(item["state"] == "completed" for item in files),
+            "bytes_received": sum(max(0, item["bytes_received"]) for item in files),
+            "total_bytes": sum(known_totals) if len(known_totals) == len(files) else -1,
+            "files": files,
         }
 
     def _drain_native_downloads(
@@ -896,13 +993,20 @@ class ProviderSurfaceCapture:
             if type(sequence) is not int or sequence <= self._download_cursor:
                 continue
             self._download_cursor = sequence
-            if not operation_id or phase not in {"started", "terminal"}:
+            if not operation_id or phase not in {"started", "progress", "terminal"}:
                 continue
             result_path = Path(str(getattr(event, "result_file_path", "") or ""))
             suggested_name = _safe_filename(
                 str(getattr(event, "suggested_file_name", "") or "cad-download")
             )
             source_url = str(getattr(event, "uri", "") or "")
+            total_bytes = getattr(event, "total_bytes", -1)
+            bytes_received = getattr(event, "bytes_received", 0)
+            interrupt_reason = str(getattr(event, "interrupt_reason", "") or "")
+            if type(total_bytes) is not int or total_bytes < -1:
+                total_bytes = -1
+            if type(bytes_received) is not int or bytes_received < 0:
+                bytes_received = 0
             with self._lock:
                 generation = self._active_generation
                 if generation in self._finalized_generations:
@@ -926,6 +1030,16 @@ class ProviderSurfaceCapture:
                 if suggested_name != "cad-download":
                     download.suggested_name = suggested_name
                 download.state = state
+                download.total_bytes = total_bytes
+                download.bytes_received = bytes_received
+                download.interrupt_reason = interrupt_reason
+                if generation > 0:
+                    self._progress_items[operation_id] = {
+                        "name": suggested_name,
+                        "state": state,
+                        "bytes_received": bytes_received,
+                        "total_bytes": total_bytes,
+                    }
                 if broker is None and download.broker is None:
                     self._download_errors.append(
                         CaptureBrowserError(
@@ -946,6 +1060,20 @@ class ProviderSurfaceCapture:
         pending = sum(item.state in {"in_progress", "unknown"} for item in active)
         for download in active:
             if download.state == "interrupted":
+                raw_reason = download.interrupt_reason.split(maxsplit=1)[0][:48]
+                reason = "".join(
+                    character
+                    for character in raw_reason
+                    if character.isalnum() or character in {"_", "-"}
+                )
+                detail = f" ({reason})" if reason else ""
+                with self._lock:
+                    self._download_errors.append(
+                        CaptureBrowserError(
+                            "the provider download was interrupted"
+                            f"{detail}; retry the download on this provider page"
+                        )
+                    )
                 download.captured = True
                 continue
             if download.state != "completed":
@@ -985,7 +1113,6 @@ class ProviderSurfaceCapture:
                     provider=self.provider_key or "",
                     via="webview2-native",
                     saved=file_note(receipt.path),
-                    path=receipt.path,
                 )
             finally:
                 source.unlink(missing_ok=True)
@@ -996,6 +1123,50 @@ class ProviderSurfaceCapture:
                 if not item.captured
             }
         return pending
+
+    def _cancel_native_downloads(self) -> int:
+        """Cancel only operations owned by this route's native lease."""
+
+        cancel = getattr(self._native_surface, "cancel_downloads", None)
+        if not callable(cancel):
+            return 0
+        try:
+            cancelled = cancel()
+        except Exception as exc:  # noqa: BLE001 - the bounded route still must terminate
+            with self._lock:
+                self._download_errors.append(
+                    CaptureBrowserError(
+                        "the embedded provider could not cancel its stuck download "
+                        f"({type(exc).__name__})"
+                    )
+                )
+            return 0
+        return cancelled if type(cancelled) is int and cancelled >= 0 else 0
+
+    def _abandon_active_native_downloads(self) -> None:
+        """Seal a timed-out generation after its task-owned cancel command."""
+
+        with self._lock:
+            generation = self._active_generation
+            abandoned = [
+                item for item in self._downloads.values()
+                if item.generation == generation and not item.captured
+            ]
+            for item in abandoned:
+                item.captured = True
+                progress = self._progress_items.get(item.operation_id)
+                if progress is not None:
+                    progress["state"] = "interrupted"
+            self._finalized_generations.add(generation)
+            self._downloads = {
+                operation_id: item
+                for operation_id, item in self._downloads.items()
+                if not item.captured
+            }
+        for item in abandoned:
+            source = item.result_path
+            if source.is_file() and not source.is_symlink():
+                source.unlink(missing_ok=True)
 
     def _finalize_native_downloads_if_idle(self) -> bool:
         """Atomically drain and seal the native intake only when no byte stream is in flight."""
@@ -1389,7 +1560,6 @@ class PlaywrightCaptureBrowser:
                 provider=self.provider_key,
                 via=route,
                 saved=file_note(receipt.path),
-                path=receipt.path,
             )
             return
 
@@ -1422,7 +1592,6 @@ class PlaywrightCaptureBrowser:
                 provider=self.provider_key,
                 via=route,
                 saved=file_note(dest),
-                path=dest,
                 task_bound=False,
             )
 

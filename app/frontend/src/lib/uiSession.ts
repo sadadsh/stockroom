@@ -16,7 +16,7 @@ export const UI_SESSION_VERSION = 3 as const;
 export const INTAKE_DRAFT_SCHEMA = "stockroom.intake-draft" as const;
 export const INTAKE_DRAFT_VERSION = 1 as const;
 
-export type UiSessionRoute = "components" | "projects" | "stm" | "settings";
+export type UiSessionRoute = "components" | "assets" | "projects" | "stm" | "settings";
 export type DetailTab = "specs" | "sourcing" | "enrich" | "history" | "handoff";
 export type SettingsGroup = "general" | "library" | "eda" | "sources" | "maintenance";
 export type OpenSurface = "search" | "add_part" | "complete_part" | null;
@@ -540,7 +540,7 @@ export function parseUiSession(value: unknown): UiSessionSnapshotV2 | null {
     !exactKeys(object, SNAPSHOT_KEYS) ||
     object.schema !== UI_SESSION_SCHEMA ||
     object.version !== UI_SESSION_VERSION ||
-    !["components", "projects", "stm", "settings"].includes(String(object.route))
+    !["components", "assets", "projects", "stm", "settings"].includes(String(object.route))
   ) {
     return null;
   }

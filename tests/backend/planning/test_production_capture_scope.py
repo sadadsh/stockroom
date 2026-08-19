@@ -1,5 +1,6 @@
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from threading import Event
 from types import SimpleNamespace
 from typing import cast
 
@@ -13,6 +14,7 @@ from stockroom.planning.production_composition import (
     ProductionApplicationContext,
     StockroomAcquisitionProviderAdapter,
     _canonical_capture_diagnostic_report,
+    _CaptureRequest,
 )
 from stockroom.planning.provider_policy import (
     KICAD_CAD_OPERATION,
@@ -134,6 +136,79 @@ def test_durable_capture_options_cross_the_provider_worker_thread(tmp_path: Path
     assert default.should_stop() is False
 
 
+def test_provider_navigation_starts_before_copy_on_write_staging_finishes(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    live_record = object()
+    live = cast(
+        ProductionApplicationContext,
+        SimpleNamespace(
+            ops=SimpleNamespace(load_record=lambda _part_id: live_record),
+            profile=SimpleNamespace(library=object()),
+            config=object(),
+            provider_browser_surface=object(),
+        ),
+    )
+    adapter = StockroomAcquisitionProviderAdapter(
+        live,
+        EvidenceStore(tmp_path / "Evidence"),
+        tmp_path / "Staging",
+    )
+    identity = ExactPartIdentity("Texas Instruments", "TPS62130")
+    staging_started = Event()
+    allow_staging = Event()
+    isolated = SimpleNamespace(
+        ops=SimpleNamespace(load_record=lambda _part_id: object()),
+        profile=object(),
+        jobs=SimpleNamespace(run_write=lambda operation: operation()),
+        rebuild_index=lambda: None,
+        auto_push=lambda: None,
+    )
+
+    def seed(*_args, **_kwargs):
+        staging_started.set()
+        assert allow_staging.wait(5)
+        return isolated
+
+    def capture(context, **_kwargs):
+        assert staging_started.wait(5)
+        assert not allow_staging.is_set()
+        assert context.ops.load_record("tps62130") is live_record
+        allow_staging.set()
+        assert context.profile is isolated.profile
+        return {"counts": {}}
+
+    monkeypatch.setattr(
+        "stockroom.planning.production_composition._seed_copy_on_write_context",
+        seed,
+    )
+    monkeypatch.setattr(
+        "stockroom.planning.production_composition.run_guided_capture",
+        capture,
+    )
+    monkeypatch.setattr(
+        "stockroom.planning.production_composition.write_durable_capture_report",
+        lambda *_args, **_kwargs: None,
+    )
+    monkeypatch.setattr(
+        "stockroom.planning.production_composition._canonical_capture_diagnostic_report",
+        lambda report, **_kwargs: report,
+    )
+    monkeypatch.setattr(
+        "stockroom.planning.production_composition.record_installed_kicad_role_evidence",
+        lambda **_kwargs: None,
+    )
+
+    request = _CaptureRequest(
+        vendor="ultralibrarian",
+        should_stop=lambda: False,
+    )
+    adapter._acquire(identity, request)
+
+    assert allow_staging.is_set()
+
+
 def test_one_slow_capture_serves_both_cad_operations(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -211,6 +286,63 @@ def test_one_slow_capture_serves_both_cad_operations(
         adapter._acquire(identity, request)
 
     assert runs["count"] == 1
+
+
+def test_collect_all_honors_open_provider_even_with_a_complete_retained_bundle(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    adapter = StockroomAcquisitionProviderAdapter(
+        cast(ProductionApplicationContext, SimpleNamespace()),
+        EvidenceStore(tmp_path / "Evidence"),
+        tmp_path / "Staging",
+    )
+    identity = ExactPartIdentity("Texas Instruments", "TPD6E05U06RVZR")
+    retained_bundle = object()
+    acquisitions: list[object] = []
+    events: list[str] = []
+    context = cast(
+        StageContext,
+        SimpleNamespace(
+            should_stop=lambda: False,
+            item=SimpleNamespace(
+                id="item-explicit-provider",
+                payload={
+                    "part_id": "tpd6e05u06rvzr",
+                    "workflow_kind": "guided_capture",
+                    "capture": {
+                        "mode": "collect-all",
+                        "vendor": "ultralibrarian",
+                        "background": False,
+                    },
+                },
+            ),
+        ),
+    )
+
+    def selection(_self, _identity):
+        events.append("selection")
+        return retained_bundle
+
+    def acquire(_self, _identity, request):
+        events.append("acquire")
+        acquisitions.append(request)
+
+    monkeypatch.setattr(StockroomAcquisitionProviderAdapter, "_selection", selection)
+    monkeypatch.setattr(StockroomAcquisitionProviderAdapter, "_acquire", acquire)
+    monkeypatch.setattr(
+        StockroomAcquisitionProviderAdapter,
+        "_provider_manifest",
+        lambda *_args, **_kwargs: "sha256:" + "a" * 64,
+    )
+
+    with adapter.capture_scope(context, identity):
+        outcome = adapter.execute(identity, KICAD_CAD_OPERATION)
+
+    assert outcome.status is AdapterOutcomeStatus.SUCCESS
+    assert events == ["acquire", "selection"]
+    assert len(acquisitions) == 1
+    assert acquisitions[0].vendor == "ultralibrarian"
 
 
 def test_finish_first_reuses_a_complete_retained_bundle_without_network_capture(

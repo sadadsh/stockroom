@@ -44,9 +44,9 @@ export const providerScenarios: readonly DesignScenario[] = providerScenarioIds.
   return {
     id,
     title: TITLES[state],
-    area: "components",
+    area: "assets",
     group: "Provider Download",
-    route: "components",
+    route: "assets",
     fixtures: providerReadFixtures(state),
     initialUi: {
       components: { cadView: "manage-models" },

@@ -20,6 +20,8 @@ const globalAboutContractIds = [
   "global.about.open", "global.about.current", "global.about.update-available", "global.about.stale",
 ] as const;
 
+const assetsContractIds = ["assets.landing"] as const;
+
 const componentContractIds = [
   "components.full-data", "components.empty", "components.loading", "components.server-error",
   "components.no-selection", "components.no-matches", "components.complete-only", "components.duplicates-only",
@@ -27,9 +29,13 @@ const componentContractIds = [
   "components.missing-footprint", "components.cad-source-conflict", "components.spec-conflict", "components.pinout-absent",
   "components.sourcing-sparse", "components.offer-failure", "components.documents-empty", "components.related-empty",
   "components.provenance-conflict", "components.preview-3d", "components.preview-symbol", "components.preview-footprint",
-  "components.manage-models-ready", "components.manage-models-partial", "components.manage-models-blocked",
-  "components.bulk-import", "components.offers-open", "components.manage-models-attached", "components.manage-models-invalid",
+  "components.offers-open",
   "components.diff-open", "components.pinout-open", "components.delete-confirm",
+] as const;
+
+const componentAssetContractIds = [
+  "components.manage-models-ready", "components.manage-models-partial", "components.manage-models-blocked",
+  "components.manage-models-attached", "components.manage-models-invalid",
 ] as const;
 
 const providerContractIds = [
@@ -77,8 +83,10 @@ const settingsContractIds = [
 
 export const globalStateContracts = defineScenarioStateContracts("global", "components", globalContractIds);
 export const globalAboutStateContracts = defineScenarioStateContracts("global", "settings", globalAboutContractIds);
+export const assetsStateContracts = defineScenarioStateContracts("assets", "assets", assetsContractIds);
 export const componentStateContracts = defineScenarioStateContracts("components", "components", componentContractIds);
-export const providerStateContracts = defineScenarioStateContracts("components", "components", providerContractIds);
+export const componentAssetStateContracts = defineScenarioStateContracts("assets", "assets", componentAssetContractIds);
+export const providerStateContracts = defineScenarioStateContracts("assets", "assets", providerContractIds);
 export const projectStateContracts = defineScenarioStateContracts("projects", "projects", projectContractIds);
 export const stmStateContracts = defineScenarioStateContracts("stm", "stm", stmContractIds);
 export const settingsStateContracts = defineScenarioStateContracts("settings", "settings", settingsContractIds);
@@ -86,7 +94,9 @@ export const settingsStateContracts = defineScenarioStateContracts("settings", "
 export const bootstrapStateContracts = [
   ...globalStateContracts,
   ...globalAboutStateContracts,
+  ...assetsStateContracts,
   ...componentStateContracts,
+  ...componentAssetStateContracts,
   ...providerStateContracts,
   ...projectStateContracts,
   ...stmStateContracts,

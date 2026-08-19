@@ -1434,10 +1434,9 @@ export const api = {
     );
   },
 
-  // ONE ACQUISITION WORKFLOW, and exactly one lane inside it: the person opens the provider page
-  // Stockroom resolved, signs in if the provider asks, chooses the formats, and downloads. The
-  // backend captures those downloads and validates them. There is no mode to pick, so no `mode`
-  // is sent.
+  // ONE ACQUISITION WORKFLOW. An explicitly selected provider uses `collect-all`: this is not a
+  // second capture lane, but the durable instruction that the person's Open Provider action must
+  // not be bypassed merely because retained evidence already exists.
   //
   // `partIds: [one]` is per-component; omitting it captures every part still missing files. Both
   // are the same backend path deliberately, so verifying one verifies the other.
@@ -1448,6 +1447,7 @@ export const api = {
     input: {
       partIds?: string[];
       vendor?: string;
+      mode?: "collect-all";
       limit?: number;
       background?: boolean;
       edas?: string[];
@@ -1458,10 +1458,49 @@ export const api = {
       body: {
         part_ids: input.partIds,
         vendor: input.vendor,
+        mode: input.mode,
         limit: input.limit,
         background: input.background,
         edas: input.edas,
         idempotency_key: input.idempotencyKey,
+      },
+    });
+  },
+
+  signalCaptureIntent(input: {
+    partId: string;
+    workflowItemId: string;
+    action: "finish-route" | "skip-part";
+    routeToken?: string;
+  }): Promise<{
+    part_id: string;
+    workflow_item_id: string;
+    action: "finish-route" | "skip-part";
+    accepted: boolean;
+  }> {
+    return request("POST", `/api/library/capture/parts/${encodeURIComponent(input.partId)}/intent`, {
+      body: {
+        action: input.action,
+        workflow_item_id: input.workflowItemId,
+        ...(input.routeToken ? { route_token: input.routeToken } : {}),
+      },
+    });
+  },
+
+  applyCaptureAttachments(input: {
+    partId: string;
+    workflowItemId: string;
+    proposalToken: string;
+  }): Promise<{
+    part_id: string;
+    workflow_item_id: string;
+    proposal_token: string;
+    accepted: boolean;
+  }> {
+    return request("POST", `/api/library/capture/parts/${encodeURIComponent(input.partId)}/attachments/apply`, {
+      body: {
+        workflow_item_id: input.workflowItemId,
+        proposal_token: input.proposalToken,
       },
     });
   },

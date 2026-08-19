@@ -31,6 +31,15 @@ def _draft_body(value: str = "TPS62130") -> dict:
     }
 
 
+def test_assets_route_survives_a_fresh_store_read() -> None:
+    document = default_snapshot()
+    document["route"] = "assets"
+
+    save_snapshot(document)
+
+    assert load_snapshot()["route"] == "assets"
+
+
 def test_snapshot_defaults_then_survives_a_fresh_store_read() -> None:
     assert load_snapshot() == default_snapshot()
 

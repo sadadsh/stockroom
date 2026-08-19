@@ -514,7 +514,7 @@ describe("DesignStudioShell", () => {
 
   it("lets the real SpecMatrix Columns popover own Escape before Design Studio", async () => {
     const { entry } = await renderStudio();
-    await userEvent.setup().click(screen.getByRole("button", { name: "STM Viewer" }));
+    await userEvent.setup().click(screen.getByRole("button", { name: "Tools" }));
     const columnsButton = await screen.findByRole("button", { name: "Columns" });
     await userEvent.setup().click(columnsButton);
     expect(screen.getByTestId("column-picker")).toBeVisible();

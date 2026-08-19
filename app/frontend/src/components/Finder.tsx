@@ -57,7 +57,8 @@ export function Finder({
     : [];
   // Copy for an attribute (placeholder + label), so it is reworded through the same override
   // as any <Text> label when dev mode saves it.
-  const searchLabel = useText("components.search-placeholder", "Search Components");
+  const searchLabel = useText("components.search-label", "Search Components");
+  const searchPlaceholder = useText("components.search-placeholder", "Search");
   const filtersLabel = useText("components.filter-button-label", "Filters");
   const advancedLabel = useText("components.advanced-search-label", "Advanced Search");
   const clearLabel = useText("components.clear-filters", "Clear Filters");
@@ -77,12 +78,12 @@ export function Finder({
           data-dev-id="components.search-box"
           className="flex h-[24px] min-w-0 flex-1 items-center gap-2 rounded-control border border-line bg-field pl-2 pr-1.5 focus-within:border-line2"
         >
-          <SearchIcon className="flex-none text-t3" />
+          <SearchIcon className="h-3.5 w-3.5 flex-none text-t3" />
           <input
             data-dev-id="components.search-input"
             value={search}
             onChange={(e) => onSearch(e.target.value)}
-            placeholder={searchLabel}
+            placeholder={searchPlaceholder}
             aria-label={searchLabel}
             className="ui-control-label min-w-0 flex-1 cursor-text bg-transparent text-t1 outline-none placeholder:text-t3"
           />
@@ -96,6 +97,7 @@ export function Finder({
             onClick={onOpenSearch}
             className="ui-control-label inline-flex h-[24px] flex-none items-center gap-1.5 rounded-control border border-line bg-raise px-2 text-t2 transition-colors hover:bg-raise2 hover:text-t1"
           >
+            <SearchIcon className="h-3.5 w-3.5 flex-none" />
             <Text id="components.advanced-search-label">Advanced Search</Text>
           </button>
         ) : null}
@@ -107,7 +109,7 @@ export function Finder({
           onClick={() => setOpen((v) => !v)}
           className="inline-flex h-[24px] flex-none items-center gap-1.5 rounded-control border border-line bg-raise px-2 text-t3 transition-colors hover:bg-raise2 hover:text-t1"
         >
-          <Icon id="finder.filter" />
+          <Icon id="finder.filter" className="h-3.5 w-3.5 flex-none" />
           {activeFilters > 0 ? (
             <span className="ui-status-text tabular-nums text-t1">{activeFilters}</span>
           ) : null}
@@ -165,7 +167,7 @@ export function Finder({
                     : "border-line2 text-transparent")
                 }
               >
-                {"✓"}
+                <Icon id="modal.check" className="h-3 w-3" />
               </span>
               <Text id="components.filter-complete-label">Just Complete</Text>
             </label>
@@ -191,7 +193,7 @@ export function Finder({
                       : "border-line2 text-transparent")
                   }
                 >
-                  {"✓"}
+                  <Icon id="modal.check" className="h-3 w-3" />
                 </span>
                 Duplicates ({duplicateCount})
               </label>

@@ -30,6 +30,8 @@ export interface WorkspaceHeaderSlice {
   onOpenDatasheet: (target: DatasheetTarget) => void;
   /** No datasheet is on record: open the surface that can go and find one. */
   onFindDatasheet: () => void;
+  /** Leave Components and open this exact component in the Assets workspace. */
+  onManageAssets: () => void;
 }
 
 export interface WorkspaceCadSlice {

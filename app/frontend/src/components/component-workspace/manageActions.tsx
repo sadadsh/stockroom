@@ -28,7 +28,6 @@ export function manageMenuItems(actions: {
   onReviewMissing: () => void;
   onRefresh: () => void;
   refreshing: boolean;
-  onReviewCadSources: () => void;
   onViewProvenance: () => void;
   onDelete: () => void;
   /**
@@ -64,12 +63,6 @@ export function manageMenuItems(actions: {
       label: "Refresh Component Data",
       disabled: actions.refreshing,
       run: actions.onRefresh,
-    },
-    {
-      id: "manage-models",
-      copyId: "component-browser.manage-review-cad",
-      label: "Manage Models",
-      run: actions.onReviewCadSources,
     },
     {
       id: "view-provenance",

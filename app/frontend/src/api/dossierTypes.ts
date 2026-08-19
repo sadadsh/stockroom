@@ -794,6 +794,8 @@ export interface ProviderCoverageRow {
   needsLogin: boolean;
   aggregator: boolean;
   distributor: boolean;
+  /** This provider has a task-bound download/capture adapter, not merely a useful URL. */
+  captureAvailable: boolean;
   statusCounts: Record<CoverageStatus, number>;
   /** This provider can supply symbol, footprint AND 3D model for this component. */
   complete: boolean;
