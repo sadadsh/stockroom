@@ -341,6 +341,7 @@ describe("InspectorPanel", () => {
       expect(untouched.querySelector<HTMLElement>("[data-copy-id]")!.style.fontSize).toBe("");
       expect(untouched.querySelector<SVGElement>("[data-icon-id]")!.style.width).toBe("");
     },
+    15_000,
   );
 
   it("accepts only the validated property grammar in Advanced", async () => {

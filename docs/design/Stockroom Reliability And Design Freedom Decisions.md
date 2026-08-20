@@ -690,3 +690,12 @@ the supported PC but required 375.27 seconds on the hosted runner's virtual SQLi
 CI therefore runs the smaller exact-once scale case and all ordinary backend behavior, while the
 controlled workstation gate alone enforces the absolute wall-clock budget. This separates functional
 regression detection from variable host performance without weakening the product budget.
+
+### Cross-Machine UI Gates Separate Structure From Local Presentation
+
+Stockroom displays exact timestamps in the person's local time. DOM-structure snapshots preserve
+the count and position of those tooltips but normalize only their clock text, which is independently
+covered by the timestamp formatter tests. This keeps UTC CI and the local Windows app comparable
+without forcing production timestamps into the wrong timezone. A deliberately broad Design Studio
+inspector integration may use an explicit per-test timeout when it exercises lazy icon-catalog loading;
+the timeout belongs to the test boundary and does not weaken any product response-time contract.

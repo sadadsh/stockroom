@@ -32,6 +32,11 @@
  *                    have nothing to do with the arrangement. The COUNT and POSITION of every
  *                    object URL still has to match; only the serial number is masked.
  *
+ *   absolute title  Stockroom intentionally formats an exact timestamp in the person's local time.
+ *                    GitHub's UTC runner and the supported PC therefore render different honest
+ *                    tooltip text for the same instant. FormatValue owns that wording; this gate
+ *                    keeps each title's count and position while masking only its local clock value.
+ *
  * Nothing else is masked. Column widths are real numbers (jsdom never measures the band, so the
  * assumed 1366px total is deterministic), the clock is frozen, and the fixtures carry fixed
  * timestamps, so every other byte is compared exactly.
@@ -195,7 +200,12 @@ async function renderWorkspace(dossier: ComponentDossier): Promise<string> {
 
 /** The one volatile token, masked. See the file header for why this is not a hole. */
 function normalise(html: string): string {
-  return html.replace(/blob:mock\/\d+/g, "blob:mock/x");
+  return html
+    .replace(/blob:mock\/\d+/g, "blob:mock/x")
+    .replace(
+      /title="(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \d{1,2}, \d{4}, \d{1,2}:\d{2} (?:AM|PM)"/g,
+      'title="local timestamp"',
+    );
 }
 
 /** A newline between adjacent tags, so the committed tree is a diff a person can read. */
@@ -236,7 +246,7 @@ describe("the opened component renders the same DOM it shipped with", () => {
     await expectTree(
       "populated",
       await renderWorkspace(populatedDossier()),
-      "86291-606439da-44d5a06f",
+      "86231-f21dbac8-d191f395",
     );
   });
 
@@ -245,7 +255,7 @@ describe("the opened component renders the same DOM it shipped with", () => {
     await expectTree(
       "populated-developer",
       await renderWorkspace(populatedDossier()),
-      "103392-650c0799-5c0df4ce",
+      "103332-b851070f-473dd66d",
     );
   });
 
