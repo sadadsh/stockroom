@@ -1786,13 +1786,13 @@
       ]
     },
     {
-      "id": "settings.updates.ready",
-      "title": "updates ready",
+      "id": "settings.update-store",
+      "title": "update-store",
       "area": "settings",
       "group": "Settings",
       "route": "settings",
       "expectedTargets": [
-        "settings.update"
+        "settings.update-store-action"
       ]
     },
     {
