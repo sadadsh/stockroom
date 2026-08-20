@@ -1145,7 +1145,7 @@ def main() -> int:
     parser.add_argument("--bundle-root", required=True, type=Path)
     parser.add_argument("--version", required=True)
     parser.add_argument("--minimum-host-version", required=True)
-    parser.add_argument("--feed-base-uri", required=True)
+    parser.add_argument("--feed-base-uri", default="")
     parser.add_argument("--source-revision", required=True)
     parser.add_argument("--source-date-epoch", required=True, type=int)
     parser.add_argument("--protocol-version", default=1, type=int)

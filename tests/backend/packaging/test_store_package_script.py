@@ -10,6 +10,13 @@ BUILD_SCRIPT = REPOSITORY_ROOT / "packaging/Build-Windows-Package.ps1"
 STORE_PUBLISHER = "CN=6586C41B-410B-4C94-8631-F025DB362E47"
 
 
+def test_store_contract_omits_empty_direct_feed_arguments() -> None:
+    script = BUILD_SCRIPT.read_text(encoding="utf-8")
+
+    assert "if (-not $IsStore)" in script
+    assert '"--feed-base-uri", $FeedBaseUri' in script
+
+
 def run_store_input_check(tmp_path: Path, *arguments: str) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         [

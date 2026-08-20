@@ -643,10 +643,10 @@ def main() -> int:
         )
         subparser.add_argument("--publisher", required=True)
         subparser.add_argument("--version", required=True)
-        subparser.add_argument("--feed-base-uri", required=True)
+        subparser.add_argument("--feed-base-uri", default="")
         subparser.add_argument("--signing-certificate-provided", action="store_true")
         subparser.add_argument("--package-root", type=Path, required=True)
-        subparser.add_argument("--appinstaller-path", type=Path, required=True)
+        subparser.add_argument("--appinstaller-path", type=Path)
         if command == "render":
             subparser.add_argument("--template-directory", type=Path, required=True)
             subparser.add_argument("--version-info-path", type=Path, required=True)
@@ -670,12 +670,17 @@ def main() -> int:
         return 0
 
     configuration = _configuration_from_args(args)
+    if configuration.requires_appinstaller and args.appinstaller_path is None:
+        parser.error("--appinstaller-path is required outside Store mode")
+    appinstaller_path = args.appinstaller_path or (
+        args.package_root.resolve().parent / "Stockroom.appinstaller"
+    )
     if args.command == "render":
         render_contract(
             configuration,
             template_directory=args.template_directory.resolve(),
             package_root=args.package_root.resolve(),
-            appinstaller_path=args.appinstaller_path.resolve(),
+            appinstaller_path=appinstaller_path.resolve(),
             version_info_path=args.version_info_path.resolve(),
             source_icon=args.source_icon.resolve(),
         )
@@ -683,7 +688,7 @@ def main() -> int:
         validate_rendered_contract(
             configuration,
             manifest_path=args.package_root.resolve() / "AppxManifest.xml",
-            appinstaller_path=args.appinstaller_path.resolve(),
+            appinstaller_path=appinstaller_path.resolve(),
             package_root=args.package_root.resolve(),
         )
     return 0

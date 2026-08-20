@@ -1,7 +1,7 @@
 # Stockroom Windows Packaging
 
-Stockroom's future production delivery is a signed x64 MSIX through App Installer;
-no signed production feed has been published yet. Windows launches
+Stockroom's public Windows delivery is an x64 MSIX through Microsoft Store.
+Microsoft signs the package after certification and owns updates. Windows launches
 `WindowHost\Stockroom.WindowHost.exe`, the self-contained .NET 10 WPF host. The
 host starts one immutable PyInstaller onedir backend from the package's verified
 release set.
@@ -11,18 +11,36 @@ Python environment, install WebView2, or provision provider browsers. The Python
 worker has no interactive entry point. `packaging\build_exe.ps1` fails closed
 because the former standalone bootstrap is no longer a supported product.
 
-The package contains:
+The Store package contains:
 
 - the native WPF window host;
 - an immutable onedir backend worker and committed frontend;
 - the source-pinned native CAD converter;
-- a pinned TUF root and built-in release set;
-- an App Installer update policy; and
+- a built-in immutable release;
+- an exact Microsoft Store distribution marker; and
 - MSIX assets and registration metadata.
 
 MSIX installation owns the Start menu entry, Installed Apps registration, update
-policy, and uninstall operation. Production builds require a trusted code-signing
-certificate. The build never creates or trusts a self-signed certificate.
+policy, and uninstall operation. The Store submission is intentionally unsigned;
+Microsoft signs it after certification. The build never creates or trusts a
+self-signed certificate.
+
+## Microsoft Store build
+
+Build the unsigned upload candidate from the repository root on Windows:
+
+```powershell
+.\packaging\Build-Windows-Package.ps1 `
+  -Mode Store `
+  -Version 1.0.1.0 `
+  -OutputRoot "work\Microsoft Store Candidate"
+```
+
+Store versions use `1.0.<build>.0`. The command builds twice by default and
+requires identical worker, host, converter, unpacked package, and MSIX outputs.
+The artifact directory contains only the MSIX, build evidence, and checksums. It
+contains no App Installer file, TUF feed, private key, certificate, or password.
+The Microsoft Store is the package's only update authority.
 
 ## Unsigned fixture
 

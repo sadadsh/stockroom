@@ -1,0 +1,83 @@
+name: Stockroom Microsoft Store Candidate
+
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  quality-gate:
+    name: Canonical CI Gate
+    permissions:
+      contents: read
+    uses: ./.github/workflows/ci.yml
+
+  build-store-package:
+    name: Build Unsigned Store MSIX
+    needs: quality-gate
+    runs-on: windows-2025
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    env:
+      GIT_TERMINAL_PROMPT: "0"
+      GCM_INTERACTIVE: "never"
+      UV_PYTHON: "3.12.13"
+      STORE_VERSION: 1.0.${{ github.run_number }}.0
+    steps:
+      - name: Check Out Exact Revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Initialize Pinned CAD Writer Source
+        shell: pwsh
+        run: |
+          git submodule update --init vendor/AltiumSharp
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          git -C vendor/AltiumSharp submodule update --init shared/OriginalCircuit.Eda.Abstractions
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ((git -C vendor/AltiumSharp rev-parse HEAD).Trim() -cne "ce72437f30cd54f549601d4e0ca5846d21272150") { throw "AltiumSharp pin drifted." }
+          if ((git -C vendor/AltiumSharp/shared/OriginalCircuit.Eda.Abstractions rev-parse HEAD).Trim() -cne "114b40b94fcde0cd68a0c6a5db4d26b7aa3fb0f3") { throw "EDA abstractions pin drifted." }
+
+      - name: Install Pinned uv
+        uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86
+        with:
+          version: "0.11.16"
+          python-version: "3.12.13"
+          enable-cache: false
+
+      - name: Install Pinned .NET SDK
+        uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1
+        with:
+          dotnet-version: "10.0.302"
+
+      - name: Validate Store Version
+        shell: pwsh
+        run: |
+          $build = [int64]"${{ github.run_number }}"
+          if ($build -lt 1 -or $build -gt 65535) { throw "Store build number must be 1..65535." }
+          if ($env:STORE_VERSION -cne "1.0.$build.0") { throw "Store version is invalid." }
+
+      - name: Build Store Candidate
+        shell: pwsh
+        run: |
+          .\packaging\Build-Windows-Package.ps1 -Mode Store -Version $env:STORE_VERSION -OutputRoot "$env:RUNNER_TEMP\Stockroom Store"
+
+      - name: Verify Upload Allowlist
+        shell: pwsh
+        run: |
+          $artifacts = Join-Path $env:RUNNER_TEMP "Stockroom Store\Artifacts"
+          $actual = @(Get-ChildItem -LiteralPath $artifacts -File | Select-Object -ExpandProperty Name | Sort-Object)
+          $expected = @("Build Evidence.json", "Checksums.sha256", "Stockroom_$($env:STORE_VERSION)_x64_store.msix") | Sort-Object
+          if (Compare-Object $expected $actual) { throw "Store artifact allowlist is invalid." }
+
+      - name: Upload Private Store Candidate
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: Stockroom-Microsoft-Store-${{ env.STORE_VERSION }}
+          path: ${{ runner.temp }}/Stockroom Store/Artifacts/*
+          if-no-files-found: error
+          retention-days: 14
+

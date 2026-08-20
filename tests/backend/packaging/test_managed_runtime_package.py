@@ -745,7 +745,7 @@ def test_frozen_worker_and_native_host_are_the_managed_runtime_contract() -> Non
     assert "workflow_coordinator_running = $true" in build
     assert "packaged_worker_handoff = $true" in build
     assert "package_worker_probe.py" in build
-    assert "signed_tuf_release_feed = $true" in build
+    assert "signed_tuf_release_feed = -not $IsStore" in build
     assert '"packaging.release_feed"' in build
     assert '"stockroom-release-feed/1"' in build
     assert "trusted_updater_round_trip" in build

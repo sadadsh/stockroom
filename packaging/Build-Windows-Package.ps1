@@ -469,13 +469,17 @@ $contractArguments = @(
     "--mode", $Mode,
     "--publisher", $Publisher,
     "--version", $Version,
-    "--feed-base-uri", $FeedBaseUri,
     "--package-root", $SeedPackage,
-    "--appinstaller-path", $SeedAppInstaller,
     "--template-directory", $PackagingRoot,
     "--version-info-path", $VersionInfoPath,
     "--source-icon", $SourceIcon
 )
+if (-not $IsStore) {
+    $contractArguments += @(
+        "--feed-base-uri", $FeedBaseUri,
+        "--appinstaller-path", $SeedAppInstaller
+    )
+}
 if ($SigningCertificateProvided) {
     $contractArguments += "--signing-certificate-provided"
 }
@@ -708,13 +712,17 @@ function Initialize-PackageStage {
         "--mode", $Mode,
         "--publisher", $Publisher,
         "--version", $Version,
-        "--feed-base-uri", $FeedBaseUri,
         "--package-root", $stage,
-        "--appinstaller-path", $AppInstallerPath,
         "--template-directory", $PackagingRoot,
         "--version-info-path", $VersionInfoPath,
         "--source-icon", $SourceIcon
     )
+    if (-not $IsStore) {
+        $renderArguments += @(
+            "--feed-base-uri", $FeedBaseUri,
+            "--appinstaller-path", $AppInstallerPath
+        )
+    }
     if ($SigningCertificateProvided) {
         $renderArguments += "--signing-certificate-provided"
     }
@@ -731,12 +739,16 @@ function Initialize-PackageStage {
         "--version", $Version,
         "--minimum-host-version", $MinimumHostVersion,
         "--protocol-version", [string]$ProtocolVersion,
-        "--feed-base-uri", $FeedBaseUri,
         "--source-revision", $GitRevision,
         "--source-date-epoch", [string]$SourceDateEpoch,
-        "--rollback-release-id", $RollbackReleaseId,
         "--output", $bundleEvidence
     )
+    if (-not $IsStore) {
+        $bundleArguments += @(
+            "--feed-base-uri", $FeedBaseUri,
+            "--rollback-release-id", $RollbackReleaseId
+        )
+    }
     foreach ($predecessor in $CompatibleFromReleaseIds) {
         if ([string]::IsNullOrWhiteSpace($predecessor)) {
             throw "Compatible predecessor release IDs cannot be blank."
@@ -883,10 +895,14 @@ $validateArguments = @(
     "--mode", $Mode,
     "--publisher", $Publisher,
     "--version", $Version,
-    "--feed-base-uri", $FeedBaseUri,
-    "--package-root", $UnpackedRoot,
-    "--appinstaller-path", $FinalAppInstaller
+    "--package-root", $UnpackedRoot
 )
+if (-not $IsStore) {
+    $validateArguments += @(
+        "--feed-base-uri", $FeedBaseUri,
+        "--appinstaller-path", $FinalAppInstaller
+    )
+}
 if ($SigningCertificateProvided) {
     $validateArguments += "--signing-certificate-provided"
 }

@@ -82,23 +82,17 @@ shipping it is covered in `packaging/README.md`.
 
 ## Installing and updating
 
-The future supported production route is a signed `Stockroom.appinstaller`
-published with a [GitHub Release](https://github.com/sadadsh/stockroom/releases).
-No production App Installer feed is published yet; the current unsigned fixture
-is verification evidence, not an installable release. Once published, Windows/MSIX
-owns the Start menu entry, Installed Apps registration, update checks, repair, and
-uninstall. Normal startup launches `Stockroom.WindowHost.exe`, which starts the
-package's immutable PyInstaller onedir `Backend\Stockroom Worker.exe`. That frozen
-worker does not invoke a checkout, `uv`, or a system/source Python environment.
+The supported public Windows route is the
+[Microsoft Store](https://apps.microsoft.com/detail/9NQ6HP17PH4H). Microsoft signs
+the submitted MSIX after certification and owns installation and updates. Windows
+owns the Start menu entry, Installed Apps registration, repair, and uninstall.
+Normal startup launches `Stockroom.WindowHost.exe`, which supervises the immutable
+packaged backend without invoking a checkout, `uv`, or a system Python environment.
 
-Every main push triggers `.github/workflows/release.yml`; after the canonical Windows CI gate, a
-successful run publishes one normal immutable GitHub Release as
-`1.0.0.<GitHub run number>`. Manual workflow dispatch builds and verifies an Actions artifact but
-does not publish, and version tags do not create a competing release line. Production packaging
-requires the legitimate Authenticode certificate, publisher/feed configuration, pinned TUF root,
-and online-role signing keys; missing credentials are a hard blocker, never an unsigned fallback.
-Updates are accepted only from the signed App Installer/TUF release set, with generation-fenced
-adoption and rollback. See `packaging/README.md` for the exact trust and evidence boundaries.
+`.github/workflows/store.yml` builds a private unsigned Store candidate only after
+canonical CI passes. GitHub continues to host source, release notes, SBOMs,
+checksums, and evidence; it does not publish the unsigned Store MSIX as a normal
+download. See `packaging/README.md` for the exact package and trust boundaries.
 
 ## Verifying a change
 

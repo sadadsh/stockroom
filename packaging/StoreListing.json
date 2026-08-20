@@ -1,0 +1,24 @@
+{
+  "schema": "stockroom-store-listing/1",
+  "store_id": "9NQ6HP17PH4H",
+  "msa_app_id": "310029eb-7c34-4599-ba31-57ca888d37d0",
+  "store_protocol_uri": "ms-windows-store://pdp/?productid=9NQ6HP17PH4H",
+  "title": "Stockroom",
+  "short_description": "Manage electronic parts, sourcing evidence, CAD assets, and EDA libraries.",
+  "description": "Stockroom keeps electronic component data, supplier evidence, CAD assets, and library workflows together. Add a part by exact manufacturer part number, review information from configured official sources, obtain CAD files through provider pages when needed, and stage verified assets into your local catalog. Stockroom supports deliberate KiCad and Altium workflows without claiming universal CAD availability or automating provider sign-in.",
+  "features": [
+    "Component catalog and specification evidence",
+    "Mouser and DigiKey enrichment when configured",
+    "Manual provider browser for CAD acquisition",
+    "KiCad and Altium library workflows",
+    "Local Design Studio drafts and applied designs"
+  ],
+  "search_terms": ["electronics", "components", "CAD", "KiCad", "Altium", "BOM"],
+  "price": "free",
+  "device_family": "Windows Desktop",
+  "architecture": "x64",
+  "privacy_policy": "https://sadadsh.github.io/stockroom/privacy/",
+  "support_url": "https://github.com/sadadsh/stockroom/issues",
+  "release_notes_url": "https://github.com/sadadsh/stockroom/releases",
+  "testing_instructions": "Create or select a library. Add a component using an exact manufacturer part number. Open CAD Models, then Manage Models. Choose a provider and use its page manually when CAD files are required."
+}
