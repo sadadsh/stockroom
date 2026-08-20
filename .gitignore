@@ -32,22 +32,8 @@ Thumbs.db
 /packaging/webview2/
 /mingit.zip
 
-# Developer-local planning scratch (ledger, task briefs, review packages)
-.work plans/
-
-# Developer-local assistant settings and personal commands
-.local-tools/
-
-# Developer-local instruction file; never publish it
-/local instructions
-
 # Temporary design and research work; durable authority belongs under the product docs
-docs/work plans/
 docs/research/
-
-# Spec-driven-development working state; local only
-.planning/
-.gsd/
 
 # Derived, never-committed library artifacts (the SQLite indexes are in-memory; the enrich
 # cache is the one on-disk derived dir, written beside the in-repo library at <repo>/)
@@ -80,12 +66,6 @@ libraries/*/altium/*.xlsx
 libraries/*/altium/stockroom-parts.db
 libraries/*/altium/*.DbLib
 
-# Agent tooling: installed skills + SuperDesign workspace (never committed)
-.agents/
-.superdesign/
-/skills-lock.json
-/app/frontend/**/skills/frontend check/
-
 # S8 cold-rebuild harness run outputs (local only)
 scripts/out/
 
@@ -104,9 +84,6 @@ docs/FINALE_SAUCE_SOURCE.md
 /launcher/
 tests/backend/api/test_launcher.py
 tests/backend/api/test_gitshim.py
-
-.planning/
-.gsd/
 
 # headless UI shot output
 build/shots/

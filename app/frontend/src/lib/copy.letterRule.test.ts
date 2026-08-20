@@ -33,7 +33,7 @@
  *     that module's `OWNER_AUTHORED_COPY_IDS` was typed by the OWNER through the Design Mode editor,
  *     and the rule exists to stop this application authoring blocked words FOR them, not to overrule
  *     them inside their own product. The exemption is keyed on the id and on nothing else, so a
- *     rewording hand-edited into the map - or written by an agent through any other route - stays
+ *     rewording entered through any other route stays
  *     bound. `POST /api/dev/save` is what writes the record, and it drops any id that does not carry
  *     an override, so the record cannot become a standing exemption for a string that is not there.
  *

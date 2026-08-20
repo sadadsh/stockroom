@@ -96,7 +96,7 @@ package only for a genuinely new domain.
 
 **Two invariants that shape everything here:** the backend imports zero Qt (CI greps and fails on
 a hit), and every KiCad/`.kicad_pro` edit goes through `sexp/` + `mutation/Transaction` — never a
-re-serialize, never a bare file write. See the gitignored agent contract for the full list.
+re-serialize, never a bare file write. See the local contributor contract for the full list.
 
 ## Frontend structure (`app/frontend/src/`)
 

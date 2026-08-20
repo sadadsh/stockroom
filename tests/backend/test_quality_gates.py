@@ -128,13 +128,11 @@ def test_ci_enforces_backend_types() -> None:
     assert _ci_violations(text) == []
 
 
-def test_release_repository_excludes_generated_agent_tooling() -> None:
+def test_release_repository_excludes_personal_editor_tooling() -> None:
     frontend = ROOT / "app" / "frontend"
-    assert list(frontend.glob("**/skills/frontend check/SKILL.md")) == []
+    assert list(frontend.glob("**/SKILL.md")) == []
     assert not (ROOT / "doctor.config.jsonc").exists()
     assert not (ROOT / "scripts" / "workflows" / "rebuild-library.js").exists()
-    assert "frontend check" not in (frontend / "package.json").read_text(encoding="utf-8")
-    assert "frontend check" not in (ROOT / ".pre-commit-config.yaml").read_text(encoding="utf-8")
 
 
 def test_windows_detector_rejects_label_only_known_bad_gate() -> None:

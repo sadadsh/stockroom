@@ -1,6 +1,6 @@
 # Contributing to Stockroom
 
-Whether you are a person or an agent, this is the shortest path to a clean change.
+This is the shortest path to a clean contribution.
 
 ## Start here
 

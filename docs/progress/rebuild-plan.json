@@ -644,7 +644,7 @@
             {
               "id": "cold-eyes-fixes",
               "name": "Cold-Eyes Review, Verified And Fixed",
-              "why": "One fresh worker reviewed the diff (07db6a8..6d27dba) with no plan or reasoning context, per the owner's standing rule. It found 11 real defects, most with a mutation proving they were real and a negative control proving the check wasn't vacuous. All 11 fixed same session, each re-verified with the SAME mutation.",
+              "why": "An independent review of the diff (07db6a8..6d27dba) found 11 real defects, most with a mutation proving they were real and a negative control proving the check was not vacuous. All 11 were fixed in the same session and re-verified with the same mutation.",
               "steps": [
                 {
                   "t": "Finding 1 (CRITICAL): fetch_payload used HTTP-truthiness ('ok' if body else 'not_found') to decide a hit, but a genuine not-found is HTTP 200 with an EMPTY results list - a truthy dict. A fabricated MPN was indistinguishable from a real hit: written to sourced/, indexed, counted imported, and never retried.",

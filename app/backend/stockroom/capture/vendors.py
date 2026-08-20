@@ -168,7 +168,7 @@ class SnapMagicAdapter:
         label=registry_label("snapmagic"),
         # Both tools are native, so both can pass through Stockroom's existing attach seams.
         tools=("kicad", "altium"),
-        # It hosts community and automatically generated models as well as authored ones, so its bytes are
+        # It hosts community and unverified generated models as well as authored ones, so its bytes are
         # lower-trust than Ultra Librarian's. Verification, not provider prose, decides whether
         # those bytes can attach.
         aggregator=False,

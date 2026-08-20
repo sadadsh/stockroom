@@ -11,10 +11,8 @@ type IconifyCollection = {
 
 export const OFFLINE_ICON_LIBRARY_NAMES = [
   "Lucide",
-  "Tabler",
   "Phosphor",
   "Material Symbols",
-  "Simple Icons",
 ] as const;
 
 export const OFFLINE_ICON_FAMILIES = ["Font Awesome", ...OFFLINE_ICON_LIBRARY_NAMES] as const;
@@ -23,10 +21,8 @@ export const DEFAULT_OFFLINE_ICON_FAMILY: OfflineIconFamily = "Font Awesome";
 
 const LOADERS: readonly { label: typeof OFFLINE_ICON_LIBRARY_NAMES[number]; load: () => Promise<IconifyCollection> }[] = [
   { label: "Lucide", load: () => import("@iconify-json/lucide/icons.json").then((value) => value.default as IconifyCollection) },
-  { label: "Tabler", load: () => import("@iconify-json/tabler/icons.json").then((value) => value.default as IconifyCollection) },
   { label: "Phosphor", load: () => import("@iconify-json/ph/icons.json").then((value) => value.default as IconifyCollection) },
   { label: "Material Symbols", load: () => import("@iconify-json/material-symbols/icons.json").then((value) => value.default as IconifyCollection) },
-  { label: "Simple Icons", load: () => import("@iconify-json/simple-icons/icons.json").then((value) => value.default as IconifyCollection) },
 ];
 
 const cachedFamilies = new Map<OfflineIconFamily, readonly IconCatalogEntry[]>();

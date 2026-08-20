@@ -2,7 +2,7 @@
  * THE INTERFACE-LETTER RULE, as a function the running editor can call.
  *
  * `lib/interfaceTerms.ts` states the rule and the replacement for each blocked term.
- * `copy.letterRule.test.ts` enforces it against everything an AGENT authors, by reading the four
+ * `copy.letterRule.test.ts` enforces it against all authored copy by reading the four
  * shapes a copy default is written in out of source. Neither of those can help while the OWNER is
  * typing: Design Mode's copy editor rewords a shipped label in the browser, and a gate that runs in
  * CI over source text has nothing to say about a string that exists only in a draft.
@@ -21,7 +21,7 @@
  *
  * WHAT IS NOT HERE, and where it goes instead. Plan 1.5 settles the rest of this question: at commit
  * an owner-authored override carries PROVENANCE marking it as such, and the lint exempts an
- * owner-authored override while still binding everything an agent writes. Provenance is a field on
+ * owner-authored override while still binding every ordinary edit. Provenance is a field on
  * the committed override and belongs to the commit pipeline, which is PHASE 4 - so nothing in this
  * module records who typed anything. It reports what the text says, and that is all it claims.
  */

@@ -73,7 +73,7 @@ class ProviderRecord:
 #
 # Trust order for the model authors is a separate owner decision, stated 2026-07-27: Ultra
 # Librarian is manufacturer-verified, SamacSys is independently verified (and what Mouser
-# serves), SnapMagic blends community and automatically generated content. The evidence-only providers
+# serves), SnapMagic blends community and unverified generated content. The evidence-only providers
 # close the list.
 PROVIDERS: tuple[ProviderRecord, ...] = (
     ProviderRecord(

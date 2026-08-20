@@ -222,14 +222,14 @@ function CopyEditor() {
   const id = dev.selectedCopyId;
   const defaultText = dev.selectedCopyDefault;
   const current = id ? dev.resolveCopy(id, defaultText) : "";
-  // THE LIVE LETTER RULE (plan 1.5). `copy.letterRule.test.ts` binds what an AGENT authors, by
+  // THE LIVE LETTER RULE (plan 1.5). `copy.letterRule.test.ts` binds authored copy by
   // reading source in CI; it can say nothing about a string the owner is typing into this box right
   // now. `lib/letterRule.ts` is the same judgement over the same allowlist, called here on every
   // keystroke - and it WARNS, never blocks: Save stays enabled below, because the rule exists to
   // catch text written FOR the owner rather than to overrule the owner in their own product.
   //
   // What is deliberately NOT here: PROVENANCE. Plan 1.5 settles that an owner-authored override
-  // carries a marker at commit and the lint then exempts it while still binding agent-authored copy.
+  // carries a marker at commit and the lint then exempts it while still binding ordinary copy.
   // That marker is a field on the committed override and belongs to the Phase 4 commit pipeline, so
   // this surface reports what the text says and claims nothing about who typed it.
   //

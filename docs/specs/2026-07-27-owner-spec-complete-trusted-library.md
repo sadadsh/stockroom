@@ -302,13 +302,13 @@ Owner's own research, which settles it:
 > *"Ultra Librarian: Offers the widest raw collection of manufacturer-verified models. They partner
 > directly with large semiconductor companies (like Texas Instruments and Analog Devices) to build
 > models straight from the source. SnapMagic (formerly SnapEDA): Hosts a massive database of
-> millions of parts but heavily blends manufacturer data with community-built and automatically generated
+> millions of parts but heavily blends manufacturer data with community-built and unverified generated
 > models. SamacSys: Possesses a smaller independent footprint but is deeply integrated into Mouser
 > Electronics and RS Components. If a part is on Mouser, its SamacSys-powered model is usually
 > available instantly."*
 
 **SnapMagic is DISQUALIFIED as a primary source** despite being the only one with a usable API.
-Its models blend community-built and automatically generated content, which is precisely the defect the owner
+Its models blend community-built and UNVERIFIED GENERATED content, which is precisely the defect the owner
 reported ("a lot of our symbols, footprints, and 3d models are broken so its not trusted where
 we've gotten them"). Automating against it would have bought speed at the cost of the one property
 that matters. Recorded so no future session re-proposes it for its API.
@@ -364,7 +364,7 @@ earlier research passes never surfaced it, because each stopped at the first usa
 4. **Terms of service on automated download** - unread for Nexar, SamacSys, UL and SnapMagic alike.
    No source has been checked on whether bulk automated retrieval is permitted. **This is a real
    gap and must be closed before building any fetcher.**
-5. Does the `cad_agg` count distinguish PROVENANCE (manufacturer-verified vs automatically generated), which is
+5. Does the `cad_agg` count distinguish PROVENANCE (manufacturer-verified vs unverified generated), which is
    the owner's actual trust criterion?
 
 ### Negative results, recorded so they are not retried

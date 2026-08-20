@@ -1,17 +1,15 @@
-import * as brands from "@fortawesome/free-brands-svg-icons";
 import * as regular from "@fortawesome/free-regular-svg-icons";
 import * as solid from "@fortawesome/free-solid-svg-icons";
 import { sanitizeIconBody } from "../components/iconResolve";
 import type { IconCatalogEntry } from "../lib/iconRegistry";
 
 type FontAwesomeDefinition = {
-  prefix: "fab" | "far" | "fas";
+  prefix: "far" | "fas";
   iconName: string;
   icon: readonly [number, number, readonly (string | number)[], string, string | readonly string[]];
 };
 
 const FAMILIES: Record<FontAwesomeDefinition["prefix"], string> = {
-  fab: "brands",
   far: "regular",
   fas: "solid",
 };
@@ -22,7 +20,7 @@ function isDefinition(value: unknown): value is FontAwesomeDefinition {
   if (!value || typeof value !== "object") return false;
   const candidate = value as Partial<FontAwesomeDefinition>;
   return (
-    (candidate.prefix === "fab" || candidate.prefix === "far" || candidate.prefix === "fas") &&
+    (candidate.prefix === "far" || candidate.prefix === "fas") &&
     typeof candidate.iconName === "string" &&
     Array.isArray(candidate.icon) &&
     typeof candidate.icon[0] === "number" &&
@@ -66,7 +64,7 @@ function normalizeDefinition(definition: FontAwesomeDefinition): IconCatalogEntr
 export function fontAwesomeEntries(): readonly IconCatalogEntry[] {
   if (cachedEntries) return cachedEntries;
   const entries = new Map<string, IconCatalogEntry>();
-  for (const pack of [solid, regular, brands]) {
+  for (const pack of [solid, regular]) {
     for (const value of Object.values(pack)) {
       if (!isDefinition(value)) continue;
       const entry = normalizeDefinition(value);

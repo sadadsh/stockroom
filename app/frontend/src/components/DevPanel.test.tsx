@@ -158,7 +158,7 @@ describe("DevPanel inspect-first shell", () => {
   });
 
   /**
-   * THE LIVE LETTER RULE (plan 1.5). `copy.letterRule.test.ts` binds what an AGENT authors by reading
+   * THE LIVE LETTER RULE (plan 1.5). `copy.letterRule.test.ts` binds authored copy by reading
    * source in CI and can say nothing about text the owner is typing into this box; this is the same
    * judgement, over the same allowlist in `lib/letterRule.ts`, running on the working string.
    *

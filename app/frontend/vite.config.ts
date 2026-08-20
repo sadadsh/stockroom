@@ -88,6 +88,24 @@ function developmentApiProxy() {
   };
 }
 
+function stripRuntimeLocaleDescriptionsPlugin() {
+  return {
+    name: "stockroom-strip-runtime-locale-descriptions",
+    enforce: "pre" as const,
+    transform(source: string, id: string) {
+      const normalizedId = normalizePath(id);
+      if (!normalizedId.includes("/@astryxdesign/core/locales/") || !normalizedId.endsWith(".json")) {
+        return null;
+      }
+      const messages = JSON.parse(source) as Record<string, Record<string, unknown>>;
+      for (const entry of Object.values(messages)) {
+        if (entry && typeof entry === "object") delete entry.description;
+      }
+      return { code: JSON.stringify(messages), map: null };
+    },
+  };
+}
+
 // The backend serves the built SPA from app/frontend-dist/ (see
 // stockroom.api.app._FRONTEND_DIST), so emit there. Relative asset base so the
 // bundle works whether the host loads it from the API mount or from file://.
@@ -95,6 +113,7 @@ const config = defineConfig({
   plugins: [
     developmentBootstrapPlugin(),
     stockroomDesignIdentityPlugin(),
+    stripRuntimeLocaleDescriptionsPlugin(),
     react(),
     // `stripBase: true` matters: without it the plugin reproduces each file's path from the
     // project root, so the fonts land under `node_modules/pdfjs-dist/standard_fonts/...` in the

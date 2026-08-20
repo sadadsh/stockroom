@@ -1,7 +1,5 @@
 # Microsoft Store Distribution Implementation Plan
 
-> **For automated workers:** REQUIRED SUB-SKILL: Use work plans:worker-driven-development (recommended) or work plans:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
-
 **Goal:** Produce Stockroom's zero-cost Microsoft Store MSIX, make the Store the package's only update authority, and prepare a truthful first submission without publishing an unsigned public installer.
 
 **Architecture:** Extend the existing Windows package contract with a third, fail-closed `Store` mode rather than creating a second packager. A checked-in Store identity document drives the manifest, package evidence, native worker environment, backend update status, frontend copy, CI artifact, privacy site, and listing source. Store packages retain the immutable built-in release and managed service authority, but they construct no TUF repository, poll no direct feed, and expose only the Microsoft Store product page.
@@ -566,4 +564,3 @@ After confirmation, submit once. Record submission ID, time, and current status.
 - [ ] **Step 7: Close the release only after Store proof**
 
 After certification, install Stockroom from its public Store page on this PC, launch it, verify running package identity `Sadad.Stockroom`, confirm Microsoft Store update authority in Settings, verify a persisted library and Design Studio draft, and update Current State/QMD with the public Store result.
-

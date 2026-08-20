@@ -270,7 +270,7 @@ describe("owner-authored copy provenance", () => {
    * this editor by the owner; an entry that matches the committed text was not touched here and keeps
    * whatever provenance the committed record gave it - which for a hand-edited rewording is none.
    *
-   * FAILS IF: every override is marked owner-authored (the lint would stop binding agent-authored
+   * FAILS IF: every override is marked owner-authored (the lint would stop binding ordinary
    * text committed through any route), or none is (the exemption could never be earned).
    */
   it("records what the editor changed, and leaves untouched entries alone", () => {

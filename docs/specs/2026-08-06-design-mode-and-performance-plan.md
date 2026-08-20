@@ -214,7 +214,7 @@ decision 3). At commit, an owner-authored override carries provenance marking it
 owner-authored, and the lint exempts owner-authored overrides while still binding
 everything agents author. The lint's purpose is to catch authored-for-the-owner
 violations, not to overrule the owner in their own product. None of this is built
-before the edit-mode phase; it is recorded here so the implementing agent does not
+before the edit-mode phase; it is recorded here so implementation does not
 invent something worse.
 
 ## 1.6 Commit pipeline

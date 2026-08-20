@@ -89,3 +89,10 @@ def test_production_frontend_ignores_local_dotenv_files() -> None:
 
     assert 'command === "build" ? false' in vite_source
     assert "import.meta.env.DEV\n    ? (import.meta.env.VITE_API_BASE" in runtime_source
+
+
+def test_production_bundle_strips_translation_only_descriptions() -> None:
+    source = _VITE_CONFIG.read_text(encoding="utf-8")
+
+    assert "stripRuntimeLocaleDescriptionsPlugin()" in source
+    assert 'delete entry.description' in source

@@ -39,7 +39,7 @@ class CadSource:
 
 # Ordered by the owner's trust ranking, stated 2026-07-27: Ultra Librarian is manufacturer-verified
 # and built from source with the semiconductor makers; SamacSys is independently verified and is
-# what Mouser serves; SnapMagic is last of the authors because it blends community and automatically generated
+# what Mouser serves; SnapMagic is last of the authors because it blends community and unverified generated
 # content. DigiKey sits first only because it is the one page that gathers all three in one place,
 # which is fewer clicks when the part is stocked there.
 _SOURCES: tuple[tuple[str, str, tuple[str, ...], bool, str], ...] = (

@@ -193,8 +193,8 @@ describe("InspectorPanel", () => {
     fireEvent.click(screen.getByRole("button", { name: "Choose Icon" }));
 
     const search = await screen.findByRole("searchbox", { name: "Search Icon Catalog" });
-    fireEvent.change(search, { target: { value: "github" } });
-    fireEvent.click(await screen.findByRole("button", { name: "Select github from Font Awesome brands" }));
+    fireEvent.change(search, { target: { value: "address book" } });
+    fireEvent.click(await screen.findByRole("button", { name: "Select address-book from Font Awesome regular" }));
 
     await waitFor(() => {
       const draft = JSON.parse(screen.getByTestId("inspector-draft").textContent ?? "{}") as {
@@ -303,8 +303,8 @@ describe("InspectorPanel", () => {
       fireEvent.change(screen.getByLabelText("Alignment"), { target: { value: "text-top" } });
       fireEvent.change(screen.getByLabelText("Accessible Label"), { target: { value: "Add item" } });
       fireEvent.click(screen.getByRole("button", { name: "Choose Icon" }));
-      fireEvent.change(await screen.findByRole("searchbox", { name: "Search Icon Catalog" }), { target: { value: "github" } });
-      fireEvent.click(await screen.findByRole("button", { name: "Select github from Font Awesome brands" }));
+      fireEvent.change(await screen.findByRole("searchbox", { name: "Search Icon Catalog" }), { target: { value: "address book" } });
+      fireEvent.click(await screen.findByRole("button", { name: "Select address-book from Font Awesome regular" }));
       const body = screen.queryByLabelText("Edit Icon SVG Markup");
       if (body) fireEvent.change(body, { target: { value: '<path d="M2 2h20" />' } });
 

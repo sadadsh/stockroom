@@ -45,7 +45,7 @@ vi.mock("../../design-studio/offlineIconRegistry", () => ({
   DEFAULT_OFFLINE_ICON_FAMILY: "Font Awesome",
   fontAwesomeCatalogEntries: () => registry.fontAwesome,
   loadOfflineIconCollections: registry.load,
-  offlineIconFamilies: () => ["Font Awesome", "Lucide", "Tabler", "Phosphor", "Material Symbols", "Simple Icons"],
+  offlineIconFamilies: () => ["Font Awesome", "Lucide", "Phosphor", "Material Symbols"],
   searchOfflineIcons: registry.search,
 }));
 

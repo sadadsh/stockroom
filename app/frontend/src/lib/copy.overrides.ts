@@ -12,7 +12,7 @@ export const COPY_OVERRIDES: Record<string, string> = {};
  *
  * The letter rule and the term map are the owner's own rules, enforced by `copy.letterRule.test.ts`
  * against text this application AUTHORS FOR the owner. Text the owner types themselves, through the
- * Design Mode editor, is not that: the lint exists to catch an agent writing a blocked word into
+ * Design Mode editor, is not that: the lint exists to catch a blocked word entering
  * their product, not to overrule the owner inside it. So an id listed here is exempt from the letter
  * rule and every id that is not listed stays bound by it - including a rewording somebody hand-edited
  * into the map above, which is exactly the case the exemption must not cover.

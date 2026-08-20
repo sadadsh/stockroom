@@ -56,7 +56,7 @@ def test_digikey_is_marked_as_an_aggregator_not_a_model_author():
 
 def test_vendor_order_is_stable_and_puts_the_trusted_authors_first():
     # Owner's trust ordering, 2026-07-27: UL is manufacturer-verified and built from source;
-    # SnapMagic blends community + automatically generated content and comes last of the authors.
+    # SnapMagic blends community and unverified generated content and comes last of the authors.
     keys = [s.key for s in all_cad_sources()]
     assert keys.index("ultralibrarian") < keys.index("snapmagic")
 

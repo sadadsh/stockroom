@@ -676,10 +676,14 @@ authority. Binary font formats are marked as binary so Git never rewrites releas
 ### Repository Tooling Stays Product-Owned
 
 The release repository carries product source, product tests, and deterministic project tooling.
-Generated assistant skill copies, autonomous prompt workflows, private instruction references, and
-tool-specific configuration are local development artifacts rather than product authority. They are
+Generated editor tooling, private instruction references, and tool-specific configuration are local
+development artifacts rather than product authority. They are
 removed from version control and ignored at their generated locations. Frontend acceptance remains
 owned by the repository's type, test, accessibility, build, browser, and native gates.
+
+The repository publishes product source, product documentation, deterministic build inputs, and
+required third-party notices only. Personal development instructions and tool-specific working files
+remain local so the public tree presents Stockroom itself without unrelated development metadata.
 
 ### Wall-Clock Performance Runs On Controlled Hardware
 

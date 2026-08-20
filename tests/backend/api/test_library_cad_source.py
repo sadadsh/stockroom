@@ -101,7 +101,7 @@ def test_cad_source_unknown_part_is_404(client):
 #
 # Owner, 2026-07-27, on where CAD may come from: *"yes rebuild guided capture, digikey UL snapmagic
 # and samacsys"*, with Ultra Librarian and SamacSys the ones they TRUST (manufacturer-verified) and
-# SnapMagic disqualified as a PRIMARY source because it blends automatically generated models.
+# SnapMagic is disqualified as a PRIMARY source because it blends unverified generated models.
 #
 # `enrich/cad_sources.py` has held all four -- with each vendor's URL, the tools it can export for,
 # whether it merely aggregates, and a per-vendor instruction -- since it was written, and NOTHING
