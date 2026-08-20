@@ -26,6 +26,11 @@ from packaging.brand_assets import (
     render_ico_bytes,
     render_png_bytes,
 )
+from packaging.store_distribution import (
+    StoreDistributionError,
+    StoreDistributionMarker,
+    StoreIdentity,
+)
 
 PACKAGE_NAMESPACE = "http://schemas.microsoft.com/appx/manifest/foundation/windows10"
 UAP_NAMESPACE = "http://schemas.microsoft.com/appx/manifest/uap/windows10"
@@ -85,14 +90,26 @@ class PackageConfiguration:
             package_name = "Stockroom.Desktop"
             application_id = "Stockroom"
             display_name = "Stockroom"
+            publisher_display_name = "Stockroom"
+        elif normalized_mode == "store":
+            try:
+                identity = StoreIdentity.load()
+            except StoreDistributionError as exc:
+                raise PackageContractError(str(exc)) from exc
+            package_name = identity.package_name
+            application_id = "Stockroom"
+            display_name = identity.product_name
+            publisher_display_name = identity.publisher_display_name
         else:
-            raise PackageContractError("mode must be Fixture or Production")
+            raise PackageContractError("mode must be Fixture, Production, or Store")
+        if normalized_mode == "fixture":
+            publisher_display_name = "Stockroom"
         configuration = cls(
             mode=normalized_mode,
             package_name=package_name,
             application_id=application_id,
             display_name=display_name,
-            publisher_display_name="Stockroom",
+            publisher_display_name=publisher_display_name,
             publisher=publisher.strip(),
             version=version.strip(),
             feed_base_uri=feed_base_uri.rstrip("/"),
@@ -105,7 +122,17 @@ class PackageConfiguration:
     def package_filename(self) -> str:
         if self.mode == "fixture":
             return f"Stockroom.Development_{self.version}_x64_unsigned.msix"
+        if self.mode == "store":
+            return f"Stockroom_{self.version}_x64_store.msix"
         return f"Stockroom_{self.version}_x64.msix"
+
+    @property
+    def update_channel(self) -> str:
+        return "microsoft-store" if self.mode == "store" else self.mode
+
+    @property
+    def requires_appinstaller(self) -> bool:
+        return self.mode != "store"
 
     @property
     def appinstaller_filename(self) -> str:
@@ -137,6 +164,21 @@ class PackageConfiguration:
             raise PackageContractError("each version component must be at most 65535")
         if self.version_tuple == (0, 0, 0, 0):
             raise PackageContractError("version 0.0.0.0 is not deployable")
+
+        if self.mode == "store":
+            try:
+                identity = StoreIdentity.load()
+            except StoreDistributionError as exc:
+                raise PackageContractError(str(exc)) from exc
+            if self.publisher != identity.publisher:
+                raise PackageContractError("Store package must use the exact Partner Center publisher")
+            if self.version_tuple[3] != 0:
+                raise PackageContractError("Store package fourth component must be zero")
+            if self.feed_base_uri:
+                raise PackageContractError("Store package cannot use a direct feed")
+            if self.signing_certificate_provided:
+                raise PackageContractError("Store packages must remain unsigned before submission")
+            return
 
         parsed = urlparse(self.feed_base_uri)
         if parsed.scheme != "https" or not parsed.hostname:
@@ -200,7 +242,8 @@ def render_contract(
     if not source_icon.is_file():
         raise PackageContractError(f"source icon does not exist: {source_icon}")
     package_root.mkdir(parents=True, exist_ok=True)
-    appinstaller_path.parent.mkdir(parents=True, exist_ok=True)
+    if configuration.requires_appinstaller:
+        appinstaller_path.parent.mkdir(parents=True, exist_ok=True)
     version_info_path.parent.mkdir(parents=True, exist_ok=True)
 
     values = {
@@ -215,10 +258,21 @@ def render_contract(
         "VERSION_TUPLE": ", ".join(str(part) for part in configuration.version_tuple),
     }
     manifest = _render_template(template_directory / "AppxManifest.xml.in", values)
-    appinstaller = _render_template(template_directory / "Stockroom.appinstaller.in", values)
     version_info = _render_template(template_directory / "StockroomVersionInfo.txt.in", values)
     (package_root / "AppxManifest.xml").write_text(manifest, encoding="utf-8", newline="\n")
-    appinstaller_path.write_text(appinstaller, encoding="utf-8", newline="\n")
+    if configuration.requires_appinstaller:
+        appinstaller = _render_template(template_directory / "Stockroom.appinstaller.in", values)
+        appinstaller_path.write_text(appinstaller, encoding="utf-8", newline="\n")
+    else:
+        identity = StoreIdentity.load()
+        support = package_root / "Support"
+        support.mkdir(parents=True, exist_ok=True)
+        marker = StoreDistributionMarker.from_identity(identity, version=configuration.version)
+        (support / "Distribution.json").write_text(
+            marker.to_json(),
+            encoding="utf-8",
+            newline="\n",
+        )
     version_info_path.write_text(version_info, encoding="utf-8", newline="\n")
     _render_assets(source_icon, package_root / "Assets")
 
@@ -245,7 +299,17 @@ def validate_rendered_contract(
     _validate_manifest(configuration, manifest_path, package_root)
     if require_payload:
         _validate_window_host_payload(package_root)
-    _validate_appinstaller(configuration, appinstaller_path)
+    if configuration.requires_appinstaller:
+        _validate_appinstaller(configuration, appinstaller_path)
+    else:
+        try:
+            StoreDistributionMarker.load(
+                package_root / "Support" / "Distribution.json",
+                identity=StoreIdentity.load(),
+                version=configuration.version,
+            )
+        except StoreDistributionError as exc:
+            raise PackageContractError(str(exc)) from exc
 
 
 def _validate_window_host_payload(package_root: Path) -> None:
@@ -572,7 +636,11 @@ def main() -> int:
     subparsers = parser.add_subparsers(dest="command", required=True)
     for command in ("render", "validate"):
         subparser = subparsers.add_parser(command)
-        subparser.add_argument("--mode", choices=("Fixture", "Production"), required=True)
+        subparser.add_argument(
+            "--mode",
+            choices=("Fixture", "Production", "Store"),
+            required=True,
+        )
         subparser.add_argument("--publisher", required=True)
         subparser.add_argument("--version", required=True)
         subparser.add_argument("--feed-base-uri", required=True)

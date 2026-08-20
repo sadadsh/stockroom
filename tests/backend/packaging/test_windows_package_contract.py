@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import hashlib
+import json
+import subprocess
+import sys
 import zipfile
 from pathlib import Path
 from xml.etree import ElementTree
@@ -34,6 +37,16 @@ def fixture_configuration() -> PackageConfiguration:
         publisher="CN=Stockroom Development",
         version="0.1.2.3",
         feed_base_uri="https://updates.example.invalid/stockroom/development/x64",
+        signing_certificate_provided=False,
+    )
+
+
+def store_configuration() -> PackageConfiguration:
+    return PackageConfiguration.for_mode(
+        mode="Store",
+        publisher="CN=6586C41B-410B-4C94-8631-F025DB362E47",
+        version="1.0.42.0",
+        feed_base_uri="",
         signing_certificate_provided=False,
     )
 
@@ -89,6 +102,157 @@ def test_fixture_and_production_are_cryptographically_distinct_identities() -> N
     assert production.package_name == "Stockroom.Desktop"
     assert production.application_id == "Stockroom"
     assert fixture.package_name != production.package_name
+
+
+def test_store_configuration_uses_the_exact_partner_center_identity() -> None:
+    store = PackageConfiguration.for_mode(
+        mode="Store",
+        publisher="CN=6586C41B-410B-4C94-8631-F025DB362E47",
+        version="1.0.42.0",
+        feed_base_uri="",
+        signing_certificate_provided=False,
+    )
+
+    assert store.package_name == "Sadad.Stockroom"
+    assert store.application_id == "Stockroom"
+    assert store.display_name == "Stockroom"
+    assert store.publisher_display_name == "Sadad"
+    assert store.update_channel == "microsoft-store"
+    assert store.requires_appinstaller is False
+    assert store.package_filename == "Stockroom_1.0.42.0_x64_store.msix"
+
+
+@pytest.mark.parametrize(
+    ("overrides", "message"),
+    [
+        (
+            {"publisher": "CN=Stockroom Development"},
+            "Partner Center publisher",
+        ),
+        (
+            {"version": "1.0.42.1"},
+            "fourth component must be zero",
+        ),
+        (
+            {"feed_base_uri": "https://sadadsh.github.io/stockroom/windows/x64"},
+            "cannot use a direct feed",
+        ),
+        (
+            {"signing_certificate_provided": True},
+            "must remain unsigned",
+        ),
+    ],
+)
+def test_store_configuration_refuses_mixed_distribution_authority(
+    overrides: dict[str, object], message: str
+) -> None:
+    values: dict[str, object] = {
+        "mode": "Store",
+        "publisher": "CN=6586C41B-410B-4C94-8631-F025DB362E47",
+        "version": "1.0.42.0",
+        "feed_base_uri": "",
+        "signing_certificate_provided": False,
+    }
+    values.update(overrides)
+
+    with pytest.raises(PackageContractError, match=message):
+        PackageConfiguration.for_mode(**values)  # type: ignore[arg-type]
+
+
+def test_store_contract_emits_a_distribution_marker_without_appinstaller(
+    tmp_path: Path,
+) -> None:
+    package_root = tmp_path / "Package"
+    appinstaller = tmp_path / "Stockroom.appinstaller"
+    version_info = tmp_path / "StockroomVersionInfo.txt"
+
+    render_contract(
+        store_configuration(),
+        template_directory=TEMPLATE_DIRECTORY,
+        package_root=package_root,
+        appinstaller_path=appinstaller,
+        version_info_path=version_info,
+        source_icon=SOURCE_ICON,
+    )
+
+    assert not appinstaller.exists()
+    assert json.loads((package_root / "Support/Distribution.json").read_text(encoding="utf-8")) == {
+        "channel": "microsoft-store",
+        "package_name": "Sadad.Stockroom",
+        "publisher": "CN=6586C41B-410B-4C94-8631-F025DB362E47",
+        "schema": "stockroom-distribution/1",
+        "store_id": "9NQ6HP17PH4H",
+        "store_uri": "https://apps.microsoft.com/detail/9NQ6HP17PH4H",
+        "version": "1.0.42.0",
+    }
+    root = ElementTree.parse(package_root / "AppxManifest.xml").getroot()
+    identity = root.find(f"{{{PACKAGE_NAMESPACE}}}Identity")
+    assert identity is not None
+    assert identity.attrib["Name"] == "Sadad.Stockroom"
+    assert identity.attrib["Publisher"] == "CN=6586C41B-410B-4C94-8631-F025DB362E47"
+
+
+def test_store_contract_rejects_a_direct_update_marker(tmp_path: Path) -> None:
+    package_root = tmp_path / "Package"
+    appinstaller = tmp_path / "Stockroom.appinstaller"
+    render_contract(
+        store_configuration(),
+        template_directory=TEMPLATE_DIRECTORY,
+        package_root=package_root,
+        appinstaller_path=appinstaller,
+        version_info_path=tmp_path / "StockroomVersionInfo.txt",
+        source_icon=SOURCE_ICON,
+    )
+    marker_path = package_root / "Support/Distribution.json"
+    marker = json.loads(marker_path.read_text(encoding="utf-8"))
+    marker["channel"] = "production"
+    marker_path.write_text(json.dumps(marker), encoding="utf-8")
+
+    with pytest.raises(PackageContractError, match="Microsoft Store distribution marker"):
+        validate_rendered_contract(
+            store_configuration(),
+            manifest_path=package_root / "AppxManifest.xml",
+            appinstaller_path=appinstaller,
+            package_root=package_root,
+            require_payload=False,
+        )
+
+
+def test_package_contract_cli_renders_store_mode(tmp_path: Path) -> None:
+    package_root = tmp_path / "Package"
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "packaging.package_contract",
+            "render",
+            "--mode",
+            "Store",
+            "--publisher",
+            "CN=6586C41B-410B-4C94-8631-F025DB362E47",
+            "--version",
+            "1.0.42.0",
+            "--feed-base-uri",
+            "",
+            "--package-root",
+            str(package_root),
+            "--appinstaller-path",
+            str(tmp_path / "Stockroom.appinstaller"),
+            "--template-directory",
+            str(TEMPLATE_DIRECTORY),
+            "--version-info-path",
+            str(tmp_path / "StockroomVersionInfo.txt"),
+            "--source-icon",
+            str(SOURCE_ICON),
+        ],
+        cwd=REPOSITORY_ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert (package_root / "Support/Distribution.json").is_file()
 
 
 @pytest.mark.parametrize(
