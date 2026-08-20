@@ -1539,6 +1539,7 @@ export interface UpdateCheck {
   // checkout HEAD when committed generated assets are built from the preceding source commit.
   frontend_revision?: string;
   channel?: string;
+  store_uri?: string;
   automatic_on_launch?: boolean;
   check_interval_seconds?: number;
   convergence_phase?: string;

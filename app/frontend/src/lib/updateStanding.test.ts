@@ -11,6 +11,26 @@ import {
 } from "./updateStanding";
 
 describe("deriveUpdateStanding", () => {
+  it("treats Microsoft Store authority as current without inventing a remote revision", () => {
+    expect(
+      deriveUpdateStanding({
+        data: {
+          update_available: false,
+          state: "store_managed",
+          channel: "microsoft-store",
+          current_release_id: "release-1.0.42.0",
+        },
+        checking: false,
+        failed: false,
+      }),
+    ).toMatchObject({
+      standing: "current",
+      currentRevision: "release-1.0.42.0",
+      targetRevision: "",
+      detail: "Microsoft Store manages installation and updates.",
+    });
+  });
+
   it("calls an install current only after a verified upstream comparison", () => {
     expect(
       deriveUpdateStanding({

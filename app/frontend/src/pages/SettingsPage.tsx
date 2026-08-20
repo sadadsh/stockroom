@@ -43,6 +43,7 @@ import {
 } from "../api/queries";
 import { useTheme, type Theme } from "../lib/theme";
 import { statusTone } from "../lib/statusTone";
+import { openExternalUrl } from "../lib/externalNavigation";
 import { useToast } from "../lib/toast";
 import {
   Badge,
@@ -1540,6 +1541,7 @@ function UpdateSection() {
   const { query: check, view: standing } = useUpdateStanding();
   const { toast } = useToast();
   const [restarting, setRestarting] = useState(false);
+  const storeManaged = check.data?.channel === "microsoft-store";
   const targetRevision = updateTargetRevision(check.data);
   const branchUnknown = useText("settings.update.branch-unknown", "Unknown");
   const revisionMissing = useText("settings.update.revision-unavailable", "Unavailable");
@@ -1577,7 +1579,9 @@ function UpdateSection() {
             label="Updates"
             labelId="settings.update.delivery"
             value={
-              check.data?.automatic_apply ? (
+              storeManaged ? (
+                <Text id="settings.update.delivery-store">Microsoft Store</Text>
+              ) : check.data?.automatic_apply ? (
                 <Text id="settings.update.delivery-open">Automatic while Stockroom is open</Text>
               ) : check.data?.automatic_on_launch ? (
                 <Text id="settings.update.delivery-launch">Automatic when Stockroom opens</Text>
@@ -1587,7 +1591,7 @@ function UpdateSection() {
             }
           />
           <StatusRow
-            label="Application Branch"
+            label={storeManaged ? "Update Channel" : "Application Branch"}
             labelId="settings.update.branch"
             value={<span className="font-mono">{check.data?.channel || branchUnknown}</span>}
           />
@@ -1609,7 +1613,11 @@ function UpdateSection() {
             label="Update Status"
             labelId="settings.update.status"
             value={
-              standing.standing === "checking" ? (
+              storeManaged ? (
+                <span className="text-ok-text">
+                  <Text id="settings.update.status-store">Microsoft Store Managed</Text>
+                </span>
+              ) : standing.standing === "checking" ? (
                 <span className="text-t3">
                   <Text id="settings.update.status-checking">
                     Checking the application remote...
@@ -1705,10 +1713,24 @@ function UpdateSection() {
         </>
       )}
       <p className="mt-3 text-xs leading-relaxed text-t3">
-        <Text id="settings.update.lede">New releases are staged beside the running app and health-checked. Restart Now applies a prepared release; otherwise Stockroom applies it when next opened. A failed release rolls back to the last sound backend.</Text>
+        {storeManaged ? (
+          <Text id="settings.update.store-lede">
+            Microsoft Store installs each update.
+          </Text>
+        ) : (
+          <Text id="settings.update.lede">New releases are staged beside the running app and health-checked. Restart Now applies a prepared release; otherwise Stockroom applies it when next opened. A failed release rolls back to the last sound backend.</Text>
+        )}
       </p>
       <div className="mt-3.5 flex flex-wrap items-center gap-2">
-        {standing.standing === "ready" ? (
+        {storeManaged && check.data?.store_uri ? (
+          <Button
+            small
+            data-dev-id="settings.update-store-action"
+            onClick={() => openExternalUrl(check.data?.store_uri ?? "")}
+          >
+            <Text id="settings.update.open-store">Open Microsoft Store</Text>
+          </Button>
+        ) : standing.standing === "ready" ? (
           <Button small variant="accent" disabled={restarting} onClick={() => void restartNow()}>
             {restarting ? (
               <Text id="settings.update.restarting-now">Restarting</Text>
@@ -1717,14 +1739,14 @@ function UpdateSection() {
             )}
           </Button>
         ) : null}
-        <a
+        {!storeManaged ? <a
           href="https://github.com/sadadsh/stockroom/releases"
           target="_blank"
           rel="noreferrer"
           className="inline-flex h-[27px] items-center rounded-control px-2 text-xs font-medium text-t2 underline decoration-line2 underline-offset-2 hover:text-t1"
         >
           <Text id="settings.update.download">View Releases</Text>
-        </a>
+        </a> : null}
       </div>
     </>
   );

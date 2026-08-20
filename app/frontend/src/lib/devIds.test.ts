@@ -199,7 +199,7 @@ import { DEV_IDS, DEV_ID_AREAS, DEV_ID_BY_ID } from "./devIds";
 // 514 exposes the provider modal/dashboard, add-session and new source/spec summaries while retiring the
 // deleted Altium bulk-embed control.
 // 515 makes the truthful About current-version status directly editable.
-const EXPECTED_ENTRIES = 515;
+const EXPECTED_ENTRIES = 516;
 
 describe("devIds catalogue", () => {
   // The count is asserted from a single constant so bumping it is one edit, and so the test NAME can

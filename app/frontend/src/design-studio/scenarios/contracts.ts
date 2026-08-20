@@ -74,7 +74,7 @@ const settingsContractIds = [
   "settings.distributors.error", "settings.distributors.credentials-partial", "settings.distributors.credentials-refresh", "settings.vendor-logins.ready",
   "settings.vendor-logins.attention",
   "settings.vendor-logins.error", "settings.github.ready", "settings.github.attention", "settings.github.error",
-  "settings.updates.ready", "settings.updates.attention", "settings.updates.error", "settings.maintenance.ready",
+  "settings.update-store", "settings.updates.attention", "settings.updates.error", "settings.maintenance.ready",
   "settings.maintenance.attention", "settings.maintenance.error", "settings.completion.ready",
   "settings.completion.attention", "settings.completion.error", "settings.health.ready", "settings.health.attention",
   "settings.health.error", "settings.rescan.ready", "settings.rescan.attention", "settings.rescan.error",

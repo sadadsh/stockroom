@@ -176,6 +176,14 @@ export function deriveUpdateStanding({
         "The remote check did not complete; Stockroom will retry automatically.",
     };
   }
+  if (data.channel === "microsoft-store" && data.state === "store_managed") {
+    return {
+      standing: "current",
+      currentRevision,
+      targetRevision: "",
+      detail: data.detail || "Microsoft Store manages installation and updates.",
+    };
+  }
   if (["offline", "unverified"].includes(data.state ?? "")) {
     return {
       standing: "retrying",

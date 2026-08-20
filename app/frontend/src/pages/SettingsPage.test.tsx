@@ -597,6 +597,29 @@ describe("SettingsPage — sync + kicad + update", () => {
     expect(mockApi.applyUpdate).toHaveBeenCalledTimes(1);
   });
 
+  it("hands Store installations back to Microsoft without direct update controls", async () => {
+    mockApi.checkUpdate.mockResolvedValue({
+      update_available: false,
+      state: "store_managed",
+      current_release_id: "release-1.0.42.0",
+      current_revision: "release-1.0.42.0",
+      channel: "microsoft-store",
+      store_uri: "https://apps.microsoft.com/detail/9NQ6HP17PH4H",
+      automatic_on_launch: true,
+      automatic_apply: true,
+    } as never);
+    renderPage();
+    await openSettings("settings.update");
+
+    expect(await screen.findByText("Microsoft Store Managed")).toBeInTheDocument();
+    expect(screen.getByText("Microsoft Store installs each update.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Open Microsoft Store" })).toBeEnabled();
+    expect(screen.queryByRole("button", { name: "Restart Now" })).toBeNull();
+    const update = document.querySelector<HTMLElement>('[data-dev-id="settings.update"]')!;
+    expect(within(update).queryByRole("link", { name: "View Releases" })).toBeNull();
+    expect(mockApi.applyUpdate).not.toHaveBeenCalled();
+  });
+
   it("does not offer to apply when up to date", async () => {
     renderPage();
     await openSettings("settings.update");

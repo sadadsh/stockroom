@@ -491,6 +491,7 @@ export const DEV_IDS: DevIdEntry[] = [
   { id: "settings.distributor-key", label: "Mouser key input", area: "settings" },
   { id: "settings.vendor-login-row", label: "API credential row", area: "settings" },
   { id: "settings.update", label: "Automatic Updates section", area: "settings" },
+  { id: "settings.update-store-action", label: "Open Microsoft Store action", area: "settings" },
   { id: "altiumdb.section-progress", label: "DbLib ready meter", area: "altiumdb" },
   { id: "altiumdb.section-path", label: "DbLib install path row", area: "altiumdb" },
   { id: "altiumdb.section-odbc", label: "ODBC driver status + download", area: "altiumdb" },

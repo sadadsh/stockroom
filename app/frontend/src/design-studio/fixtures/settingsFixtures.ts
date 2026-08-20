@@ -48,6 +48,7 @@ export type SettingsFixtureOptions = {
   updateState?: string;
   syncState?: string;
   credentialsPartial?: boolean;
+  storeManaged?: boolean;
 };
 
 function read(path: string, response: unknown, errorPath?: string): ScenarioFixture {
@@ -73,12 +74,24 @@ export function settingsReadFixtures(options: SettingsFixtureOptions = {}): Scen
     github_auth: { mode: "git_credential_manager" as const, accounts: attention ? [] : ["fixture-owner"] },
     last_sync: options.syncState ? { state: options.syncState, pulled: false, pushed: false, converged: false, detail: options.syncState } : null,
   };
-  const update = {
-    ...SETTINGS_UPDATE,
-    state: options.updateState ?? (attention ? "update_available" : "up_to_date"),
-    update_available: (options.updateState ?? "") === "update_available" || attention,
-    behind: attention ? 2 : 0,
-  };
+  const update = options.storeManaged
+    ? {
+        update_available: false,
+        state: "store_managed",
+        current_release_id: "release-1.0.42.0",
+        current_revision: "release-1.0.42.0",
+        channel: "microsoft-store",
+        store_uri: "https://apps.microsoft.com/detail/9NQ6HP17PH4H",
+        automatic_on_launch: true,
+        automatic_apply: true,
+        detail: "Microsoft Store manages installation and updates.",
+      }
+    : {
+        ...SETTINGS_UPDATE,
+        state: options.updateState ?? (attention ? "update_available" : "up_to_date"),
+        update_available: (options.updateState ?? "") === "update_available" || attention,
+        behind: attention ? 2 : 0,
+      };
   return [
     read("/api/onboarding", SETTINGS_ONBOARDING, options.errorPath),
     read("/api/update/check", update, options.errorPath),

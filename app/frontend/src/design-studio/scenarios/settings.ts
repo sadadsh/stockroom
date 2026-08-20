@@ -11,7 +11,7 @@ export const settingsScenarioIds = [
   "settings.distributors.ready", "settings.distributors.attention", "settings.distributors.error", "settings.distributors.credentials-partial", "settings.distributors.credentials-refresh",
   "settings.vendor-logins.ready", "settings.vendor-logins.attention", "settings.vendor-logins.error",
   "settings.github.ready", "settings.github.attention", "settings.github.error",
-  "settings.updates.ready", "settings.updates.attention", "settings.updates.error",
+  "settings.update-store", "settings.updates.attention", "settings.updates.error",
   "settings.maintenance.ready", "settings.maintenance.attention", "settings.maintenance.error",
   "settings.completion.ready", "settings.completion.attention", "settings.completion.error",
   "settings.health.ready", "settings.health.attention", "settings.health.error",
@@ -21,9 +21,9 @@ export const settingsScenarioIds = [
 type SettingsScenarioId = typeof settingsScenarioIds[number];
 
 function stateFor(id: SettingsScenarioId): { section: string; target: string; errorPath?: string } {
-  if (id.includes("appearance") || id.includes("updates")) {
-    const section = id.includes("updates") ? "settings.update" : "settings.appearance";
-    return { section, target: section, errorPath: id.endsWith(".error") ? "/api/update/check" : undefined };
+  if (id.includes("appearance") || id.includes("updates") || id === "settings.update-store") {
+    const section = id.includes("update") ? "settings.update" : "settings.appearance";
+    return { section, target: id === "settings.update-store" ? "settings.update-store-action" : section, errorPath: id.endsWith(".error") ? "/api/update/check" : undefined };
   }
   if (id.includes("libraries")) return { section: "settings.profiles", target: "settings.profiles", errorPath: id.endsWith(".error") ? "/api/onboarding" : undefined };
   if (id.includes("sync")) return { section: "settings.sync", target: "settings.sync", errorPath: id.endsWith(".error") ? "/api/sync/status" : undefined };
@@ -56,6 +56,7 @@ function scenario(id: SettingsScenarioId): DesignScenario {
     fixtures: settingsReadFixtures({
       attention, errorPath: state.errorPath,
       updateState: id.includes("updates.attention") ? "update_available" : undefined,
+      storeManaged: id === "settings.update-store",
       syncState: id.endsWith(".syncing") ? "syncing" : id.endsWith(".diverged") ? "diverged" : undefined,
       credentialsPartial: id.endsWith("credentials-partial") || id.endsWith("credentials-refresh"),
     }),

@@ -40,7 +40,7 @@ const SETTINGS_SCENARIO_INVENTORY = [
   "settings.github.ready",
   "settings.github.attention",
   "settings.github.error",
-  "settings.updates.ready",
+  "settings.update-store",
   "settings.updates.attention",
   "settings.updates.error",
   "settings.maintenance.ready",
@@ -59,16 +59,16 @@ const SETTINGS_SCENARIO_INVENTORY = [
 ] as const;
 
 const READY_CASES = [
-  ["appearance", "settings.appearance"],
-  ["libraries", "settings.profiles"],
-  ["sync", "settings.sync"],
-  ["kicad", "settings.kicad"],
-  ["altium", "settings.altium"],
-  ["cubemx", "settings.cubemx"],
-  ["distributors", "settings.distributor"],
-  ["vendor-logins", "settings.vendor-login-row"],
-  ["github", "settings.github"],
-  ["updates", "settings.update"],
+  ["appearance", "settings.appearance", "settings.appearance.ready"],
+  ["libraries", "settings.profiles", "settings.libraries.ready"],
+  ["sync", "settings.sync", "settings.sync.ready"],
+  ["kicad", "settings.kicad", "settings.kicad.ready"],
+  ["altium", "settings.altium", "settings.altium.ready"],
+  ["cubemx", "settings.cubemx", "settings.cubemx.ready"],
+  ["distributors", "settings.distributor", "settings.distributors.ready"],
+  ["vendor-logins", "settings.vendor-login-row", "settings.vendor-logins.ready"],
+  ["github", "settings.github", "settings.github.ready"],
+  ["updates", "settings.update-store-action", "settings.update-store"],
 ] as const;
 
 afterEach(cleanup);
@@ -108,8 +108,8 @@ describe("Settings Design Studio scenarios", () => {
     expect(mounted.liveRequest).not.toHaveBeenCalled();
   });
 
-  it.each(READY_CASES)("mounts Settings %s with real controls", async (section, target) => {
-    const mounted = await mountScenario(`settings.${section}.ready`);
+  it.each(READY_CASES)("mounts Settings %s with real controls", async (_section, target, id) => {
+    const mounted = await mountScenario(id);
     expect(document.querySelector(`[data-dev-id="${target}"]`)).toBeVisible();
     expect(screen.getAllByText("Settings").length).toBeGreaterThan(0);
     expect(mounted.liveRequest).not.toHaveBeenCalled();
