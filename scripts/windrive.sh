@@ -22,7 +22,7 @@
 # a second Python process to launch a Python process is cost with no benefit. `deploy.py` is
 # Python because it has real logic (assert the resulting HEAD, grep for content markers).
 #
-# WARNING carried from the repo local instructions, because this script is exactly where it would bite:
+# Repository safety warning, because this script is exactly where it would bite:
 # NEVER run `uv` with the shell's cwd inside the install. `uv` treats the directory it starts in
 # as its project and once DELETED that install's Windows venv, rebuilding it as a Linux one. This
 # script changes directory only INSIDE cmd.exe, never in the calling shell, so it cannot cause it.

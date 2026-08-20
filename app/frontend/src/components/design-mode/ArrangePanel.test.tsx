@@ -94,11 +94,11 @@ describe("the Arrange section states what the arrangement is", () => {
   it("says whether an edit is in force, and reverts to what is committed", () => {
     mount();
     expect(screen.getByTestId("draft").textContent).toBe("none");
-    expect(screen.getByRole("button", { name: /Reset To Committed/ })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /Reset To Applied/ })).toBeDisabled();
 
     fireEvent.click(screen.getByTestId("edit"));
     expect(screen.getByTestId("draft").textContent).toBe("held");
-    const reset = screen.getByRole("button", { name: /Reset To Committed/ });
+    const reset = screen.getByRole("button", { name: /Reset To Applied/ });
     expect(reset).not.toBeDisabled();
 
     fireEvent.click(reset);

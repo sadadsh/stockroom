@@ -52,12 +52,13 @@ import {
 
 export interface DesignStudioContextValue {
   open: () => void;
-  close: () => Promise<void>;
+  close: () => Promise<boolean>;
   enabled: boolean;
   document: DesignDocument;
   replaceDocument: (document: DesignDocument) => void;
   replaceDocumentAtomically: (document: DesignDocument) => void;
   replaceResolvedDraftAtomically: (draft: DevModeDraft) => void;
+  restoreRenderableState: (document: DesignDocument, draft: DevModeDraft) => void;
   activeVariationId: string;
   setVariation: (variationId: string) => void;
   personalState: PersonalDesignState;
@@ -366,6 +367,16 @@ function DesignStudioBridge({
     },
     [devMode.replaceDraftAtomically, devMode.theme, snapshot.document],
   );
+  const restoreRenderableState = useCallback(
+    (document: DesignDocument, draft: DevModeDraft) => {
+      const nextDraft = cloneDraft(draft);
+      const nextDocument = withWorkingDraft(document, nextDraft);
+      applyingDraft.current = JSON.stringify(nextDraft);
+      devMode.replaceDraft(nextDraft);
+      controller.replaceDocument(nextDocument);
+    },
+    [controller, devMode.replaceDraft],
+  );
   const setCadPresentation = useCallback(
     <K extends CadPresentationKind>(
       targetId: string,
@@ -453,7 +464,11 @@ function DesignStudioBridge({
     setAppliedState("applying");
     const document = withWorkingDraft(controller.getSnapshot().document, devMode.draft);
     controller.replaceDocument(document);
-    await controller.flush();
+    const persisted = await controller.flush();
+    if (!persisted.persisted) {
+      setAppliedState("error");
+      return false;
+    }
     try {
       const response = await api.designStudioApplyLocal({ document });
       const parsed = parseDesignDocument(response.document);
@@ -499,11 +514,22 @@ function DesignStudioBridge({
     });
   }, [queryClient]);
   const refreshActiveProductQueries = useCallback(
-    () =>
-      queryClient.resetQueries({
-        predicate: isProductQuery,
+    (preserveReadyOnboarding = false) => {
+      const reset = queryClient.resetQueries({
+        predicate: (query) =>
+          isProductQuery(query) &&
+          (!preserveReadyOnboarding || query.queryKey[0] !== "onboarding"),
         type: "active",
-      }),
+      });
+      if (!preserveReadyOnboarding) return reset;
+      // A Settings-side catalog failure is a revalidation failure after Guided Setup, not a cold
+      // boot failure. Invalidate the already-ready onboarding query so its cached application gate
+      // remains mounted while the scenario adapter supplies the failed refresh.
+      return Promise.all([
+        reset,
+        queryClient.invalidateQueries({ queryKey: ["onboarding"], exact: true, refetchType: "active" }),
+      ]).then(() => undefined);
+    },
     [queryClient],
   );
   const activateScenarioInternal = useCallback(
@@ -530,7 +556,12 @@ function DesignStudioBridge({
         // A loading scenario deliberately owns queries whose fixture never settles. The scenario
         // transition is complete once the adapter and UI state are installed; awaiting its query
         // refresh would keep the catalog locked forever and make the next scenario unreachable.
-        void refreshActiveProductQueries();
+        const preservesReadyOnboarding = scenario.fixtures.some((fixture) =>
+          fixture.method === "GET" &&
+          fixture.path === "/api/onboarding" &&
+          fixture.behavior?.state === "error"
+        );
+        void refreshActiveProductQueries(preservesReadyOnboarding);
       }),
     [beginTransition, clearInactiveProductQueries, queryClient, refreshActiveProductQueries],
   );
@@ -556,9 +587,11 @@ function DesignStudioBridge({
     [beginTransition, clearInactiveProductQueries, queryClient, refreshActiveProductQueries],
   );
   const close = useCallback(async () => {
+    const persisted = await controller.flush();
+    if (!persisted.persisted) return false;
     if (activeScenario) await exitScenario();
-    await controller.flush();
     if (devMode.enabled) devMode.toggle();
+    return true;
   }, [activeScenario, controller, devMode.enabled, devMode.toggle, exitScenario]);
   const activateScenario = useCallback(
     (scenarioId: string) => {
@@ -579,6 +612,7 @@ function DesignStudioBridge({
       replaceDocument,
       replaceDocumentAtomically,
       replaceResolvedDraftAtomically,
+      restoreRenderableState,
       activeVariationId: snapshot.document.activeVariationId,
       setVariation,
       personalState: snapshot.personalState,
@@ -608,6 +642,7 @@ function DesignStudioBridge({
       replaceDocument,
       replaceDocumentAtomically,
       replaceResolvedDraftAtomically,
+      restoreRenderableState,
       setVariation,
       activeScenario,
       activateScenario,

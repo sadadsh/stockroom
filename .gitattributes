@@ -16,18 +16,21 @@
 *.kicad_wks  text eol=lf
 *.pretty     text eol=lf
 
-# These three byte-roundtrip fixtures deliberately exercise CRLF input on
+# These five byte-roundtrip fixtures deliberately exercise CRLF input on
 # Windows. Git still stores normalized LF blobs, but checks out CRLF working
 # bytes so the test remains meaningful without making a fresh checkout dirty.
 tests/backend/fixtures/kicad/minimal.kicad_mod text eol=crlf
 tests/backend/fixtures/kicad/minimal.kicad_sch text eol=crlf
 tests/backend/fixtures/kicad/minimal.kicad_sym text eol=crlf
+tests/backend/fixtures/kicad/fp-lib-table.sample text eol=crlf
+tests/backend/fixtures/kicad/sym-lib-table.sample text eol=crlf
 
 # Binary assets: leave the bytes exactly as committed (no line-ending or text munging).
 *.woff2 binary
 *.woff  binary
 *.ttf   binary
 *.otf   binary
+*.pfb   binary
 *.png   binary
 *.jpg   binary
 *.jpeg  binary

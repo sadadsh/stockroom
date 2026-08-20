@@ -201,7 +201,7 @@ function CheckBox({ checked, small = false }: { checked: boolean; small?: boolea
         (checked ? "border-acc bg-acc text-acc-on" : "border-line2 text-transparent")
       }
     >
-      <Icon id="modal.check" className={small ? "h-2.5 w-2.5" : "h-3 w-3"} />
+      <Icon id="overlay.check" className={small ? "h-2.5 w-2.5" : "h-3 w-3"} />
     </span>
   );
 }

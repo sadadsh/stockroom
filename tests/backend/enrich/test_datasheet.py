@@ -105,6 +105,7 @@ def test_extract_datasheet_specs_reads_mpn_manufacturer_package():
     assert r.mpn.confidence == "high"
     assert "Texas Instruments" in (r.manufacturer.value or "")
     assert r.package.value == "VQFN-16"
+    assert r.identity_authorities == ["manufacturer_datasheet"]
 
 
 def test_extract_datasheet_specs_is_lenient_on_a_bad_pdf(tmp_path):
@@ -122,11 +123,13 @@ def test_datasheet_fill_reads_identity_from_the_stored_pdf(tmp_path, monkeypatch
     from stockroom.ingest.staging import StagingCandidate
 
     def fake_extract(pdf_path, known_mpn=""):
-        return EnrichmentResult(
+        result = EnrichmentResult(
             category="ICs",
             mpn=Sourced(value="TPS62130RGTR", source="datasheet", confidence=0.9),
             manufacturer=Sourced(value="Texas Instruments", source="datasheet", confidence=0.9),
         )
+        result.identity_authorities.append("manufacturer_datasheet")
+        return result
 
     monkeypatch.setattr("stockroom.enrich.datasheet.extract_datasheet_specs", fake_extract)
     pdf = tmp_path / "d.pdf"
@@ -140,6 +143,38 @@ def test_datasheet_fill_reads_identity_from_the_stored_pdf(tmp_path, monkeypatch
     pipeline.datasheet_fill(c)
     assert c.mpn == "TPS62130RGTR"  # blank -> filled from the datasheet
     assert c.manufacturer == "Already Set"  # never overwrites a value
+
+
+def test_datasheet_fill_rejects_identity_when_the_pdf_does_not_match_the_part(
+    tmp_path, monkeypatch
+):
+    from stockroom.enrich.pipeline import EnrichmentPipeline
+    from stockroom.enrich.schema import EnrichmentResult, Sourced
+    from stockroom.ingest.staging import StagingCandidate
+
+    def fake_extract(pdf_path, known_mpn=""):
+        return EnrichmentResult(
+            category="ICs",
+            manufacturer=Sourced(value="Wrong Manufacturer", source="datasheet", confidence=0.9),
+        )
+
+    monkeypatch.setattr("stockroom.enrich.datasheet.extract_datasheet_specs", fake_extract)
+    pdf = tmp_path / "wrong.pdf"
+    pdf.write_bytes(b"%PDF-1.4\n%%EOF\n")
+    candidate = StagingCandidate(
+        vendor="manual",
+        symbol_lib_path=None,
+        symbol_name="X",
+        footprint_variants=[],
+        datasheet_path=pdf,
+        mpn="RIGHT-PART",
+        manufacturer="",
+        category="ICs",
+    )
+
+    EnrichmentPipeline(tmp_path / "cache").datasheet_fill(candidate)
+
+    assert candidate.manufacturer == ""
 
 
 def test_datasheet_fill_without_a_datasheet_is_a_no_op(tmp_path):

@@ -32,13 +32,13 @@
  *   INSTANCE - an id carrying a `[value]` segment names exactly ONE element. Editing
  *              `component-browser.component[stm32h743vit6].tab` moves that one tab and leaves its
  *              siblings alone, because no other element can ever carry that id.
- *   SHARED   - a catalogue id names a ROLE. Editing `components.row` is meant to restyle every
- *              part row; that is the whole point of a class-level id, and narrowing it to the first
- *              match would silently break the contract every existing override was written under.
+ *   SHARED   - a catalogue id may appear on multiple elements directly. Editing `components.row`
+ *              reaches those exact `data-dev-id` matches. Merely declaring `data-dev-role` is
+ *              descriptive metadata and never opts an instance into an unrelated edit.
  *
- * An element may hold both: `data-dev-id` is the instance it IS, `data-dev-role` is the shared
- * class it BELONGS TO. `lib/applyElementOverrides.ts` resolves an id through whichever contract it
- * declares, so the two never quietly collapse into one another.
+ * An element may hold both: `data-dev-id` is the target it IS, `data-dev-role` is the class it
+ * BELONGS TO. The role remains useful for coverage and explicit UI grouping, but resolution never
+ * expands through it implicitly.
  */
 import { designIdSelector, isGeneratedDesignId } from "./designIdentity";
 
@@ -189,18 +189,14 @@ export function devRoleSelector(devId: string): string {
 /**
  * Every element an id addresses, under the contract the id declares.
  *
- * An INSTANCE id resolves through `data-dev-id` only - it names one element, and a role match would
- * hand back its siblings. A SHARED id resolves through BOTH attributes, so a catalogue id keeps
- * reaching every element that carries it directly AND every instance that declares it as its role.
+ * Every id resolves through exact `data-dev-id` matches only. Repeated direct matches intentionally
+ * share one semantic override; `data-dev-role` never broadens an edit by implication.
  */
 export function nodesForDevId(devId: string, root: ParentNode = document): HTMLElement[] {
   if (isGeneratedDesignId(devId)) {
     return Array.from(root.querySelectorAll<HTMLElement>(designIdSelector(devId)));
   }
-  const selector =
-    devIdScope(devId) === "instance"
-      ? devIdSelector(devId)
-      : `${devIdSelector(devId)}, ${devRoleSelector(devId)}`;
+  const selector = devIdSelector(devId);
   try {
     return Array.from(root.querySelectorAll<HTMLElement>(selector));
   } catch {

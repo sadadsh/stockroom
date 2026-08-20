@@ -2,6 +2,7 @@ import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import type { UpdateCheck } from "../api/types";
 import { deriveUpdateStanding } from "../lib/updateStanding";
+import { ICON_BY_ID } from "../lib/iconRegistry";
 import { RunningVersionIndicator } from "./RunningVersionIndicator";
 
 // The indicator takes the DERIVED standing now (the clocks that bound it live in
@@ -15,6 +16,11 @@ function viewOf(data: UpdateCheck | undefined, checking = false, failed = false)
 }
 
 describe("RunningVersionIndicator", () => {
+  function expectTransitionIcon(status: HTMLElement) {
+    const expected = ICON_BY_ID.get("relation.transition")?.body.match(/d="([^"]+)"/)?.[1];
+    expect([...status.querySelectorAll("path")].some((path) => path.getAttribute("d") === expected)).toBe(true);
+  }
+
   it("shows the running revision and Current only with remote proof", () => {
     render(
       <RunningVersionIndicator
@@ -48,11 +54,11 @@ describe("RunningVersionIndicator", () => {
       />,
     );
 
-    expect(
-      screen.getByRole("status", {
-        name: "running revision 1111111, Update Available, target revision 2222222",
-      }),
-    ).toHaveTextContent("r1111111→2222222Update Available");
+    const status = screen.getByRole("status", {
+      name: "running revision 1111111, Update Available, target revision 2222222",
+    });
+    expect(status).toHaveTextContent(/r1111111\s*2222222Update Available/);
+    expectTransitionIcon(status);
   });
 
   it("shows a packaged release as its full version and Current", () => {
@@ -111,6 +117,7 @@ describe("RunningVersionIndicator", () => {
       state: "up_to_date",
       current_revision: "222222222222",
       target_revision: "222222222222",
+      frontend_revision: "222222222222",
     } as UpdateCheck;
     render(
       <RunningVersionIndicator
@@ -127,7 +134,8 @@ describe("RunningVersionIndicator", () => {
     const status = screen.getByRole("status", {
       name: "running revision 1111111, Restart Required, backend revision 2222222",
     });
-    expect(status).toHaveTextContent("r1111111→2222222Restart Required");
+    expect(status).toHaveTextContent(/r1111111\s*2222222Restart Required/);
+    expectTransitionIcon(status);
     expect(status).not.toHaveTextContent("Current");
   });
 

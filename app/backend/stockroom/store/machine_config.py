@@ -99,6 +99,11 @@ class MachineConfig:
     # Accepted resumable Guided Setup decisions and operation receipts. Current readiness is never
     # trusted from this document: store.guided_setup revalidates the repository and tool on reads.
     guided_setup: dict[str, object] = field(default_factory=dict)
+    # Restart-safe Assets Catalog Build ledger.  Desired identities are hashes of the current
+    # canonical records; completed identities name the exact projection a confirmed batch reached.
+    # Kept machine-local because the selected Primary CAD Tool and its derived projection are
+    # machine-local.  Library records remain the source of truth.
+    catalog_build: dict[str, object] = field(default_factory=dict)
     window: dict = field(default_factory=dict)
     # UI preferences (theme, rail_collapsed). MACHINE level, not profile level: they follow the
     # person, not the library. They live here rather than in the browser because the host binds an

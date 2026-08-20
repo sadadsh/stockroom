@@ -469,6 +469,40 @@ describe("the three modules", () => {
     }
   });
 
+  it("gives attached previews the height missing assets would otherwise consume", async () => {
+    const dossier = attached();
+    dossier.cadAssets.kinds.footprint = makeRepresentation("footprint", "missing", []);
+    dossier.cadAssets.kinds.model = makeRepresentation("model", "missing", []);
+    await open(dossier);
+
+    expect(module_("symbol")).toHaveClass("flex-1");
+    expect(
+      module_("symbol").querySelector('[data-dev-id="component-browser.asset-preview"]'),
+    ).toHaveClass("flex-1");
+    for (const kind of ["footprint", "model"]) {
+      expect(module_(kind)).toHaveClass("flex-none");
+      expect(
+        module_(kind).querySelector('[data-dev-id="component-browser.asset-preview"]'),
+      ).toHaveClass("h-[40px]", "flex-none");
+    }
+  });
+
+  it("keeps an all-missing CAD set compact without removing its asset workflow", async () => {
+    const dossier = attached(emptyPreference());
+    for (const kind of ["symbol", "footprint", "model"] as const) {
+      dossier.cadAssets.kinds[kind] = makeRepresentation(kind, "missing", []);
+    }
+    await open(dossier);
+
+    for (const kind of ["symbol", "footprint", "model"]) {
+      expect(module_(kind)).toHaveClass("flex-none");
+      expect(
+        module_(kind).querySelector('[data-dev-id="component-browser.asset-preview"]'),
+      ).toHaveClass("h-[40px]");
+    }
+    expect(screen.getByRole("button", { name: "Manage CAD Assets" })).toBeVisible();
+  });
+
   it("keeps every header AND a preview when one module is focused", async () => {
     const column = await open(attached());
     const user = userEvent.setup();
@@ -743,7 +777,7 @@ describe("the previews are drawn from the file", () => {
       expect(controls.length).toBeLessThanOrEqual(3);
       for (const control of controls) {
         expect(control.getAttribute("aria-label")).toBeTruthy();
-        expect(control.textContent).toBe("");
+        expect(control.textContent?.trim()).toBe("");
       }
     }
   });
@@ -848,9 +882,9 @@ describe("the previews are drawn from the file", () => {
         "data-design-id",
         runtimeDesignId("icon", "status.cad-missing"),
       );
-      expect(icon).toHaveClass("opacity-40");
-      expect(icon).toHaveClass("h-14");
-      expect(icon).toHaveClass("w-14");
+      expect(icon).toHaveClass("opacity-50");
+      expect(icon).toHaveClass("h-6");
+      expect(icon).toHaveClass("w-6");
     }
   });
 

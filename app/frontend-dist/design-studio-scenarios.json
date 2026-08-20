@@ -919,7 +919,7 @@
       "route": "assets",
       "expectedTargets": [
         "component-browser.manage-models",
-        "component-browser.provider-viewport"
+        "component-browser.provider-status"
       ]
     },
     {
@@ -930,7 +930,7 @@
       "route": "assets",
       "expectedTargets": [
         "component-browser.manage-models",
-        "component-browser.provider-viewport"
+        "component-browser.provider-status"
       ]
     },
     {
@@ -941,7 +941,7 @@
       "route": "assets",
       "expectedTargets": [
         "component-browser.manage-models",
-        "component-browser.provider-viewport"
+        "component-browser.provider-status"
       ]
     },
     {
@@ -952,7 +952,7 @@
       "route": "assets",
       "expectedTargets": [
         "component-browser.manage-models",
-        "component-browser.provider-viewport"
+        "component-browser.provider-status"
       ]
     },
     {
@@ -963,7 +963,7 @@
       "route": "assets",
       "expectedTargets": [
         "component-browser.manage-models",
-        "component-browser.provider-viewport"
+        "component-browser.provider-status"
       ]
     },
     {
@@ -974,7 +974,7 @@
       "route": "assets",
       "expectedTargets": [
         "component-browser.manage-models",
-        "component-browser.provider-viewport"
+        "component-browser.provider-status"
       ]
     },
     {
@@ -985,7 +985,7 @@
       "route": "assets",
       "expectedTargets": [
         "component-browser.manage-models",
-        "component-browser.provider-viewport"
+        "component-browser.provider-status"
       ]
     },
     {

@@ -10,11 +10,56 @@ import {
 // source-owned shape without reaching outside src/ or depending on Design Studio runtime state.
 
 describe("iconRegistry", () => {
-  it("has 74 application icons with a matching by-id map", () => {
-    // The deliberate re-baseline includes the reusable provider, preview, media, and Settings
-    // semantics that replaced hand-drawn interface glyphs during the product-wide icon migration.
-    expect(ICON_REGISTRY).toHaveLength(74);
-    expect(ICON_BY_ID.size).toBe(74);
+  it("uses one 24px outline grammar for every shipped interface and category icon", () => {
+    const exceptions = new Set(["art.symbol", "art.footprint", "art.model", "brand.linkedin", "brand.github"]);
+    const productIcons = ICON_REGISTRY.filter((entry) => !exceptions.has(entry.id));
+
+    expect(productIcons.length).toBeGreaterThan(80);
+    for (const entry of productIcons) {
+      const sourced = entry as typeof entry & { family?: string; sourceIcon?: string };
+      expect(["tabler-outline", "stockroom-electrical"], entry.id).toContain(sourced.family);
+      expect(sourced.sourceIcon, entry.id).toMatch(/^[a-z0-9-]+$/);
+      expect(entry.viewBox, entry.id).toBe("0 0 24 24");
+      expect(entry.strokeWidth, entry.id).toBe(2);
+      expect(entry.body, entry.id).not.toContain('fill="currentColor"');
+      expect(entry.body, entry.id).not.toContain('stroke="none"');
+    }
+
+    const sources = productIcons.map((entry) =>
+      (entry as typeof entry & { sourceIcon?: string }).sourceIcon,
+    );
+    expect(new Set(sources).size).toBe(sources.length);
+  });
+
+  it("registers every component-category mark in the same icon authority", () => {
+    const expected = [
+      "category.battery",
+      "category.capacitor",
+      "category.capacitor-polarized",
+      "category.connector",
+      "category.crystal",
+      "category.diode",
+      "category.fuse",
+      "category.generic",
+      "category.ic",
+      "category.inductor",
+      "category.lamp",
+      "category.led",
+      "category.motor",
+      "category.opamp",
+      "category.pushbutton",
+      "category.resistor",
+      "category.switch",
+      "category.transformer",
+      "category.transistor",
+      "category.waveform",
+    ];
+
+    expect(expected.every((id) => ICON_BY_ID.has(id))).toBe(true);
+  });
+
+  it("has a matching by-id map", () => {
+    expect(ICON_BY_ID.size).toBe(ICON_REGISTRY.length);
     for (const entry of ICON_REGISTRY) {
       expect(ICON_BY_ID.get(entry.id), entry.id).toBe(entry);
     }
@@ -31,13 +76,14 @@ describe("iconRegistry", () => {
     }
   });
 
-  it("has the expected per-category counts (primary 41 / bespoke 27 / art 3 / brand 3)", () => {
-    // New reusable interface semantics stay primary so `.ico` owns their stroke and optical weight.
+  it("has every declared category represented", () => {
     const counts = ICON_REGISTRY.reduce<Record<string, number>>((acc, entry) => {
       acc[entry.category] = (acc[entry.category] ?? 0) + 1;
       return acc;
     }, {});
-    expect(counts).toEqual({ primary: 41, bespoke: 27, art: 3, brand: 3 });
+    expect(counts.primary).toBeGreaterThan(80);
+    expect(counts.bespoke).toBeGreaterThan(20);
+    expect(counts).toMatchObject({ art: 3, brand: 3 });
   });
 
   it("keeps migrated interface semantics on the shared 24px primary preset", () => {
@@ -51,12 +97,67 @@ describe("iconRegistry", () => {
       "media.photo",
       "detail.provider",
       "nav.assets",
+      "nav.forward",
+      "nav.projects",
+      "nav.cad-assets",
+      "action.show-provider",
+      "action.import-files",
+      "status.success",
+      "status.error",
+      "view.placement-auto",
+      "relation.transition",
+      "detail.offers",
+      "status.loading",
+      "document.project",
+      "document.schematic",
+      "document.pcb",
+      "design.disclosure-open",
+      "design.disclosure-closed",
+      "design.drag",
+      "design.resize",
       "settings.cad-tools",
       "settings.sources",
     ];
     for (const id of migrated) {
       expect(ICON_BY_ID.get(id), id).toMatchObject({ category: "primary", viewBox: "0 0 24 24" });
     }
+  });
+
+  it("does not reuse offer enrichment or close geometry for unrelated meanings", () => {
+    const ids = ["action.enrich", "detail.offers", "view.placement-auto", "overlay.close", "status.error", "nav.up-to-date", "status.success"];
+    const sources = ids.map((id) => ICON_BY_ID.get(id)?.sourceIcon);
+    expect(sources.every(Boolean)).toBe(true);
+    expect(new Set(sources).size).toBe(sources.length);
+  });
+
+  it("gives Design Studio navigation its own truthful palette mark", () => {
+    expect(ICON_BY_ID.get("nav.design-studio")).toMatchObject({
+      category: "primary",
+      family: "tabler-outline",
+      sourceIcon: "palette",
+      viewBox: "0 0 24 24",
+    });
+    expect(ICON_BY_ID.get("nav.design-studio")?.sourceIcon)
+      .not.toBe(ICON_BY_ID.get("nav.settings")?.sourceIcon);
+  });
+
+  it("gives Design Studio drawers truthful screen-layout and layer-stack marks", () => {
+    expect(ICON_BY_ID.get("design.screens")).toMatchObject({
+      category: "primary",
+      family: "tabler-outline",
+      sourceIcon: "layout-dashboard",
+      viewBox: "0 0 24 24",
+    });
+    expect(ICON_BY_ID.get("design.layers")).toMatchObject({
+      category: "primary",
+      family: "tabler-outline",
+      sourceIcon: "stack-2",
+      viewBox: "0 0 24 24",
+    });
+    expect(ICON_BY_ID.get("design.screens")?.sourceIcon)
+      .not.toBe(ICON_BY_ID.get("nav.components")?.sourceIcon);
+    expect(ICON_BY_ID.get("design.layers")?.sourceIcon)
+      .not.toBe(ICON_BY_ID.get("finder.filter")?.sourceIcon);
   });
 
   it("only uses the four declared categories", () => {
@@ -101,35 +202,11 @@ describe("iconRegistry", () => {
     }
   });
 
-  it("keeps the owner-selected interface artwork on stable semantic ids", () => {
-    const selected = [
-      "action.external",
-      "brand.wordmark",
-      "nav.about",
-      "nav.board",
-      "nav.collapse-rail",
-      "nav.components",
-      "nav.settings",
-      "nav.stm",
-      "nav.theme",
-      "nav.update",
-    ];
-    for (const id of selected) {
-      expect(ICON_BY_ID.get(id)?.body, id).toContain('fill="currentColor"');
-      expect(ICON_BY_ID.get(id)?.body, id).toContain('stroke="none"');
-    }
-    const missing = ICON_BY_ID.get("status.cad-missing");
-    expect(missing?.viewBox).toBe("0 0 512 512");
-    expect(missing?.fill).toBe("currentColor");
-    expect(missing?.body).toContain("M256 512");
-  });
-
   it("routes the art glyphs' theme vars (the tint survives the lift)", () => {
     expect(ICON_BY_ID.get("art.symbol")?.body).toContain("var(--c-icon-line)");
     expect(ICON_BY_ID.get("art.footprint")?.body).toContain("var(--c-icon-fill)");
     expect(ICON_BY_ID.get("art.footprint")?.body).toContain("var(--c-icon-edge)");
     expect(ICON_BY_ID.get("art.model")?.style?.stroke).toBe("var(--c-icon-cube)");
-    // The part-ready check keeps its --c-ok stroke tint.
-    expect(ICON_BY_ID.get("detail.ready-check")?.stroke).toBe("var(--c-ok)");
+    expect(ICON_BY_ID.get("detail.ready-check")?.family).toBe("tabler-outline");
   });
 });

@@ -9,6 +9,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
+using System.Windows.Threading;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.Wpf;
 using Microsoft.Win32;
@@ -274,9 +275,9 @@ internal sealed class WebViewWindowHost : IDisposable
             });
     }
 
-    internal void Focus()
+    internal Task<bool> FocusAsync(CancellationToken cancellationToken)
     {
-        InvokeOnDispatcher(
+        return InvokeOnDispatcherAsync(
             () =>
             {
                 ThrowIfNotReady();
@@ -286,9 +287,18 @@ internal sealed class WebViewWindowHost : IDisposable
                         "cannot focus a hidden managed window");
                 }
 
-                WindowsWindowGeometry.Focus(_windowHandle);
-                _window.Activate();
-            });
+                var foregrounded = WindowsWindowGeometry.Focus(_windowHandle);
+                var activated = _window.Activate();
+                return foregrounded || activated;
+            },
+            cancellationToken);
+    }
+
+    internal bool Focus()
+    {
+        return FocusAsync(CancellationToken.None)
+            .GetAwaiter()
+            .GetResult();
     }
 
     internal IReadOnlyDictionary<string, object?> Health()
@@ -488,6 +498,12 @@ internal sealed class WebViewWindowHost : IDisposable
         _webView.Visibility = Visibility.Visible;
         _tabStrip.SelectStockroom();
         _webView.Focus();
+    }
+
+    private bool HideProviderFromRenderer()
+    {
+        ShowStockroomTab();
+        return true;
     }
 
     private void ShowActiveProviderBrowser()
@@ -931,27 +947,36 @@ internal sealed class WebViewWindowHost : IDisposable
         NavigateProviderAddress(typed);
     }
 
-    private void NavigateProviderAddress(string typed)
+    private bool NavigateProviderAddress(string typed)
     {
         if (!ProviderNavigationPolicy.IsAllowedTopLevel(typed))
         {
             _providerNavigationError = "Provider URL Is Invalid";
             UpdateProviderChrome();
-            return;
+            return false;
         }
 
         var core = ActiveProviderWebView()?.CoreWebView2;
         if (core is null)
         {
-            return;
+            return false;
         }
 
         _providerNavigationError = string.Empty;
         core.Navigate(typed);
+        return true;
     }
 
     private void OnWindowPreviewKeyDown(object sender, KeyEventArgs eventArguments)
     {
+        if (eventArguments.Key == Key.Escape
+            && _providerSurface.Visibility == Visibility.Visible
+            && _providerViewportRequest is { Visible: true } viewport)
+        {
+            eventArguments.Handled = true;
+            PostProviderCloseRequested(viewport.Identity);
+            return;
+        }
         if (!_tabStrip.IsProviderSelected)
         {
             return;
@@ -970,16 +995,35 @@ internal sealed class WebViewWindowHost : IDisposable
         NavigateProviderHistory(back: step == ProviderHistoryStep.Back);
     }
 
-    private void RefreshActiveProvider()
+    private void PostProviderCloseRequested(ProviderBrowserSurfaceIdentity identity)
+    {
+        if (_webView.CoreWebView2 is not CoreWebView2 core)
+        {
+            return;
+        }
+        core.PostWebMessageAsJson(
+            JsonSerializer.Serialize(
+                new Dictionary<string, object?>
+                {
+                    ["schema"] = "stockroom.host.provider-close-requested",
+                    ["component_id"] = identity.ComponentId,
+                    ["provider_id"] = identity.ProviderId,
+                    ["route_id"] = identity.RouteId,
+                    ["session_id"] = identity.SessionId,
+                }));
+    }
+
+    private bool RefreshActiveProvider()
     {
         var core = ActiveProviderWebView()?.CoreWebView2;
         if (core is null)
         {
-            return;
+            return false;
         }
 
         _providerNavigationError = string.Empty;
         core.Reload();
+        return true;
     }
 
     private void UpdateProviderChrome()
@@ -1018,11 +1062,19 @@ internal sealed class WebViewWindowHost : IDisposable
 
     private bool TryApplyProviderViewport()
     {
-        if (_providerViewportRequest is not ProviderViewportRequest request
-            || !_providerLeases.TryGetActive(out _, out var context)
-            || !ProviderViewportLayout.TryResolve(
+        if (_providerViewportRequest is not ProviderViewportRequest request)
+        {
+            return false;
+        }
+        if (!_providerLeases.TryGetActive(out _, out var context)
+            || !request.Identity.MatchesLease(context))
+        {
+            return false;
+        }
+        var expectedComponentId = context.ComponentId;
+        if (!ProviderViewportLayout.TryResolve(
                 request,
-                context.ComponentId,
+                expectedComponentId,
                 _webView.ActualWidth,
                 _webView.ActualHeight,
                 out var layout)
@@ -1047,12 +1099,12 @@ internal sealed class WebViewWindowHost : IDisposable
                 && view.CoreWebView2 is not null);
     }
 
-    private void NavigateProviderHistory(bool back)
+    private bool NavigateProviderHistory(bool back)
     {
         var core = ActiveProviderWebView()?.CoreWebView2;
         if (core is null)
         {
-            return;
+            return false;
         }
         if (back && core.CanGoBack)
         {
@@ -1062,7 +1114,12 @@ internal sealed class WebViewWindowHost : IDisposable
         {
             core.GoForward();
         }
+        else
+        {
+            return false;
+        }
         UpdateProviderNavigationButtons();
+        return true;
     }
 
     private void UpdateProviderNavigationButtons()
@@ -1595,15 +1652,44 @@ internal sealed class WebViewWindowHost : IDisposable
                   webview.addEventListener("message", (event) => {
                     const value = event.data;
                     if (
-                      !value ||
+                      value?.schema === "stockroom.host.provider-close-requested" &&
+                      typeof value.component_id === "string" &&
+                      typeof value.provider_id === "string" &&
+                      typeof value.route_id === "string" &&
+                      typeof value.session_id === "string"
+                    ) {
+                      window.dispatchEvent(new CustomEvent(
+                        "stockroom:provider-close-requested",
+                        {
+                          detail: {
+                            componentId: value.component_id,
+                            providerId: value.provider_id,
+                            routeId: value.route_id,
+                            sessionId: value.session_id
+                          }
+                        }
+                      ));
+                      return;
+                    }
+                    if (!value || typeof value.id !== "string") return;
+                    const request = pending.get(value.id);
+                    if (!request || value.schema !== request.expectedSchema) return;
+                    if (value.schema === "stockroom.host.provider-command-result") {
+                      if (typeof value.accepted !== "boolean" || typeof value.error !== "string") {
+                        return;
+                      }
+                      pending.delete(value.id);
+                      clearTimeout(request.timer);
+                      if (value.accepted) request.resolve(true);
+                      else request.reject(new Error(value.error || "The provider browser refused the command."));
+                      return;
+                    }
+                    if (
                       (value.schema !== "stockroom.host.folder-result" &&
                        value.schema !== "stockroom.host.file-result") ||
-                      typeof value.id !== "string" ||
                       !Array.isArray(value.paths) ||
                       !value.paths.every((path) => typeof path === "string")
                     ) return;
-                    const request = pending.get(value.id);
-                    if (!request || value.schema !== request.expectedSchema) return;
                     pending.delete(value.id);
                     clearTimeout(request.timer);
                     if (typeof value.error === "string" && value.error) {
@@ -1663,6 +1749,9 @@ internal sealed class WebViewWindowHost : IDisposable
                       if (
                         !viewport ||
                         typeof viewport.componentId !== "string" ||
+                        typeof viewport.providerId !== "string" ||
+                        typeof viewport.routeId !== "string" ||
+                        typeof viewport.sessionId !== "string" ||
                         typeof viewport.visible !== "boolean" ||
                         ![viewport.x, viewport.y, viewport.width, viewport.height]
                           .every(Number.isFinite)
@@ -1672,6 +1761,9 @@ internal sealed class WebViewWindowHost : IDisposable
                       webview.postMessage({
                         schema: "stockroom.host.provider-viewport",
                         component_id: viewport.componentId,
+                        provider_id: viewport.providerId,
+                        route_id: viewport.routeId,
+                        session_id: viewport.sessionId,
                         visible: viewport.visible,
                         x: viewport.x,
                         y: viewport.y,
@@ -1683,16 +1775,36 @@ internal sealed class WebViewWindowHost : IDisposable
                       if (
                         !request ||
                         typeof request.componentId !== "string" ||
+                        typeof request.providerId !== "string" ||
+                        typeof request.routeId !== "string" ||
+                        typeof request.sessionId !== "string" ||
                         !["back", "forward", "reload", "close", "navigate"].includes(request.command) ||
                         (request.command === "navigate" && typeof request.url !== "string")
                       ) {
                         throw new Error("Invalid provider browser command.");
                       }
-                      webview.postMessage({
-                        schema: "stockroom.host.provider-command",
-                        component_id: request.componentId,
-                        command: request.command,
-                        ...(request.command === "navigate" ? { url: request.url } : {})
+                      const id = crypto.randomUUID();
+                      return new Promise((resolve, reject) => {
+                        const timer = setTimeout(() => {
+                          pending.delete(id);
+                          reject(new Error("The provider browser command did not respond."));
+                        }, 10000);
+                        pending.set(id, {
+                          resolve,
+                          reject,
+                          timer,
+                          expectedSchema: "stockroom.host.provider-command-result"
+                        });
+                        webview.postMessage({
+                          schema: "stockroom.host.provider-command",
+                          id,
+                          component_id: request.componentId,
+                          provider_id: request.providerId,
+                          route_id: request.routeId,
+                          session_id: request.sessionId,
+                          command: request.command,
+                          ...(request.command === "navigate" ? { url: request.url } : {})
+                        });
                       });
                     }
                   });
@@ -1850,7 +1962,7 @@ internal sealed class WebViewWindowHost : IDisposable
             "Bearer " + credential);
     }
 
-    private void OnWebMessageReceived(
+    private async void OnWebMessageReceived(
         object? sender,
         CoreWebView2WebMessageReceivedEventArgs eventArguments)
     {
@@ -1874,27 +1986,26 @@ internal sealed class WebViewWindowHost : IDisposable
                 && commandSchema.ValueKind == JsonValueKind.String
                 && commandSchema.GetString() == "stockroom.host.provider-command")
             {
+                var commandId = HandoffCodec.GetRequiredString(root, "id");
                 var componentId = HandoffCodec.GetRequiredString(root, "component_id");
+                var providerId = HandoffCodec.GetRequiredString(root, "provider_id");
+                var routeId = HandoffCodec.GetRequiredString(root, "route_id");
+                var sessionId = HandoffCodec.GetRequiredString(root, "session_id");
                 var commandValue = HandoffCodec.GetRequiredString(root, "command");
-                if (!_providerLeases.TryGetActive(out _, out var activeContext)
-                    || !string.Equals(
-                        componentId,
-                        activeContext.ComponentId,
-                        StringComparison.Ordinal))
-                {
-                    return;
-                }
-                if (!ProviderBrowserCommandCodec.TryParse(commandValue, out var command))
-                {
-                    return;
-                }
+                var parsedCommand = ProviderBrowserCommandCodec.TryParse(
+                    commandValue,
+                    out var command);
                 if (command == ProviderBrowserCommand.Navigate)
                 {
                     HandoffCodec.RequireExactObject(
                         root,
                         "provider browser command",
                         "schema",
+                        "id",
                         "component_id",
+                        "provider_id",
+                        "route_id",
+                        "session_id",
                         "command",
                         "url");
                 }
@@ -1904,27 +2015,84 @@ internal sealed class WebViewWindowHost : IDisposable
                         root,
                         "provider browser command",
                         "schema",
+                        "id",
                         "component_id",
+                        "provider_id",
+                        "route_id",
+                        "session_id",
                         "command");
                 }
-                switch (command)
+                ProviderBrowserCommandOutcome outcome;
+                var validRequest = Guid.TryParseExact(commandId, "D", out _)
+                    && parsedCommand;
+                var requestedIdentity = new ProviderBrowserSurfaceIdentity(
+                    componentId,
+                    providerId,
+                    routeId,
+                    sessionId);
+                var viewportVisible = _providerViewportRequest?.Visible ?? false;
+                var contextMatches = ProviderBrowserCommandContext.Matches(
+                    command,
+                    requestedIdentity,
+                    _providerViewportRequest?.Identity,
+                    viewportVisible);
+                var activeCommandLease = _providerLeases.TryGetActive(
+                    out _,
+                    out var commandContext)
+                    ? commandContext
+                    : null;
+                var leaseMatches = ProviderBrowserCommandContext.MatchesLease(
+                    command,
+                    requestedIdentity,
+                    activeCommandLease);
+                if (!validRequest || !contextMatches || !leaseMatches)
                 {
-                    case ProviderBrowserCommand.Back:
-                        NavigateProviderHistory(back: true);
-                        break;
-                    case ProviderBrowserCommand.Forward:
-                        NavigateProviderHistory(back: false);
-                        break;
-                    case ProviderBrowserCommand.Reload:
-                        RefreshActiveProvider();
-                        break;
-                    case ProviderBrowserCommand.Close:
-                        ShowStockroomTab();
-                        break;
-                    case ProviderBrowserCommand.Navigate:
-                        NavigateProviderAddress(HandoffCodec.GetRequiredString(root, "url"));
-                        break;
+                    outcome = new ProviderBrowserCommandOutcome(
+                        false,
+                        "The provider browser request does not match the visible component.");
                 }
+                else
+                {
+                    var url = command == ProviderBrowserCommand.Navigate
+                        ? HandoffCodec.GetRequiredString(root, "url")
+                        : null;
+                    try
+                    {
+                        if (command != ProviderBrowserCommand.Close)
+                        {
+                            await EnsureProviderBrowserReadyAsync().ConfigureAwait(true);
+                            TryApplyProviderViewport();
+                        }
+                        outcome = ProviderBrowserCommandExecutor.Execute(
+                            command,
+                            url,
+                            (candidate, target) => candidate switch
+                            {
+                                ProviderBrowserCommand.Back => NavigateProviderHistory(back: true),
+                                ProviderBrowserCommand.Forward => NavigateProviderHistory(back: false),
+                                ProviderBrowserCommand.Reload => RefreshActiveProvider(),
+                                ProviderBrowserCommand.Close => HideProviderFromRenderer(),
+                                ProviderBrowserCommand.Navigate => NavigateProviderAddress(target ?? string.Empty),
+                                _ => false,
+                            });
+                    }
+                    catch (Exception exception)
+                        when (exception is not (OutOfMemoryException or StackOverflowException))
+                    {
+                        outcome = new ProviderBrowserCommandOutcome(
+                            false,
+                            $"The provider browser could not execute {commandValue}.");
+                    }
+                }
+                core.PostWebMessageAsJson(
+                    JsonSerializer.Serialize(
+                        new Dictionary<string, object?>
+                        {
+                            ["schema"] = "stockroom.host.provider-command-result",
+                            ["id"] = commandId,
+                            ["accepted"] = outcome.Accepted,
+                            ["error"] = outcome.Error,
+                        }));
                 return;
             }
             if (root.TryGetProperty("schema", out var viewportSchema)
@@ -1936,6 +2104,9 @@ internal sealed class WebViewWindowHost : IDisposable
                     "provider viewport request",
                     "schema",
                     "component_id",
+                    "provider_id",
+                    "route_id",
+                    "session_id",
                     "visible",
                     "x",
                     "y",
@@ -1948,11 +2119,31 @@ internal sealed class WebViewWindowHost : IDisposable
                 }
                 var request = new ProviderViewportRequest(
                     HandoffCodec.GetRequiredString(root, "component_id"),
+                    HandoffCodec.GetRequiredString(root, "provider_id"),
+                    HandoffCodec.GetRequiredString(root, "route_id"),
+                    HandoffCodec.GetRequiredString(root, "session_id"),
                     visible.GetBoolean(),
                     RequiredFiniteDouble(root, "x"),
                     RequiredFiniteDouble(root, "y"),
                     RequiredFiniteDouble(root, "width"),
                     RequiredFiniteDouble(root, "height"));
+                var currentViewport = _providerViewportRequest;
+                if (!request.Visible
+                    && currentViewport is not null
+                    && request.Identity != currentViewport.Identity)
+                {
+                    return;
+                }
+                if (request.Visible
+                    && currentViewport is not null
+                    && request.Identity != currentViewport.Identity)
+                {
+                    // Commit the provider switch by hiding the old compositor before accepting
+                    // any geometry or history state for the replacement session.
+                    _providerSurface.Visibility = Visibility.Collapsed;
+                    _webView.Visibility = Visibility.Visible;
+                    _tabStrip.SetNavigationState(false, false);
+                }
                 _providerViewportRequest = request;
                 if (!request.Visible || !TryApplyProviderViewport())
                 {
@@ -2276,6 +2467,22 @@ internal sealed class WebViewWindowHost : IDisposable
             .Unwrap()
             .GetAwaiter()
             .GetResult();
+    }
+
+    private Task<T> InvokeOnDispatcherAsync<T>(
+        Func<T> operation,
+        CancellationToken cancellationToken)
+    {
+        if (_window.Dispatcher.CheckAccess())
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.FromResult(operation());
+        }
+        return _window.Dispatcher.InvokeAsync(
+                operation,
+                DispatcherPriority.Send,
+                cancellationToken)
+            .Task;
     }
 
     public void Dispose()

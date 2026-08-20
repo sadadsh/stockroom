@@ -1,3 +1,6 @@
+import hashlib
+import hmac
+import os
 from dataclasses import replace
 
 from stockroom.service import (
@@ -13,6 +16,40 @@ def test_health_needs_no_token(anon_client):
     r = anon_client.get("/api/health")
     assert r.status_code == 200
     assert r.json()["status"] == "ok"
+
+
+def test_health_proves_the_exact_spawned_process_without_disclosing_its_secret(
+    anon_client,
+    app_ctx,
+):
+    nonce = "ab" * 32
+    app_ctx.release_id = "release-packaged"
+    app_ctx.startup_proof_token = "startup-proof-secret"
+
+    response = anon_client.get(
+        "/api/health",
+        headers={"X-Stockroom-Startup-Nonce": nonce},
+    )
+
+    process_id = os.getpid()
+    message = (
+        f"stockroom-packaged-worker-v1\0release-packaged\0{process_id}\0{nonce}"
+    ).encode("ascii")
+    expected = hmac.new(
+        b"startup-proof-secret",
+        message,
+        hashlib.sha256,
+    ).hexdigest()
+    assert response.json()["startup_process_id"] == process_id
+    assert response.json()["startup_proof"] == expected
+    assert "startup-proof-secret" not in response.text
+
+    invalid = anon_client.get(
+        "/api/health",
+        headers={"X-Stockroom-Startup-Nonce": "predictable"},
+    )
+    assert "startup_proof" not in invalid.json()
+    assert "startup_process_id" not in invalid.json()
 
 
 def test_health_is_degraded_when_production_requires_unavailable_authority(
@@ -113,7 +150,7 @@ def test_system_identity_is_authenticated_and_names_the_active_release(
     assert response.json() == {
         "release_id": "release-candidate",
         "build_release_id": "development-source",
-        "package_version": "0.1.0",
+        "package_version": "1.0.0",
         "protocol_version": 1,
         "source_revision": "",
         "service_generation": 7,

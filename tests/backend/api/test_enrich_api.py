@@ -37,8 +37,8 @@ def test_enrich_part_streams_sourced_fields(client, monkeypatch):
 
         def enrich(self, mpn, category, want=None, progress=None):
             r = EnrichmentResult(category=category)
-            r.manufacturer = Sourced("Texas Instruments", "jsonld", "high")
-            r.description = Sourced("buck converter", "jsonld", "high")
+            r.manufacturer = Sourced("Texas Instruments", "mouser", "high")
+            r.description = Sourced("buck converter", "mouser", "high")
             return r
 
     monkeypatch.setattr("stockroom.api.routers.enrich._make_pipeline",
@@ -50,8 +50,56 @@ def test_enrich_part_streams_sourced_fields(client, monkeypatch):
     assert out["status"] == "done"
     body = out["result"]
     assert body["manufacturer"]["value"] == "Texas Instruments"
-    assert body["manufacturer"]["source"] == "jsonld"
+    assert body["manufacturer"]["source"] == "mouser"
     assert body["manufacturer"]["confidence"] == "high"
+
+
+def test_enrich_result_carries_complete_official_payloads_to_initial_add(client, monkeypatch):
+    from stockroom.enrich.schema import EnrichmentResult, Sourced
+
+    mouser = {"SearchResults": {"Parts": [{"ManufacturerPartNumber": "TPS62130RGTR"}]}}
+    digikey = {"Product": {"ManufacturerProductNumber": "TPS62130RGTR"}}
+
+    class _FakePipeline:
+        def enrich(self, mpn, category, want=None, progress=None):
+            result = EnrichmentResult(category="ICs", mpn=Sourced(mpn, "mouser", "high"))
+            result.official_payloads = {"mouser": mouser, "digikey": digikey}
+            result.official_evidence = {
+                provider: {
+                    "provider": provider,
+                    "queried_mpn": mpn,
+                    "canonical_mpn": mpn,
+                    "selected_values": {"mpn": mpn},
+                }
+                for provider in ("mouser", "digikey")
+            }
+            result.source_states = {"mouser": "success", "digikey": "success"}
+            return result
+
+    monkeypatch.setattr(
+        "stockroom.api.routers.enrich._make_pipeline", lambda _ctx: _FakePipeline()
+    )
+
+    job_id = client.post(
+        "/api/enrich/part", json={"mpn": "TPS62130RGTR", "category": "ICs"}
+    ).json()["job_id"]
+    body = _drain_job(client, job_id)["result"]
+
+    assert body["official_payloads"] == {"mouser": mouser, "digikey": digikey}
+    assert body["official_evidence"] == {
+        "mouser": {
+            "provider": "mouser",
+            "queried_mpn": "TPS62130RGTR",
+            "canonical_mpn": "TPS62130RGTR",
+            "selected_values": {"mpn": "TPS62130RGTR"},
+        },
+        "digikey": {
+            "provider": "digikey",
+            "queried_mpn": "TPS62130RGTR",
+            "canonical_mpn": "TPS62130RGTR",
+            "selected_values": {},
+        },
+    }
 
 
 def test_enrich_part_streams_the_real_stage_sequence(client, monkeypatch):

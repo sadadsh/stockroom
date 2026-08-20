@@ -10,6 +10,8 @@
  * A collapsed module keeps its header AND a small preview. Collapsing must never remove the third
  * of the CAD set that happens not to be in focus, because "is the symbol consistent with the
  * footprint" is one question and it cannot be answered by flipping between two views.
+ * Missing modules also keep their identity, but at rest use a compact absence strip so an empty
+ * placeholder cannot take the drawing space away from an asset that can actually be inspected.
  *
  * The provider is stated here only when it DIFFERS from the column's preferred source. Repeating
  * the same provider sentence under all three assets is what pushed the asset off its own header
@@ -23,6 +25,7 @@ import type {
 import { useLandPattern, usePreviewGlb, useSymbolGeometry } from "../../api/queries";
 import { componentRepresentationDevId } from "../../lib/componentDevIds";
 import { Text, useText } from "../../lib/copy";
+import { runtimeDesignId } from "../../lib/designIdentity";
 import { CubeArt, FootprintArt, SymbolArt } from "../icons";
 import { Icon } from "../Icon";
 import { Glb3DView } from "../Glb3DView";
@@ -73,7 +76,13 @@ function assetArt(kind: RepresentationKind) {
  * three asset-art ids globally. Attached files that are loading or unreadable keep their own art;
  * a question mark means only that no file exists.
  */
-function MissingAssetArt({ kind: _kind }: { kind: RepresentationKind }) {
+function MissingAssetArt({
+  kind: _kind,
+  compact,
+}: {
+  kind: RepresentationKind;
+  compact: boolean;
+}) {
   return (
     <span
       data-dev-id="component-browser.asset-missing-art"
@@ -82,7 +91,8 @@ function MissingAssetArt({ kind: _kind }: { kind: RepresentationKind }) {
     >
       <Icon
         id="status.cad-missing"
-        className="h-14 w-14 opacity-40"
+        data-design-id={runtimeDesignId("icon", "status.cad-missing")}
+        className={compact ? "h-6 w-6 opacity-50" : "h-14 w-14 opacity-40"}
       />
     </span>
   );
@@ -99,12 +109,16 @@ function MissingAssetArt({ kind: _kind }: { kind: RepresentationKind }) {
  * `w-full` because the compact stage is a <button>, which is inline-block and would otherwise
  * shrink to its contents where the expanded <div> fills the column.
  */
-function previewStageClass(expanded: boolean): string {
+function previewStageClass(expanded: boolean, compactMissing: boolean): string {
   return (
     "flex w-full items-center justify-center overflow-hidden border-y border-line " +
     "bg-technical focus-visible:outline focus-visible:outline-2 " +
     "focus-visible:-outline-offset-2 focus-visible:outline-focus " +
-    (expanded ? "min-h-[40px] flex-1" : "h-[56px] min-h-[32px] flex-none")
+    (compactMissing
+      ? "h-[40px] min-h-[40px] flex-none"
+      : expanded
+        ? "min-h-[40px] flex-1"
+        : "h-[56px] min-h-[32px] flex-none")
   );
 }
 
@@ -157,6 +171,7 @@ export function CadAssetModule({
   const preview = usePreviewData(componentId, kind, attached);
   const measured = measurementsFor(kind, preview, expectedPins);
   const status = cadAssetStatus(view, measured);
+  const compactMissing = status === "Missing" && !focused;
 
   return (
     <section
@@ -169,7 +184,7 @@ export function CadAssetModule({
       aria-label={label}
       className={
         "flex min-h-0 flex-col border-b border-line last:border-b-0 " +
-        (expanded ? "flex-1" : "flex-none")
+        (expanded && !compactMissing ? "flex-1" : "flex-none")
       }
     >
       {/* One dense line: name, state, and the source ONLY when it differs from the column's. */}
@@ -226,12 +241,16 @@ export function CadAssetModule({
           stage a name, focus, Enter AND Space for free. Expanded, the stage is a plain surface and
           the keyboard path is the maximize button that is already inside it. */}
       {expanded ? (
-        <div data-dev-id="component-browser.asset-preview" className={previewStageClass(true)}>
+        <div
+          data-dev-id="component-browser.asset-preview"
+          className={previewStageClass(true, compactMissing)}
+        >
           <AssetPreview
             kind={kind}
             view={view}
             preview={preview}
             missing={status === "Missing"}
+            compactMissing={compactMissing}
             interactive
             onOpenFullPreview={onOpenFullPreview}
           />
@@ -242,13 +261,14 @@ export function CadAssetModule({
           data-dev-id="component-browser.asset-preview"
           aria-label={fullPreview}
           onClick={onOpenFullPreview}
-          className={previewStageClass(false)}
+          className={previewStageClass(false, compactMissing)}
         >
           <AssetPreview
             kind={kind}
             view={view}
             preview={preview}
             missing={status === "Missing"}
+            compactMissing={compactMissing}
             interactive={false}
             onOpenFullPreview={onOpenFullPreview}
           />
@@ -386,6 +406,7 @@ function AssetPreview({
   view,
   preview,
   missing,
+  compactMissing,
   interactive,
   onOpenFullPreview,
 }: {
@@ -393,6 +414,7 @@ function AssetPreview({
   view: RepresentationView;
   preview: PreviewData;
   missing: boolean;
+  compactMissing: boolean;
   interactive: boolean;
   /** Handed to the 3D viewer, which owns the only control strip a model module has. */
   onOpenFullPreview: () => void;
@@ -408,7 +430,7 @@ function AssetPreview({
   // no CAD at all said the same thing four times down a ~300px column. The decorative question
   // mark is the visual statement; the exact status remains screen-reader text in the header.
   if (!view.tools.some((tool) => tool.present)) {
-    return <PreviewMessage kind={kind} message="" missing={missing} />;
+    return <PreviewMessage kind={kind} message="" missing={missing} compact={compactMissing} />;
   }
   if (kind === "symbol") {
     if (preview.geometry.isError) return <PreviewMessage kind={kind} message={unreadable} />;
@@ -463,14 +485,16 @@ function PreviewMessage({
   kind,
   message,
   missing = false,
+  compact = false,
 }: {
   kind: RepresentationKind;
   message: string;
   missing?: boolean;
+  compact?: boolean;
 }) {
   return (
     <span className="flex flex-col items-center gap-1 text-t3">
-      {missing ? <MissingAssetArt kind={kind} /> : assetArt(kind)}
+      {missing ? <MissingAssetArt kind={kind} compact={compact} /> : assetArt(kind)}
       {message ? <span className="ui-component-metadata">{message}</span> : null}
     </span>
   );

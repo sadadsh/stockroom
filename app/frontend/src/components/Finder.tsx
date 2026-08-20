@@ -167,7 +167,7 @@ export function Finder({
                     : "border-line2 text-transparent")
                 }
               >
-                <Icon id="modal.check" className="h-3 w-3" />
+                <Icon id="overlay.check" className="h-3 w-3" />
               </span>
               <Text id="components.filter-complete-label">Just Complete</Text>
             </label>
@@ -193,7 +193,7 @@ export function Finder({
                       : "border-line2 text-transparent")
                   }
                 >
-                  <Icon id="modal.check" className="h-3 w-3" />
+                  <Icon id="overlay.check" className="h-3 w-3" />
                 </span>
                 Duplicates ({duplicateCount})
               </label>

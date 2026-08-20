@@ -184,6 +184,79 @@ describe("personal design persistence", () => {
     });
   });
 
+  it("keeps a transport-failed document pending until a later flush acknowledges it", async () => {
+    const initial = fixtureDocument({ "rail.about": "About" });
+    const edited = fixtureDocument({ "rail.about": "Information" });
+    mockApi.designStudioGet.mockResolvedValue({ revision: "r1", document: initial });
+    mockApi.designStudioPut
+      .mockRejectedValueOnce(new ApiError(503, "unavailable"))
+      .mockResolvedValueOnce({ revision: "r2", document: edited });
+    const controller = createPersonalDesignController(initial);
+    await controller.hydrate();
+
+    controller.replaceDocument(edited);
+    await vi.advanceTimersByTimeAsync(400);
+    await settle();
+    const result = await controller.flush();
+
+    expect(mockApi.designStudioPut).toHaveBeenCalledTimes(2);
+    expect(mockApi.designStudioPut).toHaveBeenLastCalledWith({
+      document: edited,
+      expected_revision: "r1",
+    });
+    expect(result).toEqual({ persisted: true, state: "ready" });
+    expect(controller.getSnapshot().lastValidDocument).toEqual(edited);
+  });
+
+  it("reports a conflicted flush as unsaved and retains the exact local document", async () => {
+    const initial = fixtureDocument({ "rail.about": "About" });
+    const edited = fixtureDocument({ "rail.about": "Local" });
+    mockApi.designStudioGet.mockResolvedValue({ revision: "r1", document: initial });
+    mockApi.designStudioPut.mockRejectedValue(new ApiError(409, "revision conflict"));
+    const controller = createPersonalDesignController(initial);
+    await controller.hydrate();
+
+    controller.replaceDocument(edited);
+    const result = await controller.flush();
+
+    expect(result).toEqual({ persisted: false, state: "conflict" });
+    expect(controller.getSnapshot()).toMatchObject({
+      document: edited,
+      lastValidDocument: initial,
+      personalState: "conflict",
+      revision: "r1",
+    });
+    expect(mockApi.designStudioPut).toHaveBeenCalledOnce();
+  });
+
+  it("requeues a failed in-flight save without overwriting the newer pending edit", async () => {
+    const initial = fixtureDocument();
+    const first = fixtureDocument({ "rail.about": "First" });
+    const latest = fixtureDocument({ "rail.about": "Latest" });
+    const firstSave = deferred<{ revision: string; document: DesignDocument }>();
+    mockApi.designStudioGet.mockResolvedValue({ revision: "r1", document: initial });
+    mockApi.designStudioPut
+      .mockImplementationOnce(() => firstSave.promise)
+      .mockResolvedValueOnce({ revision: "r2", document: latest });
+    const controller = createPersonalDesignController(initial);
+    await controller.hydrate();
+
+    controller.replaceDocument(first);
+    await vi.advanceTimersByTimeAsync(400);
+    controller.replaceDocument(latest);
+    firstSave.reject(new ApiError(503, "unavailable"));
+    await settle();
+    const result = await controller.flush();
+
+    expect(mockApi.designStudioPut).toHaveBeenCalledTimes(2);
+    expect(mockApi.designStudioPut).toHaveBeenLastCalledWith({
+      document: latest,
+      expected_revision: "r1",
+    });
+    expect(result).toEqual({ persisted: true, state: "ready" });
+    expect(controller.getSnapshot().document).toEqual(latest);
+  });
+
   it("debounces a valid replacement for 400 ms and saves with the hydrated revision", async () => {
     const initial = fixtureDocument();
     const edited = fixtureDocument({ "rail.about": "Information" });
@@ -365,6 +438,28 @@ describe("personal design persistence", () => {
       superseded_document: firstEdit,
     });
     firstSave.resolve({ revision: "r2", document: firstEdit });
+  });
+
+  it("resends the sole in-flight document through the safe page-exit path", async () => {
+    const initial = fixtureDocument();
+    const edited = fixtureDocument({ "rail.about": "Closing" });
+    const ordinarySave = deferred<{ revision: string; document: DesignDocument }>();
+    mockApi.designStudioGet.mockResolvedValue({ revision: "r1", document: initial });
+    mockApi.designStudioPut.mockReturnValue(ordinarySave.promise);
+    mockApi.designStudioPutForPageExit.mockResolvedValue({ revision: "r2", document: edited });
+    const controller = createPersonalDesignController(initial);
+    await controller.hydrate();
+
+    controller.replaceDocument(edited);
+    await vi.advanceTimersByTimeAsync(400);
+    controller.flushForPageExit();
+
+    expect(mockApi.designStudioPutForPageExit).toHaveBeenCalledWith({
+      document: edited,
+      expected_revision: "r1",
+      superseded_document: edited,
+    });
+    ordinarySave.resolve({ revision: "r2", document: edited });
   });
 
   it("starts ordinary autosave immediately when a document is too large for keepalive", async () => {

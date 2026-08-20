@@ -12,7 +12,7 @@
  * fails every case here.
  */
 import { describe, expect, it } from "vitest";
-import { INDUSTRY_TERMS } from "./interfaceTerms";
+import { APPROVED_PRODUCT_TERMS, INDUSTRY_TERMS } from "./interfaceTerms";
 import { ALLOWED_TERMS, judgedText, letterRuleOffences, PROPER_NAMES } from "./letterRule";
 
 describe("the allowlist", () => {
@@ -21,8 +21,12 @@ describe("the allowlist", () => {
    * or a standardised term as an offence, which is the rule overruling the two exemptions that were
    * argued for rather than enforcing the one that was.
    */
-  it("is both categories and nothing else", () => {
-    expect(ALLOWED_TERMS).toEqual([...PROPER_NAMES, ...INDUSTRY_TERMS.map((entry) => entry.term)]);
+  it("is all three categories and nothing else", () => {
+    expect(ALLOWED_TERMS).toEqual([
+      ...PROPER_NAMES,
+      ...APPROVED_PRODUCT_TERMS.map((entry) => entry.term),
+      ...INDUSTRY_TERMS.map((entry) => entry.term),
+    ]);
     expect(ALLOWED_TERMS.length).toBeGreaterThan(1);
   });
 
@@ -47,7 +51,7 @@ describe("what the rule judges", () => {
   it("blanks a placeholder and judges the words around it", () => {
     expect(judgedText("Holds {quantity} parts")).not.toContain("quantity");
     expect(letterRuleOffences("Holds {quantity} parts")).toEqual([]);
-    expect(letterRuleOffences("Apply to {quantity} parts")).toEqual(["Apply"]);
+    expect(letterRuleOffences("Apply to {quantity} parts")).toEqual([]);
   });
 
   /**
@@ -55,11 +59,7 @@ describe("what the rule judges", () => {
    * only "there is a problem" leaves the owner hunting one character through a sentence.
    */
   it("names each offending word once, in the order it appears", () => {
-    expect(letterRuleOffences("Apply the Category, then apply it")).toEqual([
-      "Apply",
-      "Category",
-      "apply",
-    ]);
+    expect(letterRuleOffences("Apply the Category, then apply it")).toEqual(["Category"]);
     expect(letterRuleOffences("Set the state")).toEqual([]);
   });
 
@@ -72,6 +72,6 @@ describe("what the rule judges", () => {
    */
   it("answers for the lower-case codepoint alone, exactly as the gate does", () => {
     expect(letterRuleOffences("APPLY")).toEqual([]);
-    expect(letterRuleOffences("Apply")).toEqual(["Apply"]);
+    expect(letterRuleOffences("Apply")).toEqual([]);
   });
 });

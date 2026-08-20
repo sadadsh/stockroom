@@ -4,6 +4,8 @@ import { useState } from "react";
 import { DevModeProvider, useDevMode } from "../../lib/devMode";
 import { ThemeProvider } from "../../lib/theme";
 import { InspectorPanel } from "./InspectorPanel";
+import { Button } from "../primitives";
+import { Text } from "../../lib/copy";
 
 function Controls() {
   const dev = useDevMode();
@@ -20,6 +22,24 @@ function Controls() {
       </button>
       <button type="button" onClick={dev.undo}>Undo Inspector</button>
       <button type="button" onClick={() => dev.setToken("--c-acc", "#123456")}>Set Accent</button>
+      <button
+        type="button"
+        onClick={() => {
+          if (!dev.enabled) dev.toggle();
+          dev.selectTarget(document.querySelector('[data-testid="repeated-inspector-second"]'));
+        }}
+      >
+        Select Repeated Second
+      </button>
+      <button
+        type="button"
+        onClick={() => {
+          if (!dev.enabled) dev.toggle();
+          dev.selectTarget(document.querySelector('[data-dev-id="preview.root"]'));
+        }}
+      >
+        Select Preview Root
+      </button>
       <button
         type="button"
         onClick={() => {
@@ -77,6 +97,10 @@ function Harness() {
         </section>
         <svg data-design-id="auto.raw-svg.0abc123" viewBox="0 0 24 24"><path d="M3 12h18" /></svg>
         <span data-copy-id="component-browser.key-specs-title" data-design-id="auto.copy.0fedcba">Main Specifications</span>
+        <Button type="button" data-testid="repeated-inspector-first" data-design-id="auto.inspector-repeat.1234567"><Text id="repeated.copy.first">Repeated First</Text></Button>
+        <Button type="button" data-testid="repeated-inspector-second" data-design-id="auto.inspector-repeat.1234567"><Text id="repeated.copy.second">Repeated Second</Text></Button>
+        <Button type="button" data-testid="repeated-inspector-third" data-design-id="auto.inspector-repeat.1234567"><Text id="repeated.copy.third">Repeated Third</Text></Button>
+        <main data-design-product-root="true" data-dev-id="preview.root"><p>Preview Root</p></main>
         <output data-testid="activation-count">{activations}</output>
         <InspectorPanel />
       </DevModeProvider>
@@ -95,16 +119,23 @@ describe("InspectorPanel", () => {
     if (button.getAttribute("aria-expanded") !== "true") fireEvent.click(button);
   }
 
-  it("groups every editing capability into six plain-language sections", async () => {
+  it("groups every editing capability into four plain-language sections", async () => {
     render(<Harness />);
     fireEvent.click(screen.getByRole("button", { name: "Select First" }));
 
     expect(screen.getAllByText("First Action")).toHaveLength(2);
-    for (const facet of ["Quick", "Arrangement", "Appearance", "Content", "States", "Advanced"]) {
-      expect(screen.getByRole("button", { name: facet })).toBeEnabled();
+    for (const facet of ["Layout", "Appearance", "Content", "Advanced"]) {
+      const button = screen.getByRole("button", { name: facet });
+      expect(button).toBeEnabled();
+      expect(button.querySelector("svg.ico")).not.toBeNull();
+      expect(button.textContent).not.toMatch(/[+−]/);
+    }
+    for (const obsolete of ["Quick", "Arrangement", "States"]) {
+      expect(screen.queryByRole("button", { name: obsolete })).not.toBeInTheDocument();
     }
     expect(screen.queryAllByRole("tab")).toHaveLength(0);
     openGroup("Content");
+    expect(screen.getByLabelText("Treatment")).not.toContainHTML('value="solid"');
     fireEvent.change(screen.getByLabelText("Icon Stroke"), { target: { value: "2.4" } });
     await waitFor(() => {
       const draft = JSON.parse(screen.getByTestId("inspector-draft").textContent ?? "{}") as {
@@ -124,6 +155,25 @@ describe("InspectorPanel", () => {
     expect(await screen.findByRole("searchbox", { name: "Search Icon Catalog" })).toBeVisible();
     expect(await screen.findByText(/offline icons/)).toBeVisible();
     expect(screen.getByRole("combobox", { name: "Icon Catalog" })).toContainHTML("Lucide");
+    const close = screen.getByRole("button", { name: "Close Icon Catalog" });
+    expect(close.querySelector("svg.ico")).not.toBeNull();
+    expect(close).toHaveTextContent("");
+  });
+
+  it("focuses the icon search and restores the opener when Escape closes it", async () => {
+    render(<Harness />);
+    fireEvent.click(screen.getByRole("button", { name: "Select First" }));
+    openGroup("Content");
+    const opener = screen.getByRole("button", { name: "Choose Icon" });
+    opener.focus();
+    fireEvent.click(opener);
+
+    const search = await screen.findByRole("searchbox", { name: "Search Icon Catalog" });
+    await waitFor(() => expect(search).toHaveFocus());
+    fireEvent.keyDown(search, { key: "Escape" });
+
+    expect(screen.queryByRole("dialog", { name: "Choose Icon" })).not.toBeInTheDocument();
+    await waitFor(() => expect(opener).toHaveFocus());
   });
 
   it("offers the complete library for a raw automatically exposed interface SVG", async () => {
@@ -172,7 +222,7 @@ describe("InspectorPanel", () => {
     });
   });
 
-  it("edits every global occurrence and removal is undoable", async () => {
+  it("does not implicitly expand a selected role and removal is undoable", async () => {
     render(<Harness />);
     fireEvent.click(screen.getByRole("button", { name: "Select First" }));
     const first = document.querySelector<HTMLElement>('[data-dev-id="detail.action[first]"]')!;
@@ -180,10 +230,10 @@ describe("InspectorPanel", () => {
     expect(first.style.display).toBe("");
     expect(second.style.display).toBe("");
 
-    fireEvent.click(screen.getByRole("button", { name: "Remove From Arrangement" }));
+    fireEvent.click(screen.getByRole("button", { name: "Hide Element" }));
     await waitFor(() => {
       expect(first.style.display).toBe("none");
-      expect(second.style.display).toBe("none");
+      expect(second.style.display).toBe("");
     });
 
     fireEvent.click(screen.getByRole("button", { name: "Undo Inspector" }));
@@ -193,8 +243,44 @@ describe("InspectorPanel", () => {
     });
   });
 
+  it("edits only the exact selected duplicate occurrence", async () => {
+    render(<Harness />);
+    fireEvent.click(screen.getByRole("button", { name: "Select First" }));
+    fireEvent.click(screen.getByRole("button", { name: "Select Repeated Second" }));
+    const first = screen.getByTestId("repeated-inspector-first") as HTMLElement;
+    const second = screen.getByTestId("repeated-inspector-second") as HTMLElement;
+    const third = screen.getByTestId("repeated-inspector-third") as HTMLElement;
+
+    openGroup("Content");
+    fireEvent.change(screen.getByLabelText("Text Content"), { target: { value: "Edited Second" } });
+    expect(first).toHaveTextContent("Repeated First");
+    expect(second).toHaveTextContent("Edited Second");
+    expect(third).toHaveTextContent("Repeated Third");
+
+    fireEvent.click(screen.getByRole("button", { name: "Hide Element" }));
+
+    await waitFor(() => expect(second.style.display).toBe("none"));
+    expect(first.style.display).toBe("");
+    expect(third.style.display).toBe("");
+  });
+
+  it("blocks root visibility, removal, and geometry from inspector facets", () => {
+    render(<Harness />);
+    fireEvent.click(screen.getByRole("button", { name: "Select Preview Root" }));
+    const root = document.querySelector<HTMLElement>('[data-dev-id="preview.root"]')!;
+
+    expect(screen.getByRole("button", { name: "Hide Element" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "Hide Element" }));
+    openGroup("Layout");
+    fireEvent.change(screen.getByLabelText("Width Value"), { target: { value: "1" } });
+
+    expect(root.style.visibility).toBe("");
+    expect(root.style.display).toBe("");
+    expect(root.style.width).toBe("");
+  });
+
   it(
-    "keeps content edits on the exact selected copy and icon while styling semantic occurrences",
+    "keeps content and styling edits on the exact selected target",
     async () => {
       const copyIds = ["detail.action.copy"];
       const iconIds = ["action.add"];
@@ -213,7 +299,7 @@ describe("InspectorPanel", () => {
       fireEvent.change(screen.getByLabelText("Icon Color"), { target: { value: "#123456" } });
       expect(screen.getByLabelText("Icon Color")).toHaveAttribute("type", "color");
       fireEvent.change(screen.getByLabelText("Icon Size"), { target: { value: "28" } });
-      fireEvent.change(screen.getByLabelText("Treatment"), { target: { value: "solid" } });
+      fireEvent.change(screen.getByLabelText("Treatment"), { target: { value: "muted" } });
       fireEvent.change(screen.getByLabelText("Alignment"), { target: { value: "text-top" } });
       fireEvent.change(screen.getByLabelText("Accessible Label"), { target: { value: "Add item" } });
       fireEvent.click(screen.getByRole("button", { name: "Choose Icon" }));
@@ -235,11 +321,11 @@ describe("InspectorPanel", () => {
         expect(draft.icons["action.edit"]).toBeUndefined();
         for (const id of iconIds) {
           expect(draft.icons[id]?.swapToId ?? draft.icons[id]?.body).toBeTruthy();
-          expect(draft.icons[id]).toMatchObject({ treatment: "solid", alignment: "text-top", a11yLabel: "Add item" });
+          expect(draft.icons[id]).toMatchObject({ treatment: "muted", alignment: "text-top", a11yLabel: "Add item" });
         }
       });
 
-      const expectedRoots = ["detail.action[first]", "detail.action[second]"];
+      const expectedRoots = ["detail.action[first]"];
       for (const id of expectedRoots) {
         const root = document.querySelector<HTMLElement>(`[data-dev-id="${id}"]`)!;
         const text = root.querySelector<HTMLElement>("[data-copy-id]")!;
@@ -251,6 +337,9 @@ describe("InspectorPanel", () => {
         expect(icon.style.width).toBe("28px");
         expect(icon.style.color).toBe("rgb(18, 52, 86)");
       }
+      const untouched = document.querySelector<HTMLElement>('[data-dev-id="detail.action[second]"]')!;
+      expect(untouched.querySelector<HTMLElement>("[data-copy-id]")!.style.fontSize).toBe("");
+      expect(untouched.querySelector<SVGElement>("[data-icon-id]")!.style.width).toBe("");
     },
   );
 
@@ -278,7 +367,7 @@ describe("InspectorPanel", () => {
     render(<Harness />);
     fireEvent.click(screen.getByRole("button", { name: "Select First" }));
     const target = document.querySelector<HTMLButtonElement>('[data-dev-id="detail.action[first]"]')!;
-    openGroup("States");
+    openGroup("Appearance");
 
     fireEvent.click(screen.getByRole("button", { name: "Disabled" }));
     expect(target).toBeDisabled();
@@ -294,7 +383,7 @@ describe("InspectorPanel", () => {
         elements: Record<string, Record<string, string>>;
       };
       expect(draft.elements["detail.action[first]::state:disabled"]?.color).toBe("#123456");
-      expect(draft.elements["detail.action[second]::state:disabled"]?.color).toBe("#123456");
+      expect(draft.elements["detail.action[second]::state:disabled"]).toBeUndefined();
     });
 
     for (const state of ["Hover", "Focus", "Active", "Selected"] as const) {
@@ -317,21 +406,23 @@ describe("InspectorPanel", () => {
     const first = document.querySelector<HTMLElement>('[data-dev-id="detail.action[first]"]')!;
     const second = document.querySelector<HTMLElement>('[data-dev-id="detail.action[second]"]')!;
 
-    openGroup("Arrangement");
+    openGroup("Layout");
     expect(screen.getByLabelText("Width Value")).toHaveAttribute("type", "range");
-    expect(screen.getByLabelText("Display Value")).toHaveRole("combobox");
+    expect(screen.queryByLabelText("Display Value")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Visibility Value")).not.toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("Width Value"), { target: { value: "240" } });
     await waitFor(() => expect(first.style.width).toBe("240px"));
     fireEvent.click(screen.getByRole("button", { name: "Reset Width" }));
     await waitFor(() => expect(first.style.width).toBe(""));
 
-    openGroup("Quick");
-    fireEvent.click(screen.getByRole("button", { name: "Remove From Arrangement" }));
-    await waitFor(() => expect(second.style.display).toBe("none"));
+    openGroup("Layout");
+    fireEvent.click(screen.getByRole("button", { name: "Hide Element" }));
+    await waitFor(() => expect(first.style.display).toBe("none"));
+    expect(second.style.display).toBe("");
     fireEvent.click(screen.getByRole("button", { name: "Target" }));
     await waitFor(() => {
       expect(first.style.display).toBe("");
-      expect(second.style.display).toBe("none");
+      expect(second.style.display).toBe("");
     });
     fireEvent.click(screen.getByRole("button", { name: "Screen" }));
     await waitFor(() => expect(second.style.display).toBe(""));

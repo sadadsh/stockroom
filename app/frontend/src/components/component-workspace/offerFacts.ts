@@ -34,6 +34,26 @@ export function groupOffersByProvider(offers: readonly DistributorOffer[]): Offe
   return [...groups.values()];
 }
 
+/** First usable in-stock offer in the backend's normalized order; no local ranking policy. */
+export function suggestedProvider(offers: readonly DistributorOffer[]): string | null {
+  const offer = offers.find(
+    (candidate) => {
+      const hasPrice =
+        (candidate.unitPrice !== null && candidate.unitPrice > 0) ||
+        candidate.priceBreaks.some(
+          (entry) => entry.qty !== null && entry.price !== null && entry.price > 0,
+        );
+      return candidate.failureState === "" &&
+        candidate.stock !== null &&
+        candidate.stock > 0 &&
+        candidate.offerUrl.trim() !== "" &&
+        candidate.sku.trim() !== "" &&
+        hasPrice;
+    },
+  );
+  return offer ? (offer.provider || offer.providerLabel) : null;
+}
+
 /** The best volume break on an offer, or null when only one quantity was ever quoted. */
 export function volumeBreak(offer: DistributorOffer): { qty: number; price: number } | null {
   const usable = offer.priceBreaks.filter(

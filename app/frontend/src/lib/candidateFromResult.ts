@@ -1,9 +1,7 @@
 /**
- * Merge a pulled product-page result (the pasted purchase link) onto a staging
- * candidate produced by inspecting a vendor ZIP. The link is the authority for the
- * part's DATA (identity, specs, price, buy link); the ZIP is the authority for its
- * ASSETS (symbol, footprint, 3D). So a non-passive part the user pastes a link for and
- * then drops a SnapEDA ZIP into carries everything the page gave without re-typing it.
+ * Merge the backend's selected official facts and all distributor offers onto a staging
+ * candidate produced by inspecting a vendor ZIP. The pasted link identifies the primary offer;
+ * it is not engineering-fact authority. The ZIP remains the authority for its CAD assets.
  */
 import type { EnrichmentResult, StagingCandidate } from "../api/types";
 import { distributorLabel, sv } from "./sourced";
@@ -185,6 +183,14 @@ export function mergeResultIntoCandidate(
 
   return {
     ...candidate,
+    official_payloads: {
+      ...(candidate.official_payloads ?? {}),
+      ...(result.official_payloads ?? {}),
+    },
+    official_evidence: {
+      ...(candidate.official_evidence ?? {}),
+      ...(result.official_evidence ?? {}),
+    },
     catalog: { ...(candidate.catalog ?? {}), ...(result.catalog ?? {}) },
     alternates,
     mpn: mpn || candidate.mpn,

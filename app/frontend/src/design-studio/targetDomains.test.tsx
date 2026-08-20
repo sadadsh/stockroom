@@ -5,6 +5,7 @@ import { Glb3DView } from "../components/Glb3DView";
 import { FootprintPreview } from "../components/component-workspace/FootprintPreview";
 import { SymbolPreview } from "../components/component-workspace/SymbolPreview";
 import { applyElementOverrides } from "../lib/applyElementOverrides";
+import { exactDesignTargetAuthority } from "../lib/designIdentity";
 import {
   TECHNICAL_CONTENT_ATTRIBUTE,
   inspectTarget,
@@ -74,6 +75,26 @@ afterEach(() => {
 });
 
 describe("inspectTarget", () => {
+  it("requires exact authority for duplicate ids and edits only that occurrence", () => {
+    const root = document.createElement("section");
+    root.innerHTML = `
+      <section data-dev-id="repeat.first"><button data-design-id="auto.target-repeat.1234567">First</button></section>
+      <section data-dev-id="repeat.second"><button data-design-id="auto.target-repeat.1234567">Second</button></section>
+      <section data-dev-id="repeat.third"><button data-design-id="auto.target-repeat.1234567">Third</button></section>
+    `;
+    document.body.append(root);
+    const [first, second, third] = Array.from(root.querySelectorAll("button")) as HTMLElement[];
+    const authority = exactDesignTargetAuthority(second);
+
+    expect(() => inspectTarget(root, "auto.target-repeat.1234567")).toThrow(/more than one/i);
+    const inspection = inspectTarget(root, authority!);
+    applyElementOverrides({ [inspection.editTargets.box.overrideId]: { width: "222px" } });
+
+    expect(first.style.width).toBe("");
+    expect(second.style.width).toBe("222px");
+    expect(third.style.width).toBe("");
+  });
+
   it("inspects and edits a generated Stockroom target without an authored id", () => {
     const target = document.createElement("section");
     target.dataset.designId = "auto.generated-section.0abc123";

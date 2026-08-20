@@ -3,9 +3,8 @@
  * LCSC, DigiKey...) or a part number and Stockroom retains every available sourced field and
  * decides what the part needs. A passive (R/C/L) needs no provider download because qualified
  * built-in representations project into both tools. A non-passive lands as an identity/spec
- * record, then Complete Part runs
- * the network capture that must verify one same-source KiCad + Altium + STEP set. Files selected
- * during that task use the same identity and cross-EDA gates as intercepted downloads.
+ * record, then the person may open Manage Models for the EDA files they selected. A validated,
+ * unambiguous provider package attaches to that exact part; ambiguous files remain a review step.
  */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import type {
@@ -15,8 +14,8 @@ import type {
   StagingCandidate,
 } from "../api/types";
 import { useEnrichLookup, useSettings } from "../api/queries";
-import { useCapture } from "../lib/capture";
 import { useAddPart } from "../lib/addPart";
+import { useOptionalRouter } from "../lib/router";
 import { useToast } from "../lib/toast";
 import { Text, useCopyFormatter, useText } from "../lib/copy";
 import {
@@ -29,16 +28,19 @@ import { SPEC_HIDDEN_KEYS } from "../lib/specSchema";
 import { distributorLabel } from "../lib/sourced";
 import { sv } from "../lib/sourced";
 import { Badge, Button, Card, Eyebrow } from "../components/primitives";
-import { CandidateCard } from "../components/CandidateCard";
+import { CandidateCard, type AddDisposition } from "../components/CandidateCard";
 import { EnrichStages } from "../components/EnrichStages";
 import { PassiveAddSection } from "../components/PassiveAddSection";
 import { PhotoTrigger } from "../components/ProductPhoto";
 import { productPhotoUrl } from "../components/partPhotos";
 import { PulledDepth } from "../components/PulledDepth";
+import { Icon } from "../components/Icon";
 import {
   discardIntakeDraft,
   loadIntakeDraft,
+  openComponentInSession,
   readUiSession,
+  setComponentViewInSession,
   setPendingIntakeDraft,
   type IntakeDraftBodyV1,
   type IntakeDraftCandidate,
@@ -46,6 +48,7 @@ import {
   type IntakeDraftPurchase,
   type IntakeDraftReview,
   type JsonValue,
+  updateUiSession,
 } from "../lib/uiSession";
 
 // Each staged candidate carries a stable id assigned on load, so committing or
@@ -60,10 +63,21 @@ interface Staged {
   conflicts: SpecConflict[];
 }
 
+type SessionOutcome = "Added" | "Failed" | "Review Needed" | "Existing" | "CAD Needed";
+
+interface SessionRow {
+  key: string;
+  input: string;
+  label: string;
+  outcome: SessionOutcome;
+  partId?: string;
+  detail?: string;
+}
+
 const isUrl = (s: string) => /^https?:\/\//i.test(s.trim());
 
 // The file-less seed a pulled result stages onto: every asset slot empty (the guided
-// capture attaches both EDA formats AFTER the part lands), everything else filled by
+// Manage Models attaches the selected EDA formats AFTER the part lands), everything else filled by
 // mergeResultIntoCandidate from the pull.
 const FILE_LESS_CANDIDATE: StagingCandidate = {
   vendor: "",
@@ -85,12 +99,12 @@ const FILE_LESS_CANDIDATE: StagingCandidate = {
   specs: {},
 };
 
-// One step of the part's path (pull -> KiCad -> Altium): a numbered micro-label in the
-// quiet eyebrow register, so the sequence reads as structure, never a prose wall.
+// One step of the part's path. Spacing and type carry the sequence so the helper does not become
+// another row of outlined badges competing with the actual input and action.
 function PathStep({ n, children }: { n: number; children: ReactNode }) {
   return (
     <span className="inline-flex items-center gap-1.5 ui-property-label">
-      <span className="tnum grid h-4 w-4 flex-none place-items-center rounded-full border border-line2 font-mono text-2xs leading-none text-t2">
+      <span className="tnum flex-none font-mono text-2xs leading-none text-t3">
         {n}
       </span>
       {children}
@@ -99,11 +113,7 @@ function PathStep({ n, children }: { n: number; children: ReactNode }) {
 }
 
 function PathArrow() {
-  return (
-    <span aria-hidden className="ui-row-metadata">
-      {"→"}
-    </span>
-  );
+  return <Icon id="relation.transition" className="h-3 w-3 flex-none text-t3" />;
 }
 
 function mpnIdentityKey(value: string): string {
@@ -116,6 +126,36 @@ function hasExactPulledIdentity(result: EnrichmentResult, input: string): boolea
   return isUrl(input) || mpnIdentityKey(mpn) === mpnIdentityKey(input);
 }
 
+const OFFICIAL_SOURCE_KEYS = ["mouser", "digikey"] as const;
+
+function failedSourceKeys(states: Record<string, string>): string[] {
+  return OFFICIAL_SOURCE_KEYS.filter((source) => states[source] === "failed");
+}
+
+function successfulSourceKeys(result: EnrichmentResult | null): string[] {
+  if (!result) return [];
+  const states = result.source_states ?? {};
+  const explicit = OFFICIAL_SOURCE_KEYS.filter((source) => states[source] === "success");
+  if (explicit.length > 0 || Object.keys(states).length > 0) return explicit;
+  const legacySource = result.mpn?.source?.trim().toLowerCase();
+  return OFFICIAL_SOURCE_KEYS.filter((source) => source === legacySource);
+}
+
+function hasAuthoritativeExactIdentity(result: EnrichmentResult, input: string): boolean {
+  if (!hasExactPulledIdentity(result, input)) return false;
+  if (result.add_plan && result.mpn?.source?.trim().toLowerCase() === "passive") return true;
+  if (successfulSourceKeys(result).length > 0) return true;
+  if (result.identity_authorities?.includes("manufacturer_datasheet")) return true;
+  return result.mpn?.source?.trim().toLowerCase() === "datasheet";
+}
+
+function sessionTone(outcome: SessionOutcome): "ok" | "err" | "warn" | "neutral" {
+  if (outcome === "Added") return "ok";
+  if (outcome === "Failed") return "err";
+  if (outcome === "Existing") return "warn";
+  return "neutral";
+}
+
 export function IngestPage() {
   const [input, setInput] = useState("");
   const [result, setResult] = useState<EnrichmentResult | null>(null);
@@ -124,19 +164,41 @@ export function IngestPage() {
   const [lookedUpInput, setLookedUpInput] = useState("");
   // A non-passive exact match stages one metadata-only candidate for review.
   const [staged, setStaged] = useState<Staged[] | null>(null);
+  const [sessionRows, setSessionRows] = useState<SessionRow[]>([]);
   const nextId = useRef(0);
   // The lookup is a background job now (the render tier can take seconds): it streams the live
   // fetching/rendering/extracting/validating stages, and the sourced result lands on `enrich.result`.
   const enrich = useEnrichLookup();
   const looking = enrich.status === "running";
   const { toast } = useToast();
-  // The added-part continuation (the new Altium workflow): when the LAST staged
-  // candidate lands, the Add window closes and the new part opens in its Complete
-  // Part window, where the guided capture pulls the KiCad AND Altium assets in one
-  // pass. Adding is no longer a dead end that leaves the part file-less.
-  const capture = useCapture();
+  // Explicit Open actions choose either the ordinary component or its Manage Models workspace.
+  // Add And Continue never calls either seam, so serial intake cannot launch provider work.
   const addPart = useAddPart();
-  const lastCommittedPart = useRef<PartDetail | null>(null);
+  const router = useOptionalRouter();
+  const openComponent = useCallback(
+    (partId: string) => {
+      updateUiSession((snapshot) => {
+        const opened = openComponentInSession(snapshot, partId);
+        const marked = setComponentViewInSession(opened, partId, { cad_view: "models" });
+        return { ...marked, selected_ids: { ...marked.selected_ids, component: partId } };
+      });
+      addPart.close();
+      router?.navigate("components");
+    },
+    [addPart, router],
+  );
+  const openManageModels = useCallback(
+    (partId: string) => {
+      updateUiSession((snapshot) => {
+        const opened = openComponentInSession(snapshot, partId);
+        const marked = setComponentViewInSession(opened, partId, { cad_view: "manage-models" });
+        return { ...marked, selected_ids: { ...marked.selected_ids, component: partId } };
+      });
+      addPart.close();
+      router?.navigate("assets");
+    },
+    [addPart, router],
+  );
   // Copy layer: strings that fire from callbacks/attributes resolve here (stable hook order);
   // everything visible below is a <Text> so the whole window is dev-mode editable.
   const toastNothing = useText(
@@ -229,15 +291,18 @@ export function IngestPage() {
     if (enrich.status === "done" && enrich.result) {
       const r = enrich.result;
       setResult(r);
-      const exactIdentity = hasExactPulledIdentity(r, lookedUpInput);
-      const officialFailure = Object.values(r.source_states ?? {}).includes("failed");
-      if (!exactIdentity || officialFailure) {
+      const exactIdentity = hasAuthoritativeExactIdentity(r, lookedUpInput);
+      if (!exactIdentity) {
         setStaged(null);
         toast(toastNothing, "neutral");
-      } else if (!r.add_plan) {
-        // The perfect workflow (owner): a pulled NON-passive stages itself immediately -
-        // one click lands it file-less, then the Complete Part window opens and the
-        // guided network capture verifies both EDA projections and their shared STEP.
+        recordSession(lookedUpInput, lookedUpInput, "Failed", undefined, toastNothing);
+      } else {
+        const label = sv(r.mpn) || lookedUpInput;
+        recordSession(lookedUpInput, label, "Review Needed");
+      }
+      if (exactIdentity && !r.add_plan) {
+        // A pulled NON-passive stages itself immediately. Add lands it file-less; only the
+        // explicit Add And Open action enters Complete Part for CAD acquisition.
         const url = isUrl(lookedUpInput) ? lookedUpInput : "";
         const candidate = {
           ...mergeResultIntoCandidate(FILE_LESS_CANDIDATE, r, url),
@@ -253,34 +318,13 @@ export function IngestPage() {
         ]);
       }
     } else if (enrich.status === "error") {
-      toast(enrich.error ?? toastLookupFailed, "err");
+      const detail = enrich.error ?? toastLookupFailed;
+      toast(detail, "err");
+      recordSession(lookedUpInput, lookedUpInput, "Failed", undefined, detail);
     }
     // toast is stable; re-running only on the lookup settling is intended.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enrich.status, enrich.result]);
-
-  // When the staged candidate is committed away, tear down the whole part context
-  // so the just-added part's live lookup cannot contaminate the next lookup.
-  // Reading the transition here (not inside removeStaged) lets removeStaged
-  // use a functional update, so committing several candidates concurrently can never miss the
-  // emptiness check via a stale render-closure.
-  const prevStagedLen = useRef<number | null>(null);
-  useEffect(() => {
-    const wasNonEmpty = (prevStagedLen.current ?? 0) > 0;
-    prevStagedLen.current = staged?.length ?? null;
-    if (staged && staged.length === 0 && wasNonEmpty) {
-      const created = lastCommittedPart.current;
-      lastCommittedPart.current = null;
-      reset();
-      if (created) {
-        capture.requestOpenFor(created.id);
-        addPart.close();
-      }
-    }
-    // reset is recreated each render; listing it would re-run this on every render. The transition
-    // to empty is the only intended trigger.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [staged]);
 
   function removeStaged(id: number) {
     // Functional update: read the LATEST staged, never this render's closure, so committing
@@ -301,15 +345,53 @@ export function IngestPage() {
     void discardIntakeDraft();
   }
 
+  function resetForNext() {
+    reset();
+    window.setTimeout(() => {
+      document.querySelector<HTMLInputElement>('[data-dev-id="ingest.input"]')?.focus();
+    }, 0);
+  }
+
+  function recordSession(
+    sourceInput: string,
+    label: string,
+    outcome: SessionOutcome,
+    partId?: string,
+    detail?: string,
+    retryInput: string = sourceInput,
+  ) {
+    const key = mpnIdentityKey(sourceInput);
+    setSessionRows((rows) => {
+      const next: SessionRow = { key, input: retryInput, label, outcome, partId, detail };
+      const index = rows.findIndex((row) => row.key === key);
+      if (index < 0) return [...rows, next];
+      return rows.map((row, rowIndex) => (rowIndex === index ? next : row));
+    });
+  }
+
+  function completeAdd(
+    sourceInput: string,
+    created: PartDetail,
+    outcome: "Added" | "CAD Needed",
+    disposition: AddDisposition,
+  ) {
+    recordSession(sourceInput, created.mpn || sourceInput, outcome, created.id);
+    if (disposition === "open") {
+      if (outcome === "CAD Needed") openManageModels(created.id);
+      else openComponent(created.id);
+    }
+    else resetForNext();
+  }
+
   const plan = result?.add_plan ?? null;
-  const officialFailure = Boolean(
-    result && Object.values(result.source_states ?? {}).includes("failed"),
-  );
-  const pulledSomething = result !== null && hasExactPulledIdentity(result, lookedUpInput);
+  const failedOfficialSources = failedSourceKeys(result?.source_states ?? {});
+  const succeededOfficialSources = successfulSourceKeys(result);
+  const pulledSomething =
+    result !== null && hasAuthoritativeExactIdentity(result, lookedUpInput);
   // A real non-passive part (data pulled, needs its assets) vs a fetch that came back
   // empty (blocked/not a product page) - the latter must NOT assert "needs files".
-  const nonPassive = result !== null && plan === null && pulledSomething && !officialFailure;
-  const blockedFetch = result !== null && (officialFailure || (plan === null && !pulledSomething));
+  const nonPassive = result !== null && plan === null && pulledSomething;
+  const blockedFetch = result !== null && plan === null && !pulledSomething;
   // When the empty pull came from a recognized distributor link and the matching API key
   // is absent, the blocked card names THE fix (the API-first lane is what makes those
   // Akamai-guarded links reliable) instead of a generic shrug. Unknown settings (still
@@ -328,7 +410,8 @@ export function IngestPage() {
   })();
 
   return (
-    <div data-dev-id="ingest.root" className="flex flex-col gap-5">
+    <div data-dev-id="ingest.root" className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_17rem]">
+      <div className="flex min-w-0 flex-col gap-5">
       {/* One network-first entry: exact identity before any CAD acquisition. */}
       <LookupHero
         input={input}
@@ -339,20 +422,38 @@ export function IngestPage() {
         showPath={!result}
       />
 
-      {result && plan && !officialFailure ? (
+      {result && plan ? (
         <Card data-dev-id="ingest.passive" className="px-4 py-4">
           <PassiveAddSection
             key={lookedUpInput}
             result={result}
             plan={plan}
             input={lookedUpInput}
-            onAdded={(name) => {
-              toast(toastAdded({ name }), "ok");
-              reset();
+            onAdded={(created, disposition) => {
+              completeAdd(lookedUpInput, created, "Added", disposition);
+              toast(toastAdded({ name: created.derived.display_name }), "ok");
             }}
+            onFailed={(detail) => {
+              recordSession(lookedUpInput, sv(result.mpn) || lookedUpInput, "Failed", undefined, detail);
+            }}
+            onExisting={(partId, mpn) => {
+              recordSession(lookedUpInput, mpn, "Existing", partId);
+            }}
+            onOpenExisting={openComponent}
             toast={toast}
           />
         </Card>
+      ) : null}
+
+      {result && failedOfficialSources.length > 0 && pulledSomething ? (
+        <OfficialSourceNotice
+          succeeded={succeededOfficialSources}
+          failed={failedOfficialSources}
+          datasheetSucceeded={
+            succeededOfficialSources.length === 0 &&
+            (result.identity_authorities?.includes("manufacturer_datasheet") ?? false)
+          }
+        />
       ) : null}
 
       {blockedFetch ? (
@@ -377,10 +478,26 @@ export function IngestPage() {
               candidate={candidate}
               conflicts={conflicts}
               initialDatasheetUrl={datasheetUrl}
-              onCommitted={(created) => {
-                lastCommittedPart.current = created;
+              onCommitted={(created, disposition) => {
                 removeStaged(id);
+                completeAdd(lookedUpInput, created, "CAD Needed", disposition);
               }}
+              onFailed={(mpn, detail) => {
+                // If review corrected the MPN, Retry must query that corrected identity. Reusing
+                // lookedUpInput here would simply fetch the stale part-A evidence again.
+                recordSession(
+                  lookedUpInput,
+                  mpn || lookedUpInput,
+                  "Failed",
+                  undefined,
+                  detail,
+                  mpn || lookedUpInput,
+                );
+              }}
+              onExisting={(partId, mpn) => {
+                recordSession(lookedUpInput, mpn, "Existing", partId);
+              }}
+              onOpenExisting={openComponent}
               toast={toast}
             />
           ))}
@@ -388,7 +505,96 @@ export function IngestPage() {
       ) : null}
 
       {nonPassive ? <NonPassiveCard result={result} /> : null}
+      </div>
+
+      <AddSessionTray
+        rows={sessionRows}
+        onOpen={openComponent}
+        onManage={openManageModels}
+        onRetry={runLookup}
+      />
     </div>
+  );
+}
+
+function OfficialSourceNotice({
+  succeeded,
+  failed,
+  datasheetSucceeded,
+}: {
+  succeeded: string[];
+  failed: string[];
+  datasheetSucceeded: boolean;
+}) {
+  const sourceEvidence = useCopyFormatter(
+    "ingest.official-source-evidence",
+    "{succeeded} succeeded. {failed} failed. The succeeded exact source is the sole evidence source.",
+  );
+  const successLabel = datasheetSucceeded
+    ? "Manufacturer datasheet"
+    : succeeded.map(distributorLabel).join(" and ") || "Offline passive identity";
+  return (
+    <Card data-dev-id="ingest.official-source-notice" className="border-warn/40 px-4 py-3">
+      <p className="text-sm text-t1">
+        {sourceEvidence({
+          succeeded: successLabel,
+          failed: failed.map(distributorLabel).join(" and "),
+        })}
+      </p>
+    </Card>
+  );
+}
+
+function AddSessionTray({
+  rows,
+  onOpen,
+  onManage,
+  onRetry,
+}: {
+  rows: SessionRow[];
+  onOpen: (partId: string) => void;
+  onManage: (partId: string) => void;
+  onRetry: (input: string) => void;
+}) {
+  return (
+    <aside data-dev-id="ingest.session" className="flex flex-col gap-3 lg:sticky lg:top-0 lg:self-start">
+      <div className="flex items-center justify-between">
+        <Eyebrow><Text id="ingest.session-title">Add Session</Text></Eyebrow>
+        <span className="tnum text-xs text-t3">{rows.length}</span>
+      </div>
+      {rows.length === 0 ? (
+        <p className="text-xs leading-relaxed text-t3">
+          <Text id="ingest.session-empty">Parts handled in this session remain here.</Text>
+        </p>
+      ) : (
+        <div className="flex flex-col gap-2">
+          {rows.map((row) => (
+            <Card key={row.key} className="flex flex-col gap-2 px-3 py-3">
+              <div className="flex min-w-0 items-center justify-between gap-2">
+                <span className="truncate text-xs font-medium text-t1">{row.label}</span>
+                <Badge tone={sessionTone(row.outcome)}>{row.outcome}</Badge>
+              </div>
+              {row.detail ? <p className="text-2xs leading-relaxed text-t3">{row.detail}</p> : null}
+              <div>
+                {row.partId && row.outcome === "CAD Needed" ? (
+                  <Button onClick={() => onManage(row.partId!)}>
+                    <Text id="ingest.session-manage-models">Manage Models</Text>
+                  </Button>
+                ) : row.partId ? (
+                  <Button onClick={() => onOpen(row.partId!)}>
+                    <Text id="ingest.session-open-component">Open Component</Text>
+                  </Button>
+                ) : row.outcome === "Failed" || row.outcome === "Review Needed" ? (
+                  <Button onClick={() => onRetry(row.input)}>
+                    <Text id="ingest.session-retry">Retry</Text>
+                  </Button>
+                ) : null}
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
+    </aside>
   );
 }
 
@@ -462,7 +668,7 @@ function LookupHero({
           {/* The only non-passive path: identity first, then one coherent network set. */}
           <div
             data-dev-id="ingest.path"
-            className="mt-3.5 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-control border border-line bg-raise px-3 py-2.5"
+            className="mt-3.5 flex flex-wrap items-center gap-x-2 gap-y-1 bg-band/35 px-3 py-2.5"
           >
             <PathStep n={1}>
               <Text id="ingest.path-pull">Resolve Identification + Data</Text>
@@ -473,7 +679,7 @@ function LookupHero({
             </PathStep>
             <PathArrow />
             <PathStep n={3}>
-              <Text id="ingest.path-capture">Collect One KiCad + Altium + STEP Package</Text>
+              <Text id="ingest.path-capture">Choose CAD In Manage Models</Text>
             </PathStep>
           </div>
         </>
@@ -498,20 +704,18 @@ function BlockedFetchCard({
   onCorrect: (mpn: string) => void;
 }) {
   const candidates = [...new Set(Object.values(suggestions).flat())];
-  const failedProviders = Object.entries(sourceStates)
-    .filter(([, state]) => state === "failed")
-    .map(([provider]) => provider === "digikey" ? "DigiKey" : provider === "mouser" ? "Mouser" : provider);
+  const failedProviders = failedSourceKeys(sourceStates).map(distributorLabel);
   const correctionLabel = useCopyFormatter("ingest.blocked-use-correction", "Use {mpn}");
+  const failedSources = useCopyFormatter(
+    "ingest.blocked-failed-sources",
+    "{providers} failed. Stockroom found no exact authoritative match and will not add this component. Attempt the named sources again or use an exact manufacturer datasheet.",
+  );
   return (
     <Card data-dev-id="ingest.blocked" className="px-4 py-4">
       <div className="flex flex-col gap-3">
         <span className="text-sm text-warn">
           {failedProviders.length > 0 ? (
-            <Text id="ingest.blocked-official-source">
-              A configured official source failed. Stockroom kept the successful evidence but will
-              not add this component as complete. Repair the named source in Settings and look it
-              up again.
-            </Text>
+            failedSources({ providers: failedProviders.join(" and ") })
           ) : vendor === "mouser" ? (
             <Text id="ingest.blocked-mouser-key">Nothing was pulled, and no Mouser API credential is set. Mouser blocks the page fetch, so the credential is what makes a Mouser link resolve. Add one in Settings under Sourcing, then look this up again.</Text>
           ) : vendor === "digikey" ? (
@@ -538,9 +742,6 @@ function BlockedFetchCard({
             </>
           )}
         </span>
-        {failedProviders.length > 0 ? (
-          <p className="text-xs font-semibold text-warn">{failedProviders.join(", ")}</p>
-        ) : null}
         {sourceStates.digikey === "unavailable" ? (
           <p className="text-xs text-t2">
             <Text id="ingest.blocked-digikey-checked">DigiKey was checked and returned no exact match.</Text>
@@ -574,21 +775,20 @@ function NonPassiveCard({ result }: { result: EnrichmentResult }) {
   return (
     <Card data-dev-id="ingest.nonpassive" className="px-4 py-4">
       <div className="flex flex-col gap-3">
-        <div className="flex items-center gap-2 text-sm text-t2">
-          <Badge tone="neutral">
-            <Text id="ingest.needs-files">Automatic Source Ladder</Text>
-          </Badge>
+        <div className="flex items-start gap-3 text-sm text-t2">
+          <span className="flex-none font-semibold text-t1">
+            <Text id="ingest.needs-files">CAD Added When You Choose</Text>
+          </span>
           <span>
             <Text id="ingest.needs-msg">
-              Add it once; Stockroom reuses validated evidence, searches eligible providers in
-              trust order, retains fallbacks, and activates one same-download KiCad + Altium +
-              STEP package.
+              Add the component now. Open Manage Models later, select the needed EDA files, then
+              browse one provider.
             </Text>
           </span>
         </div>
         <PulledSummary result={result} />
         <p className="text-xs text-t3">
-          <Text id="ingest.network-only">The same STEP is linked in KiCad and embedded in the Altium footprint. Identification-alone sources can contribute data but never active CAD; a visible provider window pauses just for an account gate, a protection challenge, or an explicit download choice.</Text>
+          <Text id="ingest.network-only">Stockroom never opens a provider or starts a CAD download unattended. It processes files after a person selects and downloads them.</Text>
         </p>
       </div>
     </Card>
@@ -671,6 +871,11 @@ function draftCandidate(staged: Staged): IntakeDraftCandidate {
       source: value.source,
       confidence: value.confidence,
     })),
+    official_payloads: jsonValue(candidate.official_payloads ?? {}) as Record<
+      string,
+      Record<string, JsonValue>
+    >,
+    official_evidence: structuredClone(candidate.official_evidence ?? {}),
     datasheet_url: staged.datasheetUrl,
     conflicts: staged.conflicts.map((conflict) => ({
       key: conflict.key,
@@ -720,6 +925,8 @@ function stagedFromDraft(id: number, saved: IntakeDraftCandidate): Staged {
         { source, confidence },
       ]),
     ),
+    official_payloads: structuredClone(saved.official_payloads ?? {}),
+    official_evidence: structuredClone(saved.official_evidence ?? {}),
   };
   return {
     id,
@@ -765,7 +972,7 @@ function PulledSummary({ result }: { result: EnrichmentResult }) {
   return (
     <div
       data-dev-id="ingest.pulled-summary"
-      className="flex flex-col gap-2 rounded-card border border-line2 bg-raise2 p-4"
+      className="flex flex-col gap-3"
     >
       <div className="flex items-start gap-4">
         {rows.length > 0 ? (
@@ -807,7 +1014,7 @@ function PulledSpecTable({ result }: { result: EnrichmentResult }) {
   const datasheet = sv(result.datasheet_url);
   if (specRows.length === 0 && !datasheet) return null;
   return (
-    <div className="border-t border-line pt-3">
+    <div className="pt-2">
       <div className="mb-2 flex items-baseline gap-2">
         <Eyebrow>
           <Text id="ingest.pulled-specs-title">Pulled Specs</Text>

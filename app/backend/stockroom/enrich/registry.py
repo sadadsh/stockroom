@@ -14,7 +14,13 @@ from collections.abc import Iterable
 from typing import Protocol, runtime_checkable
 
 from stockroom.enrich.errors import EnrichError
-from stockroom.enrich.schema import SOURCE_STATES, EnrichmentResult, mpn_identity_key
+from stockroom.enrich.schema import (
+    SOURCE_STATES,
+    SOURCED_FIELDS,
+    EnrichmentResult,
+    Sourced,
+    mpn_identity_key,
+)
 
 # adapter.last_status vocabulary -> the closed source_states vocabulary. Anything the map
 # does not name collapses to "failed": an unknown status is still an attempted source that
@@ -96,6 +102,43 @@ def record_vendor_offer(result: EnrichmentResult, vendor: str,
         url = str(partial.product_url.value).strip()
         if url:
             result.dist_urls.setdefault(vendor, url)
+
+
+def bind_official_payload(
+    result: EnrichmentResult,
+    provider: str,
+    payload: dict,
+    *,
+    queried_mpn: str,
+    canonical_mpn: str,
+    partial: EnrichmentResult,
+) -> None:
+    """Keep raw official bytes beside the identity/value index that makes them usable.
+
+    The binding is intentionally separate from the payload: the payload remains the complete
+    provider response, while the small index is what a later review/commit can validate without
+    pretending every returned field was selected into the part.
+    """
+
+    provider = provider.strip().lower()
+    selected: dict[str, object] = {}
+    for name in SOURCED_FIELDS:
+        sourced = getattr(partial, name, None)
+        if sourced is not None and str(sourced.source).strip().lower() == provider:
+            selected[name] = sourced.value
+    for label, sourced in partial.specs.items():
+        if str(sourced.source).strip().lower() == provider:
+            selected[str(label)] = sourced.value
+    result.official_payloads.setdefault(provider, dict(payload))
+    result.official_evidence.setdefault(
+        provider,
+        {
+            "provider": provider,
+            "queried_mpn": str(queried_mpn).strip(),
+            "canonical_mpn": str(canonical_mpn).strip(),
+            "selected_values": selected,
+        },
+    )
 
 
 @runtime_checkable
@@ -180,6 +223,57 @@ class SourceRegistry:
                 continue
             if vendor:
                 result.source_states[vendor] = source_state(source, partial)
+                payload = getattr(source, "last_payload", None)
+                if (
+                    vendor in {"mouser", "digikey"}
+                    and result.source_states[vendor] == "success"
+                    and isinstance(payload, dict)
+                ):
+                    bind_official_payload(
+                        result,
+                        vendor,
+                        payload,
+                        queried_mpn=mpn,
+                        canonical_mpn=(
+                            str(partial.mpn.value).strip()
+                            if partial.mpn is not None
+                            else mpn
+                        ),
+                        partial=partial,
+                    )
+            if (
+                source_name == "datasheet"
+                and partial.mpn is not None
+                and "manufacturer_datasheet" not in result.identity_authorities
+            ):
+                result.identity_authorities.append("manufacturer_datasheet")
+                # The page only discovered this URL. Once the bytes at that URL contain the
+                # exact requested MPN, the document itself may own its identity. Preserve the
+                # discovery attribution beside the verified binding rather than pretending the
+                # scraped page was authoritative or discarding where the link came from.
+                if result.datasheet_url is not None:
+                    discovered = result.datasheet_url
+                    verified = Sourced(
+                        discovered.value,
+                        "manufacturer_datasheet",
+                        "high",
+                    )
+                    candidates = result.field_conflicts.setdefault("datasheet_url", [])
+                    for answer in (verified, discovered):
+                        identity = (
+                            str(answer.source).casefold(),
+                            str(answer.value).strip().casefold(),
+                        )
+                        if not any(
+                            (
+                                str(existing.source).casefold(),
+                                str(existing.value).strip().casefold(),
+                            )
+                            == identity
+                            for existing in candidates
+                        ):
+                            candidates.append(answer)
+                    result.datasheet_url = verified
             if vendor:
                 record_vendor_offer(result, vendor, partial)
             result.merge_missing(partial)

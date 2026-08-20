@@ -155,7 +155,7 @@ def test_fixture_release_bundle_is_complete_valid_and_reproducible(
     assert "Phosphor 2.1.1" in notices
     assert "ASTRYX Core 0.4.1" in notices
     assert "StyleX 0.19.0" in notices
-    assert "Lucide React 1.18.0" in notices
+    assert "Lucide React 1.31.0" in notices
     assert "GitHub CLI 2.95.0" in notices
     assert (support / "Licenses" / "GitHub CLI MIT.txt").read_text(
         encoding="utf-8"

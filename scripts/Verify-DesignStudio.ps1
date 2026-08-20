@@ -14,7 +14,7 @@ if (Test-Path -LiteralPath $capabilityBin -PathType Container) {
     $env:Path = "$capabilityBin;$env:Path"
 }
 if ([string]::IsNullOrWhiteSpace($EvidenceRoot)) {
-    $EvidenceRoot = Join-Path $repositoryRoot ".work plans\sdd\2026-08-11-in-app-design-studio\task-15-evidence"
+    $EvidenceRoot = Join-Path $repositoryRoot "work\Design Studio Evidence"
 }
 $EvidenceRoot = [IO.Path]::GetFullPath($EvidenceRoot)
 if ($EvidenceRoot -eq [IO.Path]::GetPathRoot($EvidenceRoot)) {

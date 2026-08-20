@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useDesignStudio } from "../../design-studio/DesignStudioProvider";
 import { useDevMode } from "../../lib/devMode";
 import type { StudioMode } from "../../lib/devMode";
@@ -10,6 +10,7 @@ import {
   type StudioViewport,
 } from "../../design-studio/responsiveViewports";
 import { ValueSlider } from "./ValueSlider";
+import { useEscapeDismiss } from "../../lib/useEscapeDismiss";
 
 interface DesignStudioToolbarProps {
   mode: StudioMode;
@@ -59,6 +60,12 @@ export function DesignStudioToolbar({
   onClose,
 }: DesignStudioToolbarProps) {
   const [viewOpen, setViewOpen] = useState(false);
+  const viewAnchorRef = useRef<HTMLDivElement | null>(null);
+  const closeView = useCallback(() => {
+    setViewOpen(false);
+    window.setTimeout(() => viewAnchorRef.current?.querySelector<HTMLButtonElement>("button")?.focus(), 0);
+  }, []);
+  useEscapeDismiss(viewOpen, closeView);
   const studio = useDesignStudio();
   const dev = useDevMode();
   const { theme, toggle: toggleTheme } = useTheme();
@@ -66,6 +73,7 @@ export function DesignStudioToolbar({
   const stockroomLabel = useText("design-studio.breadcrumb.stockroom", "Stockroom");
   const studioLabel = useText("design-studio.title", "Design Studio");
   const realDataLabel = useText("design-studio.real-data", "Real Data");
+  const fixtureDataLabel = useText("design-studio.fixture-data", "Preview Data");
   const breadcrumbLabel = useText("design-studio.breadcrumb", "Design Studio Breadcrumb");
   const modeLabel = useText("design-studio.mode", "Studio Mode");
   const darkLabel = useText("design-studio.theme.dark", "Dark");
@@ -83,19 +91,19 @@ export function DesignStudioToolbar({
   const redoLabel = useText("design-studio.redo", "Redo");
   const viewLabel = useText("design-studio.view", "View");
   const developerLabel = useText("design-studio.developer", "Developer Tools");
-  const applyLabel = useText("design-studio.apply-local", "Commit");
-  const applyFixtureTitle = useText("design-studio.apply-local.fixture-help", "Return To Real Data To Commit This Draft");
-  const applyTitle = useText("design-studio.apply-local.help", "Commit This Draft On This PC");
+  const applyLabel = useText("design-studio.apply-local", "Apply To This PC");
+  const applyFixtureTitle = useText("design-studio.apply-local.fixture-help", "Return To Real Data To Apply This Draft");
+  const applyTitle = useText("design-studio.apply-local.help", "Apply This Draft On This PC");
   const appliedStatusLabel = useText("design-studio.applied-status", "Applied Design Status");
   const appliedLabel = useCopyFormatter(
     "design-studio.applied-this-pc",
     "Applied · {revision}",
   );
   const draftOnlyLabel = useText("design-studio.draft-only", "Draft");
-  const draftChangedLabel = useText("design-studio.draft-changed", "Uncommitted Changes");
-  const commitFailedLabel = useText("design-studio.commit-failed", "Commit Failed");
-  const applyingLabel = useText("design-studio.applying", "Committing...");
-  const committedLabel = useText("design-studio.committed", "Committed");
+  const draftChangedLabel = useText("design-studio.draft-changed", "Draft Changes");
+  const commitFailedLabel = useText("design-studio.commit-failed", "Apply Failed");
+  const applyingLabel = useText("design-studio.applying", "Applying...");
+  const committedLabel = useText("design-studio.committed", "Applied");
   const presentationLabel = useText("design-studio.presentation", "Presentation");
   const closeLabel = useText("design-studio.close", "Exit");
 
@@ -120,18 +128,10 @@ export function DesignStudioToolbar({
         ))}
       </div>
 
-      {mode === "edit" ? (
-        <div role="group" aria-label={editGridControlsLabel} className="flex min-w-0 items-center gap-2 rounded-control bg-raise px-2 py-1">
-          <Button aria-pressed={grid} onClick={() => onGridChange(!grid)}>{gridLabel}</Button>
-          <Button aria-pressed={snap} onClick={() => onSnapChange(!snap)}>{snapLabel}</Button>
-          <span className="sr-only">{gridSizeLabel}</span>
-          <ValueSlider ariaLabel={gridSizeLabel} min={1} max={64} step={1} value={gridSize} unit="px" onChange={onGridSizeChange} className="w-32" />
-        </div>
-      ) : null}
-
       <div className="min-w-0 flex-1 truncate text-center text-xs text-t2" aria-label={breadcrumbLabel}>
         <span className="sr-only">{stockroomLabel} / {studioLabel} / </span>
         <span className="font-semibold text-t1">{studio.activeScenario?.title ?? realDataLabel}</span>
+        {fixturePreview ? <span className="ml-2 rounded-control bg-warn/15 px-1.5 py-0.5 font-semibold text-warn-text">{fixtureDataLabel}</span> : null}
       </div>
 
       <Button onClick={toggleTheme} title={switchThemeLabel}>
@@ -140,7 +140,7 @@ export function DesignStudioToolbar({
       <Button disabled={!dev.canUndo} onClick={dev.undo}>{undoLabel}</Button>
       <Button disabled={!dev.canRedo} onClick={dev.redo}>{redoLabel}</Button>
 
-      <div className="relative">
+      <div ref={viewAnchorRef} className="relative">
         <Button aria-expanded={viewOpen} onClick={() => setViewOpen((open) => !open)}>{viewLabel}</Button>
         {viewOpen ? (
           <div className="absolute right-0 top-full z-50 mt-2 w-72 rounded-card bg-popover p-3 shadow-pop" aria-label={viewLabel}>
@@ -159,6 +159,14 @@ export function DesignStudioToolbar({
               </label>
             </div>
             {viewport === "custom" ? <ValueSlider ariaLabel={customViewportLabel} min={320} max={3840} step={1} value={customViewportWidth} unit="px" onChange={onCustomViewportWidthChange} className="mt-3 w-full" /> : null}
+            <div role="group" aria-label={editGridControlsLabel} className="mt-3 rounded-control bg-field/50 p-2">
+              <div className="mb-2 flex items-center gap-2">
+                <Button aria-pressed={grid} onClick={() => onGridChange(!grid)}>{gridLabel}</Button>
+                <Button aria-pressed={snap} onClick={() => onSnapChange(!snap)}>{snapLabel}</Button>
+              </div>
+              <span className="sr-only">{gridSizeLabel}</span>
+              <ValueSlider ariaLabel={gridSizeLabel} min={1} max={64} step={1} value={gridSize} unit="px" onChange={onGridSizeChange} className="w-full" />
+            </div>
             <div className="mt-3 flex items-center gap-2">
               <Button aria-pressed={presentation} onClick={() => onPresentationChange(!presentation)}>{presentationLabel}</Button>
             </div>

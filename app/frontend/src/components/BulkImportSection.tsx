@@ -6,7 +6,7 @@
  * step multiplies by 169.
  *
  * PRIOR ART evaluated in this repo, and what was taken vs rejected:
- * - `AltiumDbLibSection`'s EmbedAllModelsButton is the app's existing long-running bulk action.
+ * - Assets Catalog Build is the app's long-running CAD projection action.
  *   ADOPTED wholesale: run as a job, state the count in the button, report a partial run as a
  *   problem rather than a success with a footnote.
  * - Its toast-only reporting was REJECTED here. One line can say "embedded 38 of 40"; it cannot

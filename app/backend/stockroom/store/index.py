@@ -20,6 +20,7 @@ from pathlib import Path
 
 from stockroom.eda.registry import all_tools
 from stockroom.model.asset import ASSET_KINDS
+from stockroom.model.mpn import mpn_identity_key
 from stockroom.model.part import PartRecord
 from stockroom.model.part_class import CLASS_NEEDS, PartClass
 from stockroom.model.trust import AssetCheck, Verdict, combine, verdict_for
@@ -436,7 +437,7 @@ class LibraryIndex:
         """Exact-part match for a BOM line: case and separator insensitive
         (TPS-62130-RGTR matches tps62130rgtr) but never substring-loose, so a
         prefix or a different suffix is honestly a miss."""
-        key = _mpn_key(mpn)
+        key = mpn_identity_key(mpn)
         if not key:
             return []
         with self._lock:
@@ -445,7 +446,7 @@ class LibraryIndex:
                 for r in self._conn.execute(
                     "SELECT * FROM parts WHERE mpn <> '' ORDER BY display_name COLLATE NOCASE"
                 )
-                if _mpn_key(r["mpn"]) == key
+                if mpn_identity_key(r["mpn"]) == key
             ]
             return self._to_rows(rows)
 
@@ -667,11 +668,6 @@ class LibraryIndex:
         # takes the lock too.
         with self._lock:
             self._conn.close()
-
-
-def _mpn_key(text: str) -> str:
-    """Case/separator-insensitive MPN token: alphanumerics only, lowercased."""
-    return "".join(ch for ch in text.lower() if ch.isalnum())
 
 
 def _requirements_revision() -> str:

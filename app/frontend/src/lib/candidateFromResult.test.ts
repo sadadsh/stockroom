@@ -100,6 +100,28 @@ describe("mergeResultIntoCandidate", () => {
     expect(merged.catalog).toEqual(catalog);
   });
 
+  it("carries the selected identity source binding onto the commit candidate", () => {
+    const officialEvidence = {
+      digikey: {
+        provider: "digikey",
+        queried_mpn: "STM32F103C8T6",
+        canonical_mpn: "STM32F103C8T6",
+        selected_values: {
+          manufacturer: "STMicroelectronics",
+          description: "ARM Cortex-M3 MCU",
+        },
+      },
+    };
+
+    const merged = mergeResultIntoCandidate(
+      ZIP_CANDIDATE,
+      { ...RESULT, official_evidence: officialEvidence },
+      "",
+    );
+
+    expect(merged.official_evidence).toEqual(officialEvidence);
+  });
+
   it("commits only the backend-selected Mouser-first specifications with provenance", () => {
     const selected = {
       "Supply Voltage": { value: "5 V", source: "mouser", confidence: "high" },

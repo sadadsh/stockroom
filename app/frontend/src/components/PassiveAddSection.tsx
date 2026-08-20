@@ -10,7 +10,7 @@ import { useEffect, useRef, useState } from "react";
 import { ApiError, api } from "../api/client";
 import { useFacetsQuery, usePassiveAdd } from "../api/queries";
 import { assetRef, assetsFor } from "../lib/edaTarget";
-import type { EnrichmentResult, PassiveAddPlan, PassivePreviewOk, SourcedField } from "../api/types";
+import type { EnrichmentResult, PartDetail, PassiveAddPlan, PassivePreviewOk, SourcedField } from "../api/types";
 import type { ToastTone } from "../lib/toast";
 import { Text, useText } from "../lib/copy";
 import { applySign, prettifyValue } from "../lib/specSchema";
@@ -18,6 +18,8 @@ import { Badge, Button } from "./primitives";
 import { PulledDepth } from "./PulledDepth";
 import { StockAssetPreview } from "./StockAssetPreview";
 import { ComboField, SelectField, TextField } from "./formFields";
+import { ExistingPartRecovery } from "./ExistingPartRecovery";
+import type { AddDisposition } from "./CandidateCard";
 
 const ASSET_KEYS = new Set(["Symbol", "Footprint", "3D Model"]);
 const KIND_OPTIONS: [string, string][] = [
@@ -35,12 +37,18 @@ export function PassiveAddSection({
   plan,
   input,
   onAdded,
+  onFailed,
+  onExisting,
+  onOpenExisting,
   toast,
 }: {
   result: EnrichmentResult;
   plan: PassiveAddPlan;
   input: string;
-  onAdded: (name: string) => void;
+  onAdded: (created: PartDetail, disposition: AddDisposition) => void;
+  onFailed?: (detail: string) => void;
+  onExisting?: (partId: string, mpn: string) => void;
+  onOpenExisting: (partId: string) => void;
   toast: (message: string, tone?: ToastTone) => void;
 }) {
   const [category, setCategory] = useState("");
@@ -53,6 +61,7 @@ export function PassiveAddSection({
   );
   const [preview, setPreview] = useState<PassivePreviewOk | null>(null);
   const [previewing, setPreviewing] = useState(false);
+  const [existing, setExisting] = useState<{ partId: string; mpn: string } | null>(null);
   // The rare manual path: a detected passive whose case did not resolve to a stock
   // footprint. The pickers are revealed pre-filled with what the plan already knew.
   const [manual, setManual] = useState(false);
@@ -90,9 +99,12 @@ export function PassiveAddSection({
     // stock), the same enrichment result the non-passive path keeps - so the two branches no longer
     // diverge and a passive from a Mouser link keeps its depth, not just the offline decode.
     const specs: Record<string, string> = {};
-    for (const [k, v] of Object.entries(result.specs)) {
+    const selectedSpecs = result.selected_specs ?? result.specs;
+    const enrichment: Record<string, { source: string; confidence: string }> = {};
+    for (const [k, v] of Object.entries(selectedSpecs)) {
       if (k === "product_url" || v == null) continue;
       specs[k] = String(v.value ?? "");
+      enrichment[k] = { source: v.source, confidence: v.confidence };
     }
     const stockNum =
       result.stock != null && Number.isFinite(Number(result.stock.value))
@@ -112,6 +124,9 @@ export function PassiveAddSection({
         : undefined,
       stock: stockNum,
       catalog: result.catalog,
+      enrichment,
+      official_payloads: result.official_payloads,
+      official_evidence: result.official_evidence,
     };
   }
 
@@ -152,8 +167,9 @@ export function PassiveAddSection({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  function doAdd() {
+  function doAdd(disposition: AddDisposition) {
     if (!preview || add.isPending) return;
+    setExisting(null);
     add.mutate(
       {
         ...body(),
@@ -161,9 +177,24 @@ export function PassiveAddSection({
         purchase_part_number: distributorPn.trim() || undefined,
       },
       {
-        onSuccess: (rec) => onAdded(rec.derived.display_name),
-        onError: (err) =>
-          toast(err instanceof ApiError ? err.message : toastAddFailed, "err"),
+        onSuccess: (rec) => onAdded(rec, disposition),
+        onError: (err) => {
+          if (
+            err instanceof ApiError &&
+            err.code === "mpn_conflict" &&
+            err.existingPartId
+          ) {
+            const found = {
+              partId: err.existingPartId,
+              mpn: err.existingMpn || preview.record.mpn || input,
+            };
+            setExisting(found);
+            onExisting?.(found.partId, found.mpn);
+          }
+          const detail = err instanceof ApiError ? err.message : toastAddFailed;
+          if (!(err instanceof ApiError && err.code === "mpn_conflict")) onFailed?.(detail);
+          toast(detail, "err");
+        },
       },
     );
   }
@@ -194,7 +225,7 @@ export function PassiveAddSection({
       </div>
 
       {manual ? (
-        <div className="flex flex-col gap-3 rounded-card border border-line2 bg-raise2 p-4">
+        <div className="flex flex-col gap-3">
           <p className="text-xs text-t3">
             <Text id="ingest.manual-hint">No automatic match found a stock footprint. Choose the kind and package and it still adds with no files. Then preview again.</Text>
           </p>
@@ -235,7 +266,7 @@ export function PassiveAddSection({
       ) : null}
 
       {rec ? (
-        <div className="flex flex-col gap-4 rounded-card border border-line2 bg-raise2 p-4">
+        <div className="flex flex-col gap-4">
           <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
             <span className="text-base font-medium text-t1">{rec.mpn}</span>
             <span className="text-sm text-t2">{rec.derived.description}</span>
@@ -295,7 +326,7 @@ export function PassiveAddSection({
             <span className="text-xs text-t3">
               <Text id="ingest.buy-link">Purchase Link</Text>
             </span>
-            <span className="truncate rounded-control border border-line2 bg-field px-3 py-2 text-sm text-t2">
+            <span className="truncate bg-field px-3 py-2 text-sm text-t2">
               {rec.purchase[0]?.url}
             </span>
           </div>
@@ -306,18 +337,32 @@ export function PassiveAddSection({
             </div>
           ) : null}
 
-          <div>
+          {existing ? (
+            <ExistingPartRecovery
+              partId={existing.partId}
+              mpn={existing.mpn}
+              onOpen={onOpenExisting}
+            />
+          ) : null}
+
+          <div className="flex flex-wrap gap-2">
             <Button
               variant="accent"
               data-dev-id="ingest.passive-add"
-              onClick={doAdd}
+              onClick={() => doAdd("continue")}
               disabled={add.isPending || remaining.length > 0}
             >
               {add.isPending ? (
                 <Text id="ingest.commit-busy">Adding...</Text>
               ) : (
-                <Text id="ingest.commit">Add to Components</Text>
+                <Text id="ingest.add-continue">Add And Continue</Text>
               )}
+            </Button>
+            <Button
+              onClick={() => doAdd("open")}
+              disabled={add.isPending || remaining.length > 0}
+            >
+              <Text id="ingest.add-open">Add And Open</Text>
             </Button>
           </div>
         </div>

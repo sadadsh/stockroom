@@ -196,7 +196,10 @@ import { DEV_IDS, DEV_ID_AREAS, DEV_ID_BY_ID } from "./devIds";
 // Moving About from a rail modal into Settings retires three modal-only targets and adds one
 // settings card target. The legacy rail target remains registered so personal design documents do
 // not become invalid merely because the product control moved.
-const EXPECTED_ENTRIES = 508;
+// 514 exposes the provider modal/dashboard, add-session and new source/spec summaries while retiring the
+// deleted Altium bulk-embed control.
+// 515 makes the truthful About current-version status directly editable.
+const EXPECTED_ENTRIES = 515;
 
 describe("devIds catalogue", () => {
   // The count is asserted from a single constant so bumping it is one edit, and so the test NAME can

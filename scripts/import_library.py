@@ -1,10 +1,7 @@
 #!/usr/bin/env python3
-"""Import each library part's RAW distributor payloads into `sourced/`, then re-derive.
+"""Import each library part's raw distributor payloads into `sourced/`, then re-derive.
 
-This is the CLI over `stockroom.importer.engine`, and it exists so the owner's requirement 1 -
-*"Import everything from that list, its proper data from mouser, digikey, lcsc if possible using
-api keys. Import everything so we can change the way the data's manipulated later"* - is something
-the app can do rather than something typed by hand into a python shell.
+This CLI exposes `stockroom.importer.engine` as a repeatable library operation:
 
     # what WOULD happen. This is the DEFAULT.
     uv run python scripts/import_library.py
@@ -15,10 +12,8 @@ the app can do rather than something typed by hand into a python shell.
     # actually write
     uv run python scripts/import_library.py --apply
 
-**DRY RUN IS THE DEFAULT AND `--apply` IS REQUIRED.** This pass mutates a git-backed library of
-real parts and spends metered API quota, and the owner's standing rule is that anything which acts
-on the world gets a dry run before it acts. A tool whose destructive mode is the default is one
-mistyped command away from a bad afternoon.
+Dry run is the default and `--apply` is required. A write pass mutates a Git-backed library and
+spends metered API quota, so accidental invocation must remain non-mutating.
 
 CREDENTIALS are read from the machine config (`%APPDATA%/Stockroom/config.json` on Windows,
 `~/.config/stockroom` otherwise), never from the command line - a key in argv ends up in shell

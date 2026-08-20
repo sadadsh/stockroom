@@ -11,7 +11,7 @@ from __future__ import annotations
 from stockroom.enrich.errors import EnrichError
 from stockroom.ingest.errors import IngestError
 from stockroom.kicad.errors import KiCadCliError
-from stockroom.mutation.library_ops import IncompleteError
+from stockroom.mutation.library_ops import IncompleteError, MpnConflictError
 from stockroom.projects.collaboration import CollaborationError
 from stockroom.service import WorkflowCoordinatorError
 from stockroom.vcs.github_cli import GitHubCliError
@@ -33,6 +33,8 @@ def status_for(exc: Exception) -> int:
         return exc.status
     if isinstance(exc, IncompleteError):
         return 422
+    if isinstance(exc, MpnConflictError):
+        return 409
     if isinstance(exc, WorkflowConflict):
         return 409
     if isinstance(exc, WorkflowCoordinatorError):
@@ -69,4 +71,10 @@ def error_body(exc: Exception) -> dict:
     missing = getattr(exc, "missing", None)
     if missing is not None:
         body["missing"] = list(missing)
+    existing_part_id = getattr(exc, "existing_part_id", None)
+    if existing_part_id is not None:
+        body["existing_part_id"] = existing_part_id
+    existing_mpn = getattr(exc, "existing_mpn", None)
+    if existing_mpn is not None:
+        body["existing_mpn"] = existing_mpn
     return body

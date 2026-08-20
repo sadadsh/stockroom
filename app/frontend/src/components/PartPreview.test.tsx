@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { ApiError, api, type LandPattern } from "../api/client";
 import { ThemeProvider } from "../lib/theme";
+import { ICON_BY_ID } from "../lib/iconRegistry";
 import { ModelViewer } from "./ModelViewer";
 import { Glb3DView } from "./Glb3DView";
 import { PreviewImage } from "./PreviewImage";
@@ -142,7 +143,12 @@ describe("SvgViewport", () => {
 
   it("supports explicit zoom controls and keyboard fit", async () => {
     wrap(<SvgViewport blob={svgBlob()} alt="symbol preview" />);
-    await userEvent.click(screen.getByRole("button", { name: "Zoom in" }));
+    const zoomIn = screen.getByRole("button", { name: "Zoom in" });
+    const zoomOut = screen.getByRole("button", { name: "Zoom out" });
+    expect(zoomIn.querySelector("svg.ico")).not.toBeNull();
+    expect(zoomOut.querySelector("svg.ico")).not.toBeNull();
+    expect(`${zoomIn.textContent}${zoomOut.textContent}`).not.toMatch(/[+−]/);
+    await userEvent.click(zoomIn);
     expect(screen.getByLabelText("Zoom level")).toHaveTextContent("125%");
     const canvas = screen.getByRole("application", { name: /symbol preview inspection canvas/i });
     canvas.focus();
@@ -398,6 +404,9 @@ describe("Glb3DView scene synchronization", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "3D view settings" }));
     expect(screen.getByRole("group", { name: "Placement" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Auto" }).querySelector("path")?.getAttribute("d")).toBe(
+      ICON_BY_ID.get("view.placement-auto")?.body.match(/d="([^"]+)"/)?.[1],
+    );
     await userEvent.click(screen.getByRole("button", { name: "Top" }));
     expect(handle.setView).toHaveBeenLastCalledWith("top");
     await userEvent.click(screen.getByRole("button", { name: "Studio" }));

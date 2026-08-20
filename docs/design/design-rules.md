@@ -1,11 +1,11 @@
-# NETDECK UI — Design Rules
+# Stockroom UI — Design Rules
 
 **Status:** living guardrails · **Read this before touching any UI.**
 **One line:** make it look like a shipping product (Linear, Raycast, Vercel, native
 macOS / Windows 11), not a generated mockup. When in doubt, *remove*.
 
-This document exists because the STM32 tab drifted into a look the user called "ugly"
-and "automatically generated." That did not happen by accident — it happened by adding decoration
+This document exists because an early tab drifted into a cluttered, generated-mockup look.
+That did not happen by accident — it happened by adding decoration
 (borders, pills, tags, accent bars) instead of designing hierarchy and space. The rules
 below are the correction. Sections 1–2 and 5 are **stable and never change**. Sections
 3–4 hold the concrete tokens/recipes and get locked from the chosen art direction.

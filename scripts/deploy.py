@@ -12,8 +12,8 @@ Doing it by hand is four commands, and two of them lie if you read them casually
      Therefore `--expect` greps the install for the actual EDIT, which is the only check that can
      tell "deployed" from "both sides are equally stale".
 
-Both traps are recorded in the repo's local instructions because both cost real cycles. This script exists so
-the next person does not have to remember them.
+Both traps are repository invariants because both cost real cycles. This script exists so the next
+person does not have to remember them.
 
     uv run python scripts/deploy.py
     uv run python scripts/deploy.py --expect app/backend/stockroom/altium/dblib.py=KEY_COLUMN

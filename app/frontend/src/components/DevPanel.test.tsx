@@ -183,7 +183,7 @@ describe("DevPanel inspect-first shell", () => {
     expect(warning()).toBeNull();
 
     fireEvent.change(editor, { target: { value: "Apply Every Category" } });
-    expect(warning()?.textContent).toContain("Apply");
+    expect(warning()?.textContent).not.toContain("Apply");
     expect(warning()?.textContent).toContain("Every");
     expect(warning()?.textContent).toContain("Category");
     // Warn, never block: the text is live on the label and Save is offered.
@@ -250,6 +250,9 @@ describe("DevPanel inspect-first shell", () => {
     expect(screen.getByLabelText("Edit icon SVG body")).toBeInTheDocument();
     expect(screen.getByLabelText("Icon stroke width")).toBeInTheDocument();
     expect(screen.getByLabelText("Icon treatment")).toBeInTheDocument();
+    expect(screen.getByLabelText("Icon treatment")).not.toHaveTextContent("Solid");
+    expect(screen.getByRole("option", { name: "Line" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Muted" })).toBeInTheDocument();
     expect(screen.getByLabelText("Icon alignment")).toBeInTheDocument();
     expect(screen.getByLabelText("Icon accessibility label")).toBeInTheDocument();
     // The picker offers other primary glyphs (same category), and marks the current glyph active.

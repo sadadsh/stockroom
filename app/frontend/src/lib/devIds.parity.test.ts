@@ -287,7 +287,11 @@ const KNOWN_PROP_PASSED: readonly string[] = [
   "confirm.root",
   "confirm.scrim",
   "confirm.title",
-]; // 99
+  // ProviderBrowserModal passes its frame, move handle, and body identities into ModalShell.
+  "component-browser.provider-modal",
+  "component-browser.provider-modal-drag",
+  "component-browser.provider-modal-body",
+]; // 102
 
 describe("devIds catalogue <-> code parity (IDSYS-02)", () => {
   const catalogueIds = new Set(DEV_IDS.map((e) => e.id));

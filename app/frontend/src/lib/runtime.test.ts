@@ -22,6 +22,20 @@ describe("native host runtime boundary", () => {
     expect(apiBase()).toBe(window.location.origin);
   });
 
+  it("reads the development .env base only while developing in a browser", () => {
+    delete window.__API_BASE__;
+    vi.stubEnv("DEV", true);
+    vi.stubEnv("VITE_API_BASE", "http://127.0.0.1:9013/");
+    expect(apiBase()).toBe("http://127.0.0.1:9013");
+  });
+
+  it("keeps a build-time API base out of the shipped bundle", () => {
+    delete window.__API_BASE__;
+    vi.stubEnv("DEV", false);
+    vi.stubEnv("VITE_API_BASE", "https://machine-specific.invalid");
+    expect(apiBase()).toBe(window.location.origin);
+  });
+
   it("allows native request interception to own authentication", () => {
     delete window.__STOCKROOM_TOKEN__;
     expect(apiToken()).toBe("");

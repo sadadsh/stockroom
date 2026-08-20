@@ -1,7 +1,8 @@
-import { useCallback, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   sendProviderCommand,
   setProviderViewport,
+  type ProviderBrowserIdentity,
   type ProviderViewport,
 } from "../../lib/hostProviderViewport";
 import { Text, useCopyFormatter, useText } from "../../lib/copy";
@@ -9,7 +10,7 @@ import { Icon } from "../Icon";
 import { Button, StatusText } from "../primitives";
 
 export function ProviderBrowserFrame({
-  componentId,
+  identity,
   providerLabel,
   url,
   ready = true,
@@ -17,9 +18,12 @@ export function ProviderBrowserFrame({
   canGoForward = false,
   loading = false,
   navigationError = "",
+  stalled = false,
+  onRetry,
+  onChooseAnother,
   onClose,
 }: {
-  componentId: string;
+  identity: ProviderBrowserIdentity;
   providerLabel: string;
   url: string;
   ready?: boolean;
@@ -27,6 +31,9 @@ export function ProviderBrowserFrame({
   canGoForward?: boolean;
   loading?: boolean;
   navigationError?: string;
+  stalled?: boolean;
+  onRetry?: () => void;
+  onChooseAnother?: () => void;
   onClose?: () => void;
 }) {
   const viewportRef = useRef<HTMLDivElement | null>(null);
@@ -35,15 +42,23 @@ export function ProviderBrowserFrame({
   const forwardLabel = useText("component-browser.manage-models-forward", "Forward");
   const reloadLabel = useText("component-browser.manage-models-reload", "Reload");
   const closeLabel = useText("component-browser.manage-models-hide", "Hide Provider");
+  const providerAddressLabel = useText(
+    "component-browser.manage-models-provider-address",
+    "Provider Address",
+  );
+  const goLabel = useText("component-browser.manage-models-go", "Go");
   const addressLabel = useText(
     "component-browser.manage-models-current-address",
     "Current provider address",
   );
   const browserLabel = useCopyFormatter(
     "component-browser.manage-models-browser-label",
-    "{provider} Browser",
+    "{provider} Browser Page",
   );
   const [commandError, setCommandError] = useState<string | null>(null);
+  const [address, setAddress] = useState(url);
+  const [commandPending, setCommandPending] = useState(false);
+  useEffect(() => setAddress(url), [url]);
   let visibleAddress = providerLabel;
   try {
     const parsed = new URL(url);
@@ -52,12 +67,16 @@ export function ProviderBrowserFrame({
     // The authoritative navigation error remains visible below the toolbar.
   }
 
-  function command(name: "back" | "forward" | "reload") {
+  async function command(
+    name: "back" | "forward" | "reload" | "navigate" | "close",
+    target?: string,
+  ) {
     setCommandError(null);
     if (!ready) return;
-    if (!sendProviderCommand(componentId, name)) {
-      setCommandError("The embedded provider browser is unavailable in this host.");
-    }
+    setCommandPending(true);
+    const outcome = await sendProviderCommand(identity, name, target);
+    setCommandPending(false);
+    if (!outcome.accepted) setCommandError(outcome.error);
   }
 
   const publish = useCallback(() => {
@@ -65,7 +84,7 @@ export function ProviderBrowserFrame({
     if (!element) return;
     const bounds = element.getBoundingClientRect();
     const viewport: ProviderViewport = {
-      componentId,
+      ...identity,
       visible: bounds.width > 0 && bounds.height > 0,
       x: bounds.x,
       y: bounds.y,
@@ -76,6 +95,9 @@ export function ProviderBrowserFrame({
     if (
       previous
       && previous.componentId === viewport.componentId
+      && previous.providerId === viewport.providerId
+      && previous.routeId === viewport.routeId
+      && previous.sessionId === viewport.sessionId
       && previous.visible === viewport.visible
       && previous.x === viewport.x
       && previous.y === viewport.y
@@ -88,7 +110,7 @@ export function ProviderBrowserFrame({
     } catch {
       // Design Studio preview refusal is already reported by the central effect guard.
     }
-  }, [componentId]);
+  }, [identity]);
 
   useLayoutEffect(() => {
     const element = viewportRef.current;
@@ -104,7 +126,7 @@ export function ProviderBrowserFrame({
       lastViewportRef.current = null;
       try {
         setProviderViewport({
-          componentId,
+          ...identity,
           visible: false,
           x: 0,
           y: 0,
@@ -115,7 +137,7 @@ export function ProviderBrowserFrame({
         // Same preview-only refusal as above.
       }
     };
-  }, [componentId, publish]);
+  }, [identity, publish]);
 
   // Workspace movement changes only x/y; ResizeObserver deliberately does not fire for position.
   // Publish after every committed parent render so host geometry keeps the native WebView on the
@@ -135,37 +157,56 @@ export function ProviderBrowserFrame({
           small
           data-dev-id="component-browser.provider-back"
           aria-label={backLabel}
-          disabled={!canGoBack}
+          disabled={!ready || commandPending || !canGoBack}
           icon={<Icon id="nav.back" className="h-3.5 w-3.5" />}
-          onClick={() => command("back")}
+          onClick={() => void command("back")}
         />
         <Button
           type="button"
           small
           data-dev-id="component-browser.provider-forward"
           aria-label={forwardLabel}
-          disabled={!canGoForward}
-          icon={<Icon id="nav.back" className="h-3.5 w-3.5 rotate-180" />}
-          onClick={() => command("forward")}
+          disabled={!ready || commandPending || !canGoForward}
+          icon={<Icon id="nav.forward" className="h-3.5 w-3.5" />}
+          onClick={() => void command("forward")}
         />
         <Button
           type="button"
           small
           data-dev-id="component-browser.provider-reload"
           aria-label={reloadLabel}
-          disabled={!ready}
+          disabled={!ready || commandPending}
           icon={<Icon id="action.refresh" className="h-3.5 w-3.5" />}
-          onClick={() => command("reload")}
+          onClick={() => void command("reload")}
         />
         <span className="ml-1 flex-none text-xs font-semibold text-t1">{providerLabel}</span>
         <span className="h-3 w-px flex-none bg-line" aria-hidden="true" />
-        <p
+        <span
           aria-label={addressLabel}
           title={url}
-          className="min-w-0 flex-1 truncate text-xs text-t3"
+          className="sr-only"
         >
           {visibleAddress}
-        </p>
+        </span>
+        <form
+          className="flex min-w-0 flex-1 items-center gap-1"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void command("navigate", address.trim());
+          }}
+        >
+          <input
+            type="url"
+            aria-label={providerAddressLabel}
+            value={address}
+            disabled={!ready || commandPending}
+            onChange={(event) => setAddress(event.currentTarget.value)}
+            className="h-[24px] min-w-0 flex-1 rounded-control border border-line2 bg-control px-2 text-xs text-t1 outline-none focus:border-focus"
+          />
+          <Button type="submit" small disabled={!ready || commandPending || !address.trim()}>
+            {goLabel}
+          </Button>
+        </form>
         {loading ? (
           <StatusText tone="neutral" className="text-xs">
             <Text id="component-browser.manage-models-loading">Loading</Text>
@@ -180,15 +221,25 @@ export function ProviderBrowserFrame({
             title={closeLabel}
             icon={<Icon id="action.close" className="h-3.5 w-3.5" />}
             onClick={() => {
-              sendProviderCommand(componentId, "close");
               onClose();
+              void command("close");
             }}
           />
         ) : null}
       </div>
       {commandError || navigationError ? (
-        <div role="alert" className="flex-none border-b border-line bg-warn-soft px-2 py-1 text-xs text-warn-text">
-          {commandError || navigationError}
+        <div role="alert" className="flex flex-none items-center gap-2 border-b border-line bg-warn-soft px-2 py-1 text-xs text-warn-text">
+          <span className="min-w-0 flex-1">{commandError || navigationError}</span>
+          {stalled && onRetry ? (
+            <Button type="button" small onClick={onRetry}>
+              <Text id="component-browser.manage-models-browser-retry">Retry</Text>
+            </Button>
+          ) : null}
+          {stalled && onChooseAnother ? (
+            <Button type="button" small onClick={onChooseAnother}>
+              <Text id="component-browser.manage-models-browser-choose-another">Choose Another Provider</Text>
+            </Button>
+          ) : null}
         </div>
       ) : null}
       <div

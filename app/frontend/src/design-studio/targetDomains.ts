@@ -2,9 +2,14 @@ import type { DesignScope } from "./document";
 import { nodesForDevId } from "../lib/componentDevIds";
 import {
   DESIGN_TARGET_SELECTOR,
+  designOverrideSelector,
   designIdOf,
   designIdSelector,
+  ensureDesignOccurrenceIdentities,
+  isOccurrenceDesignId,
   isGeneratedDesignId,
+  narrowDesignOverrideTargets,
+  type ExactDesignTargetAuthority,
 } from "../lib/designIdentity";
 
 /** Stable opt-out boundary for engineering drawings and model canvases inside editable UI. */
@@ -39,6 +44,7 @@ export interface TargetStateDomain {
 
 export interface TargetInspection {
   id: string;
+  overrideId: string;
   target: Element;
   role: string | null;
   screen: string;
@@ -116,9 +122,11 @@ function isTechnical(element: Element): boolean {
   return element.closest(TECHNICAL_CONTENT_SELECTOR) !== null;
 }
 
-function targetIn(root: Element, id: string): Element | null {
-  if (designIdOf(root) === id) return root;
-  return root.querySelector(designIdSelector(id));
+function targetsIn(root: Element, id: string): Element[] {
+  const targets: Element[] = [];
+  if (designIdOf(root) === id) targets.push(root);
+  targets.push(...root.querySelectorAll(designIdSelector(id)));
+  return uniqueElements(targets);
 }
 
 function belongsToTarget(element: Element, target: Element): boolean {
@@ -216,6 +224,7 @@ function textEditElements(
 
 function editTargets(
   id: string,
+  overrideId: string,
   target: Element,
   texts: readonly TargetTextDomain[],
   icons: readonly TargetIconDomain[],
@@ -227,7 +236,7 @@ function editTargets(
   ): TargetDomainEditTarget => ({
     domain,
     targetId: id,
-    overrideId: targetDomainOverrideId(id, domain),
+    overrideId: targetDomainOverrideId(overrideId, domain),
     selector: TARGET_DOMAIN_SELECTORS[domain],
     elements,
     contentIds: [...new Set(contentIds)],
@@ -251,9 +260,23 @@ function editTargets(
 }
 
 /** Inspect one exact stable target without collapsing its independent editing domains. */
-export function inspectTarget(root: Element, id: string): TargetInspection {
-  const target = targetIn(root, id);
-  if (!target) throw new Error(`Design target '${id}' is not present under the supplied root.`);
+export function inspectTarget(
+  root: Element,
+  authority: string | ExactDesignTargetAuthority,
+): TargetInspection {
+  const id = typeof authority === "string" ? authority : authority.id;
+  const matches = typeof authority === "string" ? targetsIn(root, id) : [];
+  if (typeof authority === "string" && matches.length > 1) {
+    throw new Error(`Design target '${id}' has more than one occurrence; exact target authority is required.`);
+  }
+  const target = typeof authority === "string" ? matches[0] : authority.element;
+  if (!target || (!target.isConnected && root.isConnected)) {
+    throw new Error(`Design target '${id}' is not present under the supplied root.`);
+  }
+  if (target !== root && !root.contains(target)) {
+    throw new Error(`Design target '${id}' is outside the supplied root.`);
+  }
+  const overrideId = typeof authority === "string" ? id : authority.overrideId;
   const texts = textDomains(target);
   const icons = iconDomains(target);
   const behaviors = behaviorDomains(target);
@@ -264,6 +287,7 @@ export function inspectTarget(root: Element, id: string): TargetInspection {
     target.getAttribute("aria-label") ?? target.getAttribute("title") ?? texts[0]?.value ?? id;
   return {
     id,
+    overrideId,
     target,
     role: target.getAttribute("data-dev-role"),
     screen,
@@ -283,7 +307,7 @@ export function inspectTarget(root: Element, id: string): TargetInspection {
     behaviors,
     layout: [target],
     states,
-    editTargets: editTargets(id, target, texts, icons),
+    editTargets: editTargets(id, overrideId, target, texts, icons),
   };
 }
 
@@ -294,9 +318,15 @@ export function elementsForTargetDomainOverride(
 ): Element[] {
   const address = parseTargetDomainOverrideId(overrideId);
   const elements: Element[] = [];
-  const targets = isGeneratedDesignId(address.targetId)
+  if (isOccurrenceDesignId(address.targetId)) ensureDesignOccurrenceIdentities(root);
+  const candidates = isOccurrenceDesignId(address.targetId)
+    ? Array.from(root.querySelectorAll(designOverrideSelector(address.targetId)))
+    : isGeneratedDesignId(address.targetId)
     ? Array.from(root.querySelectorAll(designIdSelector(address.targetId)))
     : nodesForDevId(address.targetId, root);
+  const targets = isOccurrenceDesignId(address.targetId)
+    ? candidates
+    : narrowDesignOverrideTargets(address.targetId, candidates);
   for (const target of targets) {
     if (address.domain === "box") elements.push(target);
     else if (address.domain === "text") {
@@ -318,8 +348,9 @@ export function previewTargetScope(
   id: string,
   scope: DesignScope,
 ): ScopePreview {
-  const target = targetIn(root, id);
-  if (!target) return { scope, affectedTargetIds: [] };
+  const matches = targetsIn(root, id);
+  if (matches.length !== 1) return { scope, affectedTargetIds: [] };
+  const target = matches[0];
   const role = target.getAttribute("data-dev-role");
   const screen = id.split(".", 1)[0] || id;
   const ids = new Set<string>();

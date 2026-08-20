@@ -10,6 +10,7 @@ import { Text, useCopyFormatter, useText } from "../lib/copy";
 import { useObjectUrl } from "../lib/useObjectUrl";
 import { usePanZoom } from "../lib/usePanZoom";
 import { useTheme } from "../lib/theme";
+import { Icon } from "./Icon";
 
 export type SvgVisibility = "checking" | "visible" | "unavailable";
 
@@ -119,7 +120,7 @@ export function SvgViewport({
           onClick={zoomOut}
           className="flex h-7 w-7 items-center justify-center text-sm text-t2 hover:bg-raise hover:text-t1"
         >
-          −
+          <Icon id="action.zoom-out" className="h-3.5 w-3.5" />
         </button>
         <output
           aria-label={zoomLevelLabel}
@@ -134,7 +135,7 @@ export function SvgViewport({
           onClick={zoomIn}
           className="flex h-7 w-7 items-center justify-center text-sm text-t2 hover:bg-raise hover:text-t1"
         >
-          +
+          <Icon id="action.zoom-in" className="h-3.5 w-3.5" />
         </button>
         <button
           type="button"

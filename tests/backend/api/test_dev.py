@@ -302,7 +302,7 @@ def test_dev_save_writes_complete_closed_box_and_text_grammar(client, tmp_path, 
         "white-space": "nowrap",
         "text-overflow": "ellipsis",
         "overflow-wrap": "anywhere",
-        "transform": "translate(12px, -4px)",
+        "transform": "matrix(1, 0, 0, 1, 10, 20) rotate(15deg)",
         "filter": "blur(2px)",
         "z-index": "120",
     }

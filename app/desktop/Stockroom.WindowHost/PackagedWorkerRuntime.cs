@@ -5,6 +5,7 @@ using System.Net;
 using System.Net.Http;
 using System.Net.Sockets;
 using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 
 namespace Stockroom.WindowHost;
@@ -14,9 +15,8 @@ internal sealed class PackagedWorkerRuntime : IDisposable
     private const int StartupTimeoutSeconds = 120;
     private readonly Process _process;
     private readonly WindowsProcessJob _job;
-    private readonly CancellationTokenSource _loggingStop = new();
-    private readonly Task _stdout;
-    private readonly Task _stderr;
+    private readonly WorkerOutputDrains _output;
+    private SensitiveCredential? _startupProofCredential;
     private bool _disposed;
 
     private PackagedWorkerRuntime(
@@ -24,20 +24,32 @@ internal sealed class PackagedWorkerRuntime : IDisposable
         WindowsProcessJob job,
         Uri baseUri,
         string releaseId,
-        SensitiveCredential apiCredential)
+        SensitiveCredential apiCredential,
+        SensitiveCredential startupProofCredential)
     {
         _process = process;
         _job = job;
         BaseUri = baseUri;
         ReleaseId = releaseId;
         ApiCredential = apiCredential;
-        _stdout = DrainAsync(process.StandardOutput, "worker-stdout", _loggingStop.Token);
-        _stderr = DrainAsync(process.StandardError, "worker-stderr", _loggingStop.Token);
+        _startupProofCredential = startupProofCredential;
+        _output = new WorkerOutputDrains(
+            process.StandardOutput,
+            process.StandardError,
+            (eventName, detail) => LauncherDiagnostics.Write(eventName, detail));
     }
 
     internal Uri BaseUri { get; }
     internal string ReleaseId { get; }
     internal SensitiveCredential ApiCredential { get; }
+
+    internal Task<int> WaitForExitAsync(CancellationToken cancellationToken = default)
+    {
+        return _output.WaitForExitAsync(
+            _process,
+            TimeSpan.FromSeconds(2),
+            cancellationToken);
+    }
 
     internal static async Task<PackagedWorkerRuntime> StartAsync(
         string packageRoot,
@@ -47,6 +59,7 @@ internal sealed class PackagedWorkerRuntime : IDisposable
         var release = PackagedRelease.Resolve(packageRoot);
         var port = ReserveLoopbackPort();
         var token = SensitiveCredential.Generate();
+        var startupProof = SensitiveCredential.Generate();
         var start = new ProcessStartInfo
         {
             FileName = release.WorkerExecutable,
@@ -59,6 +72,8 @@ internal sealed class PackagedWorkerRuntime : IDisposable
         start.ArgumentList.Add("--port");
         start.ArgumentList.Add(port.ToString(CultureInfo.InvariantCulture));
         start.Environment["STOCKROOM_HANDOFF_TOKEN"] = token.CreateEphemeralString();
+        start.Environment["STOCKROOM_STARTUP_PROOF_TOKEN"] =
+            startupProof.CreateEphemeralString();
         start.Environment["STOCKROOM_RELEASE_ID"] = release.ReleaseId;
         start.Environment["STOCKROOM_SERVICE_MODE"] = "coordinator";
         start.Environment["STOCKROOM_SERVICE_CONTROL_TOKEN"] = string.Empty;
@@ -87,8 +102,18 @@ internal sealed class PackagedWorkerRuntime : IDisposable
             start.Environment["STOCKROOM_CAD_CONVERTER"] = converter;
         }
 
-        var process = Process.Start(start)
-            ?? throw new WindowHostException("packaged worker could not be started");
+        Process process;
+        try
+        {
+            process = Process.Start(start)
+                ?? throw new WindowHostException("packaged worker could not be started");
+        }
+        catch
+        {
+            startupProof.Dispose();
+            token.Dispose();
+            throw;
+        }
         WindowsProcessJob job;
         try
         {
@@ -98,6 +123,7 @@ internal sealed class PackagedWorkerRuntime : IDisposable
         {
             process.Kill(entireProcessTree: true);
             process.Dispose();
+            startupProof.Dispose();
             token.Dispose();
             throw;
         }
@@ -106,10 +132,12 @@ internal sealed class PackagedWorkerRuntime : IDisposable
             job,
             new Uri($"http://127.0.0.1:{port}/", UriKind.Absolute),
             release.ReleaseId,
-            token);
+            token,
+            startupProof);
         try
         {
             await runtime.WaitUntilReadyAsync(cancellationToken).ConfigureAwait(false);
+            runtime.RetireStartupProof();
             LauncherDiagnostics.Write(
                 "worker-ready",
                 $"release={release.ReleaseId};pid={process.Id}");
@@ -129,7 +157,6 @@ internal sealed class PackagedWorkerRuntime : IDisposable
             return;
         }
         _disposed = true;
-        _loggingStop.Cancel();
         try
         {
             if (!_process.HasExited)
@@ -144,15 +171,19 @@ internal sealed class PackagedWorkerRuntime : IDisposable
         }
         try
         {
-            Task.WaitAll([_stdout, _stderr], TimeSpan.FromSeconds(2));
+            _ = _output.CompleteAsync(TimeSpan.FromSeconds(2))
+                .GetAwaiter()
+                .GetResult();
         }
-        catch
+        catch (Exception exception)
         {
-            // Logging is best effort during process teardown.
+            LauncherDiagnostics.Write("worker-output-drain-failed", exception: exception);
         }
+        _output.Dispose();
         _process.Dispose();
         _job.Dispose();
-        _loggingStop.Dispose();
+        _startupProofCredential?.Dispose();
+        _startupProofCredential = null;
         ApiCredential.Dispose();
     }
 
@@ -164,6 +195,7 @@ internal sealed class PackagedWorkerRuntime : IDisposable
             Timeout = TimeSpan.FromSeconds(5),
         };
         var deadline = DateTimeOffset.UtcNow.AddSeconds(StartupTimeoutSeconds);
+        var nonce = Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(32));
         while (DateTimeOffset.UtcNow < deadline)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -174,7 +206,9 @@ internal sealed class PackagedWorkerRuntime : IDisposable
             }
             try
             {
-                using var response = await client.GetAsync("api/health", cancellationToken)
+                using var request = new HttpRequestMessage(HttpMethod.Get, "api/health");
+                request.Headers.Add("X-Stockroom-Startup-Nonce", nonce);
+                using var response = await client.SendAsync(request, cancellationToken)
                     .ConfigureAwait(false);
                 if (response.StatusCode == HttpStatusCode.OK)
                 {
@@ -186,7 +220,16 @@ internal sealed class PackagedWorkerRuntime : IDisposable
                         root.GetProperty("status").GetString() == "ok"
                         && root.GetProperty("release_id").GetString() == ReleaseId
                         && root.GetProperty("service_mode").GetString() == "coordinator"
-                        && root.GetProperty("coordinator_status").GetString() == "active")
+                        && root.GetProperty("coordinator_status").GetString() == "active"
+                        && root.GetProperty("startup_process_id").GetInt32() == _process.Id
+                        && VerifyStartupProof(
+                            _startupProofCredential
+                                ?? throw new WindowHostException(
+                                    "packaged worker startup proof was unavailable"),
+                            ReleaseId,
+                            _process.Id,
+                            nonce,
+                            root.GetProperty("startup_proof").GetString() ?? string.Empty))
                     {
                         return;
                     }
@@ -196,13 +239,47 @@ internal sealed class PackagedWorkerRuntime : IDisposable
                 when (exception is HttpRequestException
                     or TaskCanceledException
                     or JsonException
-                    or KeyNotFoundException)
+                    or KeyNotFoundException
+                    or InvalidOperationException
+                    or FormatException)
             {
                 // The worker is still binding or building its first context.
             }
             await Task.Delay(100, cancellationToken).ConfigureAwait(false);
         }
         throw new WindowHostException("packaged worker readiness timed out");
+    }
+
+    private void RetireStartupProof()
+    {
+        _startupProofCredential?.Dispose();
+        _startupProofCredential = null;
+    }
+
+    internal static bool VerifyStartupProof(
+        SensitiveCredential credential,
+        string releaseId,
+        int processId,
+        string nonce,
+        string proof)
+    {
+        ArgumentNullException.ThrowIfNull(credential);
+        if (nonce.Length != 64 || nonce.Any(
+                character => character is not (>= '0' and <= '9')
+                    and not (>= 'a' and <= 'f')))
+        {
+            return false;
+        }
+        var message = Encoding.ASCII.GetBytes(
+            $"stockroom-packaged-worker-v1\0{releaseId}\0{processId}\0{nonce}");
+        try
+        {
+            return credential.VerifyHmacHex(message, proof);
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(message);
+        }
     }
 
     private static int ReserveLoopbackPort()
@@ -212,7 +289,81 @@ internal sealed class PackagedWorkerRuntime : IDisposable
         return ((IPEndPoint)listener.LocalEndpoint).Port;
     }
 
-    private static async Task DrainAsync(
+}
+
+internal sealed class WorkerOutputDrains : IDisposable
+{
+    private readonly CancellationTokenSource _stop = new();
+    private readonly Action<string, string> _write;
+    private readonly Task _completion;
+    private readonly object _sync = new();
+    private Task<bool>? _finish;
+    private bool _disposed;
+
+    internal WorkerOutputDrains(
+        StreamReader standardOutput,
+        StreamReader standardError,
+        Action<string, string> write)
+    {
+        ArgumentNullException.ThrowIfNull(standardOutput);
+        ArgumentNullException.ThrowIfNull(standardError);
+        ArgumentNullException.ThrowIfNull(write);
+        _write = write;
+        _completion = Task.WhenAll(
+            DrainAsync(standardOutput, "worker-stdout", _stop.Token),
+            DrainAsync(standardError, "worker-stderr", _stop.Token));
+    }
+
+    internal async Task<int> WaitForExitAsync(
+        Process process,
+        TimeSpan drainTimeout,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(process);
+        await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
+        _ = await CompleteAsync(drainTimeout).ConfigureAwait(false);
+        return process.ExitCode;
+    }
+
+    internal Task<bool> CompleteAsync(TimeSpan timeout)
+    {
+        lock (_sync)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            return _finish ??= CompleteCoreAsync(timeout);
+        }
+    }
+
+    private async Task<bool> CompleteCoreAsync(TimeSpan timeout)
+    {
+        try
+        {
+            await _completion.WaitAsync(timeout).ConfigureAwait(false);
+            return true;
+        }
+        catch (TimeoutException)
+        {
+            _write("worker-output-drain-timeout", string.Empty);
+            _stop.Cancel();
+            try
+            {
+                await _completion.WaitAsync(TimeSpan.FromMilliseconds(250))
+                    .ConfigureAwait(false);
+            }
+            catch
+            {
+                // The bounded output-drain deadline already records this loss.
+            }
+            return false;
+        }
+        catch (Exception exception)
+        {
+            _write("worker-output-drain-failed", exception.Message);
+            return false;
+        }
+    }
+
+    private async Task DrainAsync(
         StreamReader reader,
         string eventName,
         CancellationToken stop)
@@ -234,9 +385,132 @@ internal sealed class PackagedWorkerRuntime : IDisposable
             }
             if (!string.IsNullOrWhiteSpace(line))
             {
-                LauncherDiagnostics.Write(eventName, line);
+                _write(eventName, line);
             }
         }
+    }
+
+    public void Dispose()
+    {
+        lock (_sync)
+        {
+            if (_disposed)
+            {
+                return;
+            }
+            _disposed = true;
+        }
+        if (!_completion.IsCompleted)
+        {
+            _stop.Cancel();
+        }
+        try
+        {
+            _completion.Wait(TimeSpan.FromMilliseconds(250));
+        }
+        catch
+        {
+            // Output draining is already bounded and best effort at final disposal.
+        }
+        _stop.Dispose();
+    }
+}
+
+internal sealed class WorkerLivenessMonitor : IDisposable
+{
+    private const int Running = 0;
+    private const int IntentionalShutdown = 1;
+    private const int UnexpectedExit = 2;
+
+    private readonly CancellationTokenSource _stop = new();
+    private readonly Action<int> _recordUnexpectedExit;
+    private readonly Func<int, Task> _shutdownHost;
+    private int _state;
+    private bool _disposed;
+
+    private WorkerLivenessMonitor(
+        Func<CancellationToken, Task<int>> waitForExit,
+        Action<int> recordUnexpectedExit,
+        Func<int, Task> shutdownHost)
+    {
+        _recordUnexpectedExit = recordUnexpectedExit;
+        _shutdownHost = shutdownHost;
+        Completion = ObserveAsync(waitForExit);
+    }
+
+    internal Task Completion { get; }
+
+    internal static WorkerLivenessMonitor Start(
+        Func<CancellationToken, Task<int>> waitForExit,
+        Action<int> recordUnexpectedExit,
+        Func<int, Task> shutdownHost)
+    {
+        ArgumentNullException.ThrowIfNull(waitForExit);
+        ArgumentNullException.ThrowIfNull(recordUnexpectedExit);
+        ArgumentNullException.ThrowIfNull(shutdownHost);
+        return new WorkerLivenessMonitor(
+            waitForExit,
+            recordUnexpectedExit,
+            shutdownHost);
+    }
+
+    internal void BeginIntentionalShutdown()
+    {
+        if (Interlocked.CompareExchange(
+                ref _state,
+                IntentionalShutdown,
+                Running) == Running)
+        {
+            _stop.Cancel();
+        }
+    }
+
+    internal void BeginIntentionalShutdown(Action beginHostShutdown)
+    {
+        ArgumentNullException.ThrowIfNull(beginHostShutdown);
+        BeginIntentionalShutdown();
+        beginHostShutdown();
+    }
+
+    private async Task ObserveAsync(Func<CancellationToken, Task<int>> waitForExit)
+    {
+        int exitCode;
+        try
+        {
+            exitCode = await waitForExit(_stop.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (_stop.IsCancellationRequested)
+        {
+            return;
+        }
+        if (Interlocked.CompareExchange(
+                ref _state,
+                UnexpectedExit,
+                Running) != Running)
+        {
+            return;
+        }
+        _recordUnexpectedExit(exitCode);
+        await _shutdownHost(exitCode).ConfigureAwait(false);
+    }
+
+    public void Dispose()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+        _disposed = true;
+        BeginIntentionalShutdown();
+        try
+        {
+            Completion.Wait(TimeSpan.FromSeconds(2));
+        }
+        catch
+        {
+            // The owner observes and records completion before final disposal.
+        }
+        _stop.Dispose();
     }
 }
 

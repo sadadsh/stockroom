@@ -93,15 +93,15 @@ def test_lifecycle_status_promotes_from_the_spec_row() -> None:
     assert r.specs["Lifecycle Status"].value == "Active"
 
 
-def test_category_is_derived_from_the_product_category_spec() -> None:
-    # A4: a pasted non-passive link must land in a real category, not "Other". fill_category
-    # reads the distributor "Product Category" ("Thick Film Resistors - SMD") -> Resistors.
+def test_scraped_product_category_is_not_component_fact_authority() -> None:
+    # The browser copy remains useful as discovery and offer evidence, but category authority is
+    # the official Mouser API, then DigiKey, then an exact manufacturer datasheet.
     from stockroom.enrich.pipeline import fill_category
 
     r = _result()
     assert r.category in ("", "Other")  # extract_all alone does not classify
     fill_category(r)
-    assert r.category == "Resistors"
+    assert r.category in ("", "Other")
 
 
 def test_package_comes_from_the_case_code_not_the_mounting_style() -> None:

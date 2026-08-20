@@ -1,5 +1,7 @@
 import { render } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
+
+import { ICON_BY_ID } from "../lib/iconRegistry";
 import {
   AddPartIcon,
   BackIcon,
@@ -17,6 +19,7 @@ import {
   GitIcon,
   InfoIcon,
   LibraryIcon,
+  ProjectsIcon,
   RefreshIcon,
   SearchIcon,
   SettingsIcon,
@@ -25,133 +28,14 @@ import {
   UploadIcon,
   WarnIcon,
 } from "./icons";
-import { ICON_BY_ID } from "../lib/iconRegistry";
 
-// Render-diff guard: the icons.tsx exports are now thin <Icon> wrappers, but each must still emit
-// the exact svg its hand-written source did. We canonicalise the rendered DOM (attrs sorted + names
-// lowered, the theme-var `style` attribute excluded because jsdom's CSSOM mangles var()) and compare
-// it to the original markup parsed the same way. A match proves adoption changed no icon's output.
-function canonical(el: Element): string {
-  const attrs = Array.from(el.attributes)
-    .map((a) => [a.name.toLowerCase(), a.value] as const)
-    .filter(([name]) => name !== "style" && name !== "data-design-id")
-    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
-    .map(([name, value]) => `${name}=${value}`)
-    .join("|");
-  const children = Array.from(el.children).map(canonical).join("");
-  return `<${el.tagName.toLowerCase()} ${attrs}>${children}`;
-}
-
-function rendered(node: React.ReactElement): Element {
+function rendered(node: React.ReactElement): SVGSVGElement {
   const { container } = render(node);
   const svg = container.querySelector("svg");
   if (!svg) throw new Error("expected an <svg>");
   return svg;
 }
 
-function original(markup: string): Element {
-  const host = document.createElement("div");
-  host.innerHTML = markup;
-  const svg = host.querySelector("svg");
-  if (!svg) throw new Error("expected an <svg> in the fixture");
-  return svg;
-}
-
-// The original svg markup for a representative slice: two primary icons (one with a className, one
-// falling back to the default size), the sized bespoke line icons (including path-level caps and a
-// filled sub-shape), and all three art glyphs (inner-group + root theme-var styling).
-const CASES: Array<{ name: string; el: React.ReactElement; svg: string }> = [
-  {
-    name: "LibraryIcon (primary, explicit className)",
-    el: <LibraryIcon className="h-4 w-4" />,
-    svg:
-      '<svg class="ico h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
-      '<path d="m16 6 4 14"/><path d="M12 6v14"/><path d="M8 8v12"/><path d="M4 4v16"/></svg>',
-  },
-  {
-    name: "AddPartIcon (primary, default size)",
-    el: <AddPartIcon />,
-    svg:
-      '<svg class="ico h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
-      '<path d="M12 5v14M5 12h14"/></svg>',
-  },
-  {
-    name: "SearchIcon (bespoke, lucide search)",
-    el: <SearchIcon className="text-t3" />,
-    svg:
-      '<svg class="text-t3" aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
-      '<path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>',
-  },
-  {
-    name: "UploadIcon (bespoke, weight 1.4, lucide upload)",
-    el: <UploadIcon className="up" />,
-    svg:
-      '<svg class="up" aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">' +
-      '<path d="M12 3v12"/><path d="m17 8-5-5-5 5"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/></svg>',
-  },
-  {
-    name: "CloseIcon (bespoke, lucide x)",
-    el: <CloseIcon className="cl" />,
-    svg:
-      '<svg class="cl" aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' +
-      '<path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>',
-  },
-  {
-    name: "WarnIcon (bespoke, lucide triangle-alert)",
-    el: <WarnIcon className="text-warn" />,
-    svg:
-      '<svg class="text-warn" aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
-      '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>',
-  },
-  {
-    name: "ExternalIcon (owner-selected filled circle arrow)",
-    el: <ExternalIcon className="ext" />,
-    svg:
-      '<svg class="ext" aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
-      '<g transform="translate(0 0) scale(1)" fill="currentColor" stroke="none"><path fill="currentColor" d="M17 3.34a10 10 0 1 1-14.995 8.984L2 12l.005-.324A10 10 0 0 1 17 3.34M15 8H9l-.117.007A1 1 0 0 0 8 9l.007.117A1 1 0 0 0 9 10h3.584l-4.291 4.293l-.083.094a1 1 0 0 0 1.497 1.32L14 11.414V15l.007.117A1 1 0 0 0 16 15V9l-.007-.117l-.029-.149l-.035-.105l-.054-.113l-.071-.111a1 1 0 0 0-.097-.112l-.09-.08l-.096-.067l-.098-.052l-.11-.044l-.112-.03l-.126-.017z"/></g></svg>',
-  },
-  {
-    name: "SymbolArt (art, inner-group style)",
-    el: <SymbolArt />,
-    svg:
-      '<svg viewBox="0 0 132 94" width="132" height="94" aria-hidden="true">' +
-      '<g style="stroke:var(--c-icon-line)" stroke-width="1.5" fill="none">' +
-      '<rect x="40" y="20" width="52" height="54" rx="3"/>' +
-      '<path d="M40 33H24M40 47H24M40 61H24M92 33h16M92 47h16M92 61h16"/></g></svg>',
-  },
-  {
-    name: "FootprintArt (art, pads + edge rect)",
-    el: <FootprintArt />,
-    svg:
-      '<svg viewBox="0 0 132 94" width="132" height="94" aria-hidden="true">' +
-      '<g style="fill:var(--c-icon-fill)">' +
-      '<rect x="34" y="26" width="9" height="7" rx="1"/><rect x="48" y="26" width="9" height="7" rx="1"/>' +
-      '<rect x="62" y="26" width="9" height="7" rx="1"/><rect x="76" y="26" width="9" height="7" rx="1"/>' +
-      '<rect x="90" y="26" width="9" height="7" rx="1"/><rect x="34" y="61" width="9" height="7" rx="1"/>' +
-      '<rect x="48" y="61" width="9" height="7" rx="1"/><rect x="62" y="61" width="9" height="7" rx="1"/>' +
-      '<rect x="76" y="61" width="9" height="7" rx="1"/><rect x="90" y="61" width="9" height="7" rx="1"/></g>' +
-      '<rect x="38" y="37" width="60" height="20" rx="2" fill="none" style="stroke:var(--c-icon-edge)" stroke-width="1.3"/></svg>',
-  },
-  {
-    name: "CubeArt (art, root style)",
-    el: <CubeArt />,
-    svg:
-      '<svg viewBox="0 0 90 90" width="70" height="70" fill="none" style="stroke:var(--c-icon-cube)" stroke-width="1.4" aria-hidden="true">' +
-      '<path d="M45 12l30 17v32L45 78 15 61V29z"/>' +
-      '<path d="M45 12v18M45 30l30-17M45 30L15 13" opacity="0.5"/></svg>',
-  },
-];
-
-describe("icons.tsx wrappers - render-diff", () => {
-  for (const { name, el, svg } of CASES) {
-    it(`matches the original svg: ${name}`, () => {
-      expect(canonical(rendered(el))).toBe(canonical(original(svg)));
-    });
-  }
-});
-
-// Broad smoke over every named export: each resolves to its registry entry and draws
-// a single, non-empty svg with the right frame.
 const ALL: Array<{ Comp: (p: { className?: string }) => React.ReactElement | null; id: string }> = [
   { Comp: SearchIcon, id: "action.search" },
   { Comp: WarnIcon, id: "status.warn" },
@@ -172,34 +56,47 @@ const ALL: Array<{ Comp: (p: { className?: string }) => React.ReactElement | nul
   { Comp: TrashIcon, id: "action.trash" },
   { Comp: EnrichIcon, id: "action.enrich" },
   { Comp: GitIcon, id: "action.git" },
-  { Comp: BoardIcon, id: "nav.board" },
+  { Comp: BoardIcon, id: "nav.cad-assets" },
+  { Comp: ProjectsIcon, id: "nav.projects" },
   { Comp: SymbolArt, id: "art.symbol" },
   { Comp: FootprintArt, id: "art.footprint" },
   { Comp: CubeArt, id: "art.model" },
 ];
 
-describe("icons.tsx wrappers - coverage", () => {
-  it("maps all 23 named exports to their registry ids", () => {
-    expect(ALL).toHaveLength(23);
+describe("icons.tsx wrappers", () => {
+  it("keeps all named exports mapped to stable registry ids", () => {
+    expect(ALL).toHaveLength(24);
   });
 
   for (const { Comp, id } of ALL) {
-    it(`renders one framed svg for ${id}`, () => {
+    it(`renders the registered frame for ${id}`, () => {
       const svg = rendered(<Comp />);
       const entry = ICON_BY_ID.get(id);
       expect(entry, id).toBeDefined();
-      expect(svg.getAttribute("viewBox")).toBe(entry?.viewBox);
+      expect(svg).toHaveAttribute("viewBox", entry?.viewBox);
       expect(svg.children.length).toBeGreaterThan(0);
-      if (entry?.category === "primary") {
-        expect(svg.classList.contains("ico")).toBe(true);
-        expect(svg.getAttribute("stroke-width")).toBe(String(entry.strokeWidth));
+
+      if (entry?.family === "tabler-outline") {
+        expect(svg).toHaveClass("ico");
+        expect(svg).toHaveAttribute("fill", "none");
+        expect(svg).toHaveAttribute("stroke", "currentColor");
+        expect(svg).toHaveAttribute("stroke-width", "2");
+        expect(svg).toHaveAttribute("stroke-linecap", "round");
+        expect(svg).toHaveAttribute("stroke-linejoin", "round");
       }
+
       if (typeof entry?.size === "number") {
-        expect(svg.getAttribute("width")).toBe(String(entry.size));
+        expect(svg).toHaveAttribute("width", String(entry.size));
       } else if (Array.isArray(entry?.size)) {
-        expect(svg.getAttribute("width")).toBe(String(entry.size[0]));
-        expect(svg.getAttribute("height")).toBe(String(entry.size[1]));
+        expect(svg).toHaveAttribute("width", String(entry.size[0]));
+        expect(svg).toHaveAttribute("height", String(entry.size[1]));
       }
     });
   }
+
+  it("forwards caller size classes without changing the shared optical frame", () => {
+    const svg = rendered(<LibraryIcon className="h-4 w-4 text-t2" />);
+    expect(svg).toHaveClass("ico", "h-4", "w-4", "text-t2");
+    expect(svg).toHaveAttribute("stroke-width", "2");
+  });
 });

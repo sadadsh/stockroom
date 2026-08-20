@@ -312,7 +312,8 @@ function MachineSetupBand({
   return (
     <AstryxCard
       padding={0}
-      elevation="low"
+      variant="muted"
+      elevation="none"
       className="grid flex-none grid-cols-1 overflow-hidden @3xl:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)]"
       data-dev-id="settings.machine-band"
     >
@@ -323,7 +324,7 @@ function MachineSetupBand({
           </Eyebrow>
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-sm font-semibold text-t1">
-              <Text id="settings.delivery.mode">Automatic Convergence</Text>
+              <Text id="settings.delivery.mode">Signed Release Updates</Text>
             </span>
             {updateState === "offline" ? (
               <Badge tone="warn">
@@ -370,7 +371,7 @@ function MachineSetupBand({
             )}
           </div>
           <p className="mt-1 text-xs text-t3">
-            <Text id="settings.delivery.lede">Install Stockroom.exe once. It follows the validated application revision on its own, checks at two-minute intervals, and keeps this window open while adopting updates.</Text>
+            <Text id="settings.delivery.lede">Stockroom checks signed releases in the background, stages them with care, and activates an update after restart.</Text>
           </p>
         </div>
         <div className="flex flex-none flex-col items-end gap-1.5">
@@ -385,7 +386,7 @@ function MachineSetupBand({
             rel="noreferrer"
             className="text-2xs font-medium text-t2 underline decoration-line2 underline-offset-2 hover:text-t1"
           >
-            <Text id="settings.delivery.get-exe">Get Stockroom.exe</Text>
+            <Text id="settings.delivery.get-exe">View Releases</Text>
           </a>
         </div>
       </section>
@@ -433,7 +434,7 @@ function MachineSetupBand({
               st.met ? (
                 <span
                   key={st.id}
-                  className="inline-flex min-w-0 items-center gap-1.5 rounded-control border border-line bg-field px-2 py-1.5 text-2xs font-medium text-t3"
+                  className="inline-flex min-w-0 items-center gap-1.5 rounded-control bg-field px-2 py-1.5 text-2xs font-medium text-t3"
                 >
                   <Dot tone="ok" />
                   <span className="truncate">
@@ -482,7 +483,7 @@ function AppearanceSection() {
           <Text id="settings.appearance.theme-label">Theme</Text>
         </span>
         <div
-          className="inline-flex rounded-card border border-line2 p-0.5"
+          className="inline-flex rounded-card bg-field p-0.5"
           data-dev-id="settings.appearance-theme"
         >
           {THEME_OPTIONS.map((o) => (
@@ -863,7 +864,7 @@ function SyncSection() {
             />
           ) : null}
           <StatusRow
-            label="Automatic Convergence"
+            label="Catalog Synchronization"
             labelId="settings.sync.automatic-convergence"
             value={
               !status.data.last_sync ? (
@@ -1722,7 +1723,7 @@ function UpdateSection() {
           rel="noreferrer"
           className="inline-flex h-[27px] items-center rounded-control px-2 text-xs font-medium text-t2 underline decoration-line2 underline-offset-2 hover:text-t1"
         >
-          <Text id="settings.update.download">Download Stockroom.exe</Text>
+          <Text id="settings.update.download">View Releases</Text>
         </a>
       </div>
     </>
@@ -1757,7 +1758,13 @@ function AboutSettingsSection({ version, note = "" }: { version: string; note?: 
           <span className="font-medium"><Text id="modal.about.version">Version</Text></span>{" "}
           <span className="tnum font-mono">{version}</span>
         </p>
-        {note && !versionIsCurrent ? (
+        {versionIsCurrent ? (
+          <div data-dev-id="about.current" className="mt-2">
+            <Badge tone="ok">
+              <Text id="settings.about.current-status">Current</Text>
+            </Badge>
+          </div>
+        ) : note ? (
           <AstryxBanner
             data-dev-id="about.stale"
             status="warning"
@@ -1817,7 +1824,6 @@ function GeneralGroup() {
               <Text id="settings.summary.dark">Dark</Text>
             )
           }
-          className="@3xl:col-span-2"
           data-dev-id="settings.appearance"
         >
           <AppearanceSection />
@@ -1828,7 +1834,6 @@ function GeneralGroup() {
           hint="Application version, installed build, and project links."
           hintId="settings.about.hint"
           summary={<span className="tnum font-mono">{aboutVersion(update.data, __APP_VERSION__)}</span>}
-          className="@3xl:col-span-2"
           data-dev-id="settings.about"
         >
           <AboutSettingsSection
@@ -1868,7 +1873,6 @@ function GeneralGroup() {
               <Text id="settings.summary.update-unknown">Update Unknown</Text>
             )
           }
-          className="@3xl:col-span-2"
           data-dev-id="settings.update"
         >
           <UpdateSection />
@@ -1943,7 +1947,6 @@ function LibraryGroup() {
               )
             ) : null
           }
-          className="@3xl:col-span-2"
           data-dev-id="settings.github"
         >
           <GitHubSection />
@@ -2012,7 +2015,6 @@ function EdaGroup() {
               </Badge>
             )
           }
-          className="@3xl:col-span-2"
           data-dev-id="settings.cubemx"
         >
           <CubeMxSection />
@@ -2190,7 +2192,7 @@ function MaintenanceGroup() {
           hint="Destructive repair: remove captured schematic assets, footprints, and 3D models while preserving parts, specifications, datasheets, and source evidence."
           hintId="settings.cad-clear.hint"
           summary={cadSummary}
-          className="@3xl:col-span-2 border-err/40"
+          className="border-err/40"
           data-dev-id="settings.cad-clear"
         >
           <CadClearSection />

@@ -47,7 +47,7 @@ import { findRegion } from "../../layout/document";
 import { WORKSPACE_PIECE_REGISTRY, WORKSPACE_REGION } from "../../layout/workspacePieces";
 import { ComponentWorkspace } from "./ComponentWorkspace";
 import { OffersSection } from "./OffersSection";
-import { volumeBreak } from "./offerFacts";
+import { suggestedProvider, volumeBreak } from "./offerFacts";
 import { FORBIDDEN_IN_NORMAL_UI } from "./provenanceVocabulary";
 
 vi.mock("../../api/client", async (importActual) => {
@@ -488,9 +488,8 @@ describe("the distributor offers ledger", () => {
 
     await user.click(within(provider).getByText("All Price Breaks"));
     expect(within(provider).getByText("USD0.22")).toBeVisible();
-    for (const pill of provider.querySelectorAll<HTMLElement>("[data-price-break-pill]")) {
-      expect(pill).toHaveClass("rounded-full");
-      expect(pill.className).not.toMatch(/border|divide/);
+    for (const tier of provider.querySelectorAll<HTMLElement>("[data-price-break-pill]")) {
+      expect(tier.className).not.toMatch(/rounded-full|border|divide|bg-raise/);
     }
     expect(within(offer).getByText("Stock")).not.toBeVisible();
     await user.click(within(offer).getByText("Details"));
@@ -520,6 +519,85 @@ describe("the distributor offers ledger", () => {
     expect([...document.querySelectorAll<HTMLElement>("[data-sourcing-provider] > ul > [data-offer-provider]")].map(
       (row) => within(row).getByTitle(/^(MOUSER|DK)-/).textContent,
     )).toEqual(["MOUSER-1", "DK-1"]);
+  });
+
+  it("suggests exactly the first currently in-stock provider", () => {
+    provide(
+      <OffersSection
+        offers={[
+          makeOffer({ provider: "mouser", providerLabel: "Mouser", stock: 0 }),
+          makeOffer({ provider: "digikey", providerLabel: "DigiKey", stock: 42 }),
+          makeOffer({ provider: "lcsc", providerLabel: "LCSC", stock: 500 }),
+        ]}
+        failures={[]}
+        onRefresh={() => {}}
+        onViewAll={() => {}}
+        refreshing={false}
+      />,
+    );
+
+    expect(document.querySelector('[data-sourcing-provider="mouser"]')).not.toHaveTextContent(
+      "Suggested",
+    );
+    expect(document.querySelector('[data-sourcing-provider="digikey"]')).toHaveTextContent(
+      "Suggested",
+    );
+    expect(document.querySelector('[data-sourcing-provider="lcsc"]')).not.toHaveTextContent(
+      "Suggested",
+    );
+    expect(screen.getAllByText("Suggested")).toHaveLength(1);
+  });
+
+  it("suggests a sole usable provider and stays silent for sparse or failed offers", () => {
+    const { rerenderWrapped } = provide(
+      <OffersSection
+        offers={[makeOffer({ provider: "digikey", providerLabel: "DigiKey", stock: 7 })]}
+        failures={[]}
+        onRefresh={() => {}}
+        onViewAll={() => {}}
+        refreshing={false}
+      />,
+    );
+    expect(screen.getByText("Suggested")).toBeInTheDocument();
+
+    rerenderWrapped(
+      <OffersSection
+        offers={[
+          makeOffer({ provider: "mouser", providerLabel: "Mouser", stock: null }),
+          makeOffer({
+            provider: "digikey",
+            providerLabel: "DigiKey",
+            stock: 7,
+            failureState: "failed",
+          }),
+        ]}
+        failures={[]}
+        onRefresh={() => {}}
+        onViewAll={() => {}}
+        refreshing={false}
+      />,
+    );
+    expect(screen.queryByText("Suggested")).toBeNull();
+  });
+
+  it("skips in-stock offers that cannot actually be ordered", () => {
+    expect(suggestedProvider([
+      makeOffer({ provider: "mouser", stock: 50, offerUrl: "" }),
+      makeOffer({ provider: "digikey", stock: 40, sku: "" }),
+      makeOffer({
+        provider: "lcsc",
+        stock: 30,
+        unitPrice: null,
+        priceBreaks: [],
+      }),
+      makeOffer({
+        provider: "arrow",
+        providerLabel: "Arrow",
+        stock: 20,
+        unitPrice: null,
+        priceBreaks: [{ qty: 10, price: 0.31 }],
+      }),
+    ])).toBe("arrow");
   });
 
   it("right-aligns the figures that are compared down a column", async () => {

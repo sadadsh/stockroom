@@ -71,9 +71,13 @@ describe("Projects Design Studio scenarios", () => {
     await user.click(screen.getByRole("option", { name: /Power Board/ }));
     expect(await screen.findByRole("heading", { name: "Power Board" })).toBeVisible();
 
-    await user.click(screen.getByRole("button", { name: /Main Schematic/ }));
+    await user.click(screen.getByRole("button", {
+      name: /Power, Schematic, Power\.kicad_sch/,
+    }));
     expect(screen.getByRole("heading", { name: "Main Schematic" })).toBeVisible();
-    await user.click(screen.getByRole("button", { name: /Main PCB/ }));
+    await user.click(screen.getByRole("button", {
+      name: /Power, PCB, Power\.kicad_pcb/,
+    }));
     const overviewMap = await screen.findByRole("region", { name: "PCB view" });
     await user.click(within(overviewMap).getByRole("button", { name: /R2,/ }));
     expect(screen.getByText("Selected Placement")).toBeVisible();

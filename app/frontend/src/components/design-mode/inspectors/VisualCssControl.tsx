@@ -6,6 +6,7 @@ interface VisualCssControlProps {
   ariaLabel: string;
   value: string;
   onCommit: (value: string) => void;
+  disabled?: boolean;
 }
 
 interface RangeConfig {
@@ -98,7 +99,7 @@ function visualOptionLabel(value: string): string {
   return value.replaceAll("-", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
-export function VisualCssControl({ property, ariaLabel, value, onCommit }: VisualCssControlProps) {
+export function VisualCssControl({ property, ariaLabel, value, onCommit, disabled = false }: VisualCssControlProps) {
   const range = RANGE_CONFIG[property];
   const options = OPTIONS[property];
   const [rangeValue, setRangeValue] = useState(() => range ? finiteRangeValue(value, range) : 0);
@@ -112,6 +113,7 @@ export function VisualCssControl({ property, ariaLabel, value, onCommit }: Visua
         type="color"
         aria-label={ariaLabel}
         value={colorHex(value)}
+        disabled={disabled}
         onChange={(event) => onCommit(event.currentTarget.value)}
         className="h-7 w-full cursor-pointer rounded-control border border-line bg-field p-0.5"
       />
@@ -123,6 +125,7 @@ export function VisualCssControl({ property, ariaLabel, value, onCommit }: Visua
       <select
         aria-label={ariaLabel}
         value={selected}
+        disabled={disabled}
         onChange={(event) => onCommit(event.currentTarget.value)}
         className="w-full rounded-control border border-line bg-field px-1.5 py-1 text-2xs text-t1 outline-none focus:border-focus"
       >
@@ -139,6 +142,7 @@ export function VisualCssControl({ property, ariaLabel, value, onCommit }: Visua
       max={range.max}
       step={range.step}
       unit={range.unit}
+      disabled={disabled}
       onChange={(next) => {
         setRangeValue(next);
         onCommit(`${next}${range.unit}`);

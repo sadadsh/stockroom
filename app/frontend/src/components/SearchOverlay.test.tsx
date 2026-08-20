@@ -83,6 +83,11 @@ describe("SearchOverlay numeric facets", () => {
       "aria-pressed",
       "true",
     );
+    fireEvent.click(screen.getByRole("button", { name: /^Sort/ }));
+    const selectedSort = screen.getAllByRole("button", { name: /^In Stock/ })
+      .find((button) => button.closest(".absolute"));
+    expect(selectedSort?.querySelector("svg.ico")).not.toBeNull();
+    expect(selectedSort?.textContent).not.toMatch(/[↑↓]/);
   });
 });
 

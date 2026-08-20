@@ -7,6 +7,8 @@ import {
   useAssignProjectGroup,
   useDeletePart,
   useEditField,
+  useIngestCommit,
+  usePassiveAdd,
   useDoSync,
   useRefreshSourcing,
   useRestoreDeletedPart,
@@ -362,6 +364,34 @@ describe("duplicates invalidation (M6e)", () => {
       wrapper: wrapperWith(qc),
     });
     result.current.mutate({ id: "lm358", field: "mpn", value: "NEW-MPN" });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    expect(invalidatedKeys(spy)).toContain("duplicates");
+  });
+
+  it("committing a staged part refreshes duplicate badges", async () => {
+    const qc = new QueryClient();
+    const spy = vi.spyOn(qc, "invalidateQueries");
+    vi.spyOn(api, "ingestCommit").mockResolvedValue(PART_DETAIL);
+
+    const { result } = renderHook(() => useIngestCommit(), {
+      wrapper: wrapperWith(qc),
+    });
+    result.current.mutate({ mpn: "LM358DR" } as never);
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    expect(invalidatedKeys(spy)).toContain("duplicates");
+  });
+
+  it("adding a passive part refreshes duplicate badges", async () => {
+    const qc = new QueryClient();
+    const spy = vi.spyOn(qc, "invalidateQueries");
+    vi.spyOn(api, "passiveAdd").mockResolvedValue(PART_DETAIL);
+
+    const { result } = renderHook(() => usePassiveAdd(), {
+      wrapper: wrapperWith(qc),
+    });
+    result.current.mutate({ input: "ERJ-P03F1101V" });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
     expect(invalidatedKeys(spy)).toContain("duplicates");

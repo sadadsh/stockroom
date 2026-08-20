@@ -1,6 +1,6 @@
 # Architecture
 
-Stockroom is a KiCad component-library and PCB-project manager for the desktop. This map is the
+Stockroom is a KiCad and Altium component-library and PCB-project manager for Windows. This map is the
 "where does anything live and why" reference; the step-by-step recipes for extending it are in
 [adding-a-feature.md](adding-a-feature.md), and the day-to-day rules are in
 [../CONTRIBUTING.md](../CONTRIBUTING.md).
@@ -8,14 +8,14 @@ Stockroom is a KiCad component-library and PCB-project manager for the desktop. 
 ## The shape at a glance
 
 ```
-┌─────────────────────────────────────────── one desktop process ───────────────────────────────┐
+┌────────────────────────────────────────── one installed product ─────────────────────────────┐
 │                                                                                                 │
-│   host/  ── a WebView2 window that boots the backend, mints a per-launch token, and points      │
-│             the webview at http://127.0.0.1:<port>                                              │
+│   Stockroom.WindowHost ── native WPF shell, primary WebView2, provider WebView2, single instance │
+│              │ supervises one windowless, crash-contained worker                                 │
 │              │                                                                                   │
 │              ▼                                                                                   │
-│   app/backend/stockroom  ── a FastAPI app. /api/* is the whole surface; everything below /api   │
-│      (Python, no Qt)        is the built SPA served as static files (api routes always win).     │
+│   Stockroom Worker.exe  ── frozen Python/FastAPI. /api/* is the whole surface; the built SPA     │
+│      (no interactive UI)     is served as static files (API routes always win).                  │
 │              │  reads/writes                                                                      │
 │              ▼                                                                                    │
 │   one library repo ── one independent git repo per component collection: one-JSON-per-part       │
@@ -90,7 +90,7 @@ package only for a genuinely new domain.
 | `projects/` | Project-level analysis: BOM, fill, checks, buildability. |
 | `altium/` | The Altium DbLib emitter + status. |
 | `capture/` | The person-driven provider surface lease, the task-bound download broker, immutable provider evidence, and per-part requirements. It opens the page and stages what the person downloads; it never drives a provider control. |
-| `host/` | The WebView2 app shell, lifecycle, rendered-DOM bridge, and diagnostics. The ONLY place `pywebview` may be imported. |
+| `host/` | Source-development WebView bridge, worker lifecycle, and diagnostics. The ONLY backend package where `pywebview` may be imported. The installed native shell is `app/desktop/Stockroom.WindowHost/`. |
 | `vcs/` | Git: the repo wrapper, library-only synchronization, and per-Windows-user GitHub auth through Git Credential Manager. Stockroom never stores an app-wide PAT. |
 | `verify/` | Self-check / doctor helpers. |
 
@@ -104,7 +104,7 @@ re-serialize, never a bare file write. See the gitignored agent contract for the
 |---|---|
 | `api/` | `types.ts` (the response shapes, mirrored from the backend DTOs), `client.ts` (the typed fetch client), `queries.ts` (TanStack Query hooks). This is the whole backend seam. |
 | `pages/` | One component per route (Components, Projects, Settings, ...). Wired by `lib/router.tsx` + `lib/nav.ts`. |
-| `components/` | Reusable UI. `primitives.tsx` is the kit (Panel, Field, Button, Badge, TabStrip, ...) everything composes from. |
+| `components/` | Reusable UI. `primitives.ts` is the kit's import surface (Panel, Field, Button, Badge, TabStrip, ...) everything composes from. |
 | `lib/` | Non-UI logic + cross-cutting providers: the router, theme, toasts, the spec/attribute registries (`specSchema.ts`, `derive.ts`), the design-token registry + copy layer + dev mode (`devTokens.ts`, `copy.tsx`, `devMode.tsx`), inline-edit, SSE, etc. |
 | `styles/` | `index.css` holds the design tokens as CSS variables (dark on `:root`, light on `:root[data-theme=light]`). `tailwind.config.js` maps them to utility classes. |
 | `test/` | Test setup. |
@@ -123,9 +123,10 @@ of logic:
 - **Design tokens** — colours/radii are CSS variables; a component uses `bg-raise` / `text-t1` /
   `rounded-card`, never a literal. A token becomes live-editable by adding one row to
   `lib/devTokens.ts`.
-- **Copy layer** — a UI label wrapped in `<Text id="...">` (or `useText` for an attribute) is
-  reworded through dev mode and ships from `lib/copy.overrides.ts`.
-- **Primitives** — build UI by composing `components/primitives.tsx`, so depth, radius, and rhythm
+- **Copy layer** — a UI label wrapped in `<Text id="...">` (or `useText` for an attribute) has a
+  stable Design Studio copy identity. Drafts remain personal until Apply To This PC; shipping a
+  default remains a separate developer release action.
+- **Primitives** — build UI by composing `components/primitives.ts`, so depth, radius, and rhythm
   stay consistent by construction.
 
 ## Keeping it healthy

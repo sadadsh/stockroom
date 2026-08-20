@@ -40,7 +40,7 @@ DRAFT_VERSION = 1
 SESSION_FILE_NAME = "ui-session.json"
 DRAFT_DIRECTORY_NAME = "ui-session-drafts"
 MAX_SESSION_BYTES = 64 * 1024
-MAX_DRAFT_BYTES = 256 * 1024
+MAX_DRAFT_BYTES = 2 * 1024 * 1024
 
 _MAX_TEXT = 2_000
 _MAX_SHORT_TEXT = 256
@@ -48,8 +48,8 @@ _MAX_ID = 192
 _MAX_FILTERS = 48
 _MAX_FILTER_VALUES = 64
 _MAX_LIST = 128
-_MAX_SAFE_JSON_DEPTH = 6
-_MAX_SAFE_JSON_NODES = 2_048
+_MAX_SAFE_JSON_DEPTH = 12
+_MAX_SAFE_JSON_NODES = 50_000
 _MAX_SCROLL_OFFSET = 10_000_000
 _MAX_EVENT_SEQUENCE = (1 << 63) - 1
 
@@ -798,6 +798,13 @@ def _enrichment_result(value: object) -> dict | None:
         "catalog",
         "source_states",
         "identity_suggestions",
+        "country_of_origin",
+        "tariff_rate",
+        "selected_specs",
+        "selected_spec_conflicts",
+        "official_payloads",
+        "official_evidence",
+        "identity_authorities",
     }
     obj = _expect_exact(
         value,
@@ -956,6 +963,7 @@ def _candidate(value: object) -> dict:
             "datasheet_url",
             "conflicts",
         },
+        optional={"official_payloads", "official_evidence"},
     )
     purchases = obj["purchase"]
     if type(purchases) is not list or len(purchases) > 32:
@@ -1067,6 +1075,14 @@ def _candidate(value: object) -> dict:
             confidence=True,
         ),
         "enrichment": clean_enrichment,
+        "official_payloads": _safe_json(
+            obj.get("official_payloads", {}),
+            "review.candidates.official_payloads",
+        ),
+        "official_evidence": _safe_json(
+            obj.get("official_evidence", {}),
+            "review.candidates.official_evidence",
+        ),
         "datasheet_url": _safe_url(
             obj["datasheet_url"], "review.candidates.datasheet_url"
         ),

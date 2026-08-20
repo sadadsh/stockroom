@@ -308,6 +308,27 @@ describe("api client", () => {
     ).rejects.toMatchObject({ status: 422, missing: ["3D model", "datasheet"] });
   });
 
+  it("surfaces an MPN collision as a typed conflict naming the existing component", async () => {
+    fetchMock.mockResolvedValueOnce(
+      errJson(409, {
+        error: "MpnConflictError",
+        detail: "MPN 'lm 358' already exists as 'LM/358'",
+        code: "mpn_conflict",
+        existing_part_id: "lm-358-a1b2",
+        existing_mpn: "LM/358",
+      }),
+    );
+
+    await expect(
+      api.ingestCommit({ vendor: "manual", mpn: "lm 358" } as never),
+    ).rejects.toMatchObject({
+      status: 409,
+      code: "mpn_conflict",
+      existingPartId: "lm-358-a1b2",
+      existingMpn: "LM/358",
+    });
+  });
+
   it("opens the job event stream with the bearer header and returns the raw body", async () => {
     const fakeBody = {} as ReadableStream<Uint8Array>;
     fetchMock.mockResolvedValueOnce({
@@ -806,5 +827,22 @@ describe("api client", () => {
       { method: "POST", path: "/api/workflows/batches/batch-1/retry" },
       { method: "POST", path: "/api/workflows/batches/batch-1/cancel" },
     ]);
+  });
+
+  it("reads Catalog Build status and confirms the only build mutation", async () => {
+    fetchMock
+      .mockResolvedValueOnce(okJson({ state: "pending", pending_count: 2 }))
+      .mockResolvedValueOnce(okJson({ status: "completed", succeeded: 2 }));
+
+    await api.catalogBuildStatus();
+    await api.catalogBuild();
+
+    const status = fetchMock.mock.calls[0];
+    expect(new URL(String(status[0])).pathname).toBe("/api/catalog-build/status");
+    expect((status[1] as RequestInit).method).toBe("GET");
+    const build = fetchMock.mock.calls[1];
+    expect(new URL(String(build[0])).pathname).toBe("/api/catalog-build");
+    expect((build[1] as RequestInit).method).toBe("POST");
+    expect(JSON.parse(String((build[1] as RequestInit).body))).toEqual({ confirmed: true });
   });
 });

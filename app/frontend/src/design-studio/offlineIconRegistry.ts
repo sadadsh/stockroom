@@ -17,7 +17,11 @@ export const OFFLINE_ICON_LIBRARY_NAMES = [
   "Simple Icons",
 ] as const;
 
-const LOADERS: readonly { label: string; load: () => Promise<IconifyCollection> }[] = [
+export const OFFLINE_ICON_FAMILIES = ["Font Awesome", ...OFFLINE_ICON_LIBRARY_NAMES] as const;
+export type OfflineIconFamily = typeof OFFLINE_ICON_FAMILIES[number];
+export const DEFAULT_OFFLINE_ICON_FAMILY: OfflineIconFamily = "Font Awesome";
+
+const LOADERS: readonly { label: typeof OFFLINE_ICON_LIBRARY_NAMES[number]; load: () => Promise<IconifyCollection> }[] = [
   { label: "Lucide", load: () => import("@iconify-json/lucide/icons.json").then((value) => value.default as IconifyCollection) },
   { label: "Tabler", load: () => import("@iconify-json/tabler/icons.json").then((value) => value.default as IconifyCollection) },
   { label: "Phosphor", load: () => import("@iconify-json/ph/icons.json").then((value) => value.default as IconifyCollection) },
@@ -25,8 +29,8 @@ const LOADERS: readonly { label: string; load: () => Promise<IconifyCollection> 
   { label: "Simple Icons", load: () => import("@iconify-json/simple-icons/icons.json").then((value) => value.default as IconifyCollection) },
 ];
 
-let cachedExtra: readonly IconCatalogEntry[] | undefined;
-let loading: Promise<readonly IconCatalogEntry[]> | undefined;
+const cachedFamilies = new Map<OfflineIconFamily, readonly IconCatalogEntry[]>();
+const loadingFamilies = new Map<OfflineIconFamily, Promise<readonly IconCatalogEntry[]>>();
 
 function iconifyEntries(label: string, collection: IconifyCollection): IconCatalogEntry[] {
   return Object.entries(collection.icons).flatMap(([name, icon]) => {
@@ -48,24 +52,42 @@ export function fontAwesomeCatalogEntries(): readonly IconCatalogEntry[] {
   return fontAwesomeEntries().map((entry) => ({ ...entry, family: `Font Awesome ${entry.family}` }));
 }
 
-export function loadOfflineIconCollections(): Promise<readonly IconCatalogEntry[]> {
-  if (cachedExtra) return Promise.resolve(cachedExtra);
-  loading ??= Promise.all(LOADERS.map(async ({ label, load }) => iconifyEntries(label, await load())))
-    .then((groups) => {
-      cachedExtra = groups.flat();
-      return cachedExtra;
-    });
+export function loadOfflineIconCollections(family: OfflineIconFamily): Promise<readonly IconCatalogEntry[]> {
+  const cached = cachedFamilies.get(family);
+  if (cached) return Promise.resolve(cached);
+  const active = loadingFamilies.get(family);
+  if (active) return active;
+
+  const loader = family === "Font Awesome"
+    ? Promise.resolve().then(fontAwesomeCatalogEntries)
+    : (() => {
+      const selected = LOADERS.find((candidate) => candidate.label === family);
+      if (!selected) return Promise.reject(new Error(`Unknown offline icon family: ${family}`));
+      return selected.load().then((collection) => iconifyEntries(selected.label, collection));
+    })();
+  const loading = loader.then((entries) => {
+    cachedFamilies.set(family, entries);
+    loadingFamilies.delete(family);
+    return entries;
+  }, (error: unknown) => {
+    loadingFamilies.delete(family);
+    throw error;
+  });
+  loadingFamilies.set(family, loading);
   return loading;
 }
 
-export function offlineIconFamilies(): readonly string[] {
-  return ["Font Awesome solid", "Font Awesome brands", "Font Awesome regular", ...OFFLINE_ICON_LIBRARY_NAMES];
+export function offlineIconFamilies(): readonly OfflineIconFamily[] {
+  return OFFLINE_ICON_FAMILIES;
 }
 
-export function searchOfflineIcons(query: string, family: string, extra: readonly IconCatalogEntry[]): readonly IconCatalogEntry[] {
+export function searchOfflineIcons(query: string, family: OfflineIconFamily, entries: readonly IconCatalogEntry[]): readonly IconCatalogEntry[] {
   const terms = query.toLowerCase().trim().split(/\s+/).filter(Boolean);
-  return [...fontAwesomeCatalogEntries(), ...extra].filter((entry) => {
-    if (family && entry.family !== family) return false;
+  return entries.filter((entry) => {
+    const inFamily = family === "Font Awesome"
+      ? entry.family.startsWith("Font Awesome ")
+      : entry.family === family;
+    if (!inFamily) return false;
     if (terms.length === 0) return true;
     const haystack = [entry.label, entry.family, ...entry.terms].join(" ").toLowerCase();
     return terms.every((term) => haystack.includes(term));

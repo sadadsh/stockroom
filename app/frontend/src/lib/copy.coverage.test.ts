@@ -550,16 +550,6 @@ function unroutedAttributeCopy(path: string, raw: string): Offence[] {
  */
 const DATA_STRINGS: readonly (readonly [string, string, string])[] = [
   [
-    "/src/components/projects/ProjectDesignWorkbench.tsx",
-    "SCH",
-    "The Altium document kind, drawn as its file-extension code inside a glyph. Renaming it would say a .SchDoc is something other than what it is.",
-  ],
-  [
-    "/src/components/projects/ProjectDesignWorkbench.tsx",
-    "PRJ",
-    "As above, for the .PrjPcb project document.",
-  ],
-  [
     "/src/components/stm/PinoutTable.tsx",
     "FT",
     "ST's own datasheet code for a five-volt-tolerant pin, printed in the tolerance column beside the pin it describes. It is read against ST's tables, not as a word.",

@@ -115,7 +115,7 @@ export function RescanSection() {
                 (force ? "border-acc bg-acc text-acc-on" : "border-line2 text-transparent")
               }
             >
-              <Icon id="modal.check" className="h-3 w-3" />
+              <Icon id="overlay.check" className="h-3 w-3" />
             </span>
             <input
               type="checkbox"

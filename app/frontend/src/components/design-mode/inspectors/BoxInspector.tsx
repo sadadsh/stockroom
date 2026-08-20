@@ -1,9 +1,10 @@
 import { useCopyFormatter, useText } from "../../../lib/copy";
 import type { DomainInspectorProps } from "./types";
 import { VisualCssControl } from "./VisualCssControl";
+import { isRootProtectedDesignProperty } from "../../../lib/designIdentity";
 
 const GROUPS = [
-  ["layout", "Show And Size", ["display", "visibility", "position", "overflow", "inset", "top", "right", "bottom", "left", "width", "height", "min-width", "min-height", "max-width", "max-height"]],
+  ["layout", "Position And Size", ["position", "overflow", "inset", "top", "right", "bottom", "left", "width", "height", "min-width", "min-height", "max-width", "max-height"]],
   ["layout", "Spacing", ["margin", "margin-top", "margin-right", "margin-bottom", "margin-left", "padding", "padding-top", "padding-right", "padding-bottom", "padding-left", "gap", "row-gap", "column-gap"]],
   ["layout", "Alignment", ["flex-direction", "flex-wrap", "justify-content", "align-items", "align-content", "grid-template-columns", "grid-template-rows", "grid-auto-flow"]],
   ["appearance", "Surface", ["opacity", "background-color", "background-image", "border-color", "border-radius", "border-style", "border-width", "box-shadow", "transform", "filter", "z-index"]],
@@ -19,13 +20,14 @@ function PropertyRow({ property, ...props }: { property: string } & DomainInspec
   const resetAria = useCopyFormatter("design-studio.inspector.box.reset-aria", "Reset {property}");
   const resetLabel = useText("design-studio.inspector.box.reset", "Reset");
   const label = labelOf(property);
+  const disabled = isRootProtectedDesignProperty(props.inspection.target, property);
   return (
     <div className="py-2">
       <div className="mb-1 flex items-center justify-between gap-2">
         <label className="truncate text-xs text-t2" htmlFor={`box-${property}`}>{label}</label>
-        <button type="button" aria-label={resetAria({ property: label })} onClick={() => props.resetDomainProperty("box", property)} className="text-2xs font-semibold text-t3 hover:text-t1">{resetLabel}</button>
+        <button type="button" disabled={disabled} aria-label={resetAria({ property: label })} onClick={() => props.resetDomainProperty("box", property)} className="text-2xs font-semibold text-t3 hover:text-t1 disabled:opacity-40">{resetLabel}</button>
       </div>
-      <VisualCssControl property={property} ariaLabel={valueAria({ property: label })} value={resolved} onCommit={(value) => props.setDomainProperty("box", property, value)} />
+      <VisualCssControl disabled={disabled} property={property} ariaLabel={valueAria({ property: label })} value={resolved} onCommit={(value) => props.setDomainProperty("box", property, value)} />
     </div>
   );
 }

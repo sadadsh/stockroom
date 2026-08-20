@@ -53,6 +53,8 @@ class StagingCandidate:
     # disagreement died - the enrich layer computed it and nothing downstream could hold it.
     alternates: dict = field(default_factory=dict)
     catalog: dict = field(default_factory=dict)
+    official_payloads: dict[str, dict] = field(default_factory=dict)
+    official_evidence: dict[str, dict] = field(default_factory=dict)
 
     @property
     def chosen_footprint(self) -> Path | None:
@@ -93,6 +95,16 @@ class StagingCandidate:
             catalog={
                 str(key): dict(value)
                 for key, value in self.catalog.items()
+                if isinstance(value, dict)
+            },
+            official_payloads={
+                str(key): dict(value)
+                for key, value in self.official_payloads.items()
+                if isinstance(value, dict)
+            },
+            official_evidence={
+                str(key): dict(value)
+                for key, value in self.official_evidence.items()
                 if isinstance(value, dict)
             },
         )

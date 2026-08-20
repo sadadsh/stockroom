@@ -45,6 +45,65 @@ def test_passive_add_commits_and_indexes(client):
     assert client.get(f"/api/library/parts/{make_part_id('ERJ-P03F1101V')}").json()["mpn"] == "ERJ-P03F1101V"
 
 
+def test_passive_add_retains_initial_official_payload_and_field_provenance(client):
+    resp = client.post("/api/library/passive", json={
+        "input": _OWNER_URL,
+        "datasheet_url": "https://industrial.panasonic.com/x.pdf",
+        "specs": {"Resistance": "1.1 kOhm"},
+        "enrichment": {"Resistance": {"source": "mouser", "confidence": "high"}},
+        "official_payloads": {"mouser": {"SearchResults": {"Parts": [{
+            "ManufacturerPartNumber": "ERJ-P03F1101V",
+            "ProductAttributes": [
+                {"AttributeName": "Resistance", "AttributeValue": "1.1 kOhm"},
+            ],
+        }]}}},
+        "official_evidence": {"mouser": {
+            "provider": "mouser",
+            "queried_mpn": "ERJ-P03F1101V",
+            "canonical_mpn": "ERJ-P03F1101V",
+            "selected_values": {"mpn": "ERJ-P03F1101V", "Resistance": "1.1 kOhm"},
+        }},
+    })
+    assert resp.status_code == 200, resp.text
+    rec = resp.json()
+    assert rec["enrichment"]["Resistance"] == {"source": "mouser", "confidence": "high"}
+    assert rec["sources"]["mouser"]["file"] == f"sourced/{rec['id']}/mouser.json"
+    assert rec["sources"]["mouser"]["canonical_mpn"] == "ERJ-P03F1101V"
+
+
+def test_passive_manual_value_does_not_claim_the_original_official_provenance(client):
+    resp = client.post("/api/library/passive", json={
+        "input": "RC0603FR-0710KL",
+        "value": "11 kOhm",
+        "datasheet_url": "https://example.com/resistor.pdf",
+        "specs": {"Resistance": "1.1 kOhm"},
+        "enrichment": {"Resistance": {"source": "mouser", "confidence": "high"}},
+        "official_payloads": {
+            "mouser": {
+                "SearchResults": {"Parts": [{
+                    "ManufacturerPartNumber": "RC0603FR-0710KL",
+                    "ProductAttributes": [
+                        {"AttributeName": "Resistance", "AttributeValue": "1.1 kOhm"},
+                    ],
+                }]},
+            },
+        },
+        "official_evidence": {
+            "mouser": {
+                "provider": "mouser",
+                "queried_mpn": "RC0603FR-0710KL",
+                "canonical_mpn": "RC0603FR-0710KL",
+                "selected_values": {"Resistance": "1.1 kOhm"},
+            },
+        },
+    })
+    assert resp.status_code == 200, resp.text
+    rec = resp.json()
+    assert rec["derived"]["specs"]["Resistance"] == "11 kOhm"
+    assert rec["enrichment"]["Resistance"]["source"] == "manual"
+    assert rec["sources"]["mouser"]["selected_values"] == {}
+
+
 def test_passive_add_without_datasheet_is_422_incomplete(client):
     resp = client.post("/api/library/passive", json={"input": _OWNER_URL})
     assert resp.status_code == 422

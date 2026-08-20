@@ -149,6 +149,12 @@ partialProvider.cadSourceCoverage.rows[0] = {
 
 const blockedProvider = cloneDossier();
 blockedProvider.identity.manufacturer = "";
+blockedProvider.cadSourceCoverage.completeProviders = [];
+blockedProvider.cadSourceCoverage.rows = blockedProvider.cadSourceCoverage.rows.map((row) => ({
+  ...row,
+  url: "",
+  captureAvailable: false,
+}));
 
 export const componentScenarios: readonly DesignScenario[] = [
   scenario("components.full-data", {
@@ -189,7 +195,7 @@ export const componentScenarios: readonly DesignScenario[] = [
   scenario("components.manage-models-partial", { title: "Manage Models Partial", area: "assets", route: "assets", dossier: partialProvider, initialUi: { components: { cadView: "manage-models" }, provider: { state: "ready" } }, expectedTargets: ["component-browser.manage-models", "component-browser.provider-list"] }),
   scenario("components.manage-models-blocked", { title: "Manage Models Blocked", area: "assets", route: "assets", dossier: blockedProvider, initialUi: { components: { cadView: "manage-models" }, provider: { state: "unavailable" } }, expectedTargets: ["component-browser.manage-models", "component-browser.provider-status"] }),
   scenario("components.offers-open", { title: "Price Breaks Open", initialUi: { components: { surface: "offers" } }, expectedTargets: ["component-browser.sourcing-sheet"] }),
-  scenario("components.manage-models-attached", { title: "Manage Models Attached", area: "assets", route: "assets", initialUi: { components: { cadView: "manage-models" }, provider: { state: "complete" }, capture: { status: "done", backgrounded: false } }, expectedTargets: ["component-browser.manage-models", "component-browser.provider-status"] }),
+  scenario("components.manage-models-attached", { title: "Manage Models Attached", area: "assets", route: "assets", initialUi: { components: { cadView: "manage-models" }, provider: { state: "complete" }, capture: { status: "done", backgrounded: true } }, expectedTargets: ["component-browser.manage-models", "component-browser.provider-status"] }),
   scenario("components.manage-models-invalid", { title: "Manage Models Invalid Files", area: "assets", route: "assets", initialUi: { components: { cadView: "manage-models" }, provider: { state: "error" }, capture: { status: "error", backgrounded: false } }, expectedTargets: ["component-browser.manage-models", "component-browser.provider-import"] }),
   scenario("components.diff-open", { title: "Diff Open", initialUi: { components: { surface: "provenance", sourcesTab: "changes" } }, expectedTargets: ["component-browser.sources-sheet"] }),
   scenario("components.pinout-open", { title: "Pinout Open", initialUi: { components: { surface: "pinout" } }, expectedTargets: ["component-browser.pinout-table"] }),

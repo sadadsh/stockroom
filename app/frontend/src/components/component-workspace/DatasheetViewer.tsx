@@ -385,7 +385,7 @@ function DatasheetToolbar({
           aria-label={nextLabel}
           title={nextLabel}
           disabled={pageCount > 0 && page >= pageCount}
-          icon={<Icon id="nav.back" className="h-3.5 w-3.5 rotate-180" />}
+          icon={<Icon id="nav.forward" className="h-3.5 w-3.5" />}
           onClick={() => onPage(Math.min(pageCount || page + 1, page + 1))}
         >
           <Text id="component-browser.datasheet-next-short">Forward</Text>

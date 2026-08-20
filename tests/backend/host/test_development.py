@@ -305,7 +305,8 @@ def test_vite_config_has_loopback_token_hiding_proxy() -> None:
     assert 'target.hostname !== "127.0.0.1"' in source
     assert "STOCKROOM_DEV_API_TOKEN" not in source
     assert "VITE_API_TOKEN" not in source
-    assert "envDir: process.env.STOCKROOM_DEV_ENV_DIR" in source
+    assert 'command === "build" ? false' in source
+    assert "process.env.STOCKROOM_DEV_ENV_DIR?.trim() || undefined" in source
 
 
 def test_startup_never_provisions_or_pulls_source() -> None:

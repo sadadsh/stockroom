@@ -145,6 +145,27 @@ public sealed class ProviderWindowChromeTests
     }
 
     [Fact]
+    public void FocusedProviderEscapeRequestsAnIdentityBoundAcknowledgedClose()
+    {
+        var source = HostSource();
+
+        Assert.Contains("eventArguments.Key == Key.Escape", source, StringComparison.Ordinal);
+        Assert.Contains("PostProviderCloseRequested", source, StringComparison.Ordinal);
+        Assert.Contains(
+            "stockroom.host.provider-close-requested",
+            source,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "stockroom:provider-close-requested",
+            source,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "providerCommand(request)",
+            source,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void TheLegacyStripControllerIsMountedButItsWindowChromeIsCollapsed()
     {
         var source = HostSource();

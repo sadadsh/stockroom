@@ -89,13 +89,15 @@ def test_enrich_candidate_fills_only_empty_fields(tmp_path):
     assert c.mpn == "TPS62130RGTR"       # was empty, filled
 
 
-def test_enrich_candidate_overwrite_is_per_field_opt_in(tmp_path):
+def test_enrich_candidate_does_not_promote_discovery_identity_even_when_overwrite_is_opted_in(
+    tmp_path,
+):
     html = (FIX / "lcsc_product.html").read_text(encoding="utf-8")
     pipe = EnrichmentPipeline(cache_dir=tmp_path / "c", fetcher=_StubFetcher(html),
                               limiter=_NoWaitLimiter())
     c = _candidate(manufacturer="MyCorp")
     pipe.enrich_candidate(c, overwrite={"manufacturer"})
-    assert c.manufacturer == "Texas Instruments"  # explicitly opted in
+    assert c.manufacturer == "MyCorp"
 
 
 def test_enrich_candidate_total_miss_leaves_it_untouched(tmp_path):
@@ -184,10 +186,9 @@ _MOUSER_LIKE_HTML = (
 )
 
 
-def test_pasted_product_url_carries_every_spec_to_the_candidate_and_staged_part(tmp_path):
-    # The owner's flow: paste a distributor link -> autofill EVERYTHING. The rich specs
-    # a page yields must land on the candidate AND survive into the staged part (they
-    # were previously extracted then discarded because the candidate had no spec bag).
+def test_pasted_product_url_keeps_browser_facts_in_discovery_only(tmp_path):
+    # The page is enough to recover the lookup MPN and its own offer, but provider HTML is
+    # discovery evidence. It cannot become component identity or engineering specifications.
     pipe = EnrichmentPipeline(
         cache_dir=tmp_path / "c", fetcher=_StubFetcher(_MOUSER_LIKE_HTML),
         limiter=_NoWaitLimiter(), http_fetcher=_StubHttpFetcher(mode="pdf"),
@@ -200,15 +201,12 @@ def test_pasted_product_url_carries_every_spec_to_the_candidate_and_staged_part(
                            url="https://www.mouser.com/ProductDetail/Panasonic/ERJ-P03F1101V")]
     pipe.enrich_from_product_url(c, c.purchase[0].url)
 
-    assert c.mpn == "ERJ-P03F1101V" and c.manufacturer == "Panasonic"
-    assert c.specs["Resistance"] == "1.1 kOhm"
-    assert c.specs["Tolerance"] == "1%"
-    assert c.specs["Power"] == "0.2 W"
-    # and the specs survive the hand-off to the committable staged part
-    c.symbol_lib_path = FIX / "nope.kicad_sym"  # to_staged_part only needs the paths set
-    c.footprint_variants = [FIX / "fp.kicad_mod"]
-    staged = c.to_staged_part()
-    assert staged.specs["Resistance"] == "1.1 kOhm"
+    assert c.mpn == "ERJ-P03F1101V"
+    assert c.manufacturer == ""
+    assert c.description == ""
+    assert c.specs == {}
+    assert c.purchase[0].stock == 5000
+    assert c.purchase[0].price_breaks == [{"qty": 1, "price": 0.1}]
 
 
 def test_extract_from_url_autofills_everything_from_a_mouser_page(tmp_path):
@@ -359,7 +357,7 @@ _LD_PRODUCT_WITH_PRICE = (
 )
 
 
-def test_enrich_candidate_scrapes_the_pasted_purchase_url(tmp_path):
+def test_enrich_candidate_uses_a_pasted_page_only_to_bootstrap_the_official_lookup(tmp_path):
     """The owner's Autofill flow: a candidate carrying only a purchase link (no MPN)
     fills its identity by fetching THAT product page directly, not an MPN search."""
     from stockroom.model.part import Purchase
@@ -376,10 +374,10 @@ def test_enrich_candidate_scrapes_the_pasted_purchase_url(tmp_path):
     pipe.enrich_candidate(c)
     # the exact pasted URL was fetched (not an LCSC search built from a blank MPN)
     assert any("mouser.com/ProductDetail/xyz" in u for u in fetcher.urls)
-    # identity is filled straight from the scraped product page
+    # The scrape recovers the lookup MPN, but its catalogue copy is not fact authority.
     assert c.mpn == "TPS62130RGTR"
-    assert c.manufacturer == "Texas Instruments"
-    assert c.description == "3A step-down converter"
+    assert c.manufacturer == ""
+    assert c.description == ""
     # the pasted purchase link is preserved (vendor + url) and gains the scraped price
     assert c.purchase[0].url == purchase_url
     assert c.purchase[0].vendor == "Mouser"
@@ -395,6 +393,11 @@ def test_pipeline_follows_scraped_datasheet_url_and_extracts_specs(tmp_path):
     # the DatasheetSource followed the URL, fetched the real PDF, extracted the package
     assert r.package.value == "VQFN-16"
     assert r.package.source == "datasheet"
+    assert r.datasheet_url.source == "manufacturer_datasheet"
+    assert [answer.source for answer in r.field_conflicts["datasheet_url"]] == [
+        "manufacturer_datasheet",
+        "jsonld",
+    ]
     assert http.gets == ["https://ti.com/lit/ds/tps62130.pdf"]  # the PDF was fetched
 
 
@@ -417,9 +420,9 @@ def test_enrich_candidate_dead_datasheet_never_blocks(tmp_path):
                               limiter=_NoWaitLimiter(), http_fetcher=http)
     c = _candidate(mpn="TPS62130RGTR", manufacturer="", datasheet_path=None)
     pipe.enrich_candidate(c)
-    # an HTML "unavailable" datasheet is refused: no PDF stored, but the rest is filled
+    # An HTML "unavailable" datasheet is refused, and scrape identity remains discovery-only.
     assert c.datasheet_path is None
-    assert c.manufacturer == "Texas Instruments"  # scrape fields never blocked
+    assert c.manufacturer == ""
 
 
 def test_enrich_candidate_raising_datasheet_fetch_never_crashes(tmp_path):
@@ -477,7 +480,7 @@ def test_copy_specs_normalizes_label_no_duplicated_twin():
     twin = "Factory Pack Quantity: Factory Pack Quantity"
     cand = PartRecord(id="x", display_name="X", category="ICs", specs={"Factory Pack Quantity": "100"})
     result = EnrichmentResult()
-    result.specs[twin] = Sourced("999", "mouser_web", "medium")
+    result.specs[twin] = Sourced("999", "mouser", "high")
     # default merge (specs not opted into overwrite): existing clean key kept, no twin
     _copy_specs(cand, result, set())
     assert cand.specs["Factory Pack Quantity"] == "100"

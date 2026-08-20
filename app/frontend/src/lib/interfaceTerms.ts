@@ -428,6 +428,38 @@ export interface AllowedTerm {
   readonly why: string;
 }
 
+/**
+ * Owner-approved product vocabulary whose ordinary wording is part of the interface contract.
+ * These entries are not technical-standard exemptions; each is retained because the proposed
+ * replacement changed the action, status, or familiar UI concept a person was being shown.
+ */
+export const APPROVED_PRODUCT_TERMS: readonly AllowedTerm[] = [
+  {
+    term: "Apply",
+    why: "Apply is the approved confirmation verb for activating reviewed attachments and local Design Studio changes; Commit incorrectly implies a Git operation.",
+  },
+  {
+    term: "Applying",
+    why: "Applying is the in-progress form of the approved Apply action and must describe the same operation while it runs.",
+  },
+  {
+    term: "Layout",
+    why: "Layout is the established Design Studio inspector domain; Arrangement does not name the same editable CSS and composition surface.",
+  },
+  {
+    term: "Retry",
+    why: "Retry is the familiar recovery action for a failed provider attempt; Rerun suggests a completed batch rather than the same failed request.",
+  },
+  {
+    term: "History",
+    why: "Build History is the approved record of prior Catalog Build runs; Timeline implies a chronological visualization that this disclosure does not provide.",
+  },
+  {
+    term: "Synchronization",
+    why: "Catalog Synchronization names the established remote-alignment capability; Convergence describes an outcome rather than the capability itself.",
+  },
+];
+
 export const INDUSTRY_TERMS: readonly AllowedTerm[] = [
   {
     term: "Catalog Repository",

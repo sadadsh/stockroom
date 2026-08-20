@@ -168,7 +168,7 @@ export function AltiumSetupModal({ open, onClose }: { open: boolean; onClose: ()
 
             <Step n={4} titleId="altiumdb.setup.step4-title" title="Verified Component Flow">
               <p className="text-xs leading-relaxed text-t3">
-                <Text id="altiumdb.setup.step4-body">A part can be placed just when its KiCad and native Altium pair came from one validated download. Their shared STEP remains linked in KiCad and embedded in the Altium footprint. Rebuild DbLib is a repair action; missing assets return to Components and Get Files.</Text>
+                <Text id="altiumdb.setup.step4-body">A part can be placed just when its KiCad and native Altium pair came from one validated download. Their shared STEP remains linked in KiCad and embedded in the Altium footprint. Catalog Build remains an explicit action in Assets; missing CAD sources return there for review.</Text>
               </p>
               {data ? (
                 <p className="mt-1.5 text-xs text-t3">

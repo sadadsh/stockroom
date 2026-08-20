@@ -294,7 +294,7 @@ and `P2` meaningful fit, finish, or clarity debt.
   Chromium and a task-owned configuration. The final all-scenario run passed 190 scenarios in dark
   and light at 1,366 x 872, 1,600 x 1,000, and 1,920 x 1,200, including restart persistence and
   zero fixture product effects. A focused follow-up retained the five-provider Manage Models frame
-  at `.work plans/sdd/2026-08-12-manage-models-focused/browser/`.
+  in local ignored browser evidence that is not retained as product authority.
 - Intended claim: **CAD Models > Manage Models** stays inside the open component, shows all five
   representative providers with complete sets first, leaves partial and unavailable rows honest,
   and keeps one component-bound browser viewport without any global provider tab.
@@ -314,7 +314,7 @@ and `P2` meaningful fit, finish, or clarity debt.
   captured in dark and light themes at 1,366 x 872, 1,600 x 1,000, and 1,920 x 1,200, for 1,140
   scenario frames. Representative click-through and autosave-after-restart frames are retained
   beside the matrix under
-  `.work plans/sdd/2026-08-11-in-app-design-studio/task-15-evidence/browser-source-final/browser/`.
+  local ignored browser evidence that is not retained as product authority.
 - Intended claim: every production scenario exposes its case identity and registered target;
   preview fixtures produce no external request or product mutation; Browse, Inspect, Arrange,
   inspector domains, collapsed rails, dark/light contrast, and restart persistence remain usable
@@ -412,7 +412,7 @@ and `P2` meaningful fit, finish, or clarity debt.
 
 ### 2026-08-01 — Independent Library Repository Settings
 
-- Capture layer: development tool in-app browser against the isolated FastAPI service and
+- Capture layer: isolated in-app browser against the FastAPI service and
   current production frontend bundle.
 - Evidence:
   `work/Library Repository Audit/Library Repositories Dark 1280x720.png`,
@@ -453,7 +453,7 @@ and `P2` meaningful fit, finish, or clarity debt.
 
 ### 2026-07-29 — Served Progress HTML Audit
 
-- Capture layer: development tool in-app browser through the private Tailscale HTTPS route.
+- Capture layer: authenticated in-app browser through the private Tailscale HTTPS route.
 - Evidence: `work/Progress HTML Visual Audit/Desktop Current State.png`,
   1,265 × 712, SHA-256 `b0d78022cbb5`.
 - Intended claim: the generated punch-list page is reachable, identifies
@@ -626,7 +626,7 @@ and `P2` meaningful fit, finish, or clarity debt.
 | VA-039 | P0 | Projects, Assemble | The first guided bench persisted events, but it bypassed Stockroom's durable Altium bindings, counted only `Done` toward progress even though skipped/reworked placements can close a run, left the operator on the completed row, and used a dark-only translucent work card. | The bench now consumes the same linked library identity for KiCad and Altium, measures resolved work as Done + Skipped + Reworked, requires a matching reel scan when an MPN exists, saves on Enter, advances to the next pending placement, and keeps the verified reel loaded when the next reference uses the same MPN. Token-based surfaces render correctly in both themes. A real Altium-backed WebView2 run saved R1, advanced to R2, retained the verified reel, updated to `1/3 resolved · 33.3%`, and emitted no console errors or page overflow. Paired placement normalization now has one exact reference/board/X/Y/rotation/side/footprint shape and KiCad's native exporter is qualified. Highlighting remains hidden because both the AD26 PCB-object API and Pick and Place OutJob paths raised a native dialog on a real installed example while preserving source bytes. Remaining: qualify Altium native geometry, then add paired coordinate/polarity highlighting, inventory reservation/reversal, and repository publication of the sealed receipt. |
 | VA-041 | P1 | Native provider capture HUD | The production provider HUD forced a dark palette, so its nominal light and dark real-page captures were byte-for-byte identical. It also used an em dash in instructional copy despite the product voice contract. | The closed-shadow HUD now uses one light-first variable palette with a complete `prefers-color-scheme: dark` override, retains forced-colors and reduced-motion behavior, and uses plain two-sentence sign-in guidance. Real CloakBrowser Chromium captures on the live DigiKey TPD6E05U06RVZR model page differ by theme while preserving the same 360 × 532 px bounds, exact identity, five required-file labels, live count, and three explicit outcomes. The panel remains movable and collapsible by pointer or keyboard; DigiKey's cookie banner and guest-limit notice are provider-owned state, not Stockroom chrome. |
 | VA-042 | P1 | Projects, all tools | The rebuilt cross-EDA functionality initially retained its own dashboard/table composition instead of the Components/Library selection and inspection philosophy, so project choice and BOM work felt like a separate product. | Projects now uses the same 320 px searchable picker, compact selected-item title strip, shared tabs, bounded workbench, selectable list rows, and contextual inspector grammar as Components. BOM resolution moved beside the selected line; Design, Assemble, Changes, and Releases share the same hierarchy. A source contract forbids EDA-specific workbench branches, and KiCad/Altium fixtures prove the same five-tool shell. Real WebView2 captures at 1,384 × 861 in both themes have no page overflow or console errors. |
-| VA-044 | P2 | Served progress HTML, development tool Active Work | Long evidence and blocker prose was forced into two dense columns at a 1,265 px viewport, producing a small, report-like text wall before the owner outcome gates. | Six workstream cards now lead with one bounded state sentence in a single readable column. Exact evidence, blocker, and next action remain inside a native disclosure with visible keyboard focus; Enter and Space both toggle it. Dark/light desktop and phone captures preserve every card and outcome, UTF-8, and zero horizontal overflow even when long SHA-bearing evidence is expanded. |
+| VA-044 | P2 | Served progress HTML, Development Progress | Long evidence and blocker prose was forced into two dense columns at a 1,265 px viewport, producing a small, report-like text wall before the owner outcome gates. | Six workstream cards now lead with one bounded state sentence in a single readable column. Exact evidence, blocker, and next action remain inside a native disclosure with visible keyboard focus; Enter and Space both toggle it. Dark/light desktop and phone captures preserve every card and outcome, UTF-8, and zero horizontal overflow even when long SHA-bearing evidence is expanded. |
 
 ## Evidence Reviewed
 

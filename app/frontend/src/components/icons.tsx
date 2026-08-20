@@ -53,8 +53,8 @@ export function CubeArt({ className }: { className?: string }) {
   return <Icon id="art.model" className={className} />;
 }
 
-// -- Action + navigation icon set. Registry ids under action.* / nav.*; primary line icons that
-// carry `.ico` so dev mode's --icon-stroke retunes the whole set at once.
+// -- Action + navigation icon set. Registry ids under action.* / nav.* use the shared Tabler Outline
+// frame and carry `.ico` so Design Studio's --icon-stroke retunes the whole set at once.
 
 export function LibraryIcon({ className }: { className?: string }) {
   return <Icon id="nav.library" className={className} />;
@@ -105,5 +105,9 @@ export function GitIcon({ className }: { className?: string }) {
 }
 
 export function BoardIcon({ className }: { className?: string }) {
-  return <Icon id="nav.board" className={className} />;
+  return <Icon id="nav.cad-assets" className={className} />;
+}
+
+export function ProjectsIcon({ className }: { className?: string }) {
+  return <Icon id="nav.projects" className={className} />;
 }

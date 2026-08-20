@@ -1,37 +1,52 @@
 Stockroom - Third-Party Notices
 
-Interface icon artwork
+Interface icon artwork and offline catalogues
 
-Stockroom embeds selected SVG artwork under stable application-owned semantic
-IDs. The source artwork is fitted into Stockroom view boxes and inherits the
-application's current colour; these transformations do not change its meaning.
+Stockroom's shipped interface and component-category defaults use selected
+Tabler Outline 3.46.0 SVGs from @tabler/icons 3.46.0. They are fitted into
+Stockroom's shared 24-pixel outline frame and inherit the application's current
+colour. Copyright Pawel Kuna and contributors. License: MIT. Source:
+https://github.com/tabler/tabler-icons. The MIT terms printed below apply.
 
-- Font Awesome Free 7.3.1: box-open, box, microchip, and circle-question.
-  Copyright (c) 2026 Fonticons, Inc. License: CC BY 4.0. Source:
+Design Studio also carries searchable offline catalogues. An explicit design
+override may select one of these assets; they are not the shipped defaults.
+
+- Font Awesome Free 7.3.1, bundled by @fortawesome/free-solid-svg-icons,
+  @fortawesome/free-regular-svg-icons, and @fortawesome/free-brands-svg-icons
+  7.3.1. Copyright (c) 2026 Fonticons, Inc. Icons license: CC BY 4.0. Source:
   https://fontawesome.com/. The official Font Awesome Free notice is included
   in Support/Licenses/Font Awesome Free License.txt.
-- Tabler Icons 3.45.0, bundled by @iconify-json/tabler 1.2.38:
-  circle-arrow-up-right-filled, square-rounded-chevron-right-filled, and
-  arrow-big-down-line-filled. Copyright Pawel Kuna and contributors. License:
-  MIT. Source: https://github.com/tabler/tabler-icons. The MIT terms printed
-  below apply.
-- Material Symbols, bundled by @iconify-json/material-symbols 1.2.88:
-  info-rounded and book-2-rounded. Copyright Google LLC. License: Apache
-  License 2.0. Source: https://github.com/google/material-design-icons. A full
-  copy is included in Support/Licenses/Apache-2.0.txt.
-- Phosphor 2.1.1, bundled by @iconify-json/ph 1.2.2: gear-six-fill and moon-fill.
-  Copyright Phosphor Icons contributors. License: MIT. Source:
-  https://github.com/phosphor-icons/core. The MIT terms printed below apply.
+- @iconify-json/lucide 1.2.123 (Lucide catalogue). Copyright Lucide
+  Contributors. License: ISC. Source: https://github.com/lucide-icons/lucide.
+  The ISC terms printed below apply.
+- @iconify-json/tabler 1.2.38 (Tabler Icons 3.45.0). Copyright Pawel Kuna and
+  contributors. License: MIT. Source: https://github.com/tabler/tabler-icons.
+  The MIT terms printed below apply.
+- @iconify-json/ph 1.2.2 (Phosphor 2.1.1). Copyright Phosphor Icons
+  contributors. License: MIT. Source: https://github.com/phosphor-icons/core.
+  The MIT terms printed below apply.
+- @iconify-json/material-symbols 1.2.88 (Material Symbols catalogue).
+  Copyright Google LLC. License: Apache License 2.0. Source:
+  https://github.com/google/material-design-icons. A full copy is included in
+  Support/Licenses/Apache-2.0.txt.
+- @iconify-json/simple-icons 1.2.93 (Simple Icons 16.28.0). Copyright Simple
+  Icons Collaborators. License: CC0 1.0. Source:
+  https://github.com/simple-icons/simple-icons.
 
 Frontend design system
 
+- @fontsource-variable/geist-mono 5.3.0 packages the Geist Mono variable
+  font used by Stockroom. Copyright 2024 The Geist Project Authors.
+  License: SIL Open Font License 1.1. Source: https://github.com/vercel/geist-font.
+  The exact upstream license is included in
+  Support/Licenses/Geist Mono OFL-1.1.txt.
 - ASTRYX Core 0.4.1 and ASTRYX Neutral Theme 0.4.1. Copyright (c) 2026
   Meta Platforms, Inc. License: MIT. Source: https://github.com/facebook/astryx.
   The MIT terms printed below apply.
 - StyleX 0.19.0. Copyright Meta Platforms, Inc. and contributors. License:
   MIT. Source: https://github.com/facebook/stylex. The MIT terms printed below
   apply.
-- Lucide React 1.18.0. Copyright (c) 2026 Lucide Icons and Contributors.
+- Lucide React 1.31.0. Copyright (c) 2026 Lucide Icons and Contributors.
   License: ISC; icons derived from Feather remain under the MIT License.
   Source: https://github.com/lucide-icons/lucide.
 

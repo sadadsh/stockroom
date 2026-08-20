@@ -1,82 +1,58 @@
-/**
- * @file icons.tsx
- * @input Uses lucide-react icon components, IconRegistry type
- * @output Exports neutralIconRegistry for the neutral theme
- * @position Icon configuration for the neutral theme; consumed by index.ts
- *
- * Maps semantic icon names to Lucide icon components.
- * These icons are bundled with the theme, not with @astryxdesign/core.
- */
+import type { IconRegistry } from "@astryxdesign/core/Icon";
 
-import React from 'react';
-import type {IconRegistry} from '@astryxdesign/core/Icon';
+import { ICON_BY_ID, type IconId } from "../../lib/iconRegistry";
 
-// Astryx's theme builder evaluates this TSX through jiti's classic JSX transform.
-void React;
+function themeIcon(id: IconId) {
+  const entry = ICON_BY_ID.get(id);
+  if (!entry || entry.family !== "tabler-outline") {
+    throw new Error(`Missing Tabler Outline theme icon: ${id}`);
+  }
+  return (
+    <svg
+      width="1em"
+      height="1em"
+      viewBox={entry.viewBox}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={entry.strokeWidth}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      data-icon-family="tabler-outline"
+      data-icon-id={id}
+      dangerouslySetInnerHTML={{ __html: entry.body }}
+    />
+  );
+}
 
-import {
-  X,
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  ChevronsLeft,
-  ChevronsRight,
-  Check,
-  CheckCircle,
-  XCircle,
-  AlertTriangle,
-  Info,
-  Calendar,
-  Clock,
-  ExternalLink,
-  Menu,
-  MoreHorizontal,
-  Search,
-  ArrowUp,
-  ArrowDown,
-  ArrowUpDown,
-  Filter,
-  EyeOff,
-  Columns,
-  Copy,
-  CheckCheck,
-  Wrench,
-  Square,
-  Mic,
-} from 'lucide-react';
-
-const iconProps = {
-  size: '1em',
-  'aria-hidden': true as const,
-};
-
+/** Astryx semantic slots adapted to Stockroom's central, bundled Tabler Outline authority. */
 export const neutralIconRegistry: IconRegistry = {
-  close: <X {...iconProps} />,
-  chevronDown: <ChevronDown {...iconProps} />,
-  chevronLeft: <ChevronLeft {...iconProps} />,
-  chevronRight: <ChevronRight {...iconProps} />,
-  chevronsLeft: <ChevronsLeft {...iconProps} />,
-  chevronsRight: <ChevronsRight {...iconProps} />,
-  check: <Check {...iconProps} />,
-  success: <CheckCircle {...iconProps} />,
-  error: <XCircle {...iconProps} />,
-  warning: <AlertTriangle {...iconProps} />,
-  info: <Info {...iconProps} />,
-  calendar: <Calendar {...iconProps} />,
-  clock: <Clock {...iconProps} />,
-  externalLink: <ExternalLink {...iconProps} />,
-  menu: <Menu {...iconProps} />,
-  moreHorizontal: <MoreHorizontal {...iconProps} />,
-  search: <Search {...iconProps} />,
-  arrowUp: <ArrowUp {...iconProps} />,
-  arrowDown: <ArrowDown {...iconProps} />,
-  arrowsUpDown: <ArrowUpDown {...iconProps} />,
-  funnel: <Filter {...iconProps} />,
-  eyeSlash: <EyeOff {...iconProps} />,
-  viewColumns: <Columns {...iconProps} />,
-  copy: <Copy {...iconProps} />,
-  checkDouble: <CheckCheck {...iconProps} />,
-  wrench: <Wrench {...iconProps} />,
-  stop: <Square {...iconProps} />,
-  microphone: <Mic {...iconProps} />,
+  close: themeIcon("action.close"),
+  chevronDown: themeIcon("navigation.chevron-down"),
+  chevronLeft: themeIcon("navigation.chevron-left"),
+  chevronRight: themeIcon("overlay.chevron"),
+  chevronsLeft: themeIcon("navigation.chevrons-left"),
+  chevronsRight: themeIcon("navigation.chevrons-right"),
+  check: themeIcon("overlay.check"),
+  success: themeIcon("status.success"),
+  error: themeIcon("status.error"),
+  warning: themeIcon("status.warn"),
+  info: themeIcon("status.info"),
+  calendar: themeIcon("utility.calendar"),
+  clock: themeIcon("utility.clock"),
+  externalLink: themeIcon("action.external"),
+  menu: themeIcon("action.menu"),
+  moreHorizontal: themeIcon("action.more"),
+  search: themeIcon("action.search"),
+  arrowUp: themeIcon("action.sort-asc"),
+  arrowDown: themeIcon("action.sort-desc"),
+  arrowsUpDown: themeIcon("action.sort-swap"),
+  funnel: themeIcon("finder.filter"),
+  eyeSlash: themeIcon("action.hide"),
+  viewColumns: themeIcon("action.columns"),
+  copy: themeIcon("action.duplicate"),
+  checkDouble: themeIcon("modal.check"),
+  wrench: themeIcon("nav.settings"),
+  stop: themeIcon("action.stop"),
+  microphone: themeIcon("utility.microphone"),
 };

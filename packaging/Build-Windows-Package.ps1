@@ -3,8 +3,8 @@ param(
     [ValidateSet("Fixture", "Production")]
     [string]$Mode = "Fixture",
 
-    [string]$Version = "0.7.0.0",
-    [string]$MinimumHostVersion = "0.7.0.0",
+    [string]$Version = "1.0.0.0",
+    [string]$MinimumHostVersion = "1.0.0.0",
     [int]$ProtocolVersion = 1,
     [string]$Publisher = "",
     [string]$FeedBaseUri = "",

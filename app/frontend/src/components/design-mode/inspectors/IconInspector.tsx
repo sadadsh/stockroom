@@ -1,14 +1,16 @@
-import { lazy, Suspense, useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { useText } from "../../../lib/copy";
 import { useDevMode } from "../../../lib/devMode";
 import type { IconCatalogEntry } from "../../../lib/iconRegistry";
 import { resolveIcon, sanitizeIconBody } from "../../iconResolve";
 import { Icon } from "../../Icon";
+import { isIconId } from "../../../lib/iconRegistry";
 import type { DomainInspectorProps } from "./types";
 import { designIdOf } from "../../../lib/designIdentity";
 import { VisualCssControl } from "./VisualCssControl";
 import { ValueSlider } from "../ValueSlider";
 import { insertedIconOverrideId } from "../../../lib/applyIconOverrides";
+import { useEscapeDismiss } from "../../../lib/useEscapeDismiss";
 
 const IconBrowser = lazy(() => import("../IconBrowser").then((module) => ({ default: module.IconBrowser })));
 
@@ -20,24 +22,41 @@ function IconPickerModal({ targetViewBox, onSelect, onClose }: {
   const title = useText("design-studio.icon-picker.title", "Choose Icon");
   const closeLabel = useText("design-studio.icon-picker.close", "Close Icon Catalog");
   const loadingLabel = useText("design-studio.inspector.icon.loading-catalog", "Loading icon catalog…");
+  const dialogRef = useRef<HTMLElement | null>(null);
+  const openerRef = useRef<HTMLElement | null>(document.activeElement instanceof HTMLElement ? document.activeElement : null);
+  useEscapeDismiss(true, onClose);
   useEffect(() => {
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
-      event.preventDefault();
-      onClose();
+    return () => {
+      window.setTimeout(() => openerRef.current?.focus(), 0);
     };
-    window.addEventListener("keydown", closeOnEscape);
-    return () => window.removeEventListener("keydown", closeOnEscape);
-  }, [onClose]);
+  }, []);
+  const trapFocus = (event: ReactKeyboardEvent<HTMLElement>) => {
+    if (event.key !== "Tab") return;
+    const controls = Array.from(dialogRef.current?.querySelectorAll<HTMLElement>(
+      "button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex='-1'])",
+    ) ?? []).filter((element) => element.offsetParent !== null || element === document.activeElement);
+    if (controls.length === 0) return;
+    const first = controls[0];
+    const last = controls[controls.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  };
   return (
     <div role="presentation" className="fixed inset-0 z-[260] grid place-items-center bg-scrim p-8" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
-      <section role="dialog" aria-modal="true" aria-label={title} className="flex max-h-[82vh] w-full max-w-5xl flex-col rounded-card bg-popover p-5 shadow-pop">
+      <section ref={dialogRef} role="dialog" aria-modal="true" aria-label={title} onKeyDown={trapFocus} className="flex max-h-[82vh] w-full max-w-5xl flex-col rounded-card bg-popover p-5 shadow-pop">
         <header className="flex items-center justify-between">
           <h3 className="text-base font-semibold text-t1">{title}</h3>
-          <button type="button" aria-label={closeLabel} onClick={onClose} className="rounded-control px-3 py-1.5 text-sm text-t2 hover:bg-raise2 hover:text-t1">×</button>
+          <button type="button" aria-label={closeLabel} onClick={onClose} className="rounded-control p-2 text-t2 hover:bg-raise2 hover:text-t1">
+            <Icon id="action.close" className="h-4 w-4" />
+          </button>
         </header>
         <Suspense fallback={<p className="p-6 text-sm text-t3">{loadingLabel}</p>}>
-          <IconBrowser targetViewBox={targetViewBox} onSelect={(entry) => { onSelect(entry); onClose(); }} />
+          <IconBrowser autoFocus targetViewBox={targetViewBox} onSelect={(entry) => { onSelect(entry); onClose(); }} />
         </Suspense>
       </section>
     </div>
@@ -71,7 +90,6 @@ export function IconInspector(props: DomainInspectorProps) {
   const accessibleLabel = useText("design-studio.inspector.icon.accessible-label", "Accessible Label");
   const alignmentLabel = useText("design-studio.inspector.icon.alignment", "Alignment");
   const lineLabel = useText("design-studio.inspector.icon.treatment.line", "Line");
-  const solidLabel = useText("design-studio.inspector.icon.treatment.solid", "Solid");
   const mutedLabel = useText("design-studio.inspector.icon.treatment.muted", "Muted");
   const baselineLabel = useText("design-studio.inspector.icon.alignment.baseline", "Baseline");
   const middleLabel = useText("design-studio.inspector.icon.alignment.middle", "Middle");
@@ -103,11 +121,13 @@ export function IconInspector(props: DomainInspectorProps) {
     id: iconId,
     category: "bespoke" as const,
     viewBox: rawSvg.getAttribute("viewBox") ?? "0 0 24 24",
+    strokeWidth: undefined,
     body: sanitizeIconBody(rawSvg.innerHTML),
   } : presentation?.body ? {
     id: iconId,
     category: "bespoke" as const,
     viewBox: "0 0 24 24",
+    strokeWidth: undefined,
     body: sanitizeIconBody(presentation.body),
   } : null);
   if (!entry) return <p className="px-3.5 py-3 text-2xs text-t3">{unregisteredLabel}</p>;
@@ -116,7 +136,7 @@ export function IconInspector(props: DomainInspectorProps) {
   return (
     <div className="px-3.5 py-3">
       <div className="flex items-center gap-2">
-        {resolved ? <Icon id={iconId} className="h-5 w-5" /> : null}
+        {resolved && isIconId(iconId) ? <Icon id={iconId} className="h-5 w-5" /> : null}
         <span className="text-xs text-t2">{currentIconLabel}</span>
         {dev.isIconOverridden(iconId) ? (
           <button type="button" onClick={() => iconIds.forEach((id) => dev.resetIcon(id))} className="ml-auto text-2xs font-semibold text-t2 hover:text-t1">{resetLabel}</button>
@@ -179,12 +199,11 @@ export function IconInspector(props: DomainInspectorProps) {
       <div className="mt-3 grid grid-cols-2 gap-2">
         <label className="text-xs text-t2">{treatmentLabel}
           <select
-            value={presentation?.treatment ?? "line"}
-            onChange={(event) => iconIds.forEach((id) => dev.setIconPresentation(id, { treatment: event.target.value as "line" | "solid" | "muted" }))}
+            value={presentation?.treatment === "muted" ? "muted" : "line"}
+            onChange={(event) => iconIds.forEach((id) => dev.setIconPresentation(id, { treatment: event.target.value as "line" | "muted" }))}
             className="mt-1 w-full rounded-control border border-line bg-field px-2 py-1 text-2xs text-t1"
           >
             <option value="line">{lineLabel}</option>
-            <option value="solid">{solidLabel}</option>
             <option value="muted">{mutedLabel}</option>
           </select>
         </label>

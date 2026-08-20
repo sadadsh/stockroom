@@ -28,6 +28,7 @@ import {
   type StatusTone,
   type TypographyRoleName,
 } from "./typography";
+import { Icon } from "./Icon";
 
 function cx(...parts: Array<string | false | null | undefined>): string {
   return parts.filter(Boolean).join(" ");
@@ -157,30 +158,15 @@ const STATUS_TONE: Record<StatusTone, string> = {
  * direction - which is the accessibility rule stated properly rather than satisfied by having text
  * next to a hue.
  *
- * Drawn inline rather than through `<Icon>` so the typography kit keeps no dependency on the icon
- * registry (and so a status can never wait on one). `aria-hidden`, because the word beside it is the
- * accessible name and a screen reader announcing "warning warning" is worse than either alone.
+ * `aria-hidden`, because the word beside it is the accessible name and a screen reader announcing
+ * "warning warning" is worse than either alone.
  */
 export function WarnMark({ className }: { className?: string } = {}) {
   return (
-    <svg
-      aria-hidden
-      viewBox="0 0 10 10"
-      width="9"
-      height="9"
-      focusable="false"
-      className={cx("mr-0.5 inline-block flex-none align-[-0.5px]", className)}
-    >
-      <path
-        d="M5 0.9 9.3 8.6H0.7Z"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.1"
-        strokeLinejoin="round"
-      />
-      <path d="M5 3.6v2.1" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" />
-      <path d="M5 7.25h0.01" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
-    </svg>
+    <Icon
+      id="status.warn"
+      className={cx("mr-0.5 inline-block h-[9px] w-[9px] flex-none align-[-0.5px]", className)}
+    />
   );
 }
 

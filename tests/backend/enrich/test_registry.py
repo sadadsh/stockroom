@@ -207,3 +207,32 @@ def test_a_display_cased_vendor_key_still_lands_in_the_lowercase_map():
     r = SourceRegistry([shouty]).enrich("M1", "ICs")
     assert list(r.dist_price_breaks) == ["mouser"]
     assert r.dist_stock == {"mouser": 7}
+
+
+def test_successful_official_payload_is_bound_to_query_canonical_mpn_and_values():
+    mouser = _VendorSource(
+        "mouser",
+        {"mpn": "PART-A", "manufacturer": "Acme"},
+    )
+    mouser.last_status = "ok"
+    mouser.last_payload = {
+        "SearchResults": {"Parts": [{"ManufacturerPartNumber": "PART-A"}]}
+    }
+
+    result = SourceRegistry([mouser]).enrich("part-a", "ICs")
+
+    assert result.official_payloads["mouser"] == mouser.last_payload
+    assert result.official_evidence["mouser"] == {
+        "provider": "mouser",
+        "queried_mpn": "part-a",
+        "canonical_mpn": "PART-A",
+        "selected_values": {"mpn": "PART-A", "manufacturer": "Acme"},
+    }
+
+
+def test_exact_datasheet_mpn_is_recorded_as_an_identity_authority():
+    datasheet = _FakeSource("datasheet", {"mpn": "PART-A"})
+
+    result = SourceRegistry([datasheet]).enrich("PART-A", "ICs", want={"mpn"})
+
+    assert result.identity_authorities == ["manufacturer_datasheet"]

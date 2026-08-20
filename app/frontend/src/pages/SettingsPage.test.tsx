@@ -186,6 +186,7 @@ beforeEach(() => {
     behind: 0,
     current_revision: BACKEND_REVISION,
     target_revision: BACKEND_REVISION,
+    frontend_revision: BUNDLE_REVISION,
   } as never);
   mockApi.altiumOdbcStatus.mockResolvedValue({
     installed: true,
@@ -338,6 +339,20 @@ describe("SettingsPage — appearance", () => {
     await openSettings("settings.appearance");
     await userEvent.click(screen.getByRole("button", { name: /^light$/i }));
     expect(document.documentElement.dataset.theme).toBe("light");
+  });
+});
+
+describe("SettingsPage — release links", () => {
+  it("links to releases without promising a direct executable download", async () => {
+    renderPage();
+    await openSettings("settings.update");
+
+    const releaseLinks = await screen.findAllByRole("link", { name: "View Releases" });
+    expect(releaseLinks).toHaveLength(2);
+    for (const link of releaseLinks) {
+      expect(link).toHaveAttribute("href", "https://github.com/sadadsh/stockroom/releases");
+    }
+    expect(screen.queryByText(/Stockroom\.exe/i)).not.toBeInTheDocument();
   });
 });
 
@@ -600,6 +615,7 @@ describe("SettingsPage — sync + kicad + update", () => {
       behind: 0,
       current_revision: "222222222222",
       target_revision: "222222222222",
+      frontend_revision: "222222222222",
     } as never);
     renderPage();
     await openSettings("settings.update");
@@ -835,6 +851,8 @@ describe("SettingsPage - flat IA + Machine Setup band", () => {
     });
     renderPage();
     expect(await screen.findByText("This Machine Is Prepared")).toBeInTheDocument();
+    expect(screen.getByText("Signed Release Updates")).toBeInTheDocument();
+    expect(screen.queryByText("Automatic Convergence")).not.toBeInTheDocument();
   });
 
   it("counts unmet authoritative setup steps and focuses the selected tool card", async () => {

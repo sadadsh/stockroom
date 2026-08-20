@@ -25,11 +25,15 @@ function declared(block: string, cssVar: string): string | null {
 }
 
 describe("the Dev Mode registry matches the shipped stylesheet", () => {
+  it("routes the global icon stroke token through the shared renderer class", () => {
+    expect(css).toMatch(/\.ico\s*\{[^}]*stroke-width:\s*var\(--icon-stroke,\s*2\)/s);
+  });
+
   it.each(DEV_TOKENS.filter((t) => t.cssVar.startsWith("--")))(
     "$cssVar",
     (token) => {
       // `--icon-stroke` is the one knob with no stylesheet declaration: it is consumed as
-      // `var(--icon-stroke, 1.9)` inside the shared `.ico` rule, so its shipped value is the
+      // `var(--icon-stroke, 2)` inside the shared `.ico` rule, so its shipped value is the
       // fallback rather than a :root declaration.
       if (token.cssVar === "--icon-stroke") return;
       expect(declared(DARK_BLOCK, token.cssVar), `${token.cssVar} dark`).toBe(token.default.dark);

@@ -9,9 +9,12 @@ import json
 import mimetypes
 import re
 import threading
+from dataclasses import asdict
 from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
 from types import MappingProxyType
+from typing import cast
+from urllib.parse import urlsplit
 
 from fastapi import APIRouter, Depends, Query, Request, Response
 from fastapi.responses import FileResponse
@@ -769,6 +772,7 @@ def library_router(require_token) -> APIRouter:
             price_breaks=(body.get("price_breaks") or None),
             stock=body.get("stock"),
             catalog=(body.get("catalog") or None),
+            enrichment=(body.get("enrichment") or None),
         )
 
     @r.post("/passive/preview")
@@ -813,7 +817,11 @@ def library_router(require_token) -> APIRouter:
             build = _build_passive(body)
         except (PassiveNeedsInputError, PassiveAddError) as exc:
             raise ApiError(422, str(exc)) from exc
-        record = ctx.ops.add_passive_part(build.record)  # IncompleteError -> 422
+        record = ctx.ops.add_passive_part(
+            build.record,
+            official_payloads=(body.get("official_payloads") or None),
+            official_evidence=(body.get("official_evidence") or None),
+        )  # IncompleteError -> 422
         ctx.rebuild_index()
         ctx.auto_push()  # a library write auto-pushes to git (non-fatal without a token)
         return record.to_dict()
@@ -1996,29 +2004,16 @@ def library_router(require_token) -> APIRouter:
             "queued_files": len(paths),
         }
 
-    @r.post("/parts/{part_id}/files")
-    def add_part_files(request: Request, part_id: str, body: dict | None = None) -> dict:
-        """Process user-selected CAD files without inventing a provider capture task.
-
-        The selected component is the destination. The entire selection is inspected together so
-        split symbol, footprint, model, and native Altium files can form one coherent package;
-        irrelevant siblings are reported and ignored, and the response is canonical readback of
-        what remains.
-        """
+    def _manual_file_paths(request: Request, part_id: str, payload: dict) -> tuple:
+        """Validate picker paths before any inspection or attachment code sees them."""
 
         from pathlib import Path
-
-        from stockroom.ingest.manual_files import import_manual_cad_files
 
         if not is_valid_part_id(part_id):
             raise ValueError(f"invalid part identifier: {part_id!r}")
         ctx = request.app.state.ctx
         if ctx.index.get(part_id) is None:
             raise FileNotFoundError(f"no such part: {part_id}")
-        payload = {} if body is None else body
-        unexpected = sorted(str(key) for key in payload if key != "paths")
-        if unexpected:
-            raise ValueError("unknown file-intake fields: " + ", ".join(unexpected))
         raw_paths = payload.get("paths")
         if (
             type(raw_paths) is not list
@@ -2032,8 +2027,191 @@ def library_router(require_token) -> APIRouter:
             raise ValueError("a selected file is no longer available") from exc
         if any(path.is_symlink() or not path.is_file() for path in paths):
             raise ValueError("every selected path must be a real file")
+        return paths
 
-        result = ctx.jobs.run_write(lambda: import_manual_cad_files(ctx, part_id, paths))
+    def _manual_provider_broker(request: Request):
+        from stockroom.capture.manual_provider_browser import ManualProviderBrowserBroker
+
+        existing = getattr(request.app.state, "manual_provider_browser_broker", None)
+        if existing is not None:
+            return existing
+        ctx = request.app.state.ctx
+        surface = getattr(ctx, "provider_browser_surface", None)
+        if not callable(surface):
+            raise ApiError(503, "The embedded provider browser is unavailable in this host.")
+        broker = ManualProviderBrowserBroker(
+            ctx,
+            surface,
+            root=capture_state_root() / "Manual Provider Downloads",
+        )
+        request.app.state.manual_provider_browser_broker = broker
+        _register_manual_cad_shutdown(request)
+        return broker
+
+    def _register_manual_cad_shutdown(request: Request) -> None:
+        """Stop any browser lease before releasing process-owned proposal snapshots."""
+
+        app = request.app
+        if getattr(app.state, "manual_cad_shutdown_registered", False):
+            return
+        from stockroom.ingest.manual_files import discard_all_manual_cad_proposals
+
+        def shutdown() -> None:
+            broker = getattr(app.state, "manual_provider_browser_broker", None)
+            broker_shutdown = getattr(broker, "shutdown", None)
+            if callable(broker_shutdown):
+                broker_shutdown()
+            discard_all_manual_cad_proposals()
+
+        app.router.add_event_handler("shutdown", shutdown)
+        app.state.manual_cad_shutdown_registered = True
+
+    def _manual_provider_snapshot(snapshot) -> dict:
+        return asdict(snapshot)
+
+    @r.post("/parts/{part_id}/provider-browser")
+    def start_manual_provider_browser(
+        request: Request,
+        part_id: str,
+        body: dict | None = None,
+    ) -> dict:
+        """Stage direct downloads; auto-attach exact packages, review partial or ambiguous ones."""
+
+        from stockroom.providers import provider, provider_for_host
+
+        if not is_valid_part_id(part_id):
+            raise ValueError(f"invalid part identifier: {part_id!r}")
+        ctx = request.app.state.ctx
+        if ctx.index.get(part_id) is None:
+            raise FileNotFoundError(f"no such part: {part_id}")
+        payload = {} if body is None else body
+        expected = {"session_id", "provider_id", "url", "edas", "browser_owner_id"}
+        if set(payload) != expected:
+            raise ValueError("manual provider browser fields are invalid")
+        session_id = payload.get("session_id")
+        provider_id = payload.get("provider_id")
+        url = payload.get("url")
+        browser_owner_id = payload.get("browser_owner_id")
+        raw_edas = payload.get("edas")
+        if any(type(value) is not str for value in (session_id, provider_id, url, browser_owner_id)):
+            raise ValueError("manual provider browser identity is invalid")
+        session_id = cast(str, session_id)
+        provider_id = cast(str, provider_id)
+        url = cast(str, url)
+        browser_owner_id = cast(str, browser_owner_id)
+        if (
+            type(raw_edas) is not list
+            or not 1 <= len(raw_edas) <= 2
+            or any(type(eda) is not str for eda in raw_edas)
+            or set(raw_edas) - {"kicad", "altium"}
+            or len(set(raw_edas)) != len(raw_edas)
+        ):
+            raise ValueError("manual provider browser EDA selection is invalid")
+        try:
+            expected_provider = provider(provider_id)
+        except KeyError as exc:
+            raise ValueError("manual provider browser provider is unknown") from exc
+        parsed = urlsplit(url)
+        observed_provider = provider_for_host(parsed.hostname or "")
+        if (
+            parsed.scheme != "https"
+            or not parsed.hostname
+            or parsed.username
+            or parsed.password
+            or observed_provider is None
+            or observed_provider.key != expected_provider.key
+        ):
+            raise ValueError("manual provider browser URL is outside the selected provider")
+        record = ctx.ops.load_record(part_id)
+        snapshot = _manual_provider_broker(request).start(
+            session_id=session_id,
+            part_id=part_id,
+            manufacturer=str(record.manufacturer or "").strip(),
+            mpn=str(record.mpn or "").strip(),
+            provider_id=provider_id,
+            url=url,
+            edas=tuple(raw_edas),
+            browser_owner_id=browser_owner_id,
+        )
+        return _manual_provider_snapshot(snapshot)
+
+    @r.get("/parts/{part_id}/provider-browser/{session_id}")
+    def manual_provider_browser_status(request: Request, part_id: str, session_id: str) -> dict:
+        if not is_valid_part_id(part_id):
+            raise ValueError(f"invalid part identifier: {part_id!r}")
+        try:
+            snapshot = _manual_provider_broker(request).status(session_id)
+        except KeyError as exc:
+            raise ApiError(404, str(exc)) from exc
+        if snapshot.part_id != part_id:
+            raise ApiError(404, "Manual provider browser session does not belong to this part.")
+        return _manual_provider_snapshot(snapshot)
+
+    @r.delete("/parts/{part_id}/provider-browser/{session_id}")
+    def stop_manual_provider_browser(request: Request, part_id: str, session_id: str) -> dict:
+        if not is_valid_part_id(part_id):
+            raise ValueError(f"invalid part identifier: {part_id!r}")
+        broker = _manual_provider_broker(request)
+        try:
+            snapshot = broker.status(session_id)
+        except KeyError as exc:
+            raise ApiError(404, str(exc)) from exc
+        if snapshot.part_id != part_id:
+            raise ApiError(404, "Manual provider browser session does not belong to this part.")
+        return {"stopped": broker.stop(session_id), "session_id": session_id}
+
+    @r.post("/parts/{part_id}/files/propose")
+    def propose_part_files(request: Request, part_id: str, body: dict | None = None) -> dict:
+        """Inspect selected CAD and return exact inactive mappings; this route never mutates."""
+
+        from stockroom.ingest.manual_files import propose_manual_cad_files
+
+        payload = {} if body is None else body
+        unexpected = sorted(str(key) for key in payload if key not in {"paths", "edas"})
+        if unexpected:
+            raise ValueError("unknown file-intake fields: " + ", ".join(unexpected))
+        raw_edas = payload.get("edas")
+        if (
+            type(raw_edas) is not list
+            or not 1 <= len(raw_edas) <= 2
+            or any(type(eda) is not str for eda in raw_edas)
+            or set(raw_edas) - {"kicad", "altium"}
+            or len(set(raw_edas)) != len(raw_edas)
+        ):
+            raise ValueError("edas must select KiCad, Altium, or both")
+        _register_manual_cad_shutdown(request)
+        paths = _manual_file_paths(request, part_id, payload)
+        return propose_manual_cad_files(
+            request.app.state.ctx,
+            part_id,
+            paths,
+            edas=tuple(raw_edas),
+        )
+
+    @r.post("/parts/{part_id}/files/apply")
+    def apply_part_files(request: Request, part_id: str, body: dict | None = None) -> dict:
+        """Consume an exact reviewed proposal; this is the sole manual mutation boundary."""
+
+        from stockroom.ingest.manual_files import apply_manual_cad_proposal
+
+        if not is_valid_part_id(part_id):
+            raise ValueError(f"invalid part identifier: {part_id!r}")
+        ctx = request.app.state.ctx
+        if ctx.index.get(part_id) is None:
+            raise FileNotFoundError(f"no such part: {part_id}")
+        payload = {} if body is None else body
+        if set(payload) != {"proposal_token"}:
+            raise ValueError("manual attachment apply fields are invalid")
+        proposal_token = payload.get("proposal_token")
+        if type(proposal_token) is not str or not proposal_token or len(proposal_token) > 128:
+            raise ValueError("manual attachment proposal identity is invalid")
+
+        result = ctx.jobs.run_write(
+            lambda: apply_manual_cad_proposal(ctx, part_id, proposal_token)
+        )
+        browser_broker = getattr(request.app.state, "manual_provider_browser_broker", None)
+        if browser_broker is not None:
+            browser_broker.stop_part(part_id)
         if result["attached"]:
             ctx.jobs.run_write(ctx.rebuild_index)
             ctx.jobs.run_write(ctx.auto_push)
@@ -2049,6 +2227,14 @@ def library_router(require_token) -> APIRouter:
                     # not turn successful file intake into a false error for the person using it.
                     pass
         return result
+
+    @r.post("/parts/{part_id}/files")
+    def reject_unreviewed_part_files(part_id: str) -> dict:
+        """Retired mutation seam retained only to fail old clients closed."""
+
+        if not is_valid_part_id(part_id):
+            raise ValueError(f"invalid part identifier: {part_id!r}")
+        raise ApiError(409, "Inspect selected CAD files, then Apply Attachments explicitly.")
 
     @r.get("/capture/batches/{batch_id}")
     def capture_batch(request: Request, batch_id: str) -> dict:

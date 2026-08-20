@@ -2,8 +2,8 @@ import { QueryClient, QueryClientProvider, QueryObserver } from "@tanstack/react
 import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { useEffect } from "react";
-import { api } from "../api/client";
+import { useEffect, useState } from "react";
+import { ApiError, api } from "../api/client";
 import { OnboardingGate } from "../components/OnboardingGate";
 import { Text } from "../lib/copy";
 import { useDevMode } from "../lib/devMode";
@@ -161,7 +161,7 @@ function historyDocument(): DesignDocument {
 
 interface StudioCommands {
   open: () => void;
-  close: () => Promise<void>;
+  close: () => Promise<boolean>;
   setCopy: (id: string, text: string) => void;
   setVariation: (id: string) => void;
   activateScenario: (scenarioId: string) => Promise<void>;
@@ -184,6 +184,7 @@ function Probe({
 }) {
   const devMode = useDevMode();
   const studio = useDesignStudio();
+  const [closeResult, setCloseResult] = useState("not-run");
   useEffect(() => {
     expose({
       open: studio.open,
@@ -222,8 +223,16 @@ function Probe({
   return (
     <>
       <span data-testid="resolved-copy"><Text id="rail.components">Components</Text></span>
+      <button
+        type="button"
+        onClick={() => void studio.close().then((closed) => setCloseResult(String(closed)))}
+      >
+        Close Provider Studio
+      </button>
+      <output data-testid="close-result">{closeResult}</output>
       <span data-testid="resolved-missing"><Text id="component-browser.cad-missing">Missing</Text></span>
       <span data-testid="personal-state">{studio.personalState}</span>
+      <span data-testid="studio-enabled">{String(studio.enabled)}</span>
       <span data-testid="active-variation">{studio.activeVariationId}</span>
       <span data-testid="active-scenario">{studio.activeScenario?.id ?? "real-data"}</span>
       <span data-testid="applied-matches">{String(studio.appliedMatchesDraft)}</span>
@@ -263,8 +272,12 @@ function renderStudio(options: {
     open() {
       act(() => commands.open?.());
     },
-    close() {
-      return act(async () => commands.close?.());
+    async close() {
+      let closed = false;
+      await act(async () => {
+        closed = await commands.close?.() ?? false;
+      });
+      return closed;
     },
     setCopy(id: string, text: string) {
       act(() => commands.setCopy?.(id, text));
@@ -532,9 +545,11 @@ describe("DesignStudioProvider", () => {
     const first = renderStudio();
     await act(async () => Promise.resolve());
     first.open();
+    await act(async () => Promise.resolve());
+    expect(screen.getByTestId("studio-enabled")).toHaveTextContent("true");
 
     first.setCopy("rail.about", "Restart Safe");
-    await first.close();
+    expect(await first.close()).toBe(true);
     expect(mockApi.designStudioPut).toHaveBeenCalledOnce();
     expect(stored.base.copy["rail.about"]).toBe("Restart Safe");
     first.unmount();
@@ -546,6 +561,25 @@ describe("DesignStudioProvider", () => {
     });
     expect(screen.getByTestId("studio-document")).toHaveTextContent("Restart Safe");
     second.unmount();
+  });
+
+  it.each([
+    ["transport error", new ApiError(503, "unavailable"), "error"],
+    ["revision conflict", new ApiError(409, "revision conflict"), "conflict"],
+  ])("blocks immediate close on %s and keeps the unsaved draft visible", async (_name, failure, state) => {
+    mockApi.designStudioGet.mockResolvedValue({ revision: "r1", document: fixtureDocument() });
+    mockApi.designStudioPut.mockRejectedValue(failure);
+    const studio = renderStudio();
+    await waitFor(() => expect(screen.getByTestId("personal-state")).toHaveTextContent("ready"));
+    await waitFor(() => expect(screen.getByTestId("studio-enabled")).toHaveTextContent("true"));
+
+    studio.setCopy("rail.about", "Unsaved Local Edit");
+    await userEvent.setup().click(screen.getByRole("button", { name: "Close Provider Studio" }));
+
+    expect(screen.getByTestId("close-result")).toHaveTextContent("false");
+    expect(screen.getByTestId("studio-enabled")).toHaveTextContent("true");
+    expect(screen.getByTestId("personal-state")).toHaveTextContent(state);
+    expect(screen.getByTestId("studio-document")).toHaveTextContent("Unsaved Local Edit");
   });
 
   it("starts a keepalive save when pagehide fires inside the debounce window", async () => {

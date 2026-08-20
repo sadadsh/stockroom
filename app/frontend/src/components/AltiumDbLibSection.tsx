@@ -1,7 +1,7 @@
 /**
  * Altium Database Library, a Settings section. Shows the one git-synced library Altium reads for
  * the ACTIVE profile: how many parts are place-ready, the automatically managed path, and an
- * explicit recovery rebuild. A View Library button opens the read-only mapping table. The DbLib
+ * a pointer to Assets for explicit Catalog Build. A View Library button opens the read-only mapping table. The DbLib
  * is a projection of this profile's records, so switching profiles switches what this reflects.
  *
  * Placement: Settings, the natural sibling of Procurement Rescan and Library Health, which host
@@ -9,27 +9,21 @@
  */
 import { useEffect, useState } from "react";
 import {
-  useAltiumEmbedCapability,
-  useAltiumEmbedModels,
-  useAltiumModelsPending,
-  useAltiumRegenerate,
   useAltiumSetup,
   useAltiumStatus,
   useOdbcStatus,
 } from "../api/queries";
 import { useToast } from "../lib/toast";
-import { Text, useCopyFormatter, useText } from "../lib/copy";
+import { Text, useText } from "../lib/copy";
 import { AltiumDbLibModal } from "./AltiumDbLibModal";
 import { AltiumSetupModal } from "./AltiumSetupModal";
 import { Button, Dot, ErrorState, LoadingState } from "./primitives";
-import { RefreshIcon, LibraryIcon, DownloadIcon, ExternalIcon, DuplicateIcon } from "./icons";
-import { Icon } from "./Icon";
+import { LibraryIcon, DownloadIcon, ExternalIcon, DuplicateIcon } from "./icons";
 import { useScenarioUiState } from "../design-studio/scenarioState";
 
 export function AltiumDbLibSection() {
   const scenarioDialog = useScenarioUiState().settings?.altiumDialog;
   const status = useAltiumStatus();
-  const regenerate = useAltiumRegenerate();
   const setup = useAltiumSetup();
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
@@ -45,25 +39,6 @@ export function AltiumDbLibSection() {
     "altiumdb.section.copy-path.action",
     "Place The Install Path On The Clipboard",
   );
-  // A toast takes a resolved STRING, so the copy layer has to be read here and the result handed to
-  // it - the same contract as an `aria-label`. A counted sentence gets one id per number agreement
-  // rather than a stitched-in noun, so each override is a whole sentence somebody can reword.
-  const rebuiltOne = useCopyFormatter(
-    "altiumdb.section.toast-rebuilt-one",
-    "Regenerated the DbLib with {count} part.",
-  );
-  const rebuiltMany = useCopyFormatter(
-    "altiumdb.section.toast-rebuilt-many",
-    "Regenerated the DbLib with {count} parts.",
-  );
-  const rebuiltEmpty = useText(
-    "altiumdb.section.toast-rebuilt-empty",
-    "Regenerated. No parts hold Altium assets, so the catalog has no rows.",
-  );
-  const rebuildFailed = useText(
-    "altiumdb.section.toast-rebuild-failed",
-    "Could not regenerate the DbLib.",
-  );
   const pathPlaced = useText("altiumdb.section.toast-path-placed", "Copied the install path.");
   const pathNotPlaced = useText(
     "altiumdb.section.toast-path-failed",
@@ -73,8 +48,6 @@ export function AltiumDbLibSection() {
     "altiumdb.section.toast-setup-failed",
     "Could not set up the DbLib in Altium.",
   );
-  const rebuildBusyLabel = useText("altiumdb.section.rebuild-busy", "Rebuilding...");
-  const rebuildLabel = useText("altiumdb.section.rebuild", "Rebuild DbLib");
   const setupBusyLabel = useText("altiumdb.section.setup-busy", "Setting Up...");
   const setupLabel = useText("altiumdb.section.setup-action", "Set Up In Altium");
   const setupTip = useText(
@@ -85,20 +58,6 @@ export function AltiumDbLibSection() {
 
   const data = status.data;
   const pct = data && data.total > 0 ? Math.round((data.ready / data.total) * 100) : 0;
-
-  async function onRegenerate() {
-    try {
-      const r = await regenerate.mutateAsync();
-      const counted = r.emitted === 1 ? rebuiltOne : rebuiltMany;
-      toast(
-        r.emitted > 0 ? counted({ count: r.emitted }) : rebuiltEmpty,
-        r.emitted > 0 ? "ok" : "neutral",
-      );
-    } catch (err) {
-      // The thrown message is a backend diagnostic, which is data; the fallback sentence is ours.
-      toast(err instanceof Error ? err.message : rebuildFailed, "err");
-    }
-  }
 
   async function onCopyPath() {
     if (!data) return;
@@ -179,7 +138,7 @@ export function AltiumDbLibSection() {
             // never been opened here has none. Saying so beats letting Altium fail with an ODBC
             // error against a file nobody mentioned.
             <p className="text-xs text-warn" data-testid="altium-datasource-missing">
-              <Text id="altiumdb.section.datasource-missing">This machine-local data source has not been built. Rebuild the DbLib before setting it up in Altium.</Text>
+              <Text id="altiumdb.section.datasource-missing">This machine-local data source has not been built. Open Assets and choose Build Now before setting it up in Altium.</Text>
             </p>
           ) : null}
         </div>
@@ -192,14 +151,6 @@ export function AltiumDbLibSection() {
         data-dev-id="altiumdb.section-actions"
       >
         <Button
-          variant="accent"
-          onClick={onRegenerate}
-          disabled={regenerate.isPending || !data}
-          icon={<RefreshIcon className="h-3.5 w-3.5" />}
-        >
-          {regenerate.isPending ? rebuildBusyLabel : rebuildLabel}
-        </Button>
-        <Button
           onClick={onSetup}
           disabled={setup.isPending || !data?.datasource_present}
           title={data?.datasource_present ? setupTip : setupBlockedTip}
@@ -207,7 +158,6 @@ export function AltiumDbLibSection() {
         >
           {setup.isPending ? setupBusyLabel : setupLabel}
         </Button>
-        <EmbedAllModelsButton />
         <Button
           onClick={() => setOpen(true)}
           disabled={!data}
@@ -235,93 +185,6 @@ export function AltiumDbLibSection() {
         }}
       />
     </>
-  );
-}
-
-// Embed every pending 3D model in one action, so a whole library does not cost one click per part
-// (owner's deadline ask: "no work on my end"). It states the number it will work on, because an
-// action that promises a count it cannot honour is worse than one that promises none, and it hides
-// itself entirely when nothing is pending rather than offering a no-op.
-//
-// Disabled with the REASON when Altium cannot run here: not installed, or a windowed Altium holding
-// the single On-Demand license seat. Both come from the capability probe, which re-checks on window
-// focus, so closing Altium and coming back enables the button with no manual refresh.
-function EmbedAllModelsButton() {
-  const pending = useAltiumModelsPending();
-  const capability = useAltiumEmbedCapability();
-  const embed = useAltiumEmbedModels();
-  const { toast } = useToast();
-
-  const blockedBusy = useCopyFormatter(
-    "altiumdb.embed.blocked-busy",
-    "Close Altium first: {app} is holding the license seat.",
-  );
-  const blockedMissing = useText(
-    "altiumdb.embed.blocked-missing",
-    "Altium is not installed on this machine.",
-  );
-  const partialRun = useCopyFormatter(
-    "altiumdb.embed.toast-partial",
-    "Embedded {done} of {attempted}. {failed} failed.",
-  );
-  const partialRunFirst = useCopyFormatter(
-    "altiumdb.embed.toast-partial-first",
-    "Embedded {done} of {attempted}. {failed} failed, starting with {part}: {detail}",
-  );
-  const embeddedOne = useCopyFormatter("altiumdb.embed.toast-one", "Embedded {count} 3D model.");
-  const embeddedMany = useCopyFormatter("altiumdb.embed.toast-many", "Embedded {count} 3D models.");
-  const embedFailed = useText("altiumdb.embed.toast-failed", "Could not embed the 3D models.");
-  const embedBusyLabel = useText("altiumdb.embed.busy", "Embedding...");
-  const embedLabel = useCopyFormatter("altiumdb.embed.action", "Embed 3D Models ({count})");
-
-  const count = pending.data?.count ?? 0;
-
-  const cap = capability.data;
-  const blocked =
-    cap && !cap.available
-      ? cap.busy
-        ? blockedBusy({ app: cap.busy })
-        : cap.reason || blockedMissing
-      : "";
-  const running = embed.status === "running";
-
-  async function onEmbed() {
-    try {
-      await embed.start();
-      const r = embed.result;
-      if (!r) return;
-      // A partial run is reported as a FAILURE tone, not a success with a footnote: the owner
-      // walked away from this, so the one line they read has to say that something needs them.
-      if (r.failed > 0) {
-        const first = r.results.find((x) => x.status === "failed");
-        const run = { done: r.embedded, attempted: r.attempted, failed: r.failed };
-        toast(
-          first?.detail
-            ? partialRunFirst({ ...run, part: first.part_id, detail: first.detail })
-            : partialRun(run),
-          "err",
-        );
-        return;
-      }
-      const counted = r.embedded === 1 ? embeddedOne : embeddedMany;
-      toast(counted({ count: r.embedded }), "ok");
-    } catch (err) {
-      toast(err instanceof Error ? err.message : embedFailed, "err");
-    }
-  }
-
-  if (count === 0) return null;
-
-  return (
-    <Button
-      onClick={onEmbed}
-      disabled={running || Boolean(blocked)}
-      title={blocked || undefined}
-      data-dev-id="altiumdb.embed-all"
-      icon={<Icon id="layer.model" className="h-3.5 w-3.5" />}
-    >
-      {running ? embed.progress?.message || embedBusyLabel : embedLabel({ count })}
-    </Button>
   );
 }
 

@@ -613,13 +613,68 @@ describe("ProjectsPage shared workspace", () => {
 
     await screen.findByRole("heading", { name: "Power Board" });
     const documents = screen.getByRole("region", { name: "Project documents" });
-    expect(within(documents).getAllByText("Power.kicad_pcb")).toHaveLength(1);
+    expect(
+      within(documents).getByRole("button", {
+        name: "Power, PCB, Power.kicad_pcb, Claim Needed",
+      }),
+    ).toHaveAttribute("title", "Power.kicad_pcb");
+    expect(within(documents).queryByText("Power.kicad_pcb")).toBeNull();
 
     const inspector = screen.getByRole("complementary", { name: "Project selection" });
     expect(within(inspector).getByRole("heading", { name: "Power.kicad_pcb" }))
       .toBeInTheDocument();
     expect(within(inspector).getByText("Claim Required")).toBeInTheDocument();
     expect(inspector.querySelector("dl")?.className).toContain("border-y");
+  });
+
+  it("distinguishes same-base project files by kind and keeps full filenames accessible", async () => {
+    const projectWorkspace = workspace("kicad");
+    mockApi.projectWorkspace.mockResolvedValue({
+      ...projectWorkspace,
+      documents: [
+        {
+          document_id: "minimal-project",
+          path: "minimal.kicad_pro",
+          label: "minimal.kicad_pro",
+          kind: "project",
+          exists: true,
+          lock_required: false,
+        },
+        {
+          document_id: "minimal-schematic",
+          path: "minimal.kicad_sch",
+          label: "minimal.kicad_sch",
+          kind: "schematic",
+          exists: true,
+          lock_required: false,
+        },
+        {
+          document_id: "minimal-pcb",
+          path: "minimal.kicad_pcb",
+          label: "minimal.kicad_pcb",
+          kind: "pcb",
+          exists: true,
+          lock_required: false,
+        },
+      ],
+    });
+    renderPage();
+
+    await screen.findByRole("heading", { name: "Power Board" });
+    const documents = screen.getByRole("region", { name: "Project documents" });
+    expect(within(documents).getAllByText("minimal")).toHaveLength(3);
+    for (const [kind, fileName] of [
+      ["Project", "minimal.kicad_pro"],
+      ["Schematic", "minimal.kicad_sch"],
+      ["PCB", "minimal.kicad_pcb"],
+    ] as const) {
+      expect(within(documents).getByText(kind)).toBeVisible();
+      expect(
+        within(documents).getByRole("button", {
+          name: `minimal, ${kind}, ${fileName}`,
+        }),
+      ).toHaveAttribute("title", fileName);
+    }
   });
 
   it("opens the selected native document through the same action for both EDAs", async () => {

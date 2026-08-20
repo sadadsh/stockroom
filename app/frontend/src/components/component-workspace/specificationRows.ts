@@ -46,7 +46,7 @@ export function isEmptyState(state: VerificationState): boolean {
 /** The four filters. They are FILTERS: each one narrows the same list, none of them is a page. */
 export type SpecFilter = "all" | "missing" | "conflicts" | "unverified";
 
-export const SPEC_FILTERS: readonly SpecFilter[] = ["all", "missing", "conflicts", "unverified"];
+export const SPEC_FILTERS: readonly SpecFilter[] = ["all", "conflicts", "unverified"];
 
 /**
  * Does this row survive the filter?

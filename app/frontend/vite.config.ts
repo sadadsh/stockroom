@@ -1,13 +1,17 @@
 /// <reference types="vitest/config" />
-import { execSync } from "node:child_process";
 import path from "node:path";
 import { createRequire } from "node:module";
+import { fileURLToPath } from "node:url";
 import { URL } from "node:url";
 import { defineConfig, normalizePath } from "vite";
 import react from "@vitejs/plugin-react";
 import { viteStaticCopy } from "vite-plugin-static-copy";
 import pkg from "./package.json";
 import { stockroomDesignIdentityPlugin } from "./scripts/design-identity-transform.mjs";
+import {
+  assertProductionBuildEnvironment,
+  frontendContentRevision,
+} from "./scripts/frontend-content-revision.mjs";
 
 // pdf.js ships the 14 standard PDF fonts as separate files and loads them at RUNTIME from a
 // directory it is told about. Without them a datasheet whose text relies on a standard font
@@ -19,21 +23,12 @@ const standardFontsDir = normalizePath(
   path.join(path.dirname(require.resolve("pdfjs-dist/package.json")), "standard_fonts"),
 );
 
-// The version string shown in the About modal: the package version plus the app-repo git
-// short SHA, resolved ONCE at build (config-load) time and baked in as a constant. The git
-// call is wrapped so any failure (no git, a detached/CI checkout, no repo) falls back to just
-// the package version and never throws or blocks the build. No runtime shell, no network.
+// The version string shown in the About modal: the package version plus a deterministic digest of
+// every declared frontend build input. A Git commit cannot identify committed generated output:
+// committing that output creates a different commit and would make the next clean build differ.
 function buildVersion(): string {
-  try {
-    const sha = execSync("git rev-parse --short HEAD", {
-      stdio: ["ignore", "pipe", "ignore"],
-    })
-      .toString()
-      .trim();
-    return sha ? `${pkg.version}+${sha}` : pkg.version;
-  } catch {
-    return pkg.version;
-  }
+  const frontendRoot = path.dirname(fileURLToPath(import.meta.url));
+  return `${pkg.version}+${frontendContentRevision(frontendRoot)}`;
 }
 
 const appVersion = buildVersion();
@@ -96,7 +91,7 @@ function developmentApiProxy() {
 // The backend serves the built SPA from app/frontend-dist/ (see
 // stockroom.api.app._FRONTEND_DIST), so emit there. Relative asset base so the
 // bundle works whether the host loads it from the API mount or from file://.
-export default defineConfig({
+const config = defineConfig({
   plugins: [
     developmentBootstrapPlugin(),
     stockroomDesignIdentityPlugin(),
@@ -126,7 +121,6 @@ export default defineConfig({
     },
   ],
   base: "./",
-  envDir: process.env.STOCKROOM_DEV_ENV_DIR?.trim() || undefined,
   define: {
     __APP_VERSION__: JSON.stringify(appVersion),
   },
@@ -158,4 +152,16 @@ export default defineConfig({
     // test. The real library is what the app imports; only the test environment sees this.
     alias: [{ find: /^react-pdf$/, replacement: "/src/test/reactPdfStub.tsx" }],
   },
+});
+
+export default defineConfig(({ command }) => {
+  if (command === "build") assertProductionBuildEnvironment();
+  return {
+    ...config,
+    // Vite loads `.env*` after this config module is evaluated. Disabling its environment
+    // directory for production is therefore the only reliable way to keep an ignored local file
+    // from changing committed bundle bytes without changing the declared content identity.
+    envDir:
+      command === "build" ? false : process.env.STOCKROOM_DEV_ENV_DIR?.trim() || undefined,
+  };
 });

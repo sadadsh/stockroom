@@ -37,7 +37,8 @@ export function SettingsDisclosure({
   return (
     <AstryxCard
       padding={0}
-      elevation="low"
+      variant="muted"
+      elevation="none"
       role="region"
       aria-labelledby={devId ? `${devId}.title` : undefined}
       className={cx(

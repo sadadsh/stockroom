@@ -38,6 +38,8 @@ def test_surface_registry_contains_only_live_frontend_surfaces():
     # at all), so the registry naming them IS the live set, and this mirror moved with it.
     assert choices == (
         "components",
+        "assets",
+        "manage-models",
         "search",
         "part-vendor-data",
         "ingest",
@@ -46,7 +48,8 @@ def test_surface_registry_contains_only_live_frontend_surfaces():
         "settings",
         "all",
     )
-    assert all_surfaces == ("components", "search", "projects", "stm", "settings")
+    assert all_surfaces == ("components", "assets", "search", "projects", "stm", "settings")
+    assert set(UISHOT["_SURFACE_ROOT"]) == set(choices) - {"all"}
 
 
 def test_help_advertises_only_live_ui_surfaces():
@@ -58,7 +61,7 @@ def test_help_advertises_only_live_ui_surfaces():
     )
 
     assert (
-        "{components,search,part-vendor-data,ingest,projects,stm,settings,all}"
+        "{components,assets,manage-models,search,part-vendor-data,ingest,projects,stm,settings,all}"
         in result.stdout
     )
     for surface in UISHOT["_SURFACE_CHOICES"]:

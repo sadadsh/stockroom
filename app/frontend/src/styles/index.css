@@ -28,6 +28,12 @@
   fill: currentColor !important;
 }
 
+/* One live weight control for every shipped 24px outline icon. The SVG attribute remains the
+   offline 2px fallback; this property is what lets Design Studio retune the family coherently. */
+.ico {
+  stroke-width: var(--icon-stroke, 2);
+}
+
 @layer base {
   /* ------------------------------------------------------------------------
      Windows desktop chrome tokens.
@@ -536,6 +542,17 @@
 
 .design-studio-resizer {
   cursor: col-resize;
+}
+
+/* Dense comparison rows use structure below the contrast of their data. Hover and selection carry
+   the active row; this hairline only keeps adjacent virtual rows from visually merging. */
+.stm-spec-matrix-row {
+  border-bottom: 1px solid color-mix(in srgb, var(--c-line) 35%, transparent);
+}
+
+/* Keep the matrix's own scrollbar gutter stable when Windows overlay scrollbars wake or sleep. */
+.stm-spec-matrix-scroll {
+  scrollbar-gutter: stable;
 }
 
 /* Docked Studio actions read as tools, not a wall of boxed buttons. Inputs retain

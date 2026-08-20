@@ -115,9 +115,13 @@ export async function transformStockroomJsx(code, filename) {
               opening.loc.start.line,
               opening.loc.start.column,
             );
-            opening.attributes.push(
-              t.jsxAttribute(t.jsxIdentifier("data-design-id"), t.stringLiteral(id)),
-            );
+            const identity = t.jsxAttribute(t.jsxIdentifier("data-design-id"), t.stringLiteral(id));
+            const firstSpread = opening.attributes.findIndex((attribute) => t.isJSXSpreadAttribute(attribute));
+            // A reusable primitive's own generated identity is only its fallback. Put it before
+            // forwarded props so the generated identity from the exact call site remains the host
+            // element's authority after the primitive spreads those props.
+            if (firstSpread === -1) opening.attributes.push(identity);
+            else opening.attributes.splice(firstSpread, 0, identity);
             changed = true;
           },
         },

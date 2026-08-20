@@ -1,6 +1,6 @@
 /**
  * The one that matters: editing ONE repeated instance must not edit every instance, and a
- * deliberately-shared role must still reach all of them.
+ * a semantic role or repeated catalogue id must never become an implicit multi-selection.
  *
  * Before this, `applyElementOverrides` resolved every id with one `querySelectorAll`, so an override
  * keyed on a repeated element's id landed on all of its siblings - which is correct for a class-level
@@ -73,23 +73,24 @@ describe("instance vs shared addressing", () => {
     expect(nodeFor(candidateDevId("c")).style.getPropertyValue("width")).toBe("");
   });
 
-  it("an override on the SHARED role reaches every instance", () => {
+  it("does not implicitly expand a semantic target through data-dev-role", () => {
     render(<Candidates ids={["a", "b", "c"]} />);
     applyElementOverrides({ [CANDIDATE_ROLE]: { padding: "8px" } });
 
     for (const id of ["a", "b", "c"]) {
-      expect(nodeFor(candidateDevId(id)).style.getPropertyValue("padding")).toBe("8px");
+      expect(nodeFor(candidateDevId(id)).style.getPropertyValue("padding")).toBe("");
     }
   });
 
-  it("keeps a shared id reaching elements that carry it as data-dev-id directly", () => {
-    // The majority case: a catalogue id repeated on a list row, with no instance identity at all.
+  it("does not implicitly broadcast a repeated data-dev-id override", () => {
+    // Explicit multi-select resolves concrete occurrence ids before writing; a raw repeated id is
+    // ambiguous and therefore applies nowhere.
     document.body.innerHTML =
       '<div data-dev-id="components.row"></div><div data-dev-id="components.row"></div>';
     applyElementOverrides({ "components.row": { gap: "4px" } });
     const rows = nodesForDevId("components.row");
     expect(rows).toHaveLength(2);
-    for (const row of rows) expect(row.style.getPropertyValue("gap")).toBe("4px");
+    for (const row of rows) expect(row.style.getPropertyValue("gap")).toBe("");
   });
 
   it("clears an instance override without disturbing the shared one", () => {
@@ -102,8 +103,8 @@ describe("instance vs shared addressing", () => {
     applyElementOverrides({ [CANDIDATE_ROLE]: { padding: "8px" } }, first);
 
     expect(nodeFor(candidateDevId("b")).style.getPropertyValue("width")).toBe("");
-    expect(nodeFor(candidateDevId("b")).style.getPropertyValue("padding")).toBe("8px");
-    expect(nodeFor(candidateDevId("a")).style.getPropertyValue("padding")).toBe("8px");
+    expect(nodeFor(candidateDevId("b")).style.getPropertyValue("padding")).toBe("");
+    expect(nodeFor(candidateDevId("a")).style.getPropertyValue("padding")).toBe("");
   });
 
   it("survives a reorder: the id follows the record, not the position", () => {
@@ -258,12 +259,12 @@ describe("saved dynamic overrides survive a restart", () => {
     expect(nodeFor(candidateDevId("c")).style.getPropertyValue("width")).toBe("");
   });
 
-  it("re-applies a committed SHARED override on boot, to every instance", () => {
+  it("does not broaden a committed role-only override on boot", () => {
     MOCK_ELEMENT_OVERRIDES[CANDIDATE_ROLE] = { padding: "8px" };
 
     renderHook(() => useDevMode(), { wrapper });
     for (const id of ["a", "b", "c"]) {
-      expect(nodeFor(candidateDevId(id)).style.getPropertyValue("padding")).toBe("8px");
+      expect(nodeFor(candidateDevId(id)).style.getPropertyValue("padding")).toBe("");
     }
   });
 

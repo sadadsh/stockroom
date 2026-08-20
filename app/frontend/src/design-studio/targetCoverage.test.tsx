@@ -116,13 +116,35 @@ describe("target coverage", () => {
         </section>
       </main>
     `);
-    expect(targetLayersFor(root, DEV_IDS)).toEqual([
+    const layers = targetLayersFor(root, DEV_IDS);
+    expect(layers).toEqual(expect.arrayContaining([
       expect.objectContaining({ key: "dev:shell.root", depth: 0, occurrences: 1 }),
       expect.objectContaining({ key: "dev:shell.content", parentKey: "dev:shell.root", depth: 1 }),
-      expect.objectContaining({ key: "dev:rail.about", parentKey: "dev:shell.content", occurrences: 2 }),
-      expect.objectContaining({ key: "copy:about.title", parentKey: "dev:rail.about", depth: 3 }),
-    ]);
-    expect(targetLayersFor(root, DEV_IDS).map((target) => target.key).join(" ")).not.toMatch(/index|:0|:1/);
+      expect.objectContaining({
+        key: "dev:rail.about@ambiguous",
+        parentKey: "dev:shell.content",
+        occurrences: 2,
+        overrideId: null,
+      }),
+      expect.objectContaining({ key: "copy:about.title" }),
+    ]));
+    expect(layers.map((target) => target.key).join(" ")).not.toMatch(/index|:0|:1/);
+  });
+
+  it("emits one exact selectable layer row for each durable duplicate occurrence", () => {
+    const root = fixture(`
+      <main data-dev-id="shell.root">
+        <section data-dev-id="rail.root"><button data-dev-id="rail.about">Rail About</button></section>
+        <section data-dev-id="settings.root"><button data-dev-id="rail.about">Settings About</button></section>
+      </main>
+    `);
+
+    const duplicateRows = targetLayersFor(root, DEV_IDS).filter((target) => target.id === "rail.about");
+
+    expect(duplicateRows).toHaveLength(2);
+    expect(new Set(duplicateRows.map((target) => target.key)).size).toBe(2);
+    expect(duplicateRows.every((target) => target.overrideId?.startsWith("auto.occurrence."))).toBe(true);
+    expect(duplicateRows.map((target) => target.element.textContent)).toEqual(["Rail About", "Settings About"]);
   });
 
   it("includes generated identities in the complete layer tree", () => {
@@ -137,5 +159,23 @@ describe("target coverage", () => {
       expect.objectContaining({ key: "generated:auto.fixture.0abc123", depth: 1, ownerDevId: "auto.fixture.0abc123", meaningful: false }),
       expect.objectContaining({ key: "generated:auto.fixture.0def456", depth: 2, ownerDevId: "auto.fixture.0def456", meaningful: true }),
     ]);
+  });
+
+  it("marks only independently useful generated targets as meaningful", () => {
+    const root = fixture(`
+      <main data-dev-id="shell.root">
+        <button data-design-id="auto.primitives-kit.0abc123">First</button>
+        <button data-design-id="auto.primitives-kit.0abc123">Second</button>
+        <svg data-design-id="auto.icon.0def456" data-icon-id="action.add"></svg>
+        <span data-design-id="auto.fixture.0ghi789">Unique Text</span>
+      </main>
+    `);
+
+    const targets = targetLayersFor(root, DEV_IDS);
+    expect(targets).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: "auto.primitives-kit.0abc123", occurrences: 2, meaningful: false, overrideId: null }),
+      expect.objectContaining({ id: "auto.icon.0def456", occurrences: 1, meaningful: false }),
+      expect.objectContaining({ id: "auto.fixture.0ghi789", occurrences: 1, meaningful: true }),
+    ]));
   });
 });

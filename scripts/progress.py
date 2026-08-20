@@ -1,33 +1,10 @@
 #!/usr/bin/env python3
-"""Render the rebuild plan to a single self-contained HTML page, and update its evidence.
+"""Validate and render Stockroom's evidence-backed development progress.
 
-The owner asked to "always see everything on this list and ur exact progress with bars for each
-one", reachable "by my phone too so tailscale". So: the plan is DATA (docs/progress/rebuild-plan.json),
-this renders it to docs/progress/index.html, and a static server + `tailscale serve` publishes it at
-https://shdesktop.taild54105.ts.net/progress on the tailnet.
-
-The page deliberately has NO aggregate product-readiness percentage. Engineering checklist steps
-are unequal: a schema field, an off-main experiment, and a trusted dual-EDA asset cannot honestly
-carry the same product weight. Owner outcomes are independent evidence gates; the old raw step
-counter remains visible only as labelled engineering history.
-
-PRIOR ART evaluated before writing this (local instructions: "say what you evaluated and REJECTED, and why"):
-- GitHub task lists in an issue. GitHub renders a NATIVE progress bar for `- [ ]` lists, needs zero
-  code, and is reachable from a phone. REJECTED: it gives ONE bar per issue, and the owner asked for
-  a bar per item; the repo is also PUBLIC, and this plan carries their verbatim requirements.
-- The existing vault tracker `Brain/Agent/Hardware Backlog.md` + the `/backlog` command. Real prior
-  art in this exact project. ADOPTED ITS CONVENTION (`[x]` done / `[~]` doing / `[ ]` queued and an
-  `[n/m]` counter per group) rather than inventing a second vocabulary. NOT used as the store,
-  because it cannot carry per-step evidence and is not reachable from a phone.
-- `rich` / `tqdm` for bars. REJECTED: both render to a TERMINAL. The ask was explicitly a page on a
-  phone, and neither is a dependency here today.
-- Taskwarrior / todo.txt / backlog.md CLI. REJECTED: they own their own state store outside the
-  repo, which breaks the device-parity rule the rest of this project is built on, and none emits a
-  hostable page.
-- A dashboard framework (Streamlit/Dash). REJECTED: a server process and a dependency tree to keep a
-  read-only page alive. A static file behind `tailscale serve` has no runtime to break.
-What is genuinely hand-rolled here is only the JSON-to-HTML rendering, which is the part no existing
-tool does in the shape asked for.
+The JSON plan is the editable source. The generated page intentionally keeps owner outcomes
+independent: raw engineering-step counts are historical context, not product-readiness scores.
+Snapshots must explicitly say whether they are current or historical so old evidence cannot be
+presented as active work.
 
     python scripts/progress.py render                   # write docs/progress/index.html
     python scripts/progress.py tick <item> <n> -e "..." # tick step n, evidence REQUIRED
@@ -52,6 +29,7 @@ STATES = ("todo", "doing", "blocked", "done")
 STEP_STATES = ("todo", "doing", "blocked", "done", "done_off_main", "superseded", "invalidated")
 OUTCOME_STATES = ("met", "partial", "not_met", "blocked", "deferred")
 ACTIVE_WORK_STATES = ("active", "blocked", "verification", "pending", "completed")
+SNAPSHOT_STATES = ("current", "historical")
 ACTIVE_WORK_MAX_AGE = timedelta(days=7)
 PUBLIC_URL = "https://shdesktop.taild54105.ts.net/progress"
 
@@ -70,16 +48,21 @@ def _utc_now() -> datetime:
 
 
 def active_work_errors(plan: dict, *, now: datetime | None = None) -> list[str]:
-    """Validate the manually maintained current-work snapshot.
+    """Validate the manually maintained development snapshot.
 
-    This is deliberately separate from outcome gates and engineering-history counters. It says
-    what is moving now without assigning product weight or pretending a static page is telemetry.
+    This is deliberately separate from outcome gates and engineering-history counters. A current
+    snapshot says what is moving without assigning product weight or pretending the page is
+    telemetry. A historical snapshot preserves an old checkpoint without claiming currency.
     """
 
     bad: list[str] = []
     board = plan.get("active_work")
     if not isinstance(board, dict):
         return ["active_work must be an object"]
+
+    snapshot_status = board.get("snapshot_status")
+    if snapshot_status not in SNAPSHOT_STATES:
+        bad.append("active_work.snapshot_status must be current or historical")
 
     for field in ("last_updated", "objective", "refresh_policy"):
         if not isinstance(board.get(field), str) or not board[field].strip():
@@ -88,10 +71,19 @@ def active_work_errors(plan: dict, *, now: datetime | None = None) -> list[str]:
     policy = board.get("refresh_policy", "")
     if isinstance(policy, str):
         normalized_policy = policy.casefold()
-        if "manual" not in normalized_policy or "not real-time" not in normalized_policy:
+        explicitly_not_realtime = "not real-time" in normalized_policy or (
+            "not current or real-time" in normalized_policy
+        )
+        if "manual" not in normalized_policy or not explicitly_not_realtime:
             bad.append(
                 "active_work.refresh_policy must say it is manually refreshed "
                 "and not real-time telemetry"
+            )
+        if snapshot_status == "historical" and (
+            "historical" not in normalized_policy or "not current" not in normalized_policy
+        ):
+            bad.append(
+                "historical active_work.refresh_policy must say it is historical and not current"
             )
 
     stamp_text = board.get("last_updated")
@@ -110,7 +102,7 @@ def active_work_errors(plan: dict, *, now: datetime | None = None) -> list[str]:
                 current = current.replace(tzinfo=timezone.utc)
             current = current.astimezone(timezone.utc)
             age = current - stamp.astimezone(timezone.utc)
-            if age > ACTIVE_WORK_MAX_AGE:
+            if snapshot_status == "current" and age > ACTIVE_WORK_MAX_AGE:
                 bad.append(
                     "active_work.last_updated is stale "
                     f"(older than {ACTIVE_WORK_MAX_AGE.days} days)"
@@ -406,15 +398,19 @@ def _render_active_work(board: dict, e) -> list[str]:
         "pending": "Pending",
         "completed": "Completed",
     }
+    historical = board.get("snapshot_status") == "historical"
+    eyebrow = "Historical checkpoint" if historical else "Current development checkpoint"
+    updated_label = "Last refreshed" if historical else "Updated"
+    objective_label = "Objective at this checkpoint" if historical else "Current objective"
     rows = [
         '<section class="activework" aria-labelledby="active-work-title">',
         '<div class="awhead"><div>',
-        '<p class="aweyebrow">Manual checkpoint snapshot</p>',
-        '<h2 id="active-work-title">development tool Active Work</h2>',
+        f'<p class="aweyebrow">{eyebrow}</p>',
+        '<h2 id="active-work-title">Development Progress</h2>',
         "</div>",
-        f'<time datetime="{e(board["last_updated"])}">Updated '
+        f'<time datetime="{e(board["last_updated"])}">{updated_label} '
         f'{e(board["last_updated"].replace("T", " ").replace("Z", " UTC"))}</time></div>',
-        '<div class="awobjective"><span>Current objective</span>'
+        f'<div class="awobjective"><span>{objective_label}</span>'
         f'<p>{e(board["objective"])}</p></div>',
         f'<p class="awpolicy">{e(board["refresh_policy"])}</p>',
         '<div class="awgrid">',
@@ -468,7 +464,7 @@ def render_html(plan: dict) -> str:
         '<html lang="en">',
         "<head>",
         '<meta charset="utf-8">',
-        "<title>Stockroom Rebuild Progress</title>",
+        "<title>Stockroom Development Progress</title>",
         '<meta name="viewport" content="width=device-width,initial-scale=1">',
         # The page is a STATIC file regenerated as work lands, so a refresh is the only way it can
         # stay live. There is no push channel on a static host to subscribe to instead.
@@ -497,6 +493,9 @@ def render_html(plan: dict) -> str:
         ]
 
     active_work = plan.get("active_work")
+    historical_snapshot = (
+        isinstance(active_work, dict) and active_work.get("snapshot_status") == "historical"
+    )
     if isinstance(active_work, dict):
         p += _render_active_work(active_work, e)
 
@@ -539,19 +538,19 @@ def render_html(plan: dict) -> str:
             p.append("</article>")
         p += ["</div>", "</section>"]
 
-    # WHAT IS BEING WORKED ON RIGHT NOW (owner, 2026-07-27: "also add what youre currently working
-    # on" / "in the html"). Placed above everything else because it answers the question a person
-    # opens this page to ask, and a percentage cannot: 52% does not say whether anything is moving.
-    # Absent rather than an empty box when nothing is set - a blank "Now:" reads as stalled.
+    # The short checkpoint line stays above the detailed plan because it answers what is moving
+    # without turning an engineering counter into a product-readiness claim. A historical snapshot
+    # labels the line as old context instead of implying that it describes current work.
     now = (plan.get("now") or "").strip()
     now_at = (plan.get("now_updated") or "").strip()
     # `now` is the live checkpoint; `active_work` is the broader manually refreshed board.
     # They are complementary. Hiding the live line whenever the board exists made the `now`
     # command report success while the served page continued showing only a stale objective.
     if now:
+        now_heading = "Checkpoint at last refresh" if historical_snapshot else "Working on now"
         p += [
             '<section class="now">',
-            '<div class="nowhead"><span class="dot"></span><h2>Working on now</h2>'
+            f'<div class="nowhead"><span class="dot"></span><h2>{now_heading}</h2>'
             + (f'<span class="nowat">{e(now_at)}</span>' if now_at else "")
             + "</div>",
             f'<p class="nowtext">{e(now)}</p>',

@@ -120,8 +120,8 @@ export function SpecificationEditor({
   return (
     <div
       data-dev-id="component-browser.spec-editor"
-      // A bordered, coloured surface, so its text gets at least 8px of padding all round.
-      className="flex flex-col gap-1.5 border border-line bg-surface p-2"
+      // The background step and inset spacing group the form without boxing a panel inside a row.
+      className="flex flex-col gap-1.5 bg-surface p-2"
       onKeyDown={(event) => {
         if (event.key === "Escape") {
           event.preventDefault();

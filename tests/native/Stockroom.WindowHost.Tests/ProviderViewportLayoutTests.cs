@@ -8,7 +8,8 @@ public sealed class ProviderViewportLayoutTests
     public void AcceptsCurrentComponentBoundsInsideStockroomContent()
     {
         var request = new ProviderViewportRequest(
-            "part-1", true, 280, 76, 900, 620);
+            "part-1", "mouser", "manual:mouser", "session-1",
+            true, 280, 76, 900, 620);
 
         Assert.True(
             ProviderViewportLayout.TryResolve(
@@ -33,7 +34,8 @@ public sealed class ProviderViewportLayoutTests
         double height)
     {
         var request = new ProviderViewportRequest(
-            componentId, true, x, y, width, height);
+            componentId, "mouser", "manual:mouser", "session-1",
+            true, x, y, width, height);
 
         Assert.False(
             ProviderViewportLayout.TryResolve(

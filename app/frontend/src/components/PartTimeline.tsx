@@ -13,6 +13,7 @@ import { Text } from "../lib/copy";
 import type { DiffField } from "../api/types";
 import { Badge, Card } from "./primitives";
 import { DiffModal } from "./DiffModal";
+import { Icon } from "./Icon";
 
 // A commit sha is 40 hex chars; show the familiar 7-char short form.
 function shortSha(sha: string): string {
@@ -214,7 +215,7 @@ function CommitDiff({
                 ) : (
                   <>
                     <span className="text-t3 line-through">{formatValue(f.before)}</span>
-                    <span className="px-1 text-t3">→</span>
+                    <Icon id="relation.transition" className="mx-1 inline h-3 w-3 text-t3" />
                     <span className="text-t1">{formatValue(f.after)}</span>
                   </>
                 )}

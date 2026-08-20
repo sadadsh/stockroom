@@ -47,7 +47,7 @@ export function AddPartModal() {
       <div
         ref={ref}
         data-dev-id="addpart.root"
-        className="flex max-h-[84vh] w-full max-w-[720px] flex-col overflow-hidden rounded-card border border-line2 bg-popover shadow-pop outline-none"
+        className="flex max-h-[84vh] w-full max-w-[1120px] flex-col overflow-hidden rounded-card border border-line2 bg-popover shadow-pop outline-none"
         role="dialog"
         aria-modal="true"
         aria-label={dialogLabel}

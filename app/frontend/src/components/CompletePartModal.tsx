@@ -14,6 +14,7 @@ import * as m from "motion/react-m";
 import { useQueryClient } from "@tanstack/react-query";
 import { assetPresent, assetsFor } from "../lib/edaTarget";
 import type {
+  CaptureAttachmentProposal,
   CompletionEvidence,
   PartDetail,
   ProviderOutcome,
@@ -43,7 +44,7 @@ interface Props {
   autoStart?: boolean;
 }
 
-const CheckMark = () => <Icon id="modal.check" className="h-2.5 w-2.5" />;
+const CheckMark = () => <Icon id="overlay.check" className="h-2.5 w-2.5" />;
 
 // A segmented meter: one cell per needed file, filling as each lands. The discrete cells read
 // the discrete requirements at a glance (vs one anonymous bar), and settle green on completion.
@@ -608,7 +609,7 @@ export function CompletePartModal({
               aria-label={closeLabel}
               className="grid h-7 w-7 place-items-center rounded-control text-t3 hover:bg-raise2 hover:text-t1"
             >
-              <Icon id="modal.close" className="h-3.5 w-3.5" />
+              <Icon id="action.close" className="h-3.5 w-3.5" />
             </button>
           </div>
         </div>
@@ -929,6 +930,7 @@ function CompletionActions({
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [selectedFilesBusy, setSelectedFilesBusy] = useState(false);
+  const [manualProposal, setManualProposal] = useState<CaptureAttachmentProposal | null>(null);
   // A toast takes a resolved string and is written from a callback, where a hook cannot run, so
   // every message this card can raise resolves here. The counted ones carry a whole sentence per
   // number agreement rather than a stitched noun, so a rewording keeps the grammar it was written
@@ -1038,21 +1040,16 @@ function CompletionActions({
         const queued = result.queued_files === 1 ? queuedOne : queuedMany;
         toast(queued({ count: result.queued_files }), "ok");
       } else {
-        const result = await api.addPartFiles({ partId, paths });
-        await invalidatePartCadProjection(queryClient, partId);
-        const attached = result.attached.length;
-        const ignored = result.ignored.length;
-        const suffix = ignored
-          ? (ignored === 1 ? ignoredOne : ignoredMany)({ count: ignored })
-          : "";
-        const sentence = result.complete
-          ? attached === 1
-            ? attachedDoneOne({ count: attached, suffix })
-            : attachedDoneMany({ count: attached, suffix })
-          : attached === 1
-            ? attachedLeftOne({ count: attached, remaining: result.remaining.length, suffix })
-            : attachedLeftMany({ count: attached, remaining: result.remaining.length, suffix });
-        toast(sentence, attached ? "ok" : "err");
+        const edas = [
+          ...(needs.some((need) => need.startsWith("kicad_")) ? ["kicad" as const] : []),
+          ...(needs.some((need) => need.startsWith("altium_")) ? ["altium" as const] : []),
+        ];
+        const proposal = await api.proposePartFiles({
+          partId,
+          paths,
+          edas: edas.length > 0 ? edas : ["kicad"],
+        });
+        setManualProposal(proposal);
       }
     } catch (error) {
       toast(error instanceof Error ? error.message : addFilesFailed, "err");
@@ -1061,11 +1058,65 @@ function CompletionActions({
     }
   }
 
+  async function applyManualProposal() {
+    if (!manualProposal) return;
+    setSelectedFilesBusy(true);
+    try {
+      const result = await api.applyPartFiles({
+        partId,
+        proposalToken: manualProposal.proposal_token,
+      });
+      setManualProposal(null);
+      await invalidatePartCadProjection(queryClient, partId);
+      const attached = result.attached.length;
+      const ignored = result.ignored.length;
+      const suffix = ignored
+        ? (ignored === 1 ? ignoredOne : ignoredMany)({ count: ignored })
+        : "";
+      const sentence = result.complete
+        ? attached === 1
+          ? attachedDoneOne({ count: attached, suffix })
+          : attachedDoneMany({ count: attached, suffix })
+        : attached === 1
+          ? attachedLeftOne({ count: attached, remaining: result.remaining.length, suffix })
+          : attachedLeftMany({ count: attached, remaining: result.remaining.length, suffix });
+      toast(sentence, attached ? "ok" : "err");
+    } catch (error) {
+      toast(error instanceof Error ? error.message : addFilesFailed, "err");
+    } finally {
+      setSelectedFilesBusy(false);
+    }
+  }
+
   return (
-    <div
-      data-dev-id="complete.cad-actions"
-      className="mt-3 flex flex-wrap items-center gap-2"
-    >
+    <div data-dev-id="complete.cad-actions" className="mt-3">
+      {manualProposal ? (
+        <section className="mb-3 rounded-control border border-line bg-raise px-3 py-2">
+          <p className="text-xs font-semibold text-t1">
+            <Text id="modal.completePart.attachment-proposal-title">Attachment Proposal</Text>
+          </p>
+          <ul className="mt-1 space-y-1 text-2xs text-t2">
+            {manualProposal.attachments.map((item) => (
+              <li key={`${item.role}:${item.file_name}`}>
+                <span className="font-semibold">{item.role}</span>{" "}
+                <span className="font-mono">{item.file_name}</span>{" "}
+                <Icon id="relation.transition" className="inline h-3 w-3 text-t3" />{" "}
+                {item.target}
+              </li>
+            ))}
+          </ul>
+          <Button
+            small
+            variant="accent"
+            className="mt-2"
+            disabled={selectedFilesBusy || manualProposal.attachments.length === 0}
+            onClick={() => void applyManualProposal()}
+          >
+            <Text id="modal.completePart.apply-attachments">Apply Attachments</Text>
+          </Button>
+        </section>
+      ) : null}
+      <div className="flex flex-wrap items-center gap-2">
       {hasExactIdentity ? (
         <Button
           variant={isDone ? "default" : "accent"}
@@ -1133,6 +1184,7 @@ function CompletionActions({
           <Text id="modal.completePart.keep-working">Keep Working</Text>
         </button>
       ) : null}
+      </div>
     </div>
   );
 }

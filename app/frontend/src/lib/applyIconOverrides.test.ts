@@ -97,4 +97,20 @@ describe("applyGeneratedIconOverrides", () => {
       counter.disconnect();
     }
   });
+
+  it("preserves raw outline geometry for a legacy solid treatment", () => {
+    document.body.innerHTML = `
+      <svg data-design-id="auto.svg.0abc123" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+        <path data-testid="open-path" d="M4 12h16" />
+      </svg>
+    `;
+
+    applyGeneratedIconOverrides({ "auto.svg.0abc123": { treatment: "solid" } });
+
+    const icon = document.querySelector("svg");
+    expect(icon).toHaveAttribute("fill", "none");
+    expect(icon).toHaveAttribute("stroke", "currentColor");
+    expect(icon).toHaveAttribute("data-icon-treatment", "legacy-solid-fallback");
+    expect(icon?.querySelector('[data-testid="open-path"]')).not.toBeNull();
+  });
 });

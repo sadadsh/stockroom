@@ -1325,7 +1325,7 @@ def test_selected_recovery_files_must_match_the_exact_provider_route(
         ) == (selected.resolve(),)
 
 
-def test_manual_files_are_processed_without_a_capture_route_and_close_when_complete(
+def test_manual_files_are_proposed_without_mutation_then_applied_explicitly(
     client, app_ctx, tmp_path, monkeypatch
 ):
     from stockroom.ingest import manual_files
@@ -1334,13 +1334,36 @@ def test_manual_files_are_processed_without_a_capture_route_and_close_when_compl
     selected.write_bytes(b"user selected package")
     observed = {}
 
-    def import_files(ctx, part_id, paths):
+    def propose_files(ctx, part_id, paths, *, edas):
         observed["ctx"] = ctx
         observed["part_id"] = part_id
         observed["paths"] = paths
+        observed["edas"] = edas
+        return {
+            "proposal_token": "manual-proposal-1",
+            "part_id": part_id,
+            "provider": "manual",
+            "primary_tool": "both",
+            "attachments": [
+                {
+                    "role": "Altium Symbol",
+                    "file_name": "TPS62130.SchLib",
+                    "target": "Active Altium Symbol",
+                },
+                {
+                    "role": "3D Model",
+                    "file_name": "TPS62130.step",
+                    "target": "Shared 3D Model",
+                },
+            ],
+            "inactive_evidence": [],
+        }
+
+    def apply_files(ctx, part_id, proposal_token):
+        observed["applied"] = (ctx, part_id, proposal_token)
         return {
             "part_id": part_id,
-            "selected_files": len(paths),
+            "selected_files": 1,
             "attached": ["altium_symbol", "altium_footprint"],
             "ignored": ["README.txt: ignored"],
             "remaining": [],
@@ -1358,21 +1381,36 @@ def test_manual_files_are_processed_without_a_capture_route_and_close_when_compl
             self.closed += 1
 
     owner = ProviderOwner()
-    monkeypatch.setattr(manual_files, "import_manual_cad_files", import_files)
+    monkeypatch.setattr(manual_files, "propose_manual_cad_files", propose_files, raising=False)
+    monkeypatch.setattr(manual_files, "apply_manual_cad_proposal", apply_files, raising=False)
     monkeypatch.setattr(app_ctx, "provider_browser_surface", owner, raising=False)
     monkeypatch.setattr(app_ctx, "rebuild_index", lambda: observed.setdefault("rebuilt", True))
     monkeypatch.setattr(app_ctx, "auto_push", lambda: observed.setdefault("pushed", True))
 
     response = client.post(
-        "/api/library/parts/tps62130/files",
-        json={"paths": [str(selected)]},
+        "/api/library/parts/tps62130/files/propose",
+        json={"paths": [str(selected)], "edas": ["kicad", "altium"]},
     )
 
     assert response.status_code == 200
-    assert response.json()["complete"] is True
+    assert response.json()["proposal_token"] == "manual-proposal-1"
+    assert response.json()["attachments"][0]["file_name"] == "TPS62130.SchLib"
     assert observed["ctx"] is app_ctx
     assert observed["part_id"] == "tps62130"
     assert observed["paths"] == (selected.resolve(),)
+    assert observed["edas"] == ("kicad", "altium")
+    assert "applied" not in observed
+    assert "rebuilt" not in observed
+    assert "pushed" not in observed
+    assert owner.closed == 0
+
+    applied = client.post(
+        "/api/library/parts/tps62130/files/apply",
+        json={"proposal_token": "manual-proposal-1"},
+    )
+    assert applied.status_code == 200
+    assert applied.json()["complete"] is True
+    assert observed["applied"] == (app_ctx, "tps62130", "manual-proposal-1")
     assert observed["rebuilt"] is True
     assert observed["pushed"] is True
     assert owner.closed == 1
@@ -1389,7 +1427,7 @@ def test_manual_file_success_survives_a_stale_provider_surface(
     monkeypatch.setattr(
         manual_files,
         "import_manual_cad_files",
-        lambda *_args: {
+        lambda *_args, **_kwargs: {
             "part_id": "tps62130",
             "selected_files": 1,
             "attached": ["kicad_model"],
@@ -1412,13 +1450,183 @@ def test_manual_file_success_survives_a_stale_provider_surface(
     monkeypatch.setattr(app_ctx, "rebuild_index", lambda: None)
     monkeypatch.setattr(app_ctx, "auto_push", lambda: None)
 
+    proposal = client.post(
+        "/api/library/parts/tps62130/files/propose",
+        json={"paths": [str(selected)], "edas": ["kicad"]},
+    )
+    assert proposal.status_code == 200
     response = client.post(
-        "/api/library/parts/tps62130/files",
-        json={"paths": [str(selected)]},
+        "/api/library/parts/tps62130/files/apply",
+        json={"proposal_token": proposal.json()["proposal_token"]},
     )
 
     assert response.status_code == 200
     assert response.json()["complete"] is True
+
+
+def test_direct_provider_browser_route_starts_a_task_bound_proposal_session(
+    client, app_ctx
+):
+    from stockroom.capture.manual_provider_browser import ManualProviderBrowserSnapshot
+
+    observed = {}
+
+    class Broker:
+        def start(self, **fields):
+            observed.update(fields)
+            return ManualProviderBrowserSnapshot(
+                session_id=fields["session_id"],
+                part_id=fields["part_id"],
+                provider_id=fields["provider_id"],
+                url=fields["url"],
+                browser_owner_id=fields["browser_owner_id"],
+                state="active",
+            )
+
+        def status(self, session_id):
+            assert session_id == observed["session_id"]
+            return ManualProviderBrowserSnapshot(
+                session_id=session_id,
+                part_id=observed["part_id"],
+                provider_id=observed["provider_id"],
+                url=observed["url"],
+                browser_owner_id=observed["browser_owner_id"],
+                state="active",
+                proposal={"proposal_token": "proposal-1", "landed_files": ["TPS62130.zip"]},
+            )
+
+    client.app.state.manual_provider_browser_broker = Broker()
+    body = {
+        "session_id": "7ed4d06c-66b0-4dbe-88ef-35edce7a373f",
+        "provider_id": "mouser",
+        "url": "https://www.mouser.com/c/?q=TPS62130",
+        "edas": ["kicad", "altium"],
+        "browser_owner_id": "tps62130:mouser:mouser:7ed4d06c",
+    }
+
+    started = client.post(
+        "/api/library/parts/tps62130/provider-browser",
+        json=body,
+    )
+
+    assert started.status_code == 200
+    assert started.json()["state"] == "active"
+    assert observed["browser_owner_id"] == body["browser_owner_id"]
+    assert observed["edas"] == ("kicad", "altium")
+    assert observed["manufacturer"] == app_ctx.ops.load_record("tps62130").manufacturer
+
+    status = client.get(
+        f"/api/library/parts/tps62130/provider-browser/{body['session_id']}"
+    )
+    assert status.status_code == 200
+    assert status.json()["proposal"]["landed_files"] == ["TPS62130.zip"]
+
+
+def test_api_shutdown_releases_the_manual_provider_browser_broker(app_ctx, monkeypatch):
+    from fastapi.testclient import TestClient
+
+    from stockroom.api.app import create_app
+    from stockroom.capture import manual_provider_browser
+    from stockroom.capture.manual_provider_browser import ManualProviderBrowserSnapshot
+
+    observed = {"shutdown": 0}
+
+    class Broker:
+        def __init__(self, *_args, **_kwargs):
+            pass
+
+        def start(self, **fields):
+            return ManualProviderBrowserSnapshot(
+                session_id=fields["session_id"],
+                part_id=fields["part_id"],
+                provider_id=fields["provider_id"],
+                url=fields["url"],
+                browser_owner_id=fields["browser_owner_id"],
+                state="active",
+            )
+
+        def shutdown(self):
+            observed["shutdown"] += 1
+
+    monkeypatch.setattr(manual_provider_browser, "ManualProviderBrowserBroker", Broker)
+    monkeypatch.setattr(app_ctx, "provider_browser_surface", lambda **_kwargs: None, raising=False)
+    app = create_app(app_ctx)
+    with TestClient(
+        app,
+        base_url="http://test",
+        raise_server_exceptions=False,
+        headers={"X-Stockroom-Token": "testtoken"},
+    ) as local_client:
+        response = local_client.post(
+            "/api/library/parts/tps62130/provider-browser",
+            json={
+                "session_id": "7ed4d06c-66b0-4dbe-88ef-35edce7a373f",
+                "provider_id": "mouser",
+                "url": "https://www.mouser.com/c/?q=TPS62130",
+                "edas": ["kicad"],
+                "browser_owner_id": "tps62130:mouser:mouser:7ed4d06c",
+            },
+        )
+        assert response.status_code == 200, response.text
+        assert observed["shutdown"] == 0
+
+    assert observed["shutdown"] == 1
+
+
+def test_api_shutdown_releases_manual_picker_proposal_snapshots(
+    app_ctx, tmp_path, monkeypatch
+):
+    from fastapi.testclient import TestClient
+
+    from stockroom.api.app import create_app
+    from stockroom.ingest import manual_files
+
+    selected = tmp_path / "TPS62130.zip"
+    selected.write_bytes(b"reviewed package")
+    preview_paths = []
+
+    def preview(_ctx, _part_id, paths, *, edas):
+        assert edas == ("kicad",)
+        preview_paths.extend(paths)
+        return ([], [], [], [], "")
+
+    manual_files.discard_all_manual_cad_proposals()
+    monkeypatch.setattr(manual_files, "_manual_attachment_preview", preview)
+    app = create_app(app_ctx)
+    try:
+        with TestClient(
+            app,
+            base_url="http://test",
+            raise_server_exceptions=False,
+            headers={"X-Stockroom-Token": "testtoken"},
+        ) as local_client:
+            response = local_client.post(
+                "/api/library/parts/tps62130/files/propose",
+                json={"paths": [str(selected)], "edas": ["kicad"]},
+            )
+            assert response.status_code == 200, response.text
+            assert len(preview_paths) == 1
+            snapshot_root = preview_paths[0].parent.parent
+            assert snapshot_root.is_dir()
+
+        assert not snapshot_root.exists()
+    finally:
+        manual_files.discard_all_manual_cad_proposals()
+
+
+def test_direct_provider_browser_refuses_a_url_from_another_provider(client):
+    response = client.post(
+        "/api/library/parts/tps62130/provider-browser",
+        json={
+            "session_id": "7ed4d06c-66b0-4dbe-88ef-35edce7a373f",
+            "provider_id": "mouser",
+            "url": "https://www.digikey.com/en/products/result?keywords=TPS62130",
+            "edas": ["kicad"],
+            "browser_owner_id": "tps62130:mouser:mouser:7ed4d06c",
+        },
+    )
+
+    assert response.status_code == 400
 
 
 @pytest.mark.parametrize(

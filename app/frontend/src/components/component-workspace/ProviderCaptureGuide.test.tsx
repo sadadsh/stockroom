@@ -67,6 +67,18 @@ describe("ProviderCaptureGuide", () => {
     expect(screen.getByText("Checking the files and preparing attachments.")).toBeVisible();
   });
 
+  it("uses the visible Apply action terminology for a fallback proposal", () => {
+    render(
+      <ProviderCaptureGuide
+        providerLabel="DigiKey"
+        attachmentCount={2}
+      />,
+    );
+
+    expect(screen.getByText("Review and apply 2 verified attachments.")).toBeVisible();
+    expect(screen.queryByText(/commit/i)).toBeNull();
+  });
+
   it("turns an interrupted download into one precise recovery instruction", () => {
     render(
       <ProviderCaptureGuide

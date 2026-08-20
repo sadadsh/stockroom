@@ -6,15 +6,16 @@
   "note": "Owner outcomes are the product source of truth. The historical engineering checklist is retained below as unweighted implementation history and must never be presented as product readiness.",
   "product_scope": "Windows-only component-library management for both KiCad and Altium. A capability ships only when both EDA workflows are supported. KiCad-only project management is deferred and removed from the current frontend; its backend and Git history are preserved.",
   "active_work": {
+    "snapshot_status": "historical",
     "last_updated": "2026-07-30T02:16:04Z",
     "objective": "Reconcile the accepted evidence, passive-template, UI-session, and Windows identity batch; freeze one exact clean commit; then prove its aggregate, deterministic package, packaged icon surfaces, and visible update/rollback lifecycle before pushing main.",
-    "refresh_policy": "Manually refreshed at meaningful checkpoints; this is not real-time telemetry.",
+    "refresh_policy": "This historical development checkpoint was manually recorded. It is not current or real-time telemetry.",
     "workstreams": [
       {
         "id": "production-library-publication",
         "name": "Real Production Library Publication",
         "status": "completed",
-        "owner": "development tool · durable workflow and dual-EDA publication",
+        "owner": "Stockroom Development · durable workflow and dual-EDA publication",
         "evidence": "Texas Instruments TPD6E05U06RVZR completed all 14 production stages once and published a clean isolated Git commit. KiCad symbol, footprint and STEP plus Altium SchLib and PcbLib resolve to the same SnapMagic evidence manifest sha256:1bc2ee5de60e7d30ee76df2d439f3c894bd76cb4ce050c17906f3d3b7712376f. Catalog, portable KiCad tables, DbLib, native readback, cross-EDA verification, and exact file digests are present in Real Fourteen Stage Publication Report.json.",
         "blocker": "No blocker remains for this isolated strict-publication mechanism and canary. A provider can still lack a complete exact-MPN set or require a provider-owned security action, and a full live intake remains a separate active gate.",
         "next_action": "Keep this real canary and its regressions load-bearing while broader MPN qualification continues."
@@ -23,7 +24,7 @@
         "id": "network-acquisition-and-pairing",
         "name": "Network Acquisition And Strict Pairing",
         "status": "active",
-        "owner": "development tool · provider routes, evidence, and activation",
+        "owner": "Stockroom Development · provider routes, evidence, and activation",
         "evidence": "Source and regression evidence prove fail-closed local paths, terminal route ledgers, atomic same-manifest activation, retained variants, persistent isolated provider sessions, Credential Manager secret storage, and explicit unresolved rows. The real TPD6E05U06RVZR publication proves a strict five-role pair, but it began with pre-seeded CAD evidence and its published record contains no retained raw distributor source payloads.",
         "blocker": "Internal acceptance still needs one production-UI network intake that retains raw response bytes, locators, and digests; proves the real cache/direct/generation/browser fallback order; and re-derives twice without changing the raw evidence. The live Windows install has no optional provider credentials configured. Provider-owned login, CAPTCHA, consent, licensing, 2FA, account seats, and genuine publication absence remain external.",
         "next_action": "Run one installed arbitrary-MPN network intake through the real route ladder and attach its raw-retention, fallback, resume, and re-derivation receipt."
@@ -32,7 +33,7 @@
         "id": "dual-eda-definition-architecture",
         "name": "Dual-EDA Definition And Adapter Architecture",
         "status": "active",
-        "owner": "development tool · shared component definition, passive templates, and native adapters",
+        "owner": "Stockroom Development · shared component definition, passive templates, and native adapters",
         "evidence": "The shared worktree now contains a versioned tool-neutral passive-template registry, canonical-definition integration, KiCad projection, native Altium authoring hooks, and representative proof tests. The first exact-current native boot exposed a syntax error in that path; the correction plus 54 canonical/projection/catalog/production-workflow tests pass. This is source evidence beneath an uncommitted concurrent batch, not final architecture acceptance.",
         "blocker": "Reconcile and gate the complete passive-template/projection batch, prove representative native outputs from the exact clean source, and resolve the remaining accepted-architecture claim about the proven AD26 script bridge versus an unimplemented managed extension.",
         "next_action": "Run the full passive/template/native proof slice, fix any source/contract drift, and promote only the measured adapter boundary into architecture and the clean commit."
@@ -41,7 +42,7 @@
         "id": "windows-release-lifecycle",
         "name": "Windows Package And Release Lifecycle",
         "status": "active",
-        "owner": "development tool · deterministic package and managed runtime",
+        "owner": "Stockroom Development · deterministic package and managed runtime",
         "evidence": "Windows Package Final Proof 3 remains older mechanism evidence. Current source separates the stable-host ABI floor from package version, normalizes three/four-part host versions, proves a running v1 host accepts a compatible v2 candidate, preserves active routes, checks every 60 seconds, targets the exact pywebview HWND/PID, retains MSIX identity, assigns a stable unpackaged AUMID, and safely owns/replaces per-DPI HICONs. The owner-approved mirrored S-box is rendered directly into deterministic ICO and MSIX target/unplated assets. Focused host/runtime/package regressions pass.",
         "blocker": "Internal proof remains: commit one exact source revision, build its EXE/MSIX twice, verify the real titlebar/taskbar/Start/Apps surfaces, and run a distinct vN to vN+1 visible-window adoption/rollback with preserved route and zero orphans. Production signing/feed authority remains external after those internal gaps close.",
         "next_action": "Create the scoped clean source commit, then run exact-source deterministic packaging and the visible two-release identity/adoption/rollback proof."
@@ -50,7 +51,7 @@
         "id": "final-library-user-layer",
         "name": "Final Library User-Layer Gate",
         "status": "active",
-        "owner": "development tool · frontend audit and deterministic build",
+        "owner": "Stockroom Development · frontend audit and deterministic build",
         "evidence": "The complete frontend passes 114 files and 1,260 tests, token parity, TypeScript, Vite 8 production build, and a second byte-identical 14-file build. Durable UI continuity now preserves route, filters, selection, scroll, open surface, and a separately bounded Add Part network draft without leaking credentials or raw draft fields into the session snapshot. Eight exact-current real WebView2 frames at 1,384 × 861 prove the corrected empty state, working shared Add Parts intake, fail-closed KiCad/Altium readiness, and a static equal-bound facet in both themes. Root/client dimensions match, the console is empty, and the post-favicon run has no resource status at or above 400. VA-003 and VA-005 are resolved.",
         "blocker": "Internal user-layer proof remains for the positive verified dual-EDA completed state, supported DPI/responsive bounds, and the exact packaged EXE/MSIX shell surfaces. VA-002, VA-004, VA-014, and the other scoped P0/P1 findings remain explicit rather than silently waived.",
         "next_action": "Finish the scoped positive-readiness and responsive proofs, then inspect the exact packaged app and approved icon in native Windows surfaces."
@@ -59,7 +60,7 @@
         "id": "aggregate-and-canonical-state",
         "name": "Aggregate Gates And Canonical State",
         "status": "active",
-        "owner": "development tool · regression, progress, Obsidian, QMD, and scoped commits",
+        "owner": "Stockroom Development · regression, progress, Obsidian, QMD, and scoped commits",
         "evidence": "The current accepted frontend batch passes 114 files and 1,260 tests plus token parity, TypeScript, Vite 8 production builds, and byte-identical 14-file distribution output. Exact-current native WebView2 acceptance covers eight dark/light Library/Search frames. The UI-session/passive-template integration slice passes 56 backend tests; the session store/API follow-up passes 21 tests; full backend Ty and scoped Ruff pass. The adopted evidence-authority/acquisition/adapter batch passes 200 focused backend tests with one skip. The Windows gate's duplicate actionlint resolution defect is fixed with focused tests and live workflow validation. The progress HTML declares UTF-8 and renders its punctuation correctly.",
         "blocker": "The exact source commit, successful clean aggregate receipt, refreshed package proof, canonical knowledge/QMD refresh, and remote push remain. The earlier aggregate runner lost its parent/receipt while a separate persistent backend run continued, so it is not counted as a pass.",
         "next_action": "Land the current scoped repairs, reconcile the full punch list, then rerun the aggregate and package proofs from the exact clean commit."

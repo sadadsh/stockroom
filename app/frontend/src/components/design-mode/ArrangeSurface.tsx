@@ -112,6 +112,7 @@ import {
   type StepDirection,
 } from "./arrangeMoves";
 import { ValueSlider } from "./ValueSlider";
+import { Icon } from "../Icon";
 
 /* -------------------------------------------------------------------------- */
 /*  the surface                                                                */
@@ -589,7 +590,7 @@ function PlacementAffordance({
             : "border-line2 bg-popover text-t2 hover:text-t1")
         }
       >
-        <span aria-hidden="true">{"⠿"}</span>
+        <Icon id="design.drag" className="h-3 w-3" />
       </button>
       <button
         type="button"
@@ -630,7 +631,7 @@ function PlacementAffordance({
         }}
         className="pointer-events-auto absolute bottom-0 right-0 h-3.5 w-3.5 rounded-[3px] border border-line2 bg-popover text-2xs text-t2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-focus"
       >
-        <span aria-hidden="true">{"↘"}</span>
+        <Icon id="design.resize" className="h-3 w-3" />
       </button>
       {receiving ? (
         <>

@@ -23,7 +23,15 @@ from stockroom.enrich.passive import (
 )
 from stockroom.ingest.errors import IngestError
 from stockroom.model.asset import Asset
-from stockroom.model.part import AssetRef, Datasheet, EdaAssets, PartRecord, Provenance, Purchase
+from stockroom.model.part import (
+    AssetRef,
+    Datasheet,
+    EdaAssets,
+    EnrichmentField,
+    PartRecord,
+    Provenance,
+    Purchase,
+)
 from stockroom.model.part_class import PartClass
 
 _KIND_CATEGORY: dict[str, str] = {
@@ -180,6 +188,7 @@ def build_passive_record(
     price_breaks: list | None = None,
     stock: int | None = None,
     catalog: dict | None = None,
+    enrichment: dict | None = None,
     footprints_root=None,
 ) -> PassiveBuild:
     """Build (but do not commit) a passive PartRecord from `source` (a bare MPN or a
@@ -299,6 +308,38 @@ def build_passive_record(
     datasheet_url = (datasheet_url or "").strip()
     datasheet = Datasheet(source_url=datasheet_url) if datasheet_url else None
 
+    # An official source label belongs to the exact selected value, not merely to the field
+    # name. Decoder/manual values win the record, but when they differ from the pulled selection
+    # their provenance must change with them instead of falsely claiming Mouser/DigiKey said it.
+    selected_specs = specs or {}
+    manual_keys: set[str] = set()
+    if man_value:
+        manual_keys.add(
+            {"resistor": "Resistance", "capacitor": "Capacitance", "inductor": "Inductance"}[
+                spec.kind
+            ]
+        )
+    if man_tolerance:
+        manual_keys.add("Tolerance")
+    if man_package:
+        manual_keys.add("Package")
+    record_enrichment: dict[str, EnrichmentField] = {}
+    for key, value_meta in (enrichment or {}).items():
+        if not isinstance(value_meta, dict) or key not in record_specs:
+            continue
+        provenance_source = str(value_meta.get("source", ""))
+        confidence = str(value_meta.get("confidence", ""))
+        if provenance_source.strip().lower() in {"mouser", "digikey"} and (
+            key not in selected_specs
+            or str(record_specs[key]).strip() != str(selected_specs[key]).strip()
+        ):
+            provenance_source = "manual" if key in manual_keys else "import"
+            confidence = ""
+        record_enrichment[str(key)] = EnrichmentField(
+            source=provenance_source,
+            confidence=confidence,
+        )
+
     record = PartRecord(
         id="",
         display_name=_passive_display_name(spec) or mpn,
@@ -324,6 +365,7 @@ def build_passive_record(
             source_url=purchase_url,
         ),
         specs=record_specs,
+        enrichment=record_enrichment,
         catalog={
             str(key): dict(value)
             for key, value in (catalog or {}).items()

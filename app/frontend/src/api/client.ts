@@ -32,6 +32,8 @@ import type {
   CadInventory,
   AltiumRegenerateResult,
   AltiumSetupResult,
+  CatalogBuildResult,
+  CatalogBuildStatus,
   DevSaveBody,
   DevSaveResult,
   DevWorkspaceStatus,
@@ -43,6 +45,8 @@ import type {
   CadSourceResponse,
   CaptureBatchWorklist,
   CaptureWorkflowSession,
+  CaptureAttachmentProposal,
+  ManualProviderBrowserSession,
   ConnectProjectRemoteResult,
   PartShell,
   DiffResponse,
@@ -120,11 +124,24 @@ export class ApiError extends Error {
   // The complete-to-add gate returns 422 with a `missing` label list; callers
   // (the ingest commit flow) read it to highlight exactly what still needs filling.
   missing?: string[];
-  constructor(status: number, message: string, missing?: string[]) {
+  code?: string;
+  existingPartId?: string;
+  existingMpn?: string;
+  constructor(
+    status: number,
+    message: string,
+    missing?: string[],
+    code?: string,
+    existingPartId?: string,
+    existingMpn?: string,
+  ) {
     super(message);
     this.name = "ApiError";
     this.status = status;
     this.missing = missing;
+    this.code = code;
+    this.existingPartId = existingPartId;
+    this.existingMpn = existingMpn;
   }
 }
 
@@ -208,16 +225,22 @@ async function liveJsonRequest<T>(descriptor: ApiRequestDescriptor, keepalive = 
   if (!res.ok) {
     let msg = `Request failed (${res.status})`;
     let missing: string[] | undefined;
+    let code: string | undefined;
+    let existingPartId: string | undefined;
+    let existingMpn: string | undefined;
     try {
       const body = await res.json();
       msg = responseErrorMessage(body, msg);
       // The complete-to-add gate returns 422 with a `missing` label list; carry it
       // on the error so the ingest commit flow can highlight the unfilled fields.
       if (Array.isArray(body.missing)) missing = body.missing as string[];
+      if (typeof body.code === "string") code = body.code;
+      if (typeof body.existing_part_id === "string") existingPartId = body.existing_part_id;
+      if (typeof body.existing_mpn === "string") existingMpn = body.existing_mpn;
     } catch {
       /* non-JSON error body, keep the status message */
     }
-    throw new ApiError(res.status, msg, missing);
+    throw new ApiError(res.status, msg, missing, code, existingPartId, existingMpn);
   }
   if (res.status === 204) return undefined as T;
   return (await res.json()) as T;
@@ -1316,6 +1339,16 @@ export const api = {
     return apiGet<AltiumStatus>("/api/altium/status");
   },
 
+  catalogBuildStatus(): Promise<CatalogBuildStatus> {
+    return apiGet<CatalogBuildStatus>("/api/catalog-build/status");
+  },
+
+  catalogBuild(): Promise<CatalogBuildResult> {
+    return request<CatalogBuildResult>("POST", "/api/catalog-build", {
+      body: { confirmed: true },
+    });
+  },
+
   // Whether the 64-bit SQLite3 ODBC driver Altium needs to read the DbLib is registered on this
   // machine (null off Windows), plus where to download it. Machine-level, not profile-scoped.
   altiumOdbcStatus(): Promise<OdbcStatus> {
@@ -1529,7 +1562,63 @@ export const api = {
     });
   },
 
-  addPartFiles(input: { partId: string; paths: string[] }): Promise<{
+  proposePartFiles(input: {
+    partId: string;
+    paths: string[];
+    edas: Array<"kicad" | "altium">;
+  }): Promise<CaptureAttachmentProposal & {
+    ignored?: string[];
+    selected_files?: number;
+  }> {
+    return request("POST", `/api/library/parts/${encodeURIComponent(input.partId)}/files/propose`, {
+      body: { paths: input.paths, edas: input.edas },
+    });
+  },
+
+  startManualProviderBrowser(input: {
+    partId: string;
+    sessionId: string;
+    providerId: string;
+    url: string;
+    edas: Array<"kicad" | "altium">;
+    browserOwnerId: string;
+  }): Promise<ManualProviderBrowserSession> {
+    return request(
+      "POST",
+      `/api/library/parts/${encodeURIComponent(input.partId)}/provider-browser`,
+      {
+        body: {
+          session_id: input.sessionId,
+          provider_id: input.providerId,
+          url: input.url,
+          edas: input.edas,
+          browser_owner_id: input.browserOwnerId,
+        },
+      },
+    );
+  },
+
+  manualProviderBrowserStatus(input: {
+    partId: string;
+    sessionId: string;
+  }): Promise<ManualProviderBrowserSession> {
+    return request(
+      "GET",
+      `/api/library/parts/${encodeURIComponent(input.partId)}/provider-browser/${encodeURIComponent(input.sessionId)}`,
+    );
+  },
+
+  stopManualProviderBrowser(input: {
+    partId: string;
+    sessionId: string;
+  }): Promise<{ stopped: boolean; session_id: string }> {
+    return request(
+      "DELETE",
+      `/api/library/parts/${encodeURIComponent(input.partId)}/provider-browser/${encodeURIComponent(input.sessionId)}`,
+    );
+  },
+
+  applyPartFiles(input: { partId: string; proposalToken: string }): Promise<{
     part_id: string;
     selected_files: number;
     attached: string[];
@@ -1537,8 +1626,8 @@ export const api = {
     remaining: string[];
     complete: boolean;
   }> {
-    return request("POST", `/api/library/parts/${encodeURIComponent(input.partId)}/files`, {
-      body: { paths: input.paths },
+    return request("POST", `/api/library/parts/${encodeURIComponent(input.partId)}/files/apply`, {
+      body: { proposal_token: input.proposalToken },
     });
   },
 

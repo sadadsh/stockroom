@@ -891,6 +891,7 @@ export function useIngestCommit() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["parts"] });
       qc.invalidateQueries({ queryKey: ["facets"] });
+      qc.invalidateQueries({ queryKey: ["duplicates"] });
     },
   });
 }
@@ -904,6 +905,7 @@ export function usePassiveAdd() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["parts"] });
       qc.invalidateQueries({ queryKey: ["facets"] });
+      qc.invalidateQueries({ queryKey: ["duplicates"] });
     },
   });
 }
@@ -1211,6 +1213,26 @@ export function useSyncLibraryHygiene() {
 // The Altium Database Library status for the active profile (place-ready count + per-part rows).
 export function useAltiumStatus() {
   return useQuery({ queryKey: ["altium-status"], queryFn: () => api.altiumStatus() });
+}
+
+export function useCatalogBuildStatus() {
+  return useQuery({
+    queryKey: ["catalog-build-status"],
+    queryFn: () => api.catalogBuildStatus(),
+    refetchOnWindowFocus: true,
+    refetchInterval: (query) => query.state.data?.state === "building" ? 1_000 : false,
+  });
+}
+
+export function useCatalogBuild() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.catalogBuild(),
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ["catalog-build-status"] });
+      await qc.invalidateQueries({ queryKey: ["parts"] });
+    },
+  });
 }
 
 // Whether the machine's 64-bit SQLite3 ODBC driver is registered. Machine-level (not per-profile),

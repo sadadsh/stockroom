@@ -1472,7 +1472,7 @@ function PositionSolution({
             <span className="min-w-fit rounded-control bg-raise px-2 py-1 font-mono text-2xs text-t1">
               Socket {position.position}
             </span>
-            <span className="text-t3">→</span>
+            <Icon id="relation.transition" className="h-3 w-3 flex-none text-t3" />
             <div className="min-w-0 flex-1 space-y-1">
               {position.branches.map((branch) => (
                 <div
@@ -1497,7 +1497,10 @@ function PositionSolution({
                     )}
                   </span>
                   <span className="truncate text-t2">{branch.label}</span>
-                  <span className="text-t3">→ {branch.endpoint}</span>
+                  <span className="inline-flex items-center gap-1 text-t3">
+                    <Icon id="relation.transition" className="h-3 w-3 flex-none" />
+                    {branch.endpoint}
+                  </span>
                 </div>
               ))}
             </div>

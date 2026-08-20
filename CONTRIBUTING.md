@@ -10,7 +10,7 @@ Whether you are a person or an agent, this is the shortest path to a clean chang
 
 ## Set up
 
-```bash
+```powershell
 # source-pinned native CAD writer (only its required nested abstraction)
 git submodule update --init vendor/AltiumSharp
 git -C vendor/AltiumSharp submodule update --init shared/OriginalCircuit.Eda.Abstractions
@@ -19,7 +19,9 @@ git -C vendor/AltiumSharp submodule update --init shared/OriginalCircuit.Eda.Abs
 uv sync                                   # creates .venv with the pinned deps
 
 # frontend
-cd app/frontend && npm ci
+Push-Location app\frontend
+npm ci
+Pop-Location
 
 # Windows workflow validator
 winget install --id rhysd.actionlint --exact
@@ -51,18 +53,23 @@ native host; hot reload is development evidence only.
 
 A change is done when these pass. Run them before you commit; do not claim "done" off a subset.
 
-```bash
-# backend
+```powershell
+# Canonical Windows completion gate: backend, native host, frontend, types, build, and dist.
+powershell -ExecutionPolicy Bypass -File scripts\Gates.ps1
+
+# Focused layers during development.
 actionlint .github/workflows/ci.yml .github/workflows/release.yml
 uv run ty check app/backend/stockroom
-QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest tests/backend -q
-
-# frontend (from app/frontend)
-npm run test:run && npm run typecheck && npm run build
+uv run pytest tests/backend -q
+Push-Location app\frontend
+npm run test:run
+npm run typecheck
+npm run build
+Pop-Location
 ```
 
-Windows CI (`.github/workflows/ci.yml`) is the release gate; a green Linux run is necessary but
-never sufficient for a visual or Windows-specific change.
+Windows CI (`.github/workflows/ci.yml`) runs the same release gate. A focused or non-Windows run is
+useful feedback but never sufficient for a visual or Windows-specific change.
 
 > The frontend is built to `app/frontend-dist/`, and that directory **is committed** because the
 > backend serves it as static files. Always commit the regenerated `frontend-dist/` in the **same**

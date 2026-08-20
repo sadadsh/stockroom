@@ -150,6 +150,81 @@ def test_draft_and_snapshot_survive_a_new_app_origin(client, app_ctx) -> None:
         assert restored.json()["network_input"]["value"] == "STM32G474VET6"
 
 
+def test_active_draft_round_trips_raw_official_evidence_across_update_and_restart(
+    client, app_ctx
+) -> None:
+    body = _draft_body("PART-A")
+    payload = {
+        "SearchResults": {"Parts": [{"ManufacturerPartNumber": "PART-A"}]}
+    }
+    binding = {
+        "provider": "mouser",
+        "queried_mpn": "PART-A",
+        "canonical_mpn": "PART-A",
+        "selected_values": {"mpn": "PART-A", "Tolerance": "1%"},
+    }
+    body["review"]["enrichment_result"] = {
+        "category": "ICs",
+        "mpn": {"value": "PART-A", "source": "mouser", "confidence": "high"},
+        "manufacturer": {"value": "Acme", "source": "mouser", "confidence": "high"},
+        "description": None,
+        "datasheet_url": None,
+        "stock": None,
+        "package": None,
+        "price_breaks": [],
+        "specs": {},
+        "source_states": {"mouser": "success", "digikey": "not_configured"},
+        "official_payloads": {"mouser": payload},
+        "official_evidence": {"mouser": binding},
+        "schema_version": 5,
+    }
+    body["review"]["candidates"] = [{
+        "client_id": "candidate-1",
+        "vendor": "mouser",
+        "display_name": "PART-A",
+        "entry_name": "",
+        "category": "ICs",
+        "mpn": "PART-A",
+        "manufacturer": "Acme",
+        "description": "",
+        "tags": [],
+        "purchase": [],
+        "gaps": [],
+        "specs": [],
+        "alternates": [],
+        "enrichment": [],
+        "official_payloads": {"mouser": payload},
+        "official_evidence": {"mouser": binding},
+        "datasheet_url": "",
+        "conflicts": [],
+    }]
+
+    first = client.post("/api/intake-drafts", json=body)
+    assert first.status_code == 200, first.text
+    updated = client.put(
+        f"/api/intake-drafts/{first.json()['draft_id']}",
+        json={**body, "revision": first.json()["revision"]},
+    )
+    assert updated.status_code == 200, updated.text
+
+    from fastapi.testclient import TestClient
+
+    with TestClient(
+        create_app(app_ctx),
+        base_url="http://restart-origin",
+        raise_server_exceptions=False,
+        headers={"X-Stockroom-Token": "testtoken"},
+    ) as restarted:
+        restored = restarted.get(
+            f"/api/intake-drafts/{updated.json()['draft_id']}",
+            params={"revision": updated.json()["revision"]},
+        )
+    assert restored.status_code == 200
+    candidate = restored.json()["review"]["candidates"][0]
+    assert candidate["official_payloads"] == {"mouser": payload}
+    assert candidate["official_evidence"] == {"mouser": binding}
+
+
 def test_draft_revision_conflict_and_duplicate_json_fail_closed(client) -> None:
     first = client.post("/api/intake-drafts", json=_draft_body()).json()
     response = client.put(

@@ -164,6 +164,7 @@ def extract_datasheet_specs(
 
     if known_mpn and known_mpn.upper() in upper:
         r.mpn = Sourced(known_mpn, "datasheet", "high")
+        r.identity_authorities.append("manufacturer_datasheet")
 
     for man in _MANUFACTURERS:
         if man.upper() in upper:

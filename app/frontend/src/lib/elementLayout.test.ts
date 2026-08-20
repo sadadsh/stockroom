@@ -177,11 +177,25 @@ describe("closed Box and Text value grammar", () => {
       "grid-template-columns": "repeat(3, minmax(0, 1fr))", "grid-auto-flow": "row dense",
       "font-family": "system-ui", "text-transform": "uppercase", "white-space": "nowrap",
       "text-overflow": "ellipsis", "overflow-wrap": "anywhere",
-      transform: "translate(12px, -4px)", filter: "blur(2px)", "z-index": "120",
+      transform: "translateX(10px) scale(2) rotate(20deg)", filter: "blur(2px)", "z-index": "120",
     } as const;
     for (const [property, value] of Object.entries(approved)) {
       expect(isSafeElementValue(property, value), `${property}: ${value}`).toBe(true);
     }
+  });
+
+  it("accepts a browser-computed matrix followed by an inspector rotation", () => {
+    expect(isSafeElementValue(
+      "transform",
+      "matrix(1, 0, 0, 1, 10, 20) rotate(15deg)",
+    )).toBe(true);
+  });
+
+  it("keeps product z-order inside the shared four-digit grammar", () => {
+    expect(isSafeElementValue("z-index", "9999")).toBe(true);
+    expect(isSafeElementValue("z-index", "-9999")).toBe(true);
+    expect(isSafeElementValue("z-index", "10000")).toBe(false);
+    expect(isSafeElementValue("z-index", "-10000")).toBe(false);
   });
 
   it("rejects executable, remote, raw HTML, and open-ended CSS values", () => {
@@ -191,7 +205,7 @@ describe("closed Box and Text value grammar", () => {
       ["font-family", "'Custom Font'"],
       ["grid-template-columns", "subgrid<script>"],
       ["position", "expression(alert(1))"],
-      ["transform", "translateX(10px) rotate(20deg)"],
+      ["transform", "translateX(10px) rotate(20deg); display:none"],
       ["filter", "url(#remote-filter)"],
       ["z-index", "999999"],
     ]) expect(isSafeElementValue(property, value)).toBe(false);

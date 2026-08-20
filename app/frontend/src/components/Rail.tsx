@@ -52,7 +52,7 @@ const UPDATE_GLYPH_TONE: Partial<Record<UpdateStanding, string>> = {
 const NAV_ICONS: Partial<Record<Route, ReactNode>> = {
   components: <Icon id="nav.components" className="h-full w-full" />,
   assets: <Icon id="nav.assets" className="h-full w-full" />,
-  projects: <Icon id="nav.board" className="h-full w-full" />,
+  projects: <Icon id="nav.projects" className="h-full w-full" />,
   stm: <Icon id="nav.stm" className="h-full w-full" />,
   settings: <Icon id="nav.settings" className="h-full w-full" />,
 };
@@ -285,7 +285,7 @@ export function Rail() {
           }
         >
           <span aria-hidden className={RAIL_GLYPH}>
-            <Icon id="nav.settings" className="h-full w-full" />
+            <Icon id="nav.design-studio" className="h-full w-full" />
           </span>
           <span className={collapsed ? COLLAPSED_LABEL + " whitespace-nowrap" : ""}>
             {designStudioLabel}

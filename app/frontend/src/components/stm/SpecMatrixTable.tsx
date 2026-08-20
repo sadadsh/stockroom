@@ -6,7 +6,7 @@
  * smooth at all-family row counts. A row click emits the part upward (the seam the pinout map
  * consumes). The Part cell shows mpn_example, never the ref_name wildcard (Pitfall 1).
  */
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   type Column,
   type ColumnDef,
@@ -28,6 +28,7 @@ import type { McuSpecRow } from "../../api/types";
 import { SearchIcon } from "../icons";
 import { Text, useCopyFormatter, useText } from "../../lib/copy";
 import { useEscapeDismiss } from "../../lib/useEscapeDismiss";
+import { Icon } from "../Icon";
 
 // The peripheral columns TABLE-01 names (a representative count column each), read from
 // row.peripherals; NOT the full CubeMX peripheral set (the every-fact view is a deferred P2).
@@ -69,6 +70,12 @@ const PERIPH_WIDTH = 60;
 const MIN_COLUMN_WIDTH = 48;
 // How far one arrow press moves a column edge, in the same pixels the drag handle works in.
 const KEY_RESIZE_STEP = 16;
+const SCROLL_EDGE_EPSILON = 1;
+
+interface HorizontalOverflow {
+  left: boolean;
+  right: boolean;
+}
 
 interface Props {
   rows: McuSpecRow[];
@@ -83,6 +90,10 @@ export function SpecMatrixTable({ rows, activePart, onSelectPart }: Props) {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
   const [columnSizing, setColumnSizing] = useState<Record<string, number>>({});
+  const [horizontalOverflow, setHorizontalOverflow] = useState<HorizontalOverflow>({
+    left: false,
+    right: false,
+  });
   const allShownLabel = useCopyFormatter("stm.spec-matrix.all-shown", "All {total} parts shown");
   const matchCountLabel = useCopyFormatter(
     "stm.spec-matrix.match-count",
@@ -194,6 +205,18 @@ export function SpecMatrixTable({ rows, activePart, onSelectPart }: Props) {
 
 
   const scrollRef = useRef<HTMLDivElement>(null);
+  const updateHorizontalOverflow = useCallback(() => {
+    const node = scrollRef.current;
+    if (!node) return;
+    const maxScrollLeft = Math.max(0, node.scrollWidth - node.clientWidth);
+    const next = {
+      left: node.scrollLeft > SCROLL_EDGE_EPSILON,
+      right: maxScrollLeft - node.scrollLeft > SCROLL_EDGE_EPSILON,
+    };
+    setHorizontalOverflow((current) =>
+      current.left === next.left && current.right === next.right ? current : next,
+    );
+  }, []);
   const virtualizer = useVirtualizer({
     count: modelRows.length,
     getScrollElement: () => scrollRef.current,
@@ -223,6 +246,34 @@ export function SpecMatrixTable({ rows, activePart, onSelectPart }: Props) {
     [visibleColumns, columnSizing],
   );
 
+  // The browser's overlay scrollbar can disappear at rest, so measure the concealed columns and
+  // keep an explicit edge cue in sync with pointer, keyboard, resize, and column-visibility changes.
+  useEffect(() => {
+    const node = scrollRef.current;
+    if (!node) return;
+    updateHorizontalOverflow();
+    const observer =
+      typeof ResizeObserver === "undefined" ? null : new ResizeObserver(updateHorizontalOverflow);
+    observer?.observe(node);
+    window.addEventListener("resize", updateHorizontalOverflow);
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener("resize", updateHorizontalOverflow);
+    };
+  }, [columnSizing, columnVisibility, updateHorizontalOverflow]);
+
+  const overflowPosition = !horizontalOverflow.left && !horizontalOverflow.right
+    ? "none"
+    : horizontalOverflow.left && horizontalOverflow.right
+      ? "middle"
+      : horizontalOverflow.left
+        ? "end"
+        : "start";
+  const matrixScrollLabel = useText(
+    "stm.spec-matrix.scroll.aria",
+    "STM32 specification matrix. Scroll across for more columns.",
+  );
+
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <MatrixToolbar
@@ -237,11 +288,19 @@ export function SpecMatrixTable({ rows, activePart, onSelectPart }: Props) {
 
       {/* the scroll container: header + filter row + virtualized body all share the grid */}
       <div
-        ref={scrollRef}
-        data-testid="spec-matrix-scroll"
-        className="min-h-0 flex-1 overflow-auto rounded-card border border-line bg-raise"
+        data-horizontal-overflow={overflowPosition}
+        className="relative min-h-0 flex-1"
       >
-        <div className="min-w-max">
+        <div
+          ref={scrollRef}
+          role="region"
+          aria-label={matrixScrollLabel}
+          tabIndex={0}
+          onScroll={updateHorizontalOverflow}
+          data-testid="spec-matrix-scroll"
+          className="stm-spec-matrix-scroll h-full min-h-0 overflow-auto rounded-card border border-line bg-raise outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-focus"
+        >
+          <div className="min-w-max">
           <MatrixHeaderRow table={table} gridStyle={gridStyle} />
 
           {/* the per-column filter row, revealed on demand (dense, not noisy) */}
@@ -285,7 +344,7 @@ export function SpecMatrixTable({ rows, activePart, onSelectPart }: Props) {
                       transform: `translateY(${vi.start}px)`,
                     }}
                     className={
-                      "items-center border-b border-line/60 text-left transition-colors " +
+                      "stm-spec-matrix-row items-center text-left transition-colors " +
                       (selected ? "bg-acc-soft" : "hover:bg-[var(--c-hover)]")
                     }
                   >
@@ -320,8 +379,32 @@ export function SpecMatrixTable({ rows, activePart, onSelectPart }: Props) {
                   })}
             </div>
           ) : null}
+          </div>
         </div>
+        {horizontalOverflow.left ? <MatrixOverflowCue side="left" /> : null}
+        {horizontalOverflow.right ? <MatrixOverflowCue side="right" /> : null}
       </div>
+    </div>
+  );
+}
+
+function MatrixOverflowCue({ side }: { side: "left" | "right" }) {
+  return (
+    <div
+      aria-hidden="true"
+      data-testid={`spec-matrix-overflow-${side}`}
+      className={
+        "pointer-events-none absolute top-0 z-[3] flex h-8 items-center gap-1 bg-[var(--c-sticky)] px-1.5 text-2xs font-medium text-t2 shadow-card " +
+        (side === "left" ? "left-0" : "right-0")
+      }
+    >
+      {side === "left" ? <Icon id="navigation.chevron-left" className="h-3 w-3" /> : null}
+      {side === "left" ? (
+        <Text id="stm.spec-matrix.overflow-left">Earlier columns</Text>
+      ) : (
+        <Text id="stm.spec-matrix.overflow-right">More columns</Text>
+      )}
+      {side === "right" ? <Icon id="overlay.chevron" className="h-3 w-3" /> : null}
     </div>
   );
 }
@@ -394,7 +477,11 @@ function MatrixHeaderRow({
                   {flexRender(header.column.columnDef.header, header.getContext())}
                 </span>
                 <span className="w-2 flex-none text-t2">
-                  {sorted === "asc" ? "↑" : sorted === "desc" ? "↓" : ""}
+                  {sorted === "asc" ? (
+                    <Icon id="action.sort-asc" className="h-3 w-3" />
+                  ) : sorted === "desc" ? (
+                    <Icon id="action.sort-desc" className="h-3 w-3" />
+                  ) : null}
                 </span>
               </button>
               {/* The drag handle: a hairline that widens on hover; double-click resets. It is
@@ -460,7 +547,7 @@ function MatrixToolbar({
   return (
     <div className="mb-2.5 flex items-center gap-2.5">
       <div className="flex h-8 min-w-0 flex-1 items-center gap-2 rounded-control bg-field pl-2.5 pr-2">
-        <SearchIcon className="flex-none text-t3" />
+        <SearchIcon className="h-3.5 w-3.5 flex-none text-t3" />
         <input
           value={globalFilter}
           onChange={(e) => onGlobalFilter(e.target.value)}

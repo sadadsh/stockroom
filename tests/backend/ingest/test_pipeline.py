@@ -311,7 +311,7 @@ def test_second_add_only_adds_to_target_lib(tmp_path, fixtures_dir):
 
     z2 = make_vendor_zip(tmp_path / "b.zip", "snapeda", fixtures_dir)
     [c2] = pipe.inspect(inputs=[z2], workdir=tmp_path / "w2")
-    c2.category = "ICs"; c2.entry_name = "SECOND"; _complete(c2)
+    c2.category = "ICs"; c2.entry_name = "SECOND"; c2.mpn = "LM358DR"; _complete(c2)
     _materialize_legacy_fixture(pipe, c2)
     after_second = sym_path.read_text(encoding="utf-8")
 

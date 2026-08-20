@@ -40,6 +40,9 @@ import {
 } from "./devModeHistory";
 import { useDevModeSave } from "./devModeSave";
 import { useDevModeSelection } from "./devModeSelection";
+import type { ExactDesignTargetAuthority } from "./designIdentity";
+import { isRootProtectedDesignProperty } from "./designIdentity";
+import { elementsForTargetDomainOverride } from "../design-studio/targetDomains";
 import { useDevModeToggle } from "./devModeToggle";
 
 export type StudioMode = "preview" | "edit";
@@ -121,6 +124,8 @@ export interface DevModeContextValue {
   // by an inspect-click, a catalogue click, or a Show IDs read; null means "no selection".
   selectedDevId: string | null;
   selectDevId: (id: string | null) => void;
+  selectedTarget: ExactDesignTargetAuthority | null;
+  selectTarget: (element: Element | null) => void;
   // Pointing mode: while on, the Inspector hover-highlights the closest [data-dev-id] and a click
   // selects it and is swallowed (never fires the app / copy layer). Off is zero behaviour change.
   inspect: boolean;
@@ -221,6 +226,8 @@ const DEFAULT: DevModeContextValue = {
   clearSelectedCopy: noop,
   selectedDevId: null,
   selectDevId: noop,
+  selectedTarget: null,
+  selectTarget: noop,
   inspect: false,
   toggleInspect: noop,
   studioMode: "preview",
@@ -284,12 +291,18 @@ export function DevModeProvider({ children }: { children: ReactNode }) {
     resetDraft();
     clearSelectedCopy();
   }, [resetDraft, clearSelectedCopy]);
+  const setElementProp = useCallback((id: string, property: string, value: string) => {
+    const targets = elementsForTargetDomainOverride(id);
+    if (targets.some((element) => isRootProtectedDesignProperty(element, property))) return;
+    draftApi.setElementProp(id, property, value);
+  }, [draftApi]);
 
   const value = useMemo<DevModeContextValue>(
     () => ({
       ...toggleApi,
       theme,
       ...draftApi,
+      setElementProp,
       ...historyApi,
       ...selectionApi,
       ...saveApi,
@@ -307,6 +320,7 @@ export function DevModeProvider({ children }: { children: ReactNode }) {
       toggleApi,
       theme,
       draftApi,
+      setElementProp,
       historyApi,
       // The undo/redo stacks are refs, so a push or pop alone does not re-render. This counter is
       // what makes Undo/Redo enable immediately after a ref-only stack mutation.

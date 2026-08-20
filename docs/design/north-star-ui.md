@@ -1,10 +1,8 @@
 # North-Star UI — the finished app (one page, owner-approved direction)
 
-**Status:** the definitive end-state every rebuild aims at. Consolidates every owner
-request to date (ledger: feel + IA are first-class; zero feature omission; everything
-ties together; strip-and-rebuild authority). Execution plan/phases live in
-`docs/work plans/specs/2026-07-09-ui-convergence-design.md` — this doc is the
-*destination*, kept short so it stays true.
+**Status:** historical visual direction retained for context. The current product and
+interaction authority is [Stockroom Reliability And Design Freedom Decisions](Stockroom%20Reliability%20And%20Design%20Freedom%20Decisions.md); that decision record supersedes the
+dated working plan that originally accompanied this page.
 
 ## The one-sentence product
 A **KiCad workshop instrument**: one styled window where every object you care about —

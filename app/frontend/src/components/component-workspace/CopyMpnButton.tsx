@@ -70,7 +70,7 @@ export function CopyMpnButton({ mpn }: { mpn: string }) {
           className="inline-flex h-3.5 w-3.5 flex-none items-center justify-center"
         >
           {copied ? (
-            <Icon id="modal.check" className="h-3.5 w-3.5 text-ok" />
+            <Icon id="overlay.check" className="h-3.5 w-3.5 text-ok" />
           ) : (
             <DuplicateIcon className="h-3.5 w-3.5" />
           )}

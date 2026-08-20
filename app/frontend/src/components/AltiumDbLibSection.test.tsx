@@ -105,21 +105,20 @@ describe("AltiumDbLibSection", () => {
     expect(
       screen.getByText(/opening Stockroom never launches Altium/i),
     ).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Rebuild DbLib/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Rebuild DbLib/ })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Set Up In Altium/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /View Catalog/ })).toBeInTheDocument();
   });
 
-  it("regenerates and reports how many parts landed", async () => {
-    mockApi.altiumStatus.mockResolvedValue(STATUS);
-    mockApi.altiumRegenerate.mockResolvedValue({ emitted: 3, skipped: ["b"], dblib: STATUS.dblib });
+  it("keeps Catalog Build and 3D embedding out of Settings", async () => {
+    mockApi.altiumStatus.mockResolvedValue({ ...STATUS, datasource_present: false });
+    mockApi.altiumModelsPending.mockResolvedValue({ pending: ["a"], count: 1 });
     renderSection();
 
-    await screen.findByText("3");
-    await userEvent.click(screen.getByRole("button", { name: /Rebuild DbLib/ }));
-
-    await waitFor(() => expect(mockApi.altiumRegenerate).toHaveBeenCalledTimes(1));
-    expect(await screen.findByText(/Regenerated the DbLib with 3 parts\./)).toBeInTheDocument();
+    await screen.findByText(/parts prepared to place/);
+    expect(screen.queryByRole("button", { name: /Rebuild DbLib/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Embed 3D Models/ })).not.toBeInTheDocument();
+    expect(screen.getByText(/Assets.*Build Now/i)).toBeInTheDocument();
   });
 
   it("opens the library viewer modal", async () => {
@@ -264,72 +263,5 @@ describe("AltiumDbLibSection", () => {
     renderSection();
     await screen.findByText(/parts prepared to place/);
     expect(screen.queryByTestId("altium-datasource-missing")).toBeNull();
-  });
-});
-
-// --- Embed 3D Models: one action for a whole library (owner's deadline ask, "no work on my end").
-
-describe("AltiumDbLibSection / Embed 3D Models", () => {
-  beforeEach(() => {
-    mockApi.altiumOdbcStatus.mockResolvedValue(odbc(null));
-    mockApi.altiumStatus.mockResolvedValue(STATUS);
-    mockApi.altiumEmbedCapability.mockResolvedValue({
-      installed: true,
-      binary: "C:/Altium/X2.EXE",
-      requires_tool_installed: true,
-      reason: "",
-      busy: "",
-      available: true,
-    });
-  });
-
-  it("is absent when nothing is pending, rather than offering a no-op", async () => {
-    mockApi.altiumModelsPending.mockResolvedValue({ pending: [], count: 0 });
-    renderSection();
-
-    expect(await screen.findByRole("button", { name: /Rebuild DbLib/ })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Embed 3D Models/ })).not.toBeInTheDocument();
-  });
-
-  it("states the number of parts it will actually work on", async () => {
-    mockApi.altiumModelsPending.mockResolvedValue({ pending: ["a", "b", "c"], count: 3 });
-    renderSection();
-
-    expect(
-      await screen.findByRole("button", { name: /Embed 3D Models \(3\)/ }),
-    ).toBeInTheDocument();
-  });
-
-  it("is disabled WITH the reason when Altium is holding its license seat", async () => {
-    // The whole point of the capability probe: a button that silently does nothing is worse than
-    // one that says why it cannot.
-    mockApi.altiumModelsPending.mockResolvedValue({ pending: ["a"], count: 1 });
-    mockApi.altiumEmbedCapability.mockResolvedValue({
-      installed: true,
-      binary: "C:/Altium/X2.EXE",
-      requires_tool_installed: true,
-      reason: "",
-      busy: "Stockroom.DbLib - Altium Designer",
-      available: false,
-    });
-    renderSection();
-
-    const button = await screen.findByRole("button", { name: /Embed 3D Models/ });
-    expect(button).toBeDisabled();
-    expect(button).toHaveAttribute("title", expect.stringContaining("Close Altium first"));
-  });
-
-  it("starts the bulk run when pressed", async () => {
-    // Deliberately narrow, and named for what it checks. The outcome toast is driven by the SSE
-    // job stream, which this harness does not run; asserting on it here would be a test that
-    // cannot fail. The toast wording is covered by the API-level report contract in
-    // tests/backend/api/test_altium.py.
-    mockApi.altiumModelsPending.mockResolvedValue({ pending: ["a", "b"], count: 2 });
-    mockApi.altiumEmbedModels.mockResolvedValue({ job_id: "job-1" });
-    renderSection();
-
-    await userEvent.click(await screen.findByRole("button", { name: /Embed 3D Models \(2\)/ }));
-
-    await waitFor(() => expect(mockApi.altiumEmbedModels).toHaveBeenCalledWith(undefined));
   });
 });

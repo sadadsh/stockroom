@@ -1,18 +1,17 @@
-"""Pull each source's RAW payload into `sourced/`, then re-derive. Nothing else.
+"""Pull each source's raw payload into `sourced/`, then re-derive.
 
-This is the wave-2 importer of `docs/progress/rebuild-plan.json`, and its job is narrow on purpose:
+The importer has one narrow responsibility:
 
     for each part that needs evidence:
         for each usable source, in priority order:
             fetch the complete JSON   -> write every JSON value under sourced/<id>/<source>.json
         re-derive the derived block   -> by CALLING stockroom.derive.engine, never re-deriving here
 
-It contains NO derivation logic. That is the point of the plan step *"Calls the existing derive
-engine, does not write a second one"*: two derivations that drift is how the frontend ended up
-reading fields the backend had renamed.
+It contains no derivation logic. Calling the canonical derive engine prevents a second derivation
+path from drifting away from the frontend's data contract.
 
-THE OUTCOME MODEL, and why DEFERRED is not a kind of failure. A part whose fetch was refused for
-QUOTA reasons has nothing wrong with it - the answer simply has not been collected yet, and the
+The outcome model distinguishes incomplete collection from failure. A part whose fetch was refused
+for quota reasons has nothing wrong with it: the answer simply has not been collected yet, and the
 right response is to come back later. Recording that as FAILED would (a) put a permanent red mark
 on a healthy part and (b) make "how much of the library is imported" unanswerable, because a
 retryable gap and a real problem would be the same number. So:
@@ -24,15 +23,14 @@ retryable gap and a real problem would be the same number. So:
                re-run cheap and the whole pass resumable).
     FAILED     something genuinely went wrong writing or deriving. Rare and loud.
 
-RESUMABILITY has no checkpoint file, deliberately. The worklist is derived from LIBRARY STATE - a
+Resumability has no checkpoint file. The worklist is derived from library state: a
 part needs a source if `sourced/<id>/<source>.json` is absent - so killing the process and starting
 again resumes exactly where it stopped, with no state to go stale and no state to corrupt. A
 checkpoint file is a second source of truth about what has been imported, and the tree is already
 the first one.
 
-IT NEVER WRITES A RECORD IN --dry-run. Anything that acts on the world gets a dry run before it
-acts (owner's standing rule), and for a pass that mutates a git-backed library of the owner's real
-158 parts that is not optional.
+It never writes a record in `--dry-run`. A write pass can mutate a Git-backed library and spend
+provider quota, so it requires an explicit apply action.
 """
 
 from __future__ import annotations

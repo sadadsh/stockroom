@@ -725,6 +725,7 @@ class DigiKeyAdapter:
         # out-of-band signal for the rescan circuit breaker (Phase-1b-2b); never affects the
         # returned EnrichmentResult, which stays exactly what it is today on every path.
         self.last_status: str = ""
+        self.last_payload: dict | None = None
 
     @property
     def enabled(self) -> bool:
@@ -753,6 +754,7 @@ class DigiKeyAdapter:
         return body if found else None
 
     def lookup(self, mpn: str) -> EnrichmentResult:
+        self.last_payload = None
         if not self.enabled or not mpn or self._requester is None:
             return EnrichmentResult()
         try:
@@ -762,4 +764,6 @@ class DigiKeyAdapter:
             return EnrichmentResult()  # a failed API call must not break enrichment
         result = parse_digikey_payload(body, mpn)
         self.last_status = "ok" if result.filled_fields() else "not_found"
+        if self.last_status == "ok" and isinstance(body, dict):
+            self.last_payload = body
         return result

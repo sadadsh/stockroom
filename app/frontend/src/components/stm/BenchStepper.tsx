@@ -76,7 +76,7 @@ export function BenchStepper({
       </label>
       <Button
         small
-        icon={<Icon id="nav.back" className="h-3.5 w-3.5 rotate-180" />}
+        icon={<Icon id="nav.forward" className="h-3.5 w-3.5" />}
         onClick={() => onStepBy(1)}
         aria-label={nextSetLabel}
       />
@@ -200,4 +200,3 @@ function ExportMenu({
     </details>
   );
 }
-

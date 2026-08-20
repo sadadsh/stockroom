@@ -29,7 +29,10 @@ export default function App() {
       </main>
     );
   }
-  if (onboarding.isError || !onboarding.data) {
+  // A cold read failure cannot prove setup and remains fatal. Once a validated ready response is
+  // cached, however, a revalidation failure belongs to the owning surface; replacing the whole
+  // running app would discard the last known-good setup state and hide that local recovery UI.
+  if (!onboarding.data) {
     return (
       <main data-dev-id="onboarding.setup-error" className="flex min-h-screen items-center justify-center bg-app p-6">
         <ErrorState id="app.setup.error">Stockroom could not check setup. Reconnect, then restart Stockroom.</ErrorState>

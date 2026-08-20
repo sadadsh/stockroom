@@ -731,10 +731,16 @@ _GRID_TRACK_RE = re.compile(
     r"(?:\s+(?:minmax\(0,\s*1fr\)|1fr|auto|(?:\d+|\d*\.\d+)(?:px|rem|em|%))){0,11})$"
 )
 _Z_INDEX_RE = re.compile(r"^(?:auto|-?\d{1,4})$")
+_TRANSFORM_NUMBER = r"-?(?:\d+|\d*\.\d+)"
+_TRANSFORM_FUNCTION = (
+    rf"(?:matrix\({_TRANSFORM_NUMBER}(?:,\s*{_TRANSFORM_NUMBER}){{5}}\)|"
+    r"translate\(-?(?:\d+|\d*\.\d+)(?:px|rem|em|%),\s*-?(?:\d+|\d*\.\d+)(?:px|rem|em|%)\)|"
+    r"translate[XY]\(-?(?:\d+|\d*\.\d+)(?:px|rem|em|%)\)|"
+    r"scale\((?:\d+|\d*\.\d+)(?:,\s*(?:\d+|\d*\.\d+))?\)|"
+    r"rotate\(-?(?:\d+|\d*\.\d+)deg\))"
+)
 _TRANSFORM_RE = re.compile(
-    r"^(?:none|translate\(-?(?:\d+|\d*\.\d+)(?:px|rem|em|%),\s*-?(?:\d+|\d*\.\d+)(?:px|rem|em|%)\)|"
-    r"translate[XY]\(-?(?:\d+|\d*\.\d+)(?:px|rem|em|%)\)|scale\((?:\d+|\d*\.\d+)(?:,\s*(?:\d+|\d*\.\d+))?\)|"
-    r"rotate\(-?(?:\d+|\d*\.\d+)deg\))$"
+    rf"^(?:none|{_TRANSFORM_FUNCTION}(?:\s+{_TRANSFORM_FUNCTION})*)$"
 )
 _FILTER_RE = re.compile(
     r"^(?:none|blur\((?:\d+|\d*\.\d+)(?:px|rem|em)\)|"

@@ -228,6 +228,47 @@ def test_commit_lands_a_file_less_candidate_from_a_pulled_link(client):
     assert detail["assets"] == {}
 
 
+def test_commit_returns_typed_conflict_for_a_normalized_existing_mpn(client):
+    def candidate(mpn: str) -> dict:
+        return {
+            "vendor": "Mouser",
+            "symbol_lib_path": None,
+            "symbol_name": "",
+            "footprint_variants": [],
+            "chosen_footprint_index": 0,
+            "model_path": None,
+            "datasheet_path": None,
+            "category": "ICs",
+            "mpn": mpn,
+            "display_name": mpn,
+            "entry_name": "",
+            "manufacturer": "Acme",
+            "description": "interface controller",
+            "purchase": [{"vendor": "Mouser", "url": "https://www.mouser.com/x"}],
+            "provenance": {
+                "source": "mouser",
+                "source_url": "https://example.com/acme.pdf",
+                "original_zip_sha256": "",
+                "ingested_at": "",
+            },
+            "gaps": [],
+        }
+
+    created = client.post("/api/ingest/commit", json=candidate("ABC-123"))
+    assert created.status_code == 200, created.text
+
+    conflict = client.post("/api/ingest/commit", json=candidate("ABC.123"))
+
+    assert conflict.status_code == 409
+    assert conflict.json() == {
+        "error": "MpnConflictError",
+        "detail": "MPN 'ABC.123' already exists as 'ABC-123'",
+        "code": "mpn_conflict",
+        "existing_part_id": created.json()["id"],
+        "existing_mpn": "ABC-123",
+    }
+
+
 def test_the_add_lane_carries_vendor_disagreements_all_the_way_to_the_record():
     """A part ADDED must keep the competing vendor answers, exactly as a REFRESHED one does.
 
@@ -364,3 +405,61 @@ def test_a_part_committed_through_the_api_has_the_disagreements_in_its_RECORD(cl
     )
     assert [a["source"] for a in alts["Tolerance"]] == ["mouser", "digikey"]
     assert (on_disk.get("enrichment") or {}).get("Tolerance", {}).get("source") == "mouser"
+
+
+def test_commit_api_rejects_part_a_payload_submitted_as_part_b(client):
+    before = client.get("/api/library/parts").json()["count"]
+    response = client.post("/api/ingest/commit", json={
+        "vendor": "Mouser",
+        "symbol_lib_path": None,
+        "symbol_name": "",
+        "footprint_variants": [],
+        "chosen_footprint_index": 0,
+        "model_path": None,
+        "datasheet_path": None,
+        "category": "ICs",
+        "mpn": "PART-B",
+        "display_name": "PART-B",
+        "entry_name": "",
+        "manufacturer": "Acme",
+        "description": "Evidence mismatch test",
+        "tags": [],
+        "gaps": [],
+        "purchase": [{
+            "vendor": "Mouser",
+            "url": "https://www.mouser.com/part-b",
+            "part_number": "PART-B",
+            "price_breaks": [],
+            "stock": 1,
+            "currency": "USD",
+            "fetched_at": "",
+        }],
+        "provenance": {
+            "source": "mouser",
+            "source_url": "https://example.com/part-b.pdf",
+            "original_zip_sha256": "",
+            "ingested_at": "",
+        },
+        "specs": {},
+        "enrichment": {},
+        "alternates": {},
+        "catalog": {},
+        "official_payloads": {
+            "mouser": {
+                "SearchResults": {"Parts": [{"ManufacturerPartNumber": "PART-A"}]},
+            },
+        },
+        "official_evidence": {
+            "mouser": {
+                "provider": "mouser",
+                "queried_mpn": "PART-B",
+                "canonical_mpn": "PART-B",
+                "selected_values": {"mpn": "PART-B"},
+            },
+        },
+    })
+
+    assert response.status_code == 400
+    assert "PART-A" in response.json()["detail"]
+    assert "PART-B" in response.json()["detail"]
+    assert client.get("/api/library/parts").json()["count"] == before

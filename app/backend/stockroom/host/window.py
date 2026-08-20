@@ -117,6 +117,18 @@ def _finite_number(value: object) -> TypeGuard[int | float]:
     return type(value) in (int, float) and math.isfinite(cast(int | float, value))
 
 
+def _provider_viewport_identity(
+    value: tuple[object, object, object, object],
+) -> TypeGuard[tuple[str, str, str, str]]:
+    return all(
+        type(item) is str
+        and bool(item)
+        and item == item.strip()
+        and len(item) <= 256
+        for item in value
+    )
+
+
 def _place_provider_window_over_client(
     app,
     provider: _ProviderWindow,
@@ -322,6 +334,9 @@ class InAppProviderBrowserSurface:
         self._active_show: Callable[[], None] | None = None
         self._active_provider_window: _ProviderWindow | None = None
         self._active_component_id: str | None = None
+        self._active_viewport_identity: tuple[str, str, str, str] | None = None
+        self._lease_browser_owner_id: str | None = None
+        self._lease_provider_id: str | None = None
         self._last_provider_viewport: dict[str, object] | None = None
         self._provider_visible = False
         _PROVIDER_SURFACE = self
@@ -331,6 +346,9 @@ class InAppProviderBrowserSurface:
 
         if type(viewport) is not dict or set(viewport) != {
             "componentId",
+            "providerId",
+            "routeId",
+            "sessionId",
             "visible",
             "x",
             "y",
@@ -338,47 +356,66 @@ class InAppProviderBrowserSurface:
             "height",
         }:
             return False
-        component_id = viewport["componentId"]
+        identity = (
+            viewport["componentId"],
+            viewport["providerId"],
+            viewport["routeId"],
+            viewport["sessionId"],
+        )
         visible = viewport["visible"]
         values = tuple(viewport[key] for key in ("x", "y", "width", "height"))
         if (
-            type(component_id) is not str
-            or not component_id
+            not _provider_viewport_identity(identity)
             or type(visible) is not bool
             or any(not _finite_number(value) for value in values)
         ):
             return False
+        component_id, provider_id, route_id, session_id = identity
         provider = self._active_provider_window
         app = active_window()
         if not visible:
+            if (
+                self._active_viewport_identity is not None
+                and identity != self._active_viewport_identity
+            ):
+                return False
             self._last_provider_viewport = None
             if provider is not None:
                 provider.hide()
-            else:
-                # A measured pane can disappear before any native lease opens. Do not let that
-                # abandoned pre-lease component identity reject the next component's viewport.
+            if provider is None or self._active_show is None:
+                # A direct or measured pane can disappear before any task-bound lease opens. Do
+                # not let that abandoned component identity reject the next component's viewport.
                 self._active_component_id = None
+                self._active_viewport_identity = None
             self._provider_visible = False
             return True
         numeric_values = cast(tuple[int | float, int | float, int | float, int | float], values)
         x, y, width, height = (float(value) for value in numeric_values)
         if x < 0 or y < 0 or width < 320 or height < 240 or app is None:
             return False
-        if self._active_component_id is None:
-            self._active_component_id = component_id
-        if component_id != self._active_component_id:
+        if self._active_viewport_identity is not None and identity != self._active_viewport_identity:
             self._last_provider_viewport = None
             if provider is not None:
                 provider.hide()
             self._provider_visible = False
-            return False
+        self._active_component_id = component_id
+        self._active_viewport_identity = identity
         if self._provider_visible and self._last_provider_viewport == viewport:
             return True
         self._last_provider_viewport = dict(viewport)
         # React often measures and publishes the pane before the durable capture worker has
         # acquired its native provider lease. Retaining that valid rectangle is success: the
         # lease's first show/navigation applies it once the provider WebView exists.
-        if provider is None:
+        lease_provider_matches = (
+            provider_id == self._lease_provider_id
+            or route_id == self._lease_provider_id
+            or route_id == f"manual:{self._lease_provider_id}"
+        )
+        if (
+            provider is None
+            or component_id != self._lease_browser_owner_id
+            or not lease_provider_matches
+        ):
             return True
         return self._apply_provider_viewport(viewport)
 
@@ -414,6 +451,31 @@ class InAppProviderBrowserSurface:
         viewport = self._last_provider_viewport
         return bool(viewport and self._apply_provider_viewport(viewport))
 
+    def request_close_from_native(self) -> bool:
+        """Ask the loopback renderer to close the exact focused provider session."""
+
+        identity = self._active_viewport_identity
+        app = active_window()
+        if identity is None or app is None or not self._provider_visible:
+            return False
+        component_id, provider_id, route_id, session_id = identity
+        detail = json.dumps(
+            {
+                "componentId": component_id,
+                "providerId": provider_id,
+                "routeId": route_id,
+                "sessionId": session_id,
+            },
+            ensure_ascii=True,
+        )
+        app.evaluate_js(
+            "window.dispatchEvent(new CustomEvent("
+            "'stockroom:provider-close-requested', { detail: "
+            + detail
+            + " }));"
+        )
+        return True
+
     def provider_command(self, request: dict[str, object]) -> bool:
         """Apply one allowlisted browser command to the active provider document."""
 
@@ -424,24 +486,44 @@ class InAppProviderBrowserSurface:
             return False
         command_name = command
         expected = (
-            {"componentId", "command", "url"}
+            {"componentId", "providerId", "routeId", "sessionId", "command", "url"}
             if command_name == "navigate"
-            else {"componentId", "command"}
+            else {"componentId", "providerId", "routeId", "sessionId", "command"}
         )
         if set(request) != expected:
             return False
         component_id = request["componentId"]
+        identity = tuple(
+            request[key] for key in ("componentId", "providerId", "routeId", "sessionId")
+        )
         provider = self._active_provider_window
         if (
             type(component_id) is not str
-            or component_id != self._active_component_id
+            or identity != self._active_viewport_identity
             or command_name not in {"back", "forward", "reload", "close", "navigate"}
-            or provider is None
+        ):
+            return False
+        if provider is None:
+            # Provider pages are opened only by a task-bound adapter or manual broker lease.
+            # A renderer command can operate that lease, never create an unobserved browser.
+            return False
+        provider_id = request["providerId"]
+        route_id = request["routeId"]
+        if (
+            self._lease_browser_owner_id != component_id
+            or not (
+                provider_id == self._lease_provider_id
+                or route_id == self._lease_provider_id
+                or route_id == f"manual:{self._lease_provider_id}"
+            )
         ):
             return False
         if command_name == "close":
             provider.hide()
             self._provider_visible = False
+            if self._active_show is None:
+                self._active_component_id = None
+                self._last_provider_viewport = None
             return True
         if command_name == "navigate":
             target = request["url"]
@@ -456,6 +538,7 @@ class InAppProviderBrowserSurface:
             ):
                 return False
             provider.load_url(target)
+            self.reapply_provider_viewport()
             return True
         script = {
             "back": "history.back()",
@@ -504,7 +587,7 @@ class InAppProviderBrowserSurface:
     ):
         """Yield one observed provider lease and always hide its native surface afterward."""
 
-        del component_id, manufacturer, mpn, provider_id
+        del manufacturer, mpn
         with self._lock:
             if active_window() is None:
                 raise RuntimeError("the Stockroom provider browser is not ready")
@@ -518,6 +601,8 @@ class InAppProviderBrowserSurface:
                 author=download_author,
             )
             self._active_provider_window = window
+            self._lease_browser_owner_id = component_id
+            self._lease_provider_id = provider_id
 
             chrome = window_chrome()
 
@@ -691,8 +776,12 @@ class InAppProviderBrowserSurface:
             finally:
                 self._active_show = None
                 self._active_provider_window = None
-                self._active_component_id = None
-                self._last_provider_viewport = None
+                self._lease_browser_owner_id = None
+                self._lease_provider_id = None
+                if self._active_component_id == component_id:
+                    self._active_component_id = None
+                    self._active_viewport_identity = None
+                    self._last_provider_viewport = None
                 self._provider_visible = False
                 _cancel_native_webview_downloads()
                 try:
@@ -1620,8 +1709,30 @@ def _install_silent_webview2_download_handler(
                 event_args.SavesInProfile = False
 
         permission_event += on_permission_requested
+        accelerator_event = getattr(sender.CoreWebView2, "AcceleratorKeyPressed", None)
+
+        def on_accelerator_key(_core, event_args) -> None:
+            kind = str(getattr(event_args, "KeyEventKind", "")).casefold()
+            key = getattr(event_args, "VirtualKey", None)
+            with _NATIVE_DOWNLOAD_GUARD:
+                author = _NATIVE_DOWNLOAD_AUTHOR
+                task_bound = _NATIVE_DOWNLOAD_LEASE is not None and author is self
+            surface = _PROVIDER_SURFACE
+            request_close = getattr(surface, "request_close_from_native", None)
+            if (
+                task_bound
+                and "keydown" in kind
+                and key == 0x1B
+                and callable(request_close)
+                and request_close()
+            ):
+                event_args.Handled = True
+
+        if accelerator_event is not None:
+            accelerator_event += on_accelerator_key
         # pythonnet event delegates must remain strongly referenced for the life of the WebView.
         self._stockroom_provider_permission_handler = on_permission_requested
+        self._stockroom_provider_accelerator_handler = on_accelerator_key
 
     def on_download_starting(self, sender, args) -> None:
         with _NATIVE_DOWNLOAD_GUARD:

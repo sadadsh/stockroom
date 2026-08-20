@@ -52,6 +52,7 @@ from stockroom.dossier.vocabulary import (
 )
 from stockroom.enrich.schema import SOURCE_STATES
 from stockroom.model.asset import ASSET_KINDS
+from stockroom.model.part import REQUIRED_FIELDS
 from stockroom.provider_coverage import provider_coverage
 
 # The identity fields a part cannot be completed without. Separate from the category schema on
@@ -67,7 +68,12 @@ def _text(value: object) -> str:
     return "" if value is None else str(value)
 
 
-def _identity(record, schema: CategorySchema, specifications: Specifications) -> dict[str, Any]:
+def _identity(
+    record,
+    schema: CategorySchema,
+    specifications: Specifications,
+    identity_values: Mapping[str, str],
+) -> dict[str, Any]:
     by_key = {item["key"]: item for item in specifications.records}
     package = (by_key.get("package") or {}).get("displayValue") or ""
     pin_count = (by_key.get("pin_count") or {}).get("normalizedValue")
@@ -75,8 +81,8 @@ def _identity(record, schema: CategorySchema, specifications: Specifications) ->
     return {
         "id": record.id,
         "displayName": record.display_name or record.mpn or record.id,
-        "mpn": record.mpn,
-        "manufacturer": record.manufacturer,
+        "mpn": identity_values["mpn"],
+        "manufacturer": identity_values["manufacturer"],
         "category": record.category,
         "categorySchema": {
             "key": schema.key,
@@ -94,11 +100,15 @@ def _identity(record, schema: CategorySchema, specifications: Specifications) ->
     }
 
 
-def _attention(record, specifications: Specifications) -> list[dict[str, Any]]:
+def _attention(
+    record,
+    specifications: Specifications,
+    identity_values: Mapping[str, str],
+) -> list[dict[str, Any]]:
     """Only unresolved, actionable problems. Every item names what to do about it."""
     items: list[dict[str, Any]] = []
     for field_name, label in _BLOCKING_IDENTITY:
-        if not getattr(record, field_name, ""):
+        if not identity_values[field_name]:
             items.append(
                 {
                     "id": f"identity.{field_name}",
@@ -162,23 +172,39 @@ def _attention(record, specifications: Specifications) -> list[dict[str, Any]]:
 
 
 def _quality_summary(
-    record, schema: CategorySchema, specifications: Specifications
+    record,
+    schema: CategorySchema,
+    specifications: Specifications,
+    identity_values: Mapping[str, str],
 ) -> dict[str, Any]:
     counts = dict.fromkeys(VERIFICATION_STATES, 0)
     for item in specifications.records:
         if item["preferredValue"] is None:
             continue
         counts[item["verificationState"]] += 1
-    attention = _attention(record, specifications)
+    attention = _attention(record, specifications, identity_values)
+    missing_passport_fields = set(record.missing_fields())
+    passport_labels = {
+        "mpn": "MPN",
+        "manufacturer": "manufacturer",
+        "description": "value/description",
+    }
+    for key, label in passport_labels.items():
+        if identity_values[key]:
+            missing_passport_fields.discard(label)
+        else:
+            missing_passport_fields.add(label)
     return {
-        "description": record.description,
+        "description": identity_values["description"],
         "completeness": dict(specifications.completeness),
         "stateCounts": counts,
         "attention": attention,
         "blockingCount": sum(1 for item in attention if item["severity"] == "blocking"),
         # The passport gate, which is about identity and sourcing and is deliberately NOT the
         # category completeness above: a part enters the library on its identity alone.
-        "missingPassportFields": record.missing_fields(),
+        "missingPassportFields": [
+            label for _, label in REQUIRED_FIELDS if label in missing_passport_fields
+        ],
     }
 
 
@@ -222,6 +248,21 @@ def _record_fields(record, specifications: Specifications) -> list[dict[str, Any
         label = _RECORD_FIELD_LABELS.get(key) or humanize(key)
         out.append(record_field(record, key, label, value))
     return out
+
+
+def _identity_values(record, record_fields: list[dict[str, Any]]) -> dict[str, str]:
+    """Identity facts safe to present, while unattributed legacy values stay readable."""
+    values = {
+        key: _text(getattr(record, key, ""))
+        for key, _ in _BLOCKING_IDENTITY
+    }
+    for item in record_fields:
+        key = str(item.get("key") or "")
+        if key in values:
+            # A sourced field participates in authority. Discovery-only evidence remains in
+            # provenance but cannot leak back through the record's denormalized scalar value.
+            values[key] = _text(item.get("preferredValue"))
+    return values
 
 
 def _entry_state(entry) -> str:
@@ -327,6 +368,7 @@ def component_dossier(
         if rows:
             specification_groups.append({**group, "specifications": rows, "count": len(rows)})
     record_fields = _record_fields(record, specifications)
+    identity_values = _identity_values(record, record_fields)
     resolved = [*specifications.records, *record_fields]
     documents = build_documents(record)
     offers = build_offers(record, now=now)
@@ -336,8 +378,10 @@ def component_dossier(
     sources = dict(coverage) if coverage is not None else provider_coverage(record)
     return {
         "schemaVersion": DOSSIER_SCHEMA_VERSION,
-        "identity": _identity(record, schema, specifications),
-        "qualitySummary": _quality_summary(record, schema, specifications),
+        "identity": _identity(record, schema, specifications, identity_values),
+        "qualitySummary": _quality_summary(
+            record, schema, specifications, identity_values
+        ),
         # The screen lists facts a permitted source actually supplied. Expected/recommended
         # schema gaps remain in completeness diagnostics, never as fabricated `Missing` rows.
         "keySpecifications": key_specifications,

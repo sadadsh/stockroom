@@ -9,6 +9,7 @@ import type {
 import { Text, useCopyFormatter, useText } from "../../lib/copy";
 import { formatCount, formatPrice, formatTimestamp } from "../../lib/formatValue";
 import { Icon } from "../Icon";
+import type { IconId } from "../../lib/iconRegistry";
 import { ExternalIcon, WarnIcon } from "../icons";
 import { EmptyState, StatusText } from "../primitives";
 import { SourceStateBadge } from "./SheetParts";
@@ -37,7 +38,7 @@ export function SourcingSheet({
 
   return (
     <div data-dev-id="component-browser.sourcing-sheet" className="flex flex-col gap-5">
-      <div className="grid grid-cols-2 overflow-hidden rounded-card border border-line bg-raise lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-x-6 gap-y-3 px-1 py-1 lg:grid-cols-4">
         <SummaryMetric
           label={<Text id="component-browser.offers-title">Offers</Text>}
           value={formatCount(supplySummary.offerCount)}
@@ -59,7 +60,7 @@ export function SourcingSheet({
       <RecordSection
         label="Distributor Offers"
         title={<Text id="component-browser.offers-title">Distributor Offers</Text>}
-        icon="action.enrich"
+        icon="detail.offers"
         count={offers.length}
       >
         {groups.length === 0 ? (
@@ -109,7 +110,7 @@ export function SourcingSheet({
             <>
               <p
                 id="sourcing-related-warning"
-                className="flex items-start gap-1.5 border-b border-line/60 bg-field/35 px-3 py-2 text-2xs leading-relaxed text-t2"
+                className="flex items-start gap-1.5 bg-field/35 px-3 py-2 text-2xs leading-relaxed text-t2"
               >
                 <WarnIcon className="mt-0.5 h-3 w-3 flex-none" />
                 {relatedWarning}
@@ -151,7 +152,7 @@ export function SourcingSheet({
 
 function SummaryMetric({ label, value }: { label: ReactNode; value: string }) {
   return (
-    <div className="min-w-0 border-b border-line px-3 py-2.5 odd:border-r lg:border-b-0 lg:border-r lg:last:border-r-0">
+    <div className="min-w-0 py-1.5">
       <div className="ui-property-label truncate">{label}</div>
       <div className="ui-key-fact ui-numeric mt-0.5 truncate text-sm">{value}</div>
     </div>
@@ -167,13 +168,13 @@ function RecordSection({
 }: {
   label: string;
   title: ReactNode;
-  icon: string;
+  icon: IconId;
   count: number;
   children: ReactNode;
 }) {
   return (
-    <section aria-label={label} className="min-w-0 overflow-hidden rounded-card border border-line bg-raise">
-      <header className="flex min-h-[32px] items-center gap-2 border-b border-line bg-band px-3 py-1.5">
+    <section aria-label={label} className="min-w-0 overflow-hidden">
+      <header className="flex min-h-[32px] items-center gap-2 border-b border-line px-1 py-1.5">
         <Icon id={icon} className="h-3.5 w-3.5 flex-none text-t3" />
         <h2 className="ui-section-title min-w-0 truncate">{title}</h2>
         <span className="ui-component-metadata ml-auto flex-none tabular-nums">{formatCount(count)}</span>
@@ -189,9 +190,9 @@ function ProviderOfferGroup({ group }: { group: OfferGroup }) {
     <section
       data-sourcing-provider={group.provider}
       aria-label={group.providerLabel}
-      className="min-w-0 overflow-hidden rounded-card border border-line bg-field/25"
+      className="min-w-0 overflow-hidden"
     >
-      <header className="flex items-center gap-2 border-b border-line px-3 py-2">
+      <header className="flex items-center gap-2 bg-field/25 px-3 py-2">
         <h3 className="ui-row-primary min-w-0 flex-1 truncate">{group.providerLabel}</h3>
         <span className="ui-component-metadata flex-none">
           {formatCount(group.offers.length)} {offersLabel}
@@ -245,7 +246,7 @@ function OfferDisclosure({ offer }: { offer: DistributorOffer }) {
         />
       </summary>
 
-      <div className="border-t border-line/60 bg-raise px-3 pb-3 pt-2.5">
+      <div className="bg-raise px-3 pb-3 pt-2.5">
         <div className="mb-3 flex flex-wrap items-start gap-x-5 gap-y-2">
           {offer.currency ? (
             <OfferMeta label={<Text id="component-browser.offer-col-currency">Quote Code</Text>}>
@@ -436,11 +437,15 @@ function RelatedPartRow({ part }: { part: RelatedPart }) {
           {content}
           <Icon id="detail.chevron-right" className="mt-0.5 h-3 w-3 flex-none text-t3 transition-transform group-open:rotate-90" />
         </summary>
-        <dl className="grid grid-cols-1 gap-x-4 gap-y-1 border-t border-line/40 bg-field/25 px-3 py-2 sm:grid-cols-2">
+        <dl className="grid grid-cols-1 gap-x-4 gap-y-1 bg-field/25 px-3 py-2 sm:grid-cols-2">
           {part.evidence.map((item) => (
             <div key={`${item.field}:${item.ours}:${item.theirs}`} className="min-w-0">
               <dt className="ui-property-label break-words">{item.field}</dt>
-              <dd className="ui-component-metadata break-words">{item.ours} → {item.theirs}</dd>
+              <dd className="ui-component-metadata flex items-center gap-1 break-words">
+                <span>{item.ours}</span>
+                <Icon id="relation.transition" className="h-3 w-3 flex-none" />
+                <span>{item.theirs}</span>
+              </dd>
             </div>
           ))}
         </dl>

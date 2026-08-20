@@ -1,22 +1,4 @@
-import batteryRaw from "@tabler/icons/outline/circuit-battery.svg?raw";
-import bulbRaw from "@tabler/icons/outline/circuit-bulb.svg?raw";
-import cellRaw from "@tabler/icons/outline/circuit-cell.svg?raw";
-import motorRaw from "@tabler/icons/outline/circuit-motor.svg?raw";
-import pushbuttonRaw from "@tabler/icons/outline/circuit-pushbutton.svg?raw";
-import switchRaw from "@tabler/icons/outline/circuit-switch-open.svg?raw";
-import cpuRaw from "@tabler/icons/outline/cpu.svg?raw";
-import connectorRaw from "@tabler/icons/outline/plug-connected.svg?raw";
-import waveformRaw from "@tabler/icons/outline/wave-sine.svg?raw";
-
-import capacitorRaw from "../assets/electrical-symbols/iec/capacitor.svg?raw";
-import polarizedCapacitorRaw from "../assets/electrical-symbols/iec/capacitor-polarized.svg?raw";
-import diodeRaw from "../assets/electrical-symbols/iec/diode.svg?raw";
-import ledRaw from "../assets/electrical-symbols/iec/diode-led.svg?raw";
-import inductorRaw from "../assets/electrical-symbols/iec/inductor.svg?raw";
-import opampRaw from "../assets/electrical-symbols/iec/opamp-single-output.svg?raw";
-import piezoRaw from "../assets/electrical-symbols/iec/piezo.svg?raw";
-import resistorRaw from "../assets/electrical-symbols/iec/resistor.svg?raw";
-import transformerRaw from "../assets/electrical-symbols/iec/transformer.svg?raw";
+import { Icon } from "../components/Icon";
 
 /** The component identities Stockroom can distinguish visually. */
 export type ElectricalSymbolKind =
@@ -27,6 +9,7 @@ export type ElectricalSymbolKind =
   | "crystal"
   | "diode"
   | "fuse"
+  | "generic"
   | "ic"
   | "inductor"
   | "lamp"
@@ -40,77 +23,43 @@ export type ElectricalSymbolKind =
   | "transistor"
   | "waveform";
 
-const IEC_ARTWORK: Partial<Record<ElectricalSymbolKind, string>> = {
-  resistor: resistorRaw,
-  capacitor: capacitorRaw,
-  "capacitor-polarized": polarizedCapacitorRaw,
-  inductor: inductorRaw,
-  diode: diodeRaw,
-  led: ledRaw,
-  opamp: opampRaw,
-  crystal: piezoRaw,
-  transformer: transformerRaw,
-};
-
-const TABLER_ARTWORK: Partial<Record<ElectricalSymbolKind, string>> = {
-  battery: batteryRaw,
-  connector: connectorRaw,
-  fuse: cellRaw,
-  ic: cpuRaw,
-  lamp: bulbRaw,
-  motor: motorRaw,
-  pushbutton: pushbuttonRaw,
-  switch: switchRaw,
-  transistor: cpuRaw,
-  waveform: waveformRaw,
-};
-
-function injectableSvg(raw: string): string {
-  const start = raw.indexOf("<svg");
-  return start >= 0 ? raw.slice(start) : raw;
-}
-
 /**
  * The category resolver is intentionally separate from presentation. Categories remain library
  * data; this registry owns only the stable visual language used to identify them.
  */
 export function electricalSymbolForCategory(category: string): ElectricalSymbolKind {
-  const value = category.toLocaleLowerCase();
-  if (value.includes("polar") && value.includes("capacitor")) return "capacitor-polarized";
-  if (value.includes("resistor") || value.includes("thermistor") || value.includes("varistor")) {
-    return "resistor";
+  const normalized = category
+    .normalize("NFKD")
+    .toLocaleLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+  const tokens = new Set(normalized.split(" ").filter(Boolean));
+  const has = (...terms: string[]) => terms.some((term) => tokens.has(term));
+
+  // A driver or switching regulator describes the IC's job, not the driven load or a switch.
+  if (has("driver", "drivers") || normalized === "switching voltage regulators") return "generic";
+  if (has("capacitor", "capacitors") && has("polar", "polarized", "polarised")) {
+    return "capacitor-polarized";
   }
-  if (value.includes("capacitor")) return "capacitor";
-  if (value.includes("inductor") || value.includes("ferrite") || value.includes("choke")) {
-    return "inductor";
-  }
-  if (value.includes("led") || value.includes("light emitting")) return "led";
-  if (value.includes("diode") || value.includes("rectifier")) return "diode";
-  if (
-    value.includes("transistor") ||
-    value.includes("mosfet") ||
-    value.includes("igbt") ||
-    value.includes("fet")
-  ) {
-    return "transistor";
-  }
-  if (value.includes("op amp") || value.includes("opamp") || value.includes("amplifier")) {
-    return "opamp";
-  }
-  if (value.includes("relay") || value.includes("switch")) return "switch";
-  if (value.includes("button")) return "pushbutton";
-  if (value.includes("connector") || value.includes("header") || value.includes("socket")) {
-    return "connector";
-  }
-  if (value.includes("crystal") || value.includes("oscillator") || value.includes("resonator")) {
-    return "crystal";
-  }
-  if (value.includes("transformer")) return "transformer";
-  if (value.includes("battery") || value.includes("cell")) return "battery";
-  if (value.includes("fuse")) return "fuse";
-  if (value.includes("motor")) return "motor";
-  if (value.includes("lamp") || value.includes("bulb")) return "lamp";
-  return "ic";
+  if (has("resistor", "resistors", "thermistor", "thermistors", "varistor", "varistors")) return "resistor";
+  if (has("capacitor", "capacitors")) return "capacitor";
+  if (has("inductor", "inductors", "ferrite", "ferrites", "choke", "chokes")) return "inductor";
+  if (normalized === "light emitting diodes" || normalized === "light emitting diode" || has("led", "leds")) return "led";
+  if (has("diode", "diodes", "rectifier", "rectifiers")) return "diode";
+  if (has("transistor", "transistors", "mosfet", "mosfets", "igbt", "igbts", "fet", "fets")) return "transistor";
+  if (normalized === "op amp" || normalized === "op amps" || has("opamp", "opamps") ||
+      (has("operational") && has("amplifier", "amplifiers"))) return "opamp";
+  if (has("relay", "relays", "switch", "switches")) return "switch";
+  if (has("pushbutton", "pushbuttons") || (has("push") && has("button", "buttons"))) return "pushbutton";
+  if (has("connector", "connectors", "header", "headers", "socket", "sockets")) return "connector";
+  if (has("crystal", "crystals", "oscillator", "oscillators", "resonator", "resonators")) return "crystal";
+  if (has("transformer", "transformers")) return "transformer";
+  if (has("battery", "batteries") || normalized === "cell" || normalized === "cells") return "battery";
+  if (has("fuse", "fuses")) return "fuse";
+  if (normalized === "motor" || normalized === "motors") return "motor";
+  if (has("lamp", "lamps", "bulb", "bulbs")) return "lamp";
+  if (["ic", "ics", "integrated circuit", "integrated circuits", "logic gate", "logic gates"].includes(normalized)) return "ic";
+  return "generic";
 }
 
 export function ElectricalSymbol({
@@ -122,7 +71,6 @@ export function ElectricalSymbol({
   className?: string;
   title?: string;
 }) {
-  const raw = IEC_ARTWORK[kind] ?? TABLER_ARTWORK[kind] ?? cpuRaw;
   return (
     <span
       role={title ? "img" : undefined}
@@ -130,11 +78,33 @@ export function ElectricalSymbol({
       aria-hidden={title ? undefined : true}
       data-electrical-symbol={kind}
       className={`electrical-symbol inline-flex items-center justify-center ${className}`}
-      dangerouslySetInnerHTML={{ __html: injectableSvg(raw) }}
-    />
+    >
+      <Icon id={`category.${kind}`} className="h-full w-full" />
+    </span>
   );
 }
 
 export const ELECTRICAL_SYMBOL_KINDS = Object.freeze(
-  [...Object.keys(IEC_ARTWORK), ...Object.keys(TABLER_ARTWORK)] as ElectricalSymbolKind[],
+  [
+    "battery",
+    "capacitor",
+    "capacitor-polarized",
+    "connector",
+    "crystal",
+    "diode",
+    "fuse",
+    "generic",
+    "ic",
+    "inductor",
+    "lamp",
+    "led",
+    "motor",
+    "opamp",
+    "pushbutton",
+    "resistor",
+    "switch",
+    "transformer",
+    "transistor",
+    "waveform",
+  ] as ElectricalSymbolKind[],
 );

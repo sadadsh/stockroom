@@ -233,3 +233,57 @@ def test_source_host_allows_only_task_bound_multi_download_permission(tmp_path):
     after_release = PermissionArgs("MultipleAutomaticDownloads")
     sender.CoreWebView2.PermissionRequested.fire(sender.CoreWebView2, after_release)
     assert str(after_release.State).lower().endswith("deny")
+
+
+def test_focused_source_provider_escape_requests_close_from_stockroom(monkeypatch, tmp_path):
+    class EventHook:
+        def __init__(self) -> None:
+            self.handlers = []
+
+        def __iadd__(self, handler):
+            self.handlers.append(handler)
+            return self
+
+        def fire(self, sender, args) -> None:
+            for handler in list(self.handlers):
+                handler(sender, args)
+
+    class Core:
+        def __init__(self) -> None:
+            self.PermissionRequested = EventHook()
+            self.AcceleratorKeyPressed = EventHook()
+
+    class Sender:
+        def __init__(self) -> None:
+            self.CoreWebView2 = Core()
+
+    class Edge(_Edge):
+        def on_webview_ready(self, _sender, _args):
+            return None
+
+    requested = []
+    monkeypatch.setattr(
+        "stockroom.host.window._PROVIDER_SURFACE",
+        SimpleNamespace(request_close_from_native=lambda: requested.append("close") or True),
+    )
+    edge = type("Edge", (Edge,), {"original_calls": []})
+    _install_silent_webview2_download_handler(
+        SimpleNamespace(settings={"ALLOW_DOWNLOADS": True}),
+        edge,
+    )
+    sender = Sender()
+    instance = edge()
+    instance.on_webview_ready(sender, SimpleNamespace())
+    lease_token = _begin_native_webview_download_lease(
+        tmp_path / "Provider Staging",
+        author=instance,
+    )
+    try:
+        escape = SimpleNamespace(KeyEventKind="KeyDown", VirtualKey=0x1B, Handled=False)
+        sender.CoreWebView2.AcceleratorKeyPressed.fire(sender.CoreWebView2, escape)
+
+        assert requested == ["close"]
+        assert escape.Handled is True
+    finally:
+        _end_native_webview_download_lease(lease_token)
+        _discard_native_webview_downloads()

@@ -2,11 +2,21 @@ namespace Stockroom.WindowHost;
 
 internal sealed record ProviderViewportRequest(
     string ComponentId,
+    string ProviderId,
+    string RouteId,
+    string SessionId,
     bool Visible,
     double X,
     double Y,
     double Width,
-    double Height);
+    double Height)
+{
+    internal ProviderBrowserSurfaceIdentity Identity => new(
+        ComponentId,
+        ProviderId,
+        RouteId,
+        SessionId);
+}
 
 internal sealed record ProviderViewportLayout(
     double X,
@@ -27,7 +37,7 @@ internal sealed record ProviderViewportLayout(
         ArgumentNullException.ThrowIfNull(request);
         layout = null;
         if (!request.Visible
-            || request.ComponentId.Length == 0
+            || !request.Identity.IsValid
             || !string.Equals(
                 request.ComponentId,
                 expectedComponentId,

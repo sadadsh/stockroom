@@ -68,16 +68,16 @@ function elapsedSince(now: number | undefined, since: number | undefined): numbe
   return Math.max(0, now - since);
 }
 
-/** The app-repo revision baked into this bundle at build time (`0.1.0+abcdef1`), if it carries one. */
+/** The frontend-content revision baked into this bundle (`1.0.0+abcdef123456`), if present. */
 function bundleRevision(buildVersion: string): string {
   return /\+([0-9a-f]{7,})$/i.exec(buildVersion.trim())?.[1] ?? "";
 }
 
 /**
- * Whether two identities are the same revision expressed at different lengths.
+ * Whether two frontend-content identities are the same revision at different lengths.
  *
- * Only Git revisions compare: a production install reports `release-1.2.3.4` while the bundle
- * carries a short SHA, and those two disagreeing about nothing is not evidence of anything.
+ * Release identities do not compare: a production install reports `release-1.2.3.4`, while this
+ * helper compares only the hexadecimal content revision served with the frontend bundle.
  */
 function revisionsDisagree(bundle: string, revision: string): boolean {
   if (!bundle || !/^[0-9a-f]{7,}$/i.test(revision)) return false;
@@ -100,11 +100,10 @@ export function staleFrontend(
   buildVersion: string | undefined,
 ): { bundle: string; backend: string } | null {
   const bundle = bundleRevision(buildVersion ?? "");
-  // Compare against the exact bundle the backend is serving, not the checkout HEAD. Because
-  // frontend-dist is committed, a build commit necessarily follows the source revision baked
-  // into its bundle; comparing those two Git commits made every clean release look stale forever.
-  // Fall back for rolling compatibility with an older backend that has not learned this field.
-  const backend = (data?.frontend_revision ?? data?.current_revision ?? "").trim();
+  // Compare only against the exact frontend bundle served by the backend. `current_revision` is a
+  // Git or release identity and is intentionally not a fallback: a content digest and a source
+  // revision are different identity kinds, so comparing them invents a disagreement.
+  const backend = (data?.frontend_revision ?? "").trim();
   return revisionsDisagree(bundle, backend) ? { bundle, backend } : null;
 }
 
@@ -354,10 +353,11 @@ export function aboutVersion(
 export function runningVersion(
   currentRevision: string,
   buildVersion: string,
+  bundleIsStale = false,
 ): UpdateIdentityView {
   const buildRevision = bundleRevision(buildVersion);
   const revision = currentRevision.trim();
-  if (revision && !revisionsDisagree(buildRevision, revision)) {
+  if (!bundleIsStale && revision) {
     return updateIdentity(revision);
   }
   if (buildRevision) {

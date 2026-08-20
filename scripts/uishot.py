@@ -43,6 +43,8 @@ DEFAULT_OUT = REPO / "build" / "shots"
 DEFAULT_LIB = REPO / "libraries"
 _SURFACE_CHOICES = (
     "components",
+    "assets",
+    "manage-models",
     "search",
     "part-vendor-data",
     "ingest",
@@ -58,7 +60,7 @@ _SURFACE_CHOICES = (
 # `all` means the ordinary rail destinations - the surfaces that are a whole page rather than a
 # modal or an overlay over another one. Projects and STM Viewer belong to that set and were
 # missing from it only because they had no driver.
-_ALL_SURFACES = ("components", "search", "projects", "stm", "settings")
+_ALL_SURFACES = ("components", "assets", "search", "projects", "stm", "settings")
 
 # Token probe: the values a visual regression most often silently breaks. Reported with
 # every run so a shot is never interpreted against an unknown token state.
@@ -198,6 +200,8 @@ def _browser_failures(console: list[str], http: dict[str, int]) -> list[str]:
 # `part-vendor-data` shares the components root because it IS the components page, driven deeper.
 _SURFACE_ROOT: dict[str, str] = {
     "components": "components.root",
+    "assets": "assets.root",
+    "manage-models": "component-browser.manage-models",
     "part-vendor-data": "components.root",
     "search": "search.root",
     # the modal itself, not the page under it: the modal is the thing that fades in, and it is what
@@ -550,8 +554,39 @@ def _dismiss_onboarding(page, base_url: str, token: str) -> None:
     the nav rail is never reachable. Completing onboarding is a genuine user action, so the seed run
     performs it rather than faking the gate away.
     """
-    page.request.post(f"{base_url.rstrip('/')}/api/onboarding/complete",
-                      headers={"Authorization": f"Bearer {token}"})
+    if _appears(page.locator('[data-dev-id="rail.nav-components"]').first, timeout_ms=250):
+        return
+    headers = {"Authorization": f"Bearer {token}"}
+    status = page.request.get(
+        f"{base_url.rstrip('/')}/api/onboarding",
+        headers=headers,
+    )
+    if status.ok and status.json().get("onboarded") is True:
+        page.reload(wait_until="networkidle")
+        if _appears(page.locator('[data-dev-id="rail.nav-components"]').first):
+            return
+        visible = " ".join(page.locator("body").inner_text().split())[:600]
+        raise RuntimeError(
+            "visual seed is onboarded but the navigation rail did not render; "
+            f"visible page: {visible}"
+        )
+    settings = page.request.patch(
+        f"{base_url.rstrip('/')}/api/settings",
+        headers=headers,
+        data={"primary_eda": "kicad"},
+    )
+    if not settings.ok:
+        raise RuntimeError(
+            f"visual seed could not select KiCad: HTTP {settings.status} {settings.text()}"
+        )
+    complete = page.request.post(
+        f"{base_url.rstrip('/')}/api/onboarding/complete",
+        headers=headers,
+    )
+    if not complete.ok:
+        raise RuntimeError(
+            f"visual seed could not complete onboarding: HTTP {complete.status} {complete.text()}"
+        )
     page.reload(wait_until="networkidle")
     # Poll for the nav rail, which is what "onboarding is dismissed" actually LOOKS like. A fixed
     # sleep here turned a slow machine into a false "the rail is not reachable" report several
@@ -626,6 +661,28 @@ def _goto_surface(page, surface: str, select: str = "") -> bool:
             return False
         _await_land_pattern(page)
         return _open_vendor_data(page)
+    if surface == "manage-models":
+        nav = page.locator('[data-dev-id="rail.nav-components"]')
+        if not nav.count():
+            return False
+        nav.first.click()
+        rows = page.locator('[data-dev-id="components.row"]')
+        if not _appears(rows.first):
+            print("  manage-models: no component row rendered")
+            return False
+        rows.first.click()
+        if not _appears(page.locator('[data-dev-id="component-browser.root"]').first):
+            print("  manage-models: the component workspace never rendered")
+            return False
+        trigger = page.locator('[data-dev-id="component-browser.header-manage-assets"]')
+        if not _appears(trigger.first):
+            print("  manage-models: the Manage CAD Assets action never rendered")
+            return False
+        trigger.first.click()
+        if not _appears(page.locator('[data-dev-id="component-browser.manage-models"]').first):
+            print("  manage-models: the Manage Models workspace never rendered")
+            return False
+        return True
     if surface == "ingest":
         # Add-A-Part is a MODAL over Components, not a rail destination, so it is reached by
         # driving the real button - the same path a user takes. Without this surface the whole
@@ -641,7 +698,7 @@ def _goto_surface(page, surface: str, select: str = "") -> bool:
         if not nav.count():
             return False
         nav.first.click()
-        trigger = page.locator('[data-dev-id="components.add-parts"]')
+        trigger = page.locator('[data-dev-id="components.toolbar-add"]')
         if not _appears(trigger.first):
             print("  ingest: the Add Parts button never rendered")
             return False
@@ -656,7 +713,7 @@ def _goto_surface(page, surface: str, select: str = "") -> bool:
         # The overlay's own root IS the success signal, so poll it rather than sleeping and then
         # counting - the count was being taken before a slow render had finished.
         return _appears(page.locator('[data-dev-id="search.root"]').first)
-    if surface in {"projects", "stm"}:
+    if surface in {"assets", "projects", "stm"}:
         # Two rail destinations the harness simply had no driver for, so Phase 0 could not
         # photograph either (manifest.json:gaps.projects-route / gaps.stm-viewer-route). Driven the
         # same way a person reaches them: click the real rail item, then poll the route's own root.
@@ -678,7 +735,7 @@ def _goto_surface(page, surface: str, select: str = "") -> bool:
         if not _appears(page.locator(f'[data-dev-id="{surface}.root"]').first):
             print(f"  {surface}: {surface}.root never rendered after clicking its rail item")
             return False
-        # ...and the route must be ANSWERED, not still asking. Both fetch on mount (Projects lists
+        # ...and the route must be ANSWERED, not still asking. These routes fetch on mount (Projects lists
         # this machine's linked projects; STM reads its status and matrix) and render the shared
         # `LoadingState` while they wait, which stamps `data-product-state="loading"` on the DOM.
         # That attribute is the arrival signal, so it is what this polls: without it a shot of
@@ -1082,7 +1139,7 @@ def run(args) -> int:
     # family) is on the seeded probe part and nowhere in a real library, so without the seed the
     # shot would silently photograph an ordinary part.
     clicking = bool(args.click)
-    seed = args.seed or clicking or "part-vendor-data" in surfaces
+    seed = args.seed or clicking or "part-vendor-data" in surfaces or "manage-models" in surfaces
     if clicking and not args.seed:
         print("  --click implies --seed: clicks can mutate, and the default library is the real one")
     # NO SHOT MAY CHANGE A SETTING. `--seed` isolates the LIBRARY but never isolated the MACHINE
@@ -1100,6 +1157,12 @@ def run(args) -> int:
     os.environ["STOCKROOM_CONFIG_DIR"] = str(Path(config_scratch.name) / "config")
     os.environ["XDG_CONFIG_HOME"] = str(Path(config_scratch.name) / "xdg")
     os.environ["APPDATA"] = str(Path(config_scratch.name) / "appdata")
+    # The Windows development host owns a separate durable workflow/control database under
+    # LOCALAPPDATA. Isolating only UI config still lets a screenshot collide with the owner's
+    # running coordinator or inherit a differently scoped Control.sqlite.
+    os.environ["STOCKROOM_SERVICE_DATA_ROOT"] = str(
+        Path(config_scratch.name) / "service-state"
+    )
 
     scratch: tempfile.TemporaryDirectory | None = None
     library = Path(args.library)
@@ -1107,6 +1170,24 @@ def run(args) -> int:
         scratch = tempfile.TemporaryDirectory(prefix="uishot-seed-")
         library = _seed_workspace(Path(scratch.name), Path(args.library))
         print(f"  seeded library under {scratch.name}")
+        machine_config_dir = Path(os.environ["STOCKROOM_CONFIG_DIR"])
+        machine_config_dir.mkdir(parents=True, exist_ok=True)
+        (machine_config_dir / "config.json").write_text(
+            json.dumps(
+                {
+                    "primary_eda": "kicad",
+                    "libraries_root": str(library),
+                    "library_workspaces": [
+                        {"name": "UiShot", "path": str(library)}
+                    ],
+                    "sync_enabled": False,
+                    "onboarded": True,
+                    "guided_setup": {"schema": 1, "completed": True},
+                },
+                indent=2,
+            ),
+            encoding="utf-8",
+        )
 
     def opener(base_url: str, token: str) -> None:
         with sync_playwright() as p:
@@ -1318,11 +1399,49 @@ def run(args) -> int:
             browser.close()
 
     sys.path.insert(0, str(REPO / "app" / "backend"))
+    if seed:
+        # The visual harness audits product surfaces, not GitHub authentication or CAD-tool
+        # installation. Guided Setup now revalidates those external facts even when completion is
+        # recorded, so a disposable screenshot library needs an equally disposable Ready
+        # projection. This process-local seam never changes production configuration or source.
+        from stockroom.store import guided_setup as seed_guided_setup
+
+        original_guided_status = seed_guided_setup.status
+
+        def _seed_guided_status(ctx, github):
+            document = original_guided_status(ctx, github)
+            document.update(
+                {
+                    "step": "ready",
+                    "ready": True,
+                    "repository_ready": True,
+                    "tool_connection": {
+                        "tool": "kicad",
+                        "installed": True,
+                        "connected": True,
+                        "restart_required": False,
+                        "detail": "KiCad is connected for this disposable visual audit.",
+                    },
+                    "source_data": {
+                        "decided": True,
+                        "skipped": True,
+                        "mouser_connected": False,
+                        "digikey_connected": False,
+                    },
+                }
+            )
+            return document
+
+        seed_guided_setup.status = _seed_guided_status
     from stockroom.host.run import run_windowed
 
     print(f"booting app (library={library}) ...")
     try:
-        run_windowed(libraries_root=library, open_window=opener)
+        run_windowed(
+            libraries_root=library,
+            open_window=opener,
+            source_authority_scope=f"UiShot.{os.getpid()}",
+        )
     finally:
         try:
             if scratch is not None:

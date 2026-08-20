@@ -18,6 +18,9 @@ interface DevModeHistorySnapshot {
   participants: Record<string, string>;
 }
 
+export const DEV_MODE_HISTORY_GESTURE_START_EVENT = "stockroom:design-history-gesture-start";
+export const DEV_MODE_HISTORY_GESTURE_END_EVENT = "stockroom:design-history-gesture-end";
+
 /**
  * `restore` must write all five draft slices in one go; this hook flags the write as a history
  * restore first, so the snapshot effect does not record the restore as a fresh edit.
@@ -32,6 +35,7 @@ export function useDevModeHistory(draft: DevModeDraft, restore: (next: DevModeDr
   const undoRef = useRef<DevModeHistorySnapshot[]>([]);
   const redoRef = useRef<DevModeHistorySnapshot[]>([]);
   const restoringDraftRef = useRef<string | null>(null);
+  const gestureRef = useRef<{ start: DevModeHistorySnapshot; changed: boolean } | null>(null);
   // The stacks live in refs so recording history does not itself create another snapshot. Keep a
   // small revision counter in the context memo dependencies so Undo/Redo enable immediately after
   // a ref-only stack mutation.
@@ -70,6 +74,10 @@ export function useDevModeHistory(draft: DevModeDraft, restore: (next: DevModeDr
     if (currentSnapshot === lastSnapshotRef.current.draft) return;
     if (restoringDraftRef.current === currentSnapshot) {
       restoringDraftRef.current = null;
+    } else if (gestureRef.current) {
+      gestureRef.current.changed = true;
+      redoRef.current = [];
+      lastSnapshotRef.current = captureSnapshot(currentSnapshot);
     } else {
       undoRef.current = [...undoRef.current.slice(-49), lastSnapshotRef.current];
       redoRef.current = [];
@@ -77,6 +85,33 @@ export function useDevModeHistory(draft: DevModeDraft, restore: (next: DevModeDr
     }
     setHistoryRevision((revision) => revision + 1);
   }, [captureSnapshot, currentSnapshot]);
+
+  useEffect(() => {
+    const begin = () => {
+      if (gestureRef.current) return;
+      gestureRef.current = {
+        start: captureSnapshot(lastSnapshotRef.current.draft),
+        changed: false,
+      };
+    };
+    const end = () => {
+      const gesture = gestureRef.current;
+      if (!gesture) return;
+      gestureRef.current = null;
+      if (!gesture.changed) return;
+      undoRef.current = [...undoRef.current.slice(-49), gesture.start];
+      redoRef.current = [];
+      setHistoryRevision((revision) => revision + 1);
+    };
+    window.addEventListener(DEV_MODE_HISTORY_GESTURE_START_EVENT, begin);
+    window.addEventListener(DEV_MODE_HISTORY_GESTURE_END_EVENT, end);
+    window.addEventListener("blur", end);
+    return () => {
+      window.removeEventListener(DEV_MODE_HISTORY_GESTURE_START_EVENT, begin);
+      window.removeEventListener(DEV_MODE_HISTORY_GESTURE_END_EVENT, end);
+      window.removeEventListener("blur", end);
+    };
+  }, [captureSnapshot]);
 
   const restoreSnapshot = useCallback(
     (snapshot: DevModeHistorySnapshot) => {
@@ -97,10 +132,14 @@ export function useDevModeHistory(draft: DevModeDraft, restore: (next: DevModeDr
       if (!participant) {
         throw new Error(`Unknown Dev Mode history participant: ${participantKey}`);
       }
-      undoRef.current = [
-        ...undoRef.current.slice(-49),
-        captureSnapshot(lastSnapshotRef.current.draft),
-      ];
+      if (!gestureRef.current) {
+        undoRef.current = [
+          ...undoRef.current.slice(-49),
+          captureSnapshot(lastSnapshotRef.current.draft),
+        ];
+      } else {
+        gestureRef.current.changed = true;
+      }
       redoRef.current = [];
       const draftSnapshot = JSON.stringify(nextDraft);
       const next = captureSnapshot(draftSnapshot);

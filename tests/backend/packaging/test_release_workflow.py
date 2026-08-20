@@ -23,7 +23,7 @@ def named_step(job_name: str, name: str) -> dict[str, Any]:
 def test_release_workflow_parses_and_has_least_privilege_jobs() -> None:
     assert WORKFLOW["name"] == "Stockroom Windows Release"
     assert WORKFLOW["permissions"] == {}
-    assert WORKFLOW["on"]["push"] == {"branches": ["main"], "tags": ["v*"]}
+    assert WORKFLOW["on"]["push"] == {"branches": ["main"]}
     assert WORKFLOW["on"]["workflow_dispatch"]["inputs"]["version"]["required"] == "true"
 
     build = WORKFLOW["jobs"]["build-windows-package"]
@@ -34,8 +34,10 @@ def test_release_workflow_parses_and_has_least_privilege_jobs() -> None:
     assert build["permissions"] == {"contents": "read"}
     assert publish["runs-on"] == "ubuntu-24.04"
     assert publish["permissions"] == {"actions": "read", "contents": "write"}
-    assert "github.ref_type == 'tag'" in publish["if"]
-    assert "github.ref == 'refs/heads/main'" in publish["if"]
+    assert publish["name"] == "Publish GitHub Release"
+    assert publish["if"] == (
+        "${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}"
+    )
 
     checkout = named_step("build-windows-package", "Check Out The Exact Release Revision")
     setup_uv = named_step("build-windows-package", "Install Pinned uv")
@@ -49,9 +51,9 @@ def test_release_workflow_parses_and_has_least_privilege_jobs() -> None:
 
 def test_main_push_gets_one_immutable_build_number_release() -> None:
     metadata = named_step("build-windows-package", "Resolve And Validate Release Metadata")
-    publish = named_step("publish-github-release", "Publish Signed Windows Prerelease")
+    publish = named_step("publish-github-release", "Publish Signed Windows Release")
 
-    assert metadata["env"]["AUTOMATIC_BASE_VERSION"] == "0.7.0"
+    assert metadata["env"]["AUTOMATIC_BASE_VERSION"] == "1.0.0"
     assert metadata["env"]["GITHUB_RUN_NUMBER"] == "${{ github.run_number }}"
     assert (
         '$version = "$($env:AUTOMATIC_BASE_VERSION).$($env:GITHUB_RUN_NUMBER)"' in metadata["run"]
@@ -62,10 +64,44 @@ def test_main_push_gets_one_immutable_build_number_release() -> None:
     )
     assert "gh release create $env:STOCKROOM_RELEASE_TAG" in publish["run"]
     assert "--target $env:GITHUB_SHA" in publish["run"]
+    assert "--prerelease=false" in publish["run"]
+    assert "--prerelease `" not in publish["run"]
+    assert "This release contains Stockroom's stable signed-release broker" in publish["run"]
+
+
+def test_manual_dispatch_verifies_without_entering_the_publication_path() -> None:
+    metadata = named_step("build-windows-package", "Resolve And Validate Release Metadata")
+    publish = WORKFLOW["jobs"]["publish-github-release"]
+
+    assert "GITHUB_EVENT_NAME" not in metadata["env"]
+    assert '$env:GITHUB_EVENT_NAME -ceq "push"' in metadata["run"]
+    assert '$env:GITHUB_EVENT_NAME -ceq "workflow_dispatch"' in metadata["run"]
+    assert "$version = $env:MANUAL_VERSION" in metadata["run"]
+    assert publish["if"] == (
+        "${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}"
+    )
+
+
+def test_release_build_cannot_start_before_the_canonical_ci_gate() -> None:
+    quality_gate = WORKFLOW["jobs"]["quality-gate"]
+    build = WORKFLOW["jobs"]["build-windows-package"]
+
+    assert quality_gate == {
+        "name": "Canonical CI Gate",
+        "permissions": {"contents": "read"},
+        "uses": "./.github/workflows/ci.yml",
+    }
+    assert build["needs"] == "quality-gate"
 
 
 def test_every_external_action_is_pinned_to_an_exact_commit() -> None:
-    references = re.findall(r"^\s*uses:\s*([^#\s]+)", WORKFLOW_TEXT, flags=re.MULTILINE)
+    references = [
+        reference
+        for reference in re.findall(
+            r"^\s*uses:\s*([^#\s]+)", WORKFLOW_TEXT, flags=re.MULTILINE
+        )
+        if not reference.startswith("./")
+    ]
     assert set(references) == {
         "actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
         "actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093",
@@ -146,7 +182,7 @@ def test_release_materializes_only_the_pinned_tuf_root() -> None:
 def test_only_the_exact_verified_release_asset_set_can_be_published() -> None:
     verify = named_step("build-windows-package", "Verify And Stage Exact Release Assets")["run"]
     upload = named_step("build-windows-package", "Upload Verified Release Assets")
-    publish = named_step("publish-github-release", "Publish Signed Windows Prerelease")["run"]
+    publish = named_step("publish-github-release", "Publish Signed Windows Release")["run"]
 
     assert upload["with"]["path"] == "${{ runner.temp }}\\Stockroom.Release.Publish"
     assert upload["with"]["if-no-files-found"] == "error"
@@ -164,7 +200,7 @@ def test_only_the_exact_verified_release_asset_set_can_be_published() -> None:
     assert "--clobber" not in publish
     assert "Published release assets are immutable" in publish
     assert "asset outside the release allowlist" in publish
-    assert "Published GitHub prerelease assets differ from the exact release allowlist." in publish
+    assert "Published GitHub release assets differ from the exact release allowlist." in publish
 
 
 def test_release_requires_complete_signed_canonical_evidence() -> None:

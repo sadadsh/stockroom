@@ -13,9 +13,9 @@
  * looking at a mixed set nothing to do about it. It now records a decision, and the decision is
  * shown before it is taken.
  *
- * Expansion state persists per component in the ui session. `all` is the three expanded together,
- * which is the reading state: the whole point of the column is that a symbol and a footprint are
- * checked against each other. Focusing one asset compacts the other two and never removes them.
+ * Expansion state persists per component in the ui session. `all` is the reading state: attached
+ * drawings divide the available inspection space while missing assets remain compact identity
+ * strips. Focusing one asset compacts the other two and never removes them.
  *
  * THE COLUMN IS FIVE PLACEMENTS NOW (plan Phase 1): a title strip, the preferred-source row, and
  * three placements of ONE module piece parameterised by representation kind. The document decides
@@ -216,8 +216,9 @@ export function CadPreferredSourcePart() {
 }
 
 /**
- * The three assets always fit the pane. The available height is divided between expanded modules;
- * focusing one keeps two compact previews and gives the remaining space to the focused asset.
+ * The three assets always fit the pane. Attached expanded modules divide the available height;
+ * missing modules reserve only a compact strip until focused. Focusing one keeps two compact
+ * previews and gives the remaining space to the focused asset.
  * `data-workspace-scroll` stays as the stable column-body address, but CAD deliberately owns no
  * scrollbar: a drawing preview scales, while specifications and evidence retain scrolling.
  */

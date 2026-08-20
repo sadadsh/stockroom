@@ -133,11 +133,17 @@ def test_in_app_provider_surface_applies_modal_viewport_and_commands(monkeypatch
         provider_window=lambda: provider_window,
     )
 
-    with surface.lease():
+    identity = {
+        "componentId": "part-1",
+        "providerId": "mouser",
+        "routeId": "manual:mouser",
+        "sessionId": "session-1",
+    }
+    with surface.lease(component_id="part-1", provider_id="mouser"):
         assert (
             surface.set_provider_viewport(
                 {
-                    "componentId": "part-1",
+                    **identity,
                     "visible": True,
                     "x": 128,
                     "y": 114,
@@ -151,7 +157,7 @@ def test_in_app_provider_surface_applies_modal_viewport_and_commands(monkeypatch
         assert provider_window.resize_calls == [(1024, 570)]
         assert provider_window.focus_calls == 0, "layout updates must not steal a React drag"
         assert surface.set_provider_viewport({
-            "componentId": "part-1",
+            **identity,
             "visible": True,
             "x": 128,
             "y": 114,
@@ -164,11 +170,11 @@ def test_in_app_provider_surface_applies_modal_viewport_and_commands(monkeypatch
         app_window.y = 180
         assert surface.reapply_provider_viewport() is True
         assert provider_window.move_calls[-1] == (428, 294)
-        surface.provider_command({"componentId": "part-1", "command": "back"})
+        surface.provider_command({**identity, "command": "back"})
         assert provider_window.evaluations[-1] == "history.back()"
         surface.provider_command(
             {
-                "componentId": "part-1",
+                **identity,
                 "command": "navigate",
                 "url": "https://www.mouser.com/c/?q=LM358",
             }
@@ -176,17 +182,18 @@ def test_in_app_provider_surface_applies_modal_viewport_and_commands(monkeypatch
         assert provider_window.loaded_urls[-1] == "https://www.mouser.com/c/?q=LM358"
         assert not surface.provider_command(
             {
-                "componentId": "part-1",
+                **identity,
                 "command": "navigate",
                 "url": "file:///C:/Windows/System32/calc.exe",
             }
         )
-        surface.provider_command({"componentId": "part-1", "command": "close"})
+        surface.provider_command({**identity, "command": "close"})
         assert provider_window.hidden_calls == 1
 
         assert (
             surface.set_provider_viewport(
                 {
+                    **identity,
                     "componentId": "part-2",
                     "visible": True,
                     "x": 128,
@@ -195,7 +202,7 @@ def test_in_app_provider_surface_applies_modal_viewport_and_commands(monkeypatch
                     "height": 570,
                 }
             )
-            is False
+            is True
         )
         assert provider_window.hidden_calls == 2
 
@@ -259,6 +266,9 @@ def test_hidden_prelease_viewport_releases_component_identity(monkeypatch) -> No
     )
     first = {
         "componentId": "part-1",
+        "providerId": "mouser",
+        "routeId": "manual:mouser",
+        "sessionId": "session-1",
         "visible": True,
         "x": 100,
         "y": 80,
@@ -269,7 +279,13 @@ def test_hidden_prelease_viewport_releases_component_identity(monkeypatch) -> No
     assert surface.set_provider_viewport(
         {**first, "visible": False, "x": 0, "y": 0, "width": 0, "height": 0}
     ) is True
-    assert surface.set_provider_viewport({**first, "componentId": "part-2"}) is True
+    assert surface.set_provider_viewport({
+        **first,
+        "componentId": "part-2",
+        "providerId": "lcsc",
+        "routeId": "manual:lcsc",
+        "sessionId": "session-2",
+    }) is True
 
 
 def test_in_app_provider_surface_retains_modal_viewport_until_lease_is_ready(monkeypatch) -> None:
@@ -286,6 +302,9 @@ def test_in_app_provider_surface_retains_modal_viewport_until_lease_is_ready(mon
     )
     viewport = {
         "componentId": "part-1",
+        "providerId": "mouser",
+        "routeId": "manual:mouser",
+        "sessionId": "session-1",
         "visible": True,
         "x": 100,
         "y": 80,
@@ -296,11 +315,45 @@ def test_in_app_provider_surface_retains_modal_viewport_until_lease_is_ready(mon
     assert surface.set_provider_viewport(viewport) is True
     assert provider_window.show_calls == 0
 
-    with surface.lease() as lease:
+    with surface.lease(component_id="part-1", provider_id="mouser") as lease:
         lease.navigate("https://www.mouser.com/c/?q=LM358")
         assert provider_window.move_calls == [(140, 110)]
         assert provider_window.resize_calls == [(900, 560)]
         assert provider_window.show_calls == 1
+
+
+def test_renderer_cannot_open_a_provider_without_a_broker_lease(monkeypatch) -> None:
+    app_window = _Window("http://127.0.0.1:8123/assets")
+    provider_window = _Window("about:blank#stockroom-provider-proof")
+    monkeypatch.setattr(W, "_ACTIVE_WINDOW", app_window)
+    surface = W.InAppProviderBrowserSurface(
+        "http://127.0.0.1:8123",
+        provider_window=lambda: provider_window,
+    )
+    identity = {
+        "componentId": "part-1",
+        "providerId": "mouser",
+        "routeId": "manual:mouser",
+        "sessionId": "session-1",
+    }
+    assert surface.set_provider_viewport({
+        **identity,
+        "visible": True,
+        "x": 100,
+        "y": 80,
+        "width": 900,
+        "height": 560,
+    }) is True
+
+    assert surface.provider_command({
+        **identity,
+        "command": "navigate",
+        "url": "https://www.mouser.com/c/?q=LM358",
+    }) is False
+    assert provider_window.loaded_urls == []
+    assert provider_window.move_calls == []
+    assert provider_window.resize_calls == []
+    assert app_window.loaded_urls == []
 
 
 class _Webview:

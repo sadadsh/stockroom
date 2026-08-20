@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { DiscoveredProject, ProjectSummary } from "../../api/types";
 import { ApiError } from "../../api/client";
 import { useDiscoverProjects, useRegisterProject } from "../../api/queries";
-import { BoardIcon, CloseIcon, SearchIcon } from "../icons";
+import { CloseIcon, ProjectsIcon, SearchIcon } from "../icons";
 import { Badge, Button, EmptyState, ErrorState, LoadingState, RouteHeader } from "../primitives";
 import { useToast } from "../../lib/toast";
 import { Text, useText } from "../../lib/copy";
@@ -82,7 +82,7 @@ export function ProjectPicker({
       <div className="px-3 pt-3">
         <Button
           variant="soft"
-          icon={<BoardIcon />}
+          icon={<ProjectsIcon />}
           className="mb-2.5 h-9 w-full justify-center"
           onClick={() => setLinkOpen(true)}
         >
@@ -129,7 +129,7 @@ export function ProjectPicker({
         ) : projects.length === 0 ? (
           <div className="flex flex-col items-center gap-2.5 px-5 py-10 text-center">
             <span className="text-t3">
-              <BoardIcon />
+              <ProjectsIcon />
             </span>
             <p className="text-sm font-medium text-t2">
               <Text id="projects.picker.empty-title">No Linked Projects</Text>
@@ -193,7 +193,7 @@ export function ProjectPicker({
                         (active ? "bg-acc-soft text-acc" : "bg-field text-t3")
                       }
                     >
-                      <BoardIcon />
+                      <ProjectsIcon />
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm font-semibold text-t1">
@@ -409,7 +409,7 @@ function LinkProjectDialog({
                     }
                   >
                     <span className="mt-0.5 text-t3">
-                      <BoardIcon />
+                      <ProjectsIcon />
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="flex items-center gap-2">

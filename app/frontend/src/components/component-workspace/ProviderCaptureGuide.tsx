@@ -55,7 +55,7 @@ export function ProviderCaptureGuide({
     title = <Text id="component-browser.capture-guide.attachments-ready">Files ready to attach</Text>;
     detail = (
       <Text id="component-browser.capture-guide.attachments-detail" values={{ count: attachmentCount }}>
-        {"Review and commit {count} verified attachments."}
+        {"Review and apply {count} verified attachments."}
       </Text>
     );
   } else if (navigationError) {
@@ -121,8 +121,8 @@ export function ProviderCaptureGuide({
     );
     detail = <Text id="component-browser.capture-guide.automatic">Stockroom finds files in the background.</Text>;
   } else {
-    title = message ?? <Text id="component-browser.capture-guide.choose">Choose a provider above</Text>;
-    detail = <Text id="component-browser.capture-guide.choose-detail">Its page opens here. Download the files Stockroom asks for.</Text>;
+    title = message ?? <Text id="component-browser.capture-guide.choose">Ready To Start</Text>;
+    detail = <Text id="component-browser.capture-guide.choose-detail">Open a provider above, or import files present on this PC.</Text>;
   }
 
   return (

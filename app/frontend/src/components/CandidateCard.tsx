@@ -16,6 +16,7 @@ import { Badge, Button, Card, Dot } from "./primitives";
 import { PhotoTrigger } from "./ProductPhoto";
 import { productPhotoUrl } from "./partPhotos";
 import { AdaptiveChoice } from "./AdaptiveChoice";
+import { ExistingPartRecovery } from "./ExistingPartRecovery";
 
 // Where a shown conflict value came from.
 // `files` is in the shared label table now, so this no longer carries its own copy of that
@@ -44,12 +45,34 @@ const sentence = (s: string) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s)
 const titleCase = (s: string) =>
   s.replace(/\b\w/g, (ch) => ch.toUpperCase());
 
+function evidenceIdentityError(candidate: StagingCandidate): string {
+  const payloads = candidate.official_payloads ?? {};
+  for (const provider of Object.keys(payloads)) {
+    const binding = candidate.official_evidence?.[provider];
+    if (!binding?.canonical_mpn) {
+      return `Official ${distributorLabel(provider)} evidence is not identity-bound. Run lookup again.`;
+    }
+    if (
+      binding.canonical_mpn.normalize("NFC").trim().toLocaleLowerCase("en-US") !==
+      candidate.mpn.normalize("NFC").trim().toLocaleLowerCase("en-US")
+    ) {
+      return `Evidence belongs to ${binding.canonical_mpn}, not ${candidate.mpn}. Run lookup again.`;
+    }
+  }
+  return "";
+}
+
+export type AddDisposition = "continue" | "open";
+
 export function CandidateCard({
   stagedId,
   candidate,
   conflicts,
   initialDatasheetUrl,
   onCommitted,
+  onFailed,
+  onExisting,
+  onOpenExisting,
   toast,
 }: {
   // The staging list's own key for this candidate. It is the card's dev-mode identity, so tuning
@@ -60,15 +83,19 @@ export function CandidateCard({
   // the slot, the rest are shown so nothing pulled is silently discarded
   conflicts?: SpecConflict[];
   initialDatasheetUrl?: string;
-  // Fires with the CREATED part so the Add flow can continue into its Complete Part
-  // window (the guided both-format capture) instead of dead-ending on a toast.
-  onCommitted: (created: PartDetail) => void;
+  // Fires with the created part and the person's explicit continue/open choice.
+  onCommitted: (created: PartDetail, disposition: AddDisposition) => void;
+  onFailed?: (mpn: string, detail: string) => void;
+  onExisting?: (partId: string, mpn: string) => void;
+  onOpenExisting: (partId: string) => void;
   toast: (message: string, tone?: ToastTone) => void;
 }) {
   const [c, setC] = useState<StagingCandidate>(() =>
     seedDatasheet(candidate, initialDatasheetUrl ?? ""),
   );
   const [missing, setMissing] = useState<string[]>([]);
+  const [evidenceError, setEvidenceError] = useState("");
+  const [existing, setExisting] = useState<{ partId: string; mpn: string } | null>(null);
   const commit = useIngestCommit();
   // Copy layer: toast strings resolve here so the callbacks fire the override, not the literal.
   // A whole sentence with a named slot, not the word "Added" with a name glued after it.
@@ -87,19 +114,59 @@ export function CandidateCard({
     }));
   }
 
-  function handleCommit() {
+  function setPrimaryPurchaseUrl(url: string) {
+    const trimmed = url.trim();
+    setC((prev) => {
+      const purchases = prev.purchase ?? [];
+      if (purchases.length === 0) {
+        return trimmed
+          ? { ...prev, purchase: [{ vendor: "manual", url: trimmed }] }
+          : prev;
+      }
+      return {
+        ...prev,
+        purchase: [{ ...purchases[0], url: trimmed }, ...purchases.slice(1)],
+      };
+    });
+  }
+
+  function handleCommit(disposition: AddDisposition) {
     setMissing([]);
+    setExisting(null);
+    const identityError = evidenceIdentityError(c);
+    if (identityError) {
+      setEvidenceError(identityError);
+      toast(identityError, "err");
+      onFailed?.(c.mpn, identityError);
+      return;
+    }
+    setEvidenceError("");
     commit.mutate(c, {
       onSuccess: (created) => {
         toast(toastAdded({ name: c.display_name || "part" }), "ok");
-        onCommitted(created);
+        onCommitted(created, disposition);
       },
       onError: (err) => {
-        if (err instanceof ApiError && err.missing && err.missing.length > 0) {
+        if (
+          err instanceof ApiError &&
+          err.code === "mpn_conflict" &&
+          err.existingPartId
+        ) {
+          const found = {
+            partId: err.existingPartId,
+            mpn: err.existingMpn || c.mpn,
+          };
+          setExisting(found);
+          onExisting?.(found.partId, found.mpn);
+          toast(err.message, "err");
+        } else if (err instanceof ApiError && err.missing && err.missing.length > 0) {
           setMissing(err.missing);
           toast(toastIncomplete, "err");
+          onFailed?.(c.mpn, err.message);
         } else {
-          toast(err instanceof ApiError ? err.message : toastCouldNotAdd, "err");
+          const detail = err instanceof ApiError ? err.message : toastCouldNotAdd;
+          toast(detail, "err");
+          onFailed?.(c.mpn, detail);
         }
       },
     });
@@ -136,7 +203,7 @@ export function CandidateCard({
       {/* the action leads (owner 2026-07-24: burying Add at the bottom of a long card
           among the info made the flow confusing): the part's name + the ONE accent
           button on top, the editable review fields below it */}
-      <div className="mb-3.5 flex items-center justify-between gap-3 border-b border-line pb-3">
+      <div className="mb-4 flex items-center justify-between gap-3">
         <span className="min-w-0 truncate text-sm font-semibold text-t1">
           {c.display_name || c.mpn || "New Part"}
         </span>
@@ -145,20 +212,41 @@ export function CandidateCard({
           url={photoUrl}
           partName={c.display_name || c.mpn}
         />
-        <Button
-          variant="accent"
-          data-dev-id="ingest.candidate-add"
-          onClick={handleCommit}
-          disabled={commit.isPending}
-          className="flex-none"
-        >
-          {commit.isPending ? (
-            <Text id="ingest.commit-busy">Adding...</Text>
-          ) : (
-            <Text id="ingest.commit">Add to Components</Text>
-          )}
-        </Button>
+        <div className="flex flex-none items-center gap-2">
+          <Button
+            variant="accent"
+            data-dev-id="ingest.candidate-add"
+            onClick={() => handleCommit("continue")}
+            disabled={commit.isPending}
+          >
+            {commit.isPending ? (
+              <Text id="ingest.commit-busy">Adding...</Text>
+            ) : (
+              <Text id="ingest.add-continue">Add And Continue</Text>
+            )}
+          </Button>
+          <Button onClick={() => handleCommit("open")} disabled={commit.isPending}>
+            <Text id="ingest.add-manage-models">Add and Manage Models</Text>
+          </Button>
+        </div>
       </div>
+      {existing ? (
+        <div className="mb-3">
+          <ExistingPartRecovery
+            partId={existing.partId}
+            mpn={existing.mpn}
+            onOpen={onOpenExisting}
+          />
+        </div>
+      ) : null}
+      {evidenceError ? (
+        <div
+          role="alert"
+          className="mb-3 rounded-control border border-err/40 bg-err/[0.08] px-3 py-2.5 text-xs text-err-text"
+        >
+          {evidenceError}
+        </div>
+      ) : null}
       {conflicts && conflicts.length > 0 ? (
         <div
           data-dev-id="ingest.candidate-conflicts"
@@ -192,7 +280,16 @@ export function CandidateCard({
       ) : null}
       <div className="grid gap-2.5">
         <Field label="Name" copyId="ingest.field-name" value={c.display_name} onChange={(v) => set("display_name", v)} />
-        <Field label="Part Number" copyId="ingest.field-mpn" value={c.mpn} onChange={(v) => set("mpn", v)} mono />
+        <Field
+          label="Part Number"
+          copyId="ingest.field-mpn"
+          value={c.mpn}
+          onChange={(v) => {
+            setEvidenceError("");
+            set("mpn", v);
+          }}
+          mono
+        />
         <Field
           label="Manufacturer"
           copyId="ingest.field-manufacturer"
@@ -211,9 +308,7 @@ export function CandidateCard({
           copyId="ingest.field-purchase-url"
           value={purchaseUrl}
           mono
-          onChange={(v) =>
-            set("purchase", v.trim() ? [{ vendor: "manual", url: v.trim() }] : [])
-          }
+          onChange={setPrimaryPurchaseUrl}
         />
         <Field label="Datasheet URL" copyId="ingest.field-datasheet-url" value={datasheetUrl} mono onChange={setDatasheetUrl} />
         {c.footprint_variants.length > 1 ? (

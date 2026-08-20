@@ -39,6 +39,7 @@ import { layoutPlacements } from "../../layout/document";
 import { restorePlacement } from "../../layout/editOperations";
 import { resolveWorkspaceLayout } from "../../layout/resolveWorkspaceLayout";
 import { SectionHeader } from "../productState";
+import { Icon } from "../Icon";
 
 /** One placement the arrangement is currently not drawing, and which setting is doing it. */
 interface OffScreenPlacement {
@@ -71,7 +72,7 @@ export function ArrangeSection({
   );
   const editedLabel = useText("design.state-edited", "Edited");
   const cleanLabel = useText("design.state-clean", "Not Edited");
-  const resetLabel = useText("design.reset", "Reset To Committed");
+  const resetLabel = useText("design.reset", "Reset To Applied");
   const offScreenTitle = useText("design.off-screen", "Hidden And Collapsed");
   const nothingOffScreen = useText("design.off-screen-none", "Nothing is off screen");
   const restoreLabel = useText("design.restore", "Restore");
@@ -146,7 +147,7 @@ export function ArrangeSection({
         onClick={() => setOpen(!open)}
         className="flex w-full items-center gap-1.5 px-3.5 py-2 ui-property-label hover:text-t2"
       >
-        <span aria-hidden="true">{open ? "▾" : "▸"}</span>
+        <Icon id={open ? "design.disclosure-open" : "design.disclosure-closed"} className="h-3 w-3" />
         {title}
         <span data-dev-id="design.arrange-state" className="ml-auto font-mono text-t3">
           {isLayoutEdited ? editedLabel : cleanLabel}

@@ -19,13 +19,18 @@ export interface PersonalDesignSnapshot {
   revision: string | null;
 }
 
+export interface PersonalDesignFlushResult {
+  persisted: boolean;
+  state: PersonalDesignState;
+}
+
 export interface PersonalDesignController {
   getSnapshot: () => PersonalDesignSnapshot;
   subscribe: (listener: () => void) => () => void;
   activate: () => void;
   hydrate: () => Promise<void>;
   replaceDocument: (document: unknown) => boolean;
-  flush: () => Promise<void>;
+  flush: () => Promise<PersonalDesignFlushResult>;
   flushForPageExit: () => void;
   dispose: () => void;
 }
@@ -62,9 +67,12 @@ export function createPersonalDesignController(
   let blockedByConflict = false;
   let debounceTimer: ReturnType<typeof setTimeout> | null = null;
   let pendingDocument: DesignDocument | null = null;
+  let pendingGeneration = 0;
+  let acknowledgedGeneration = 0;
   let pendingReady = false;
   let inFlight: Promise<void> | null = null;
   let inFlightDocument: DesignDocument | null = null;
+  let inFlightGeneration: number | null = null;
   let hydration: Promise<void> | null = null;
   let hydrationSettled = false;
   let flushRequested = false;
@@ -80,8 +88,9 @@ export function createPersonalDesignController(
     if (!pendingDocument || blockedByConflict) return Promise.resolve();
 
     const savingDocument = pendingDocument;
+    const savingGeneration = pendingGeneration;
     inFlightDocument = savingDocument;
-    pendingDocument = null;
+    inFlightGeneration = savingGeneration;
     pendingReady = false;
     publish({ ...snapshot, personalState: "saving" });
 
@@ -91,12 +100,15 @@ export function createPersonalDesignController(
     });
     inFlight = request
       .then((response) => {
+        if (savingGeneration <= acknowledgedGeneration) return;
         const savedDocument = validDocument(response.document);
         if (!savedDocument) {
           pendingReady = false;
           publish({ ...snapshot, personalState: "invalid" });
           return;
         }
+        acknowledgedGeneration = savingGeneration;
+        if (pendingGeneration === savingGeneration) pendingDocument = null;
         publish({
           ...snapshot,
           document: pendingDocument ?? savedDocument,
@@ -106,6 +118,7 @@ export function createPersonalDesignController(
         });
       })
       .catch((error: unknown) => {
+        if (savingGeneration <= acknowledgedGeneration) return;
         if (error instanceof ApiError && error.status === 409) {
           blockedByConflict = true;
           publish({ ...snapshot, personalState: "conflict" });
@@ -116,7 +129,13 @@ export function createPersonalDesignController(
       .finally(() => {
         inFlight = null;
         inFlightDocument = null;
-        if (pendingDocument && pendingReady && !blockedByConflict) void savePending();
+        inFlightGeneration = null;
+        if (
+          pendingDocument
+          && pendingReady
+          && pendingGeneration !== savingGeneration
+          && !blockedByConflict
+        ) void savePending();
       });
     return inFlight;
   };
@@ -207,6 +226,7 @@ export function createPersonalDesignController(
         return false;
       }
       pendingDocument = document;
+      pendingGeneration += 1;
       publish({
         ...snapshot,
         document,
@@ -235,26 +255,53 @@ export function createPersonalDesignController(
       pendingReady = true;
       await savePending();
       await waitForInFlight();
+      return {
+        persisted: pendingDocument === null && inFlight === null,
+        state: snapshot.personalState,
+      };
     },
     flushForPageExit: () => {
       flushRequested = true;
       if (!hydrationSettled) return;
       if (debounceTimer) clearTimeout(debounceTimer);
       debounceTimer = null;
-      if (!pendingDocument) return;
-      if (!pageExitSafe(pendingDocument) || !pageExitSafe(inFlightDocument)) {
+      const closingDocument = pendingDocument ?? inFlightDocument;
+      const closingGeneration = pendingDocument ? pendingGeneration : inFlightGeneration;
+      if (!closingDocument || closingGeneration === null) return;
+      if (!pageExitSafe(closingDocument) || !pageExitSafe(inFlightDocument)) {
         pendingReady = true;
         void savePending();
         return;
       }
-      const closingDocument = pendingDocument;
-      pendingDocument = null;
-      pendingReady = false;
       void api.designStudioPutForPageExit({
         document: closingDocument,
         expected_revision: snapshot.revision,
         superseded_document: inFlightDocument,
-      }).catch(() => undefined);
+      }).then((response) => {
+        if (closingGeneration <= acknowledgedGeneration) return;
+        const savedDocument = validDocument(response.document);
+        if (!savedDocument) {
+          publish({ ...snapshot, personalState: "invalid" });
+          return;
+        }
+        acknowledgedGeneration = closingGeneration;
+        if (pendingGeneration === closingGeneration) pendingDocument = null;
+        publish({
+          ...snapshot,
+          document: pendingDocument ?? savedDocument,
+          lastValidDocument: savedDocument,
+          personalState: pendingDocument ? "saving" : "ready",
+          revision: response.revision,
+        });
+      }).catch((error: unknown) => {
+        if (closingGeneration <= acknowledgedGeneration) return;
+        if (error instanceof ApiError && error.status === 409) {
+          blockedByConflict = true;
+          publish({ ...snapshot, personalState: "conflict" });
+          return;
+        }
+        publish({ ...snapshot, personalState: "error" });
+      });
     },
     dispose: () => {
       flushRequested = true;

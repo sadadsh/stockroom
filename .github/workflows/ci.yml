@@ -3,6 +3,7 @@ name: ci
 on:
   push:
   pull_request:
+  workflow_call:
 
 permissions:
   contents: read
@@ -12,7 +13,7 @@ jobs:
     runs-on: windows-latest
     # A hard cap so a hung test (a browser launch that blocks on a headless Windows runner, a git
     # op waiting on a credential prompt) fails the job in minutes instead of running for hours.
-    timeout-minutes: 30
+    timeout-minutes: 60
     env:
       # Git must never block waiting for interactive credentials in CI (on Windows the credential
       # manager can hang a push/pull); fail fast instead so a bad remote surfaces as an error.
@@ -28,6 +29,23 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
+      - name: Validate workflows with pinned actionlint
+        shell: pwsh
+        run: |
+          $archiveName = "actionlint_1.7.12_windows_amd64.zip"
+          $archive = Join-Path $env:RUNNER_TEMP $archiveName
+          $tools = Join-Path $env:RUNNER_TEMP "actionlint-1.7.12"
+          Invoke-WebRequest `
+            -Uri "https://github.com/rhysd/actionlint/releases/download/v1.7.12/$archiveName" `
+            -OutFile $archive
+          $actual = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant()
+          $expected = "6e7241b51e6817ea6a047693d8e6fed13b31819c9a0dd6c5a726e1592d22f6e9"
+          if ($actual -cne $expected) {
+            throw "The pinned actionlint archive digest is invalid."
+          }
+          Expand-Archive -LiteralPath $archive -DestinationPath $tools
+          $actionlint = Join-Path $tools "actionlint.exe"
+          & $actionlint .github/workflows/ci.yml .github/workflows/release.yml
       - name: Initialize pinned CAD writer source
         shell: pwsh
         run: |
@@ -51,8 +69,18 @@ jobs:
         uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
         with:
           dotnet-version: "10.0.302"
+      - name: Install Pinned Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "24.4.1"
+          cache: npm
+          cache-dependency-path: app/frontend/package-lock.json
       - name: Sync
         run: uv sync --frozen
+      - name: Install frontend dependencies
+        run: npm.cmd --prefix app/frontend ci
+      - name: Run Ruff
+        run: uv run ruff check app/backend scripts tests
       - name: Type check backend
         # Stockroom is a Windows desktop product; check the complete backend on
         # its declared runtime platform, including pywebview and Win32 APIs.
@@ -74,10 +102,33 @@ jobs:
       - name: Run backend suite - serialized Windows state
         run: >-
           uv run pytest tests/backend -q -p no:randomly
-          -m "not live_enrich and (global_windows_mutex or serial_only)"
+          -m "not live_enrich and (global_windows_mutex or performance_budget or serial_only)"
           -n 0
       - name: Run backend suite - parallel safe
         run: >-
           uv run pytest tests/backend -q -p no:randomly
           -m "not live_enrich and not global_windows_mutex and not performance_budget and not serial_only"
           --dist loadgroup -n 4
+      - name: Run frontend suite
+        run: npm.cmd --prefix app/frontend run test:run -- --maxWorkers=1
+      - name: Type check frontend
+        run: npm.cmd --prefix app/frontend run typecheck
+      - name: Verify production build and committed distribution
+        shell: pwsh
+        run: |
+          npm.cmd --prefix app/frontend run build
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $changes = @(git status --porcelain --untracked-files=all -- app/frontend-dist)
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ($changes.Count -ne 0) {
+            $changes | ForEach-Object { Write-Error "frontend-dist $_" }
+            throw "The production build differs from committed app/frontend-dist."
+          }
+      - name: Run Windows package fixture
+        shell: pwsh
+        run: |
+          .\packaging\Build-Windows-Package.ps1 `
+            -Mode Fixture `
+            -Version 1.0.0.0 `
+            -MinimumHostVersion 1.0.0.0 `
+            -OutputRoot (Join-Path $env:RUNNER_TEMP "Stockroom Package Fixture")

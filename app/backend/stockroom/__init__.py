@@ -8,7 +8,7 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-_SOURCE_VERSION = "0.1.0"
+_SOURCE_VERSION = "1.0.0"
 _BUILD_IDENTITY_NAME = "stockroom-build-identity.json"
 _VERSION_PATTERN = re.compile(
     r"(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\."

@@ -355,6 +355,9 @@ export interface PassiveAddBody {
   price_breaks?: { qty: number; price: number }[];
   stock?: number;
   catalog?: Record<string, CatalogProductData>;
+  enrichment?: Record<string, { source: string; confidence: string }>;
+  official_payloads?: Record<string, Record<string, unknown>>;
+  official_evidence?: Record<string, OfficialEvidenceBinding>;
 }
 
 export interface ApiErrorBody {
@@ -469,6 +472,13 @@ export interface PassiveAddPlan {
   tolerance: string;
 }
 
+export interface OfficialEvidenceBinding {
+  provider: string;
+  queried_mpn: string;
+  canonical_mpn: string;
+  selected_values: Record<string, unknown>;
+}
+
 export interface EnrichmentResult {
   category: string;
   mpn: SourcedField | null;
@@ -512,6 +522,12 @@ export interface EnrichmentResult {
   // vendor key ("mouser"/"digikey"). Fixed vocabulary; optional so cached results
   // written before the field existed still type-check.
   source_states?: Record<string, EnrichSourceState>;
+  /** Complete successful official responses carried through initial Add into sourced/. */
+  official_payloads?: Record<string, Record<string, unknown>>;
+  /** Identity and selected-value index paired one-for-one with official_payloads. */
+  official_evidence?: Record<string, OfficialEvidenceBinding>;
+  /** Non-API authorities that independently proved the exact requested MPN. */
+  identity_authorities?: string[];
   // Official distributor keyword results shown only after an exact miss. Choosing one starts a
   // new exact lookup; candidates never populate a part automatically.
   identity_suggestions?: Record<string, string[]>;
@@ -565,6 +581,8 @@ export interface StagingCandidate {
   // per-key provenance for `specs`, the same trip and the same reason
   enrichment?: Record<string, { source: string; confidence: string }>;
   catalog?: Record<string, CatalogProductData>;
+  official_payloads?: Record<string, Record<string, unknown>>;
+  official_evidence?: Record<string, OfficialEvidenceBinding>;
   // carries the datasheet source_url onto the committed record; absent on
   // candidates staged before it was round-tripped
   provenance?: {
@@ -1790,6 +1808,45 @@ export interface AltiumSetupResult {
   symbol_library: string;
   footprint_library: string;
   receipt_path: string;
+}
+
+export type CatalogBuildState = "current" | "pending" | "building";
+
+export interface CatalogBuildPart {
+  id: string;
+  display_name: string;
+  identity: string;
+}
+
+export interface CatalogBuildItem {
+  part_id: string;
+  status: "current" | "failed";
+  detail: string;
+}
+
+export interface CatalogBuildResult {
+  status: "completed" | "partial" | "failed";
+  primary_eda: "kicad" | "altium";
+  tool_label: string;
+  attempted: number;
+  succeeded: number;
+  failed: number;
+  started_at: string;
+  completed_at: string;
+  items: CatalogBuildItem[];
+}
+
+export interface CatalogBuildStatus {
+  state: CatalogBuildState;
+  primary_eda: "kicad" | "altium" | null;
+  tool_label: string;
+  desired_identity: string;
+  completed_identity: string;
+  pending_count: number;
+  pending_parts: CatalogBuildPart[];
+  blocked_parts: Array<{ id: string; detail: string }>;
+  last_result: CatalogBuildResult | null;
+  history: CatalogBuildResult[];
 }
 
 // A single icon override in the POST /api/dev/save request (dev-mode v2): either `body` (raw inner
@@ -3150,6 +3207,33 @@ export interface CaptureAttachmentProposal {
   primary_tool: "kicad" | "altium" | "both";
   attachments: CaptureAttachmentProposalItem[];
   inactive_evidence: Array<{ tool: "kicad" | "altium"; file_name: string }>;
+  landed_files?: string[];
+  remaining_roles?: string[];
+  automatic_apply_ready?: boolean;
+}
+
+export interface ManualCadReady {
+  attached: string[];
+  edas: Array<"kicad" | "altium">;
+  landed_files: string[];
+  part_complete: boolean;
+  provider_id: string;
+  remaining_roles: string[];
+  warning?: string;
+}
+
+export interface ManualProviderBrowserSession {
+  session_id: string;
+  part_id: string;
+  provider_id: string;
+  url: string;
+  browser_owner_id: string;
+  state: "starting" | "active" | "stalled" | "ready" | "replaced" | "closed" | "failed" | "expired";
+  proposal: CaptureAttachmentProposal | null;
+  error: string;
+  browser_state: CaptureBrowserState | null;
+  download_progress?: CaptureDownloadProgress | null;
+  cad_ready?: ManualCadReady | null;
 }
 
 export interface CaptureWorkflowSession {

@@ -391,7 +391,9 @@ def _specification(
     override=None,
 ) -> dict[str, Any]:
     resolution = resolve(
-        candidates, pinned_source=str(getattr(override, "preferred_source", "") or "")
+        candidates,
+        pinned_source=str(getattr(override, "preferred_source", "") or ""),
+        exclude_discovery_sources=True,
     )
     override_view, pin_view = _decision_views(override, resolution)
     preferred = resolution.preferred
@@ -714,7 +716,7 @@ def record_field(record, key: str, label: str, value: object) -> dict[str, Any]:
                 unit="",
             )
         )
-    resolution = resolve(candidates)
+    resolution = resolve(candidates, exclude_discovery_sources=True)
     preferred = resolution.preferred
     return {
         "key": key,

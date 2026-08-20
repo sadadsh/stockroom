@@ -11,6 +11,7 @@ import { ToastProvider } from "../../lib/toast";
 import { DesignStudioProvider, useDesignStudio } from "../DesignStudioProvider";
 import { DesignStudioShell } from "../../components/design-mode/DesignStudioShell";
 import { bootstrapScenarioRegistry } from ".";
+import { useOnboarding } from "../../api/queries";
 
 function scenarioTarget(target: string): Element | null {
   return document.querySelector(`[data-dev-id="${target}"], [data-dev-role="${target}"]`);
@@ -21,6 +22,11 @@ function ScenarioProbe({ expose }: { expose: (activate: (id: string) => Promise<
   useEffect(() => {
     expose(studio.activateScenario);
   }, [expose, studio.activateScenario]);
+  return null;
+}
+
+function ReadyOnboardingProbe() {
+  useOnboarding();
   return null;
 }
 
@@ -46,6 +52,20 @@ export async function mountScenario(id: string) {
   const user = userEvent.setup();
   const scenario = bootstrapScenarioRegistry.scenarioById(id);
   if (!scenario) throw new Error(`Unknown Design Studio scenario '${id}'.`);
+  const onboardingRevalidationFailure = scenario.fixtures.find((fixture) =>
+    fixture.method === "GET" &&
+    fixture.path === "/api/onboarding" &&
+    fixture.behavior?.state === "error"
+  );
+  if (onboardingRevalidationFailure) {
+    // The application has already completed Guided Setup before Design Studio opens. Preserve
+    // that last successful read so this fixture exercises the real post-load refetch-error branch
+    // instead of turning a Settings scenario into the first-run setup gate.
+    queryClient.setQueryDefaults(["onboarding"], { staleTime: Infinity });
+    queryClient.setQueryData(["onboarding"], onboardingRevalidationFailure.response, {
+      updatedAt: Date.now(),
+    });
+  }
   let activateScenario: ((scenarioId: string) => Promise<void>) | undefined;
   const expose = (activate: (scenarioId: string) => Promise<void>) => {
     activateScenario = activate;
@@ -68,10 +88,14 @@ export async function mountScenario(id: string) {
       </ThemeProvider>
     </QueryClientProvider>
   );
-  const view = render(tree(null));
+  const product = <DesignStudioShell><App /></DesignStudioShell>;
+  const view = render(tree(onboardingRevalidationFailure ? <ReadyOnboardingProbe /> : null));
   await waitFor(() => expect(activateScenario).toBeDefined());
+  if (onboardingRevalidationFailure) {
+    await waitFor(() => expect(queryClient.getQueryData(["onboarding"])).toBeDefined());
+  }
   await act(async () => activateScenario?.(id));
-  view.rerender(tree(<DesignStudioShell><App /></DesignStudioShell>));
+  view.rerender(tree(product));
   await waitFor(() =>
     expect(
       scenarioTarget("shell.root")

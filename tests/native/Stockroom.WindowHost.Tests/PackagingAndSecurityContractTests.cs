@@ -118,10 +118,18 @@ public sealed class PackagingAndSecurityContractTests
                 "webview.postMessage({",
                 StringSplitOptions.None).Length - 1);
         Assert.Equal(
-            1,
+            3,
             allSource.Split(
                 "PostWebMessageAsJson",
                 StringSplitOptions.None).Length - 1);
+        Assert.Contains(
+            "stockroom.host.provider-close-requested",
+            allSource,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "stockroom.host.provider-command-result",
+            allSource,
+            StringComparison.Ordinal);
         Assert.Contains(
             "stockroom.host.folder-request",
             allSource,
@@ -205,6 +213,18 @@ public sealed class PackagingAndSecurityContractTests
             "<AssemblyName>Stockroom.WindowHost</AssemblyName>",
             project,
             StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void PackagedWorkerMustProveItsPidBeforeTheHostAcceptsItsLoopbackEndpoint()
+    {
+        var source = File.ReadAllText(
+            Path.Combine(FindProjectDirectory(), "PackagedWorkerRuntime.cs"));
+
+        Assert.Contains("X-Stockroom-Startup-Nonce", source, StringComparison.Ordinal);
+        Assert.Contains("VerifyStartupProof", source, StringComparison.Ordinal);
+        Assert.Contains("_process.Id", source, StringComparison.Ordinal);
+        Assert.Contains("startup_proof", source, StringComparison.Ordinal);
     }
 
     private static string FindProjectDirectory()

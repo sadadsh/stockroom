@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from stockroom.dossier import component_dossier
 from stockroom.dossier.categories import SCHEMAS_BY_KEY, resolve_schema
-from stockroom.dossier.specifications import build_specifications, is_presented
+from stockroom.dossier.specifications import build_specifications, is_presented, record_field
 from stockroom.dossier.vocabulary import (
     APPLICABILITY_STATES,
     CATEGORY_GROUPS,
@@ -180,18 +180,85 @@ def test_one_value_holds_the_slot_and_the_owners_distributor_order_decides_which
     assert item["verificationState"] == "conflicting"
 
 
-def test_a_field_only_lcsc_reports_is_shown_and_attributed_to_lcsc():
+def test_a_field_only_lcsc_reports_stays_as_evidence_but_is_not_a_displayed_fact():
     record = records.resistor()
     record.alternates = {"Tolerance": [SourcedValue(value="1%", source="lcsc")]}
     item = _by_key(record)["tolerance"]
-    assert item["preferredValue"] == "1%"
-    assert item["preferredSource"]["sourceId"] == "lcsc"
-    assert item["preferredSource"]["sourceLabel"] == "LCSC"
-    # A distributor answer, no longer `Parsed Or Inferred`, which is what it read as while the
-    # provider registry did not know LCSC existed.
-    assert item["preferredSource"]["tier"] == "authorized_distributor"
-    assert item["preferredSource"]["tierLabel"] == "Trusted Authorized Distributor"
+    assert item["preferredValue"] is None
+    assert item["preferredSource"] is None
+    assert [candidate["sourceId"] for candidate in item["sourceCandidates"]] == ["lcsc"]
     assert item["conflictState"] == "none"
+
+    visible = [
+        row
+        for group in component_dossier(record)["specificationGroups"]
+        for row in group["specifications"]
+    ]
+    assert "tolerance" not in {row["key"] for row in visible}
+
+
+def test_legacy_identity_keeps_discovery_provenance_without_using_it_as_the_visible_fact():
+    record = records.resistor(manufacturer="Discovery Maker")
+    record.enrichment["manufacturer"] = EnrichmentField(source="lcsc", confidence="medium")
+    record.alternates["manufacturer"] = [
+        SourcedValue(value="Discovery Maker", source="lcsc", confidence="medium")
+    ]
+
+    discovery_only = record_field(record, "manufacturer", "Manufacturer", record.manufacturer)
+    assert discovery_only["preferredValue"] is None
+    assert [candidate["sourceId"] for candidate in discovery_only["sourceCandidates"]] == ["lcsc"]
+
+    record.alternates["manufacturer"].append(
+        SourcedValue(value="Discovery Maker", source="digikey", confidence="high")
+    )
+    confirmed = record_field(record, "manufacturer", "Manufacturer", record.manufacturer)
+    assert confirmed["preferredValue"] == "Discovery Maker"
+    assert confirmed["preferredSource"]["sourceId"] == "digikey"
+    assert {candidate["sourceId"] for candidate in confirmed["sourceCandidates"]} == {
+        "digikey",
+        "lcsc",
+    }
+
+
+def test_opened_legacy_component_does_not_present_discovery_identity_as_fact():
+    record = records.resistor(
+        manufacturer="Discovery Maker",
+        description="A scraped catalogue description",
+    )
+    record.enrichment.update(
+        {
+            "manufacturer": EnrichmentField(source="lcsc", confidence="medium"),
+            "description": EnrichmentField(source="provider_scrape", confidence="medium"),
+        }
+    )
+    record.alternates.update(
+        {
+            "manufacturer": [
+                SourcedValue(value=record.manufacturer, source="lcsc", confidence="medium")
+            ],
+            "description": [
+                SourcedValue(
+                    value=record.description,
+                    source="provider_scrape",
+                    confidence="medium",
+                )
+            ],
+        }
+    )
+
+    dossier = component_dossier(record)
+
+    assert dossier["identity"]["manufacturer"] == ""
+    assert dossier["qualitySummary"]["description"] == ""
+    assert "manufacturer" in dossier["qualitySummary"]["missingPassportFields"]
+    assert "value/description" in dossier["qualitySummary"]["missingPassportFields"]
+    assert {item["id"] for item in dossier["qualitySummary"]["attention"]} >= {
+        "identity.manufacturer",
+        "identity.description",
+    }
+    fields = {item["key"]: item for item in dossier["provenance"]["recordFields"]}
+    assert fields["manufacturer"]["sourceCandidates"][0]["sourceId"] == "lcsc"
+    assert fields["description"]["sourceCandidates"][0]["sourceId"] == "provider_scrape"
 
 
 def test_mouser_holds_the_slot_against_digikey_lcsc_and_the_datasheet():
@@ -558,6 +625,21 @@ def test_a_fully_described_part_scores_one_and_an_empty_one_scores_zero():
     assert component_dossier(full)["qualitySummary"]["completeness"]["score"] == 1.0
     empty = records.resistor(specs={})
     assert component_dossier(empty)["qualitySummary"]["completeness"]["score"] == 0.0
+
+
+def test_schema_gaps_are_summarized_without_becoming_visible_specification_rows():
+    dossier = component_dossier(records.resistor(specs={}))
+    rows = [
+        *dossier["keySpecifications"],
+        *[
+            item
+            for group in dossier["specificationGroups"]
+            for item in group["specifications"]
+        ],
+    ]
+
+    assert rows == []
+    assert dossier["qualitySummary"]["completeness"]["missingExpected"]
 
 
 def test_the_same_part_scores_differently_under_two_categories():

@@ -26,7 +26,27 @@ describe("DesignPreviewBoundary", () => {
     );
 
     expect(screen.getByRole("alert")).toHaveTextContent("Preview stopped before Stockroom could go blank");
-    fireEvent.click(screen.getByRole("button", { name: "Undo Last Design Change" }));
+    fireEvent.click(screen.getByRole("button", { name: "Recover Preview" }));
     expect(recover).toHaveBeenCalledTimes(1);
+  });
+
+  it("remounts the preview even when recovery has no history entry", () => {
+    let broken = true;
+    function RecoverablePreview() {
+      if (broken) throw new Error("preview render failed once");
+      return <p>Recovered Product Preview</p>;
+    }
+    const recoverWithoutHistory = () => {
+      broken = false;
+    };
+    render(
+      <DesignPreviewBoundary resetKey="unchanged-draft" onRecover={recoverWithoutHistory}>
+        <RecoverablePreview />
+      </DesignPreviewBoundary>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Recover Preview" }));
+
+    expect(screen.getByText("Recovered Product Preview")).toBeInTheDocument();
   });
 });

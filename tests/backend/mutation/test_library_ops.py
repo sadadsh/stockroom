@@ -3,17 +3,20 @@ from types import SimpleNamespace
 
 import pytest
 
+from stockroom.ingest.passive_add import build_passive_record
 from stockroom.kicad.footprint import Footprint
 from stockroom.kicad.symbol_lib import SymbolLib
-from stockroom.model.part import Datasheet, PartRecord, Purchase
+from stockroom.model.part import Datasheet, EnrichmentField, PartRecord, Purchase
 from stockroom.model.part_class import PartClass
 from stockroom.model.part_id import make_part_id
 from stockroom.mutation.library_ops import (
     IncompleteError,
     LibraryOps,
+    MpnConflictError,
     StagedPart,
     staged_missing_fields,
 )
+from stockroom.store.index import LibraryIndex
 from stockroom.store.profile import ProfileStore
 from stockroom.vcs.repo import GitRepo
 
@@ -390,6 +393,188 @@ def test_add_part_rolls_back_on_duplicate_symbol(tmp_path, fixtures_dir):
     assert repo.is_clean()
     # only one part json exists
     assert len(list(profile.library.parts_dir.glob("*.json"))) == 1
+
+
+def _library_bytes(root):
+    return {
+        path.relative_to(root).as_posix(): path.read_bytes()
+        for path in root.rglob("*")
+        if path.is_file()
+    }
+
+
+def test_add_part_rejects_exact_mpn_before_writing_and_preserves_existing_assets(
+    tmp_path, fixtures_dir, monkeypatch
+):
+    repo, profile, staged = _setup(tmp_path, fixtures_dir)
+    ops = LibraryOps(profile, repo)
+    existing = ops.add_part(staged)
+    before_head = repo.head()
+    before_bytes = _library_bytes(profile.library.root)
+
+    duplicate = StagedPart(**{**staged.__dict__})
+    duplicate.symbol_source = None
+    duplicate.footprint_source = None
+    duplicate.model_source = None
+    duplicate.datasheet_source = None
+    duplicate.datasheet_meta = Datasheet(source_url="https://example.com/new.pdf")
+    duplicate.entry_name = ""
+
+    path_write_text = type(profile.library.parts_dir).write_text
+
+    def reject_part_write(path, *args, **kwargs):
+        if path.parent == profile.library.parts_dir:
+            raise AssertionError(f"duplicate add attempted to write {path.name}")
+        return path_write_text(path, *args, **kwargs)
+
+    monkeypatch.setattr(type(profile.library.parts_dir), "write_text", reject_part_write)
+
+    with pytest.raises(MpnConflictError) as caught:
+        ops.add_part(duplicate)
+
+    assert caught.value.existing_part_id == existing.id
+    assert repo.head() == before_head
+    assert _library_bytes(profile.library.root) == before_bytes
+    assert repo.is_clean()
+
+
+def test_add_part_rejects_normalized_mpn_before_any_part_file_write(
+    tmp_path, fixtures_dir, monkeypatch
+):
+    repo, profile, staged = _setup(tmp_path, fixtures_dir)
+    staged.mpn = "ABC-123"
+    staged.entry_name = "ABC-123"
+    ops = LibraryOps(profile, repo)
+    existing = ops.add_part(staged)
+    index = LibraryIndex.build(profile.library.parts_dir)
+    assert [row.id for row in index.find_by_mpn("ABC.123")] == [existing.id]
+    index.close()
+    before_head = repo.head()
+    before_bytes = _library_bytes(profile.library.root)
+
+    duplicate = StagedPart(**{**staged.__dict__})
+    duplicate.mpn = "ABC.123"
+    duplicate.symbol_source = None
+    duplicate.footprint_source = None
+    duplicate.model_source = None
+    duplicate.datasheet_source = None
+    duplicate.datasheet_meta = Datasheet(source_url="https://example.com/new.pdf")
+    duplicate.entry_name = ""
+    path_write_text = type(profile.library.parts_dir).write_text
+
+    def reject_part_write(path, *args, **kwargs):
+        if path.parent == profile.library.parts_dir:
+            raise AssertionError(f"normalized duplicate attempted to write {path.name}")
+        return path_write_text(path, *args, **kwargs)
+
+    monkeypatch.setattr(type(profile.library.parts_dir), "write_text", reject_part_write)
+
+    with pytest.raises(MpnConflictError) as caught:
+        ops.add_part(duplicate)
+
+    assert caught.value.existing_part_id == existing.id
+    assert caught.value.existing_mpn == staged.mpn
+    assert repo.head() == before_head
+    assert _library_bytes(profile.library.root) == before_bytes
+    assert repo.is_clean()
+
+
+def test_add_passive_part_uses_catalog_mpn_identity_before_any_part_file_write(
+    tmp_path, fixtures_dir, monkeypatch
+):
+    repo, profile, _ = _setup(tmp_path, fixtures_dir)
+    ops = LibraryOps(profile, repo)
+    record = build_passive_record(
+        "RC0603FR-0710KL",
+        datasheet_url="https://example.com/resistor.pdf",
+    ).record
+    record.mpn = "ABC-123"
+    existing = ops.add_passive_part(record)
+    before_head = repo.head()
+    before_bytes = _library_bytes(profile.library.root)
+
+    duplicate = PartRecord.from_dict(existing.to_dict())
+    duplicate.id = ""
+    duplicate.mpn = "ABC.123"
+    path_write_text = type(profile.library.parts_dir).write_text
+
+    def reject_part_write(path, *args, **kwargs):
+        if path.parent == profile.library.parts_dir:
+            raise AssertionError(f"passive duplicate attempted to write {path.name}")
+        return path_write_text(path, *args, **kwargs)
+
+    monkeypatch.setattr(type(profile.library.parts_dir), "write_text", reject_part_write)
+
+    with pytest.raises(MpnConflictError) as caught:
+        ops.add_passive_part(duplicate)
+
+    assert caught.value.existing_part_id == existing.id
+    assert repo.head() == before_head
+    assert _library_bytes(profile.library.root) == before_bytes
+    assert repo.is_clean()
+
+
+def test_add_passive_part_persists_initial_official_payloads_and_source_index(
+    tmp_path, fixtures_dir
+):
+    repo, profile, _ = _setup(tmp_path, fixtures_dir)
+    ops = LibraryOps(profile, repo)
+    record = build_passive_record(
+        "RC0603FR-0710KL",
+        datasheet_url="https://example.com/resistor.pdf",
+    ).record
+
+    created = ops.add_passive_part(
+        record,
+        official_payloads={"mouser": {"SearchResults": {"Parts": [{"ManufacturerPartNumber": "RC0603FR-0710KL"}]}}},
+        official_evidence={"mouser": {
+            "provider": "mouser",
+            "queried_mpn": "RC0603FR-0710KL",
+            "canonical_mpn": "RC0603FR-0710KL",
+            "selected_values": {"mpn": "RC0603FR-0710KL"},
+        }},
+        now="2026-08-19T12:00:00Z",
+    )
+
+    payload_path = repo.root / "sourced" / created.id / "mouser.json"
+    assert payload_path.exists()
+    stored = ops.load_record(created.id)
+    assert stored.sources["mouser"].file == f"sourced/{created.id}/mouser.json"
+    assert stored.sources["mouser"].fetched_at == "2026-08-19T12:00:00Z"
+    assert stored.sources["mouser"].extra["state"] == "success"
+
+
+def test_add_reference_part_uses_catalog_mpn_identity_before_any_part_file_write(
+    tmp_path, fixtures_dir, monkeypatch
+):
+    repo, profile, _ = _setup(tmp_path, fixtures_dir)
+    ops = LibraryOps(profile, repo)
+    record = _refless_record()
+    record.mpn = "ABC-123"
+    record.display_name = "ABC-123"
+    existing = ops.add_reference_part(record)
+    before_head = repo.head()
+    before_bytes = _library_bytes(profile.library.root)
+
+    duplicate = PartRecord.from_dict(existing.to_dict())
+    duplicate.id = ""
+    duplicate.mpn = "ABC.123"
+    path_write_text = type(profile.library.parts_dir).write_text
+
+    def reject_part_write(path, *args, **kwargs):
+        if path.parent == profile.library.parts_dir:
+            raise AssertionError(f"reference duplicate attempted to write {path.name}")
+        return path_write_text(path, *args, **kwargs)
+
+    monkeypatch.setattr(type(profile.library.parts_dir), "write_text", reject_part_write)
+
+    with pytest.raises(MpnConflictError) as caught:
+        ops.add_reference_part(duplicate)
+
+    assert caught.value.existing_part_id == existing.id
+    assert repo.head() == before_head
+    assert _library_bytes(profile.library.root) == before_bytes
+    assert repo.is_clean()
 
 
 def test_edit_field_updates_json_and_mirror(tmp_path, fixtures_dir):
@@ -952,6 +1137,98 @@ def test_add_part_persists_provenance_and_alternates(tmp_path, fixtures_dir):
     ]
 
 
+def test_add_part_persists_initial_official_payloads_and_source_index(tmp_path, fixtures_dir):
+    """Initial Add must be re-derivable without paying for an immediate Refresh Evidence."""
+    import json
+
+    from stockroom.model.sourced import read_json
+
+    repo, profile, staged = _setup(tmp_path, fixtures_dir)
+    mouser = {
+        "SearchResults": {
+            "Parts": [
+                {
+                    "ManufacturerPartNumber": staged.mpn,
+                    "Manufacturer": staged.manufacturer,
+                    "LifecycleStatus": "Active",
+                }
+            ]
+        }
+    }
+    digikey = {
+        "Product": {
+            "ManufacturerProductNumber": staged.mpn,
+            "ProductDescription": "Six-channel protection array",
+        }
+    }
+    # Dynamic assignment reaches the real add path before the new staging field exists.
+    staged.official_payloads = {"mouser": mouser, "digikey": digikey}
+    staged.specs["Lifecycle"] = "Active"
+    staged.official_evidence = {
+        provider: {
+            "provider": provider,
+            "queried_mpn": staged.mpn,
+            "canonical_mpn": staged.mpn,
+            "selected_values": {
+                "mpn": staged.mpn,
+                **(
+                    {"manufacturer": staged.manufacturer, "Lifecycle": "Active"}
+                    if provider == "mouser"
+                    else {}
+                ),
+            },
+        }
+        for provider in ("mouser", "digikey")
+    }
+    staged.enrichment = {"Lifecycle": {"source": "mouser", "confidence": "high"}}
+
+    record = LibraryOps(profile, repo).add_part(staged, now="2026-08-19T12:00:00Z")
+
+    assert read_json(repo.root, record.id, "mouser") == mouser
+    assert read_json(repo.root, record.id, "digikey") == digikey
+    assert set(record.sources) == {"mouser", "digikey"}
+    for provider in ("mouser", "digikey"):
+        entry = record.sources[provider]
+        assert entry.fetched_at == "2026-08-19T12:00:00Z"
+        assert entry.extra["state"] == "success"
+        assert entry.file == f"sourced/{record.id}/{provider}.json"
+    assert record.enrichment["Lifecycle"].source == "mouser"
+    assert record.sources["mouser"].extra["selected_values"]["manufacturer"] == staged.manufacturer
+    on_disk = json.loads(
+        (profile.library.parts_dir / f"{record.id}.json").read_text(encoding="utf-8")
+    )
+    assert set(on_disk["sources"]) == {"mouser", "digikey"}
+
+
+def test_add_part_rejects_part_a_payload_submitted_as_part_b(tmp_path, fixtures_dir):
+    repo, profile, staged = _setup(tmp_path, fixtures_dir)
+    staged.mpn = "PART-B"
+    staged.display_name = "PART-B"
+    staged.entry_name = "PART-B"
+    staged.official_payloads = {
+        "mouser": {
+            "SearchResults": {"Parts": [{"ManufacturerPartNumber": "PART-A"}]}
+        }
+    }
+    # Even a forged binding that names B cannot make raw part-A bytes evidence for B.
+    staged.official_evidence = {
+        "mouser": {
+            "provider": "mouser",
+            "queried_mpn": "PART-B",
+            "canonical_mpn": "PART-B",
+            "selected_values": {"mpn": "PART-B"},
+        }
+    }
+    before_head = repo.head()
+
+    with pytest.raises(ValueError, match="official evidence.*PART-A.*PART-B"):
+        LibraryOps(profile, repo).add_part(staged)
+
+    assert repo.head() == before_head
+    assert not list((repo.root / "sourced").rglob("*.json"))
+    assert not list(profile.library.parts_dir.glob("part-b*.json"))
+
+
 def test_rebuild_refiles_a_FILE_LESS_part_its_vendors_can_name(tmp_path, fixtures_dir):
     """An ALREADY-ADDED record stuck on "Other" gets re-filed by a rebuild.
 
@@ -978,6 +1255,9 @@ def test_rebuild_refiles_a_FILE_LESS_part_its_vendors_can_name(tmp_path, fixture
     # re-file has to relocate them.
     rec.part_class = PartClass.PASSIVE
     rec.specs["Product Category"] = "ESD Protection Diodes / TVS Diodes"
+    rec.enrichment["Product Category"] = EnrichmentField(
+        source="mouser", confidence="high"
+    )
     (profile.library.parts_dir / f"{TPS_ID}.json").write_text(rec.dumps(), encoding="utf-8")
     repo.commit("stage an unclassified record",
                 [profile.library.parts_dir / f"{TPS_ID}.json"])
@@ -1087,6 +1367,9 @@ def test_refiling_during_a_rebuild_RELOCATES_the_assets_not_just_the_field(tmp_p
     ops.move_category(TPS_ID, "Other")
     rec = ops.load_record(TPS_ID)
     rec.specs["Product Category"] = "ESD Protection Diodes / TVS Diodes"
+    rec.enrichment["Product Category"] = EnrichmentField(
+        source="mouser", confidence="high"
+    )
     (profile.library.parts_dir / f"{TPS_ID}.json").write_text(rec.dumps(), encoding="utf-8")
     repo.commit("stage a filed-wrong part that OWNS files",
                 [profile.library.parts_dir / f"{TPS_ID}.json"])

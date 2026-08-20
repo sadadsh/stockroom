@@ -38,6 +38,7 @@ describe("PulledDepth", () => {
     expect(screen.getByText("Active")).toBeInTheDocument();
     // best price = the lowest unit price across the ladder (the high-quantity break).
     expect(screen.getByText("$0.043/ea")).toBeInTheDocument();
+    expect(screen.getByText("5,616 in stock").parentElement).not.toHaveClass("border");
   });
 
   it("flags the distributor source and exposes its order number (A3)", () => {

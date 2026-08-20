@@ -12,6 +12,7 @@ describe("captureRequirementsForEdas", () => {
     expect(captureRequirementsForEdas(["altium"])).toEqual([
       "altium_symbol",
       "altium_footprint",
+      "kicad_model",
     ]);
   });
 

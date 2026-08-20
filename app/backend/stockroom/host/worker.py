@@ -14,6 +14,7 @@ def main() -> None:
     token = os.environ.pop("STOCKROOM_HANDOFF_TOKEN", "")
     if not token:
         raise SystemExit("STOCKROOM_HANDOFF_TOKEN is required")
+    startup_proof_token = os.environ.pop("STOCKROOM_STARTUP_PROOF_TOKEN", "")
 
     release_id = os.environ.pop("STOCKROOM_RELEASE_ID", "")
     generation_text = os.environ.pop("STOCKROOM_SERVICE_GENERATION", "")
@@ -43,6 +44,8 @@ def main() -> None:
             raise SystemExit("managed release worker identity is incomplete")
     elif production:
         raise SystemExit("production release worker authority is required")
+    if production and coordinator and not startup_proof_token:
+        raise SystemExit("STOCKROOM_STARTUP_PROOF_TOKEN is required")
 
     import uvicorn
 
@@ -66,6 +69,8 @@ def main() -> None:
     else:
         ctx = build_context(cold=managed)
     ctx.token = token
+    if startup_proof_token:
+        ctx.startup_proof_token = startup_proof_token
     authority = None
     production_update_runtime = None
     if managed and not coordinator:

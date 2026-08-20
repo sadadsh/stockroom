@@ -34,10 +34,14 @@ import { DEV_IDS, DEV_ID_BY_ID, DEV_ID_AREAS } from "../lib/devIds";
 import { usedVarsForElement } from "../lib/inspectVars";
 import {
   devIdScope,
-  nodeForDevId,
+  nodesForDevId,
   renderedDevIds,
-  sharedRoleOf,
 } from "../lib/componentDevIds";
+import {
+  isProtectedDesignRoot,
+  isRootProtectedDesignProperty,
+} from "../lib/designIdentity";
+import { targetDomainOverrideId } from "../design-studio/targetDomains";
 import {
   containerLayoutOf,
   gridColumnsOf,
@@ -486,28 +490,28 @@ function TokensTab({ showAll, setShowAll }: { showAll: boolean; setShowAll: (v: 
 // direct <Text> click path (which sets selectedCopyId with no selectedDevId) still works untouched.
 function CopyTab() {
   const dev = useDevMode();
-  const { selectedDevId, selectedCopyId, selectCopy, clearSelectedCopy } = dev;
+  const { selectedDevId, selectedTarget, selectedCopyId, selectCopy, clearSelectedCopy } = dev;
 
-  const copyId = useMemo(() => {
-    if (!selectedDevId) return null;
-    const el = nodeForDevId(selectedDevId);
+  const copyTarget = useMemo(() => {
+    const el = selectedTarget?.element;
     if (!el) return null;
     const c = el.querySelector("[data-copy-id]") ?? el.closest("[data-copy-id]");
-    return c?.getAttribute("data-copy-id") ?? null;
-  }, [selectedDevId]);
+    const id = c?.getAttribute("data-copy-id") ?? null;
+    return id && c ? { id, element: c } : null;
+  }, [selectedTarget]);
+  const copyId = copyTarget?.id ?? null;
 
   useEffect(() => {
     if (!selectedDevId) return; // the direct <Text> click owns selectedCopyId; leave it alone
-    if (copyId && copyId !== selectedCopyId) {
-      const el = document.querySelector(`[data-copy-id="${CSS.escape(copyId)}"]`);
+    if (copyTarget && copyId && copyId !== selectedCopyId) {
       // The raw TEMPLATE, not the rendered text: reading textContent back would bake this render's
       // substituted values into the default and make every placeholder look like a missing one.
-      const template = el?.getAttribute("data-copy-default") ?? el?.textContent ?? "";
+      const template = copyTarget.element.getAttribute("data-copy-default") ?? copyTarget.element.textContent ?? "";
       selectCopy(copyId, template);
     } else if (!copyId && selectedCopyId) {
       clearSelectedCopy();
     }
-  }, [selectedDevId, copyId, selectedCopyId, selectCopy, clearSelectedCopy]);
+  }, [selectedDevId, copyId, copyTarget, selectedCopyId, selectCopy, clearSelectedCopy]);
 
   return <CopyEditor />;
 }
@@ -522,18 +526,17 @@ function CopyTab() {
 // -edit). With no icon in the selection it shows an empty state, mirroring the Copy tab.
 function IconTab() {
   const dev = useDevMode();
-  const { selectedDevId } = dev;
+  const { selectedTarget } = dev;
 
   const iconId = useMemo(() => {
-    if (!selectedDevId) return null;
-    const el = nodeForDevId(selectedDevId);
+    const el = selectedTarget?.element;
     if (!el) return null;
     const i =
       (el.matches("[data-icon-id]") ? el : null) ??
       el.querySelector("[data-icon-id]") ??
       el.closest("[data-icon-id]");
     return i?.getAttribute("data-icon-id") ?? null;
-  }, [selectedDevId]);
+  }, [selectedTarget]);
 
   if (!iconId) {
     return (
@@ -629,11 +632,11 @@ function IconTab() {
           Treatment
           <select
             aria-label="Icon treatment"
-            value={dev.iconOverrideFor(iconId)?.treatment ?? "line"}
-            onChange={(event) => dev.setIconPresentation(iconId, { treatment: event.target.value as "line" | "solid" | "muted" })}
+            value={dev.iconOverrideFor(iconId)?.treatment === "muted" ? "muted" : "line"}
+            onChange={(event) => dev.setIconPresentation(iconId, { treatment: event.target.value as "line" | "muted" })}
             className="mt-1 w-full rounded-control border border-line bg-field px-2 py-1 text-2xs text-t1"
           >
-            <option value="line">Line</option><option value="solid">Solid</option><option value="muted">Muted</option>
+            <option value="line">Line</option><option value="muted">Muted</option>
           </select>
         </label>
         <label className="text-2xs text-t2">
@@ -774,9 +777,11 @@ const TEXT_PROPS: readonly { prop: string; label: string }[] = [
 
 function TextTab() {
   const dev = useDevMode();
-  const id = dev.selectedDevId ? `${dev.selectedDevId}::text` : null;
+  const id = dev.selectedTarget
+    ? targetDomainOverrideId(dev.selectedTarget.overrideId, "text")
+    : null;
   if (!id) return <div className="px-3.5 py-3 text-2xs text-t3">Select an element to edit its text presentation.</div>;
-  const node = nodeForDevId(dev.selectedDevId!);
+  const node = dev.selectedTarget?.element ?? null;
   const computed = node ? getComputedStyle(node) : null;
   const preset = (kind: "wrap" | "truncate") => {
     dev.setElementProp(id, "white-space", kind === "wrap" ? "normal" : "nowrap");
@@ -803,11 +808,13 @@ function BoxRow({
   prop,
   label,
   placeholder,
+  disabled = false,
 }: {
   id: string;
   prop: string;
   label: string;
   placeholder: string;
+  disabled?: boolean;
 }) {
   const dev = useDevMode();
   const value = dev.elementOverridesFor(id)?.[prop] ?? "";
@@ -826,15 +833,18 @@ function BoxRow({
         title={invalid ? `${label} does not accept this value, so it will not be saved.` : undefined}
         value={value}
         placeholder={placeholder}
+        disabled={disabled}
         onChange={(e) => {
           const next = e.target.value;
           // Clearing the text removes the override, so the token/class styling underneath re-emerges.
+          if (disabled) return;
           if (next === "") dev.resetElementProp(id, prop);
           else dev.setElementProp(id, prop, next);
         }}
         className={
           "tnum w-[104px] flex-none rounded-control border bg-field px-2 py-1 text-2xs font-mono text-t1 outline-none " +
-          (invalid ? "border-err focus:border-err" : "border-line focus:border-focus")
+          (invalid ? "border-err focus:border-err" : "border-line focus:border-focus") +
+          (disabled ? " opacity-40" : "")
         }
       />
     </div>
@@ -904,10 +914,8 @@ function GridSlotControl({
 // index), so each Move Up / Move Down walks the element exactly one step; the recomputed order values
 // are written through Phase E's per-element setter (the same map that applies inline by id and ships in
 // the save `elements` block) - no new persistence path, no reparenting.
-function LayoutSection({ id }: { id: string }) {
+function LayoutSection({ id, node }: { id: string; node: HTMLElement }) {
   const dev = useDevMode();
-  const node = nodeForDevId(id);
-  if (!node) return null;
   const layout = containerLayoutOf(node.parentElement);
   if (layout === "none") return null;
   const siblings = reorderSiblingsOf(node);
@@ -1007,24 +1015,15 @@ function LayoutSection({ id }: { id: string }) {
 // With no selection it shows an empty state, mirroring the Copy / Icon tabs.
 function BoxTab() {
   const dev = useDevMode();
-  const { selectedDevId } = dev;
-  // Which contract the edit is written under. `instance` keys the override on the selected element's
-  // own id; `shared` keys it on the role it declares, which reaches every sibling carrying that role.
-  const [scope, setScope] = useState<"instance" | "shared">("instance");
+  const { selectedDevId, selectedTarget } = dev;
 
   // Resolve the live node once and read its computed style for the placeholders. A catalogue id with
   // no mounted element (a null node) falls back to empty placeholders. getComputedStyle is a live view,
   // so a placeholder reflects the element's current value even after an override is cleared.
-  const node = useMemo(() => (selectedDevId ? nodeForDevId(selectedDevId) : null), [selectedDevId]);
+  const node = selectedTarget?.element instanceof HTMLElement ? selectedTarget.element : null;
   const computed = useMemo(() => (node ? getComputedStyle(node) : null), [node]);
-  const role = sharedRoleOf(node);
 
-  // A new selection starts on its own instance, never on whatever scope the last one was left in.
-  useEffect(() => {
-    setScope("instance");
-  }, [selectedDevId]);
-
-  if (!selectedDevId) {
+  if (!selectedDevId || !selectedTarget || !node) {
     return (
       <div className="px-3.5 py-3 text-2xs text-t3">
         Select an element to override its box size and spacing.
@@ -1032,75 +1031,39 @@ function BoxTab() {
     );
   }
 
-  const isInstance = devIdScope(selectedDevId) === "instance";
-  const targetId = scope === "shared" && role ? role : selectedDevId;
+  const targetId = selectedTarget.overrideId;
   const overrides = dev.elementOverridesFor(targetId);
   const hasAny = overrides != null && Object.keys(overrides).length > 0;
   const placeholderFor = (prop: string) => computed?.getPropertyValue(prop) ?? "";
+  const setSafeProperty = (property: string, value: string) => {
+    if (!isRootProtectedDesignProperty(node, property)) dev.setElementProp(targetId, property, value);
+  };
   const applyPreset = (preset: "fill" | "hide" | "row" | "stack" | "wrap") => {
-    if (preset === "fill") dev.setElementProp(targetId, "width", "100%");
-    if (preset === "hide") dev.setElementProp(targetId, "display", "none");
+    if (preset === "fill") setSafeProperty("width", "100%");
+    if (preset === "hide") setSafeProperty("display", "none");
     if (preset === "row") {
-      dev.setElementProp(targetId, "display", "flex");
-      dev.setElementProp(targetId, "flex-direction", "row");
-      dev.setElementProp(targetId, "align-items", "center");
+      setSafeProperty("display", "flex");
+      setSafeProperty("flex-direction", "row");
+      setSafeProperty("align-items", "center");
     }
     if (preset === "stack") {
-      dev.setElementProp(targetId, "display", "flex");
-      dev.setElementProp(targetId, "flex-direction", "column");
+      setSafeProperty("display", "flex");
+      setSafeProperty("flex-direction", "column");
     }
     if (preset === "wrap") {
-      dev.setElementProp(targetId, "display", "flex");
-      dev.setElementProp(targetId, "flex-wrap", "wrap");
+      setSafeProperty("display", "flex");
+      setSafeProperty("flex-wrap", "wrap");
     }
   };
 
   return (
     <div className="px-3.5 py-2">
-      {/* The instance / shared choice, only where there IS one. An element that names a role as well
-          as itself can be edited either way, and which one is meant is a decision, not a guess. */}
-      {isInstance && role ? (
-        <section className="py-1.5">
-          <SectionHeader title="Applies To" className="mb-1" />
-          <div className="flex gap-1">
-            <button
-              type="button"
-              aria-pressed={scope === "instance"}
-              onClick={() => setScope("instance")}
-              className={
-                "rounded-control border px-2 py-1 text-2xs font-semibold transition-colors " +
-                (scope === "instance"
-                  ? "border-transparent bg-acc text-acc-on"
-                  : "border-line text-t2 hover:text-t1")
-              }
-            >
-              This One
-            </button>
-            <button
-              type="button"
-              aria-pressed={scope === "shared"}
-              onClick={() => setScope("shared")}
-              className={
-                "rounded-control border px-2 py-1 text-2xs font-semibold transition-colors " +
-                (scope === "shared"
-                  ? "border-transparent bg-acc text-acc-on"
-                  : "border-line text-t2 hover:text-t1")
-              }
-            >
-              Every One Of These
-            </button>
-          </div>
-          <div className="mt-1 truncate font-mono text-2xs text-t3" title={targetId}>
-            {targetId}
-          </div>
-        </section>
-      ) : null}
       <section className="py-1.5">
         <SectionHeader title="Presets" className="mb-1" />
         <div className="flex flex-wrap gap-1">
           {([[
             "fill", "Fill Width"], ["row", "Row"], ["stack", "Stack"], ["wrap", "Wrap"], ["hide", "Hide"]] as const).map(([preset, label]) => (
-            <button key={preset} type="button" onClick={() => applyPreset(preset)} className="rounded-control border border-line bg-field px-2 py-1 text-2xs font-semibold text-t2 hover:text-t1">
+            <button key={preset} type="button" disabled={isProtectedDesignRoot(node)} onClick={() => applyPreset(preset)} className="rounded-control border border-line bg-field px-2 py-1 text-2xs font-semibold text-t2 hover:text-t1 disabled:opacity-40">
               {label}
             </button>
           ))}
@@ -1108,7 +1071,7 @@ function BoxTab() {
       </section>
       <section className="py-1.5">
         <SectionHeader title="Position And Insets" className="mb-1" />
-        {BOX_POSITION_PROPS.map((p) => <BoxRow key={p.prop} id={targetId} prop={p.prop} label={p.label} placeholder={placeholderFor(p.prop)} />)}
+        {BOX_POSITION_PROPS.map((p) => <BoxRow key={p.prop} id={targetId} prop={p.prop} label={p.label} placeholder={placeholderFor(p.prop)} disabled={isRootProtectedDesignProperty(node, p.prop)} />)}
       </section>
       <section className="py-1.5">
         <SectionHeader title="Resize" className="mb-1" />
@@ -1119,6 +1082,7 @@ function BoxTab() {
             prop={p.prop}
             label={p.label}
             placeholder={placeholderFor(p.prop)}
+            disabled={isRootProtectedDesignProperty(node, p.prop)}
           />
         ))}
       </section>
@@ -1131,22 +1095,23 @@ function BoxTab() {
             prop={p.prop}
             label={p.label}
             placeholder={placeholderFor(p.prop)}
+            disabled={isRootProtectedDesignProperty(node, p.prop)}
           />
         ))}
       </section>
       <section className="py-1.5">
         <SectionHeader title="Appearance And Type" className="mb-1" />
         {BOX_APPEARANCE_PROPS.map((p) => (
-          <BoxRow key={p.prop} id={targetId} prop={p.prop} label={p.label} placeholder={placeholderFor(p.prop)} />
+          <BoxRow key={p.prop} id={targetId} prop={p.prop} label={p.label} placeholder={placeholderFor(p.prop)} disabled={isRootProtectedDesignProperty(node, p.prop)} />
         ))}
       </section>
       <section className="py-1.5">
         <SectionHeader title="Container Alignment" className="mb-1" />
         {BOX_ALIGNMENT_PROPS.map((p) => (
-          <BoxRow key={p.prop} id={targetId} prop={p.prop} label={p.label} placeholder={placeholderFor(p.prop)} />
+          <BoxRow key={p.prop} id={targetId} prop={p.prop} label={p.label} placeholder={placeholderFor(p.prop)} disabled={isRootProtectedDesignProperty(node, p.prop)} />
         ))}
       </section>
-      <LayoutSection id={targetId} />
+      {!isProtectedDesignRoot(node) && targetId === selectedDevId ? <LayoutSection id={targetId} node={node} /> : null}
       {hasAny ? (
         <button
           type="button"
@@ -1173,7 +1138,10 @@ function BehaviorTab() {
   const dev = useDevMode();
   const id = dev.selectedDevId;
   if (!id) return <div className="px-3.5 py-3 text-2xs text-t3">Select a control to edit its behavior.</div>;
-  const node = nodeForDevId(id);
+  const node = dev.selectedTarget?.element;
+  if (!dev.selectedTarget || dev.selectedTarget.overrideId !== id) {
+    return <div className="px-3.5 py-3 text-2xs text-t3">Select one uniquely identified control before changing behavior.</div>;
+  }
   if (!node?.hasAttribute("data-dev-control")) {
     return (
       <div className="px-3.5 py-3 text-2xs leading-relaxed text-t3">
@@ -1225,17 +1193,23 @@ function BehaviorTab() {
 /**
  * Select one id and put its element in front of the person.
  *
- * Resolution goes through `nodeForDevId`, so an INSTANCE id lands on the exact element it names
- * rather than on the first sibling that happens to share a prefix, and an id carrying a quote or a
- * bracket is a clean miss instead of a thrown selector.
+ * Resolution accepts only one live match. An ambiguous catalogue id never guesses a first sibling;
+ * inspect-click is the path that supplies exact occurrence authority for duplicates.
  */
-function locateDevId(id: string, select: (id: string) => void, vars: (v: string[]) => void) {
-  select(id);
-  const node = nodeForDevId(id);
-  if (!node) {
+function locateDevId(
+  id: string,
+  selectId: (id: string) => void,
+  selectTarget: (element: Element | null) => void,
+  vars: (v: string[]) => void,
+) {
+  const matches = nodesForDevId(id);
+  if (matches.length !== 1) {
+    selectId(id);
     vars([]);
     return;
   }
+  const node = matches[0];
+  selectTarget(node);
   vars(usedVarsForElement(node));
   node.scrollIntoView?.({ block: "center", behavior: "smooth" });
   const prevOutline = node.style.outline;
@@ -1288,7 +1262,7 @@ function Catalogue({
   }, [open, q, dev.selectedDevId]);
 
   function locate(id: string) {
-    locateDevId(id, dev.selectDevId, dev.selectVars);
+    locateDevId(id, dev.selectDevId, dev.selectTarget, dev.selectVars);
   }
 
   return (
@@ -1299,7 +1273,7 @@ function Catalogue({
         onClick={() => setOpen(!open)}
         className="flex w-full items-center gap-1.5 px-3.5 py-2 ui-property-label hover:text-t2"
       >
-        <span aria-hidden="true">{open ? "▾" : "▸"}</span>
+        <Icon id={open ? "design.disclosure-open" : "design.disclosure-closed"} className="h-3 w-3" />
         Catalogue
         <span className="ml-auto font-mono text-t3">{filtered.length + live.length}</span>
       </button>
@@ -1399,7 +1373,8 @@ function SelectionPane({
               className="min-w-0 truncate font-mono text-2xs text-t1"
               title={selectedId}
             >
-              {"▸"} {selectedId}
+              <Icon id="design.disclosure-closed" className="mr-1 inline h-3 w-3" />
+              {selectedId}
             </span>
           ) : (
             <span className="text-2xs text-t3">Nothing selected</span>
@@ -1552,9 +1527,7 @@ export function DevPanel({
   // mirroring the Copy-tab surface above. Copy wins the tie (its tab is checked first, by the effect
   // above), so a labelled control with both never yanks away from its text.
   useEffect(() => {
-    const id = dev.selectedDevId;
-    if (!id) return;
-    const el = nodeForDevId(id);
+    const el = dev.selectedTarget?.element;
     if (!el) return;
     const hasCopy = el.querySelector("[data-copy-id]") ?? el.closest("[data-copy-id]");
     if (hasCopy) return;
@@ -1563,7 +1536,7 @@ export function DevPanel({
       el.querySelector("[data-icon-id]") ??
       el.closest("[data-icon-id]");
     if (icon) setFacet("icon");
-  }, [dev.selectedDevId]);
+  }, [dev.selectedTarget]);
 
   if (!dev.enabled) return null;
 

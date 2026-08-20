@@ -9,6 +9,7 @@ import { makeAsset, makeEdaAssets, makePartDetail } from "../test/partFixture";
 import { ToastProvider } from "../lib/toast";
 import { ThemeProvider } from "../lib/theme";
 import { DevModeProvider } from "../lib/devMode";
+import { ICON_BY_ID } from "../lib/iconRegistry";
 import { CaptureProvider } from "../lib/capture";
 import { CompletePartModal } from "./CompletePartModal";
 
@@ -547,9 +548,12 @@ describe("CompletePartModal - copy + icon adoption", () => {
       ),
     ).toBeInTheDocument();
     expect(await screen.findByText("Files From The Provider")).toBeInTheDocument();
-    // The three glyphs (modal.check on rows, action.download on the CAD button, modal.close on the
+    // The three glyphs (overlay.check on rows, action.download on the CAD button, action.close on the
     // header button) all draw as <svg> via <Icon>.
     expect(container.querySelectorAll("svg").length).toBeGreaterThanOrEqual(3);
+    expect(screen.getByRole("button", { name: "Close" }).querySelector("path")?.getAttribute("d")).toBe(
+      ICON_BY_ID.get("action.close")?.body.match(/d="([^"]+)"/)?.[1],
+    );
     // Off dev mode a <Text> is a bare string: no editable copy targets exist.
     expect(container.querySelector("[data-copy-id]")).toBeNull();
   });
@@ -802,7 +806,19 @@ describe("CompletePartModal - one automatic acquisition workflow", () => {
       configurable: true,
       value: { pickFiles },
     });
-    const add = vi.spyOn(api, "addPartFiles").mockResolvedValue({
+    const propose = vi.spyOn(api, "proposePartFiles").mockResolvedValue({
+      proposal_token: "manual-1",
+      part_id: DETAIL.id,
+      provider: "manual",
+      primary_tool: "both",
+      attachments: [{
+        role: "KiCad Symbol",
+        file_name: "BQ24074.kicad_sym",
+        target: "Active KiCad Symbol",
+      }],
+      inactive_evidence: [],
+    });
+    const apply = vi.spyOn(api, "applyPartFiles").mockResolvedValue({
       part_id: DETAIL.id,
       selected_files: 1,
       attached: ["kicad_symbol"],
@@ -816,11 +832,19 @@ describe("CompletePartModal - one automatic acquisition workflow", () => {
 
     expect(pickFiles).toHaveBeenCalledWith("cad-recovery");
     await waitFor(() =>
-      expect(add).toHaveBeenCalledWith({
+      expect(propose).toHaveBeenCalledWith({
         partId: DETAIL.id,
         paths: ["D:\\Downloads\\Recovered.zip"],
+        edas: ["kicad", "altium"],
       }),
     );
+    expect(screen.getByText("BQ24074.kicad_sym")).toBeInTheDocument();
+    expect(apply).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: "Apply Attachments" }));
+    await waitFor(() => expect(apply).toHaveBeenCalledWith({
+      partId: DETAIL.id,
+      proposalToken: "manual-1",
+    }));
     expect(
       await screen.findByText(/Stockroom attached 1 CAD role; 1 still needed/i),
     ).toBeInTheDocument();

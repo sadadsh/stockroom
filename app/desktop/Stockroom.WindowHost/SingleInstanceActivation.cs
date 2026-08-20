@@ -1,5 +1,6 @@
 using System.IO;
 using System.IO.Pipes;
+using System.Globalization;
 using System.Security.AccessControl;
 using System.Security.Principal;
 using System.Text;
@@ -11,9 +12,9 @@ internal sealed class SingleInstanceActivation : IDisposable
     private static readonly string IdentitySuffix = CurrentIdentitySuffix();
     private static readonly string MutexName = @"Local\Stockroom.NativeHost." + IdentitySuffix;
     private static readonly string PipeName = "Stockroom.NativeHost.Activate." + IdentitySuffix;
-    private const string Request = "activate\n";
+    private const string RequestPrefix = "activate ";
     private const string Response = "activated\n";
-    private const int MaximumMessageBytes = 64;
+    private const int MaximumMessageBytes = 96;
 
     private readonly Mutex? _mutex;
     private readonly CancellationTokenSource? _stop;
@@ -33,7 +34,8 @@ internal sealed class SingleInstanceActivation : IDisposable
 
     internal bool IsPrimary { get; }
 
-    internal static SingleInstanceActivation Acquire(Action activate)
+    internal static SingleInstanceActivation Acquire(
+        Func<CancellationToken, Task<bool>> activate)
     {
         ArgumentNullException.ThrowIfNull(activate);
         var mutex = new Mutex(initiallyOwned: true, MutexName, out var createdNew);
@@ -52,19 +54,45 @@ internal sealed class SingleInstanceActivation : IDisposable
 
     internal static bool ActivateExisting(TimeSpan timeout)
     {
+        return ActivateExistingAsync(
+                PipeName,
+                timeout,
+                CancellationToken.None)
+            .GetAwaiter()
+            .GetResult();
+    }
+
+    internal static async Task<bool> ActivateExistingAsync(
+        string pipeName,
+        TimeSpan timeout,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(pipeName);
+        if (timeout <= TimeSpan.Zero)
+        {
+            return false;
+        }
         try
         {
+            using var deadlineStop = CancellationTokenSource.CreateLinkedTokenSource(
+                cancellationToken);
+            deadlineStop.CancelAfter(timeout);
+            var deadlineUtc = DateTimeOffset.UtcNow.Add(timeout).ToUnixTimeMilliseconds();
             using var client = new NamedPipeClientStream(
                 ".",
-                PipeName,
+                pipeName,
                 PipeDirection.InOut,
                 PipeOptions.Asynchronous,
                 TokenImpersonationLevel.Identification);
-            client.Connect(checked((int)timeout.TotalMilliseconds));
-            var request = Encoding.ASCII.GetBytes(Request);
-            client.Write(request, 0, request.Length);
-            client.Flush();
-            var response = ReadMessage(client);
+            await client.ConnectAsync(deadlineStop.Token).ConfigureAwait(false);
+            var request = Encoding.ASCII.GetBytes(
+                RequestPrefix
+                + deadlineUtc.ToString(CultureInfo.InvariantCulture)
+                + "\n");
+            await client.WriteAsync(request, deadlineStop.Token).ConfigureAwait(false);
+            await client.FlushAsync(deadlineStop.Token).ConfigureAwait(false);
+            var response = await ReadMessageAsync(client, deadlineStop.Token)
+                .ConfigureAwait(false);
             return string.Equals(response, Response, StringComparison.Ordinal);
         }
         catch
@@ -89,22 +117,15 @@ internal sealed class SingleInstanceActivation : IDisposable
         _mutex?.Dispose();
     }
 
-    private static async Task ServeAsync(Action activate, CancellationToken stop)
+    private static async Task ServeAsync(
+        Func<CancellationToken, Task<bool>> activate,
+        CancellationToken stop)
     {
         while (!stop.IsCancellationRequested)
         {
             try
             {
-                await using var server = CreateServer();
-                await server.WaitForConnectionAsync(stop).ConfigureAwait(false);
-                if (!string.Equals(ReadMessage(server), Request, StringComparison.Ordinal))
-                {
-                    continue;
-                }
-                activate();
-                var response = Encoding.ASCII.GetBytes(Response);
-                await server.WriteAsync(response, stop).ConfigureAwait(false);
-                await server.FlushAsync(stop).ConfigureAwait(false);
+                _ = await ServeOneAsync(PipeName, activate, stop).ConfigureAwait(false);
             }
             catch (OperationCanceledException) when (stop.IsCancellationRequested)
             {
@@ -117,7 +138,59 @@ internal sealed class SingleInstanceActivation : IDisposable
         }
     }
 
-    private static NamedPipeServerStream CreateServer()
+    internal static async Task<bool> ServeOneAsync(
+        string pipeName,
+        Func<CancellationToken, Task<bool>> activate,
+        CancellationToken stop)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(pipeName);
+        ArgumentNullException.ThrowIfNull(activate);
+        await using var server = CreateServer(pipeName);
+        await server.WaitForConnectionAsync(stop).ConfigureAwait(false);
+        return await ProcessRequestAsync(server, server, activate, stop)
+            .ConfigureAwait(false);
+    }
+
+    private static async Task<bool> ProcessRequestAsync(
+        Stream input,
+        Stream output,
+        Func<CancellationToken, Task<bool>> activate,
+        CancellationToken stop)
+    {
+        var message = await ReadMessageAsync(input, stop).ConfigureAwait(false);
+        if (!TryParseDeadline(message, out var deadlineUtc))
+        {
+            return false;
+        }
+        var remaining = deadlineUtc - DateTimeOffset.UtcNow;
+        if (remaining <= TimeSpan.Zero)
+        {
+            return false;
+        }
+        using var requestStop = CancellationTokenSource.CreateLinkedTokenSource(stop);
+        requestStop.CancelAfter(remaining);
+        try
+        {
+            var activated = await activate(requestStop.Token)
+                .WaitAsync(requestStop.Token)
+                .ConfigureAwait(false);
+            if (!activated)
+            {
+                return false;
+            }
+            var response = Encoding.ASCII.GetBytes(Response);
+            await output.WriteAsync(response, requestStop.Token).ConfigureAwait(false);
+            await output.FlushAsync(requestStop.Token).ConfigureAwait(false);
+            return true;
+        }
+        catch (OperationCanceledException)
+            when (!stop.IsCancellationRequested && requestStop.IsCancellationRequested)
+        {
+            return false;
+        }
+    }
+
+    private static NamedPipeServerStream CreateServer(string pipeName)
     {
         var identity = WindowsIdentity.GetCurrent().User
             ?? throw new WindowHostException("current Windows identity is unavailable");
@@ -130,7 +203,7 @@ internal sealed class SingleInstanceActivation : IDisposable
                 PipeAccessRights.ReadWrite | PipeAccessRights.CreateNewInstance,
                 AccessControlType.Allow));
         return NamedPipeServerStreamAcl.Create(
-            PipeName,
+            pipeName,
             PipeDirection.InOut,
             1,
             PipeTransmissionMode.Byte,
@@ -147,13 +220,53 @@ internal sealed class SingleInstanceActivation : IDisposable
         return identity.Value.Replace('-', '_');
     }
 
-    private static string ReadMessage(Stream stream)
+    private static bool TryParseDeadline(
+        string message,
+        out DateTimeOffset deadlineUtc)
+    {
+        deadlineUtc = default;
+        if (!message.StartsWith(RequestPrefix, StringComparison.Ordinal)
+            || !message.EndsWith('\n'))
+        {
+            return false;
+        }
+        var encodedDeadline = message[RequestPrefix.Length..^1];
+        return long.TryParse(
+                encodedDeadline,
+                NumberStyles.None,
+                CultureInfo.InvariantCulture,
+                out var deadlineMilliseconds)
+            && TryUnixMilliseconds(deadlineMilliseconds, out deadlineUtc);
+    }
+
+    private static bool TryUnixMilliseconds(
+        long milliseconds,
+        out DateTimeOffset value)
+    {
+        try
+        {
+            value = DateTimeOffset.FromUnixTimeMilliseconds(milliseconds);
+            return true;
+        }
+        catch (ArgumentOutOfRangeException)
+        {
+            value = default;
+            return false;
+        }
+    }
+
+    private static async Task<string> ReadMessageAsync(
+        Stream stream,
+        CancellationToken cancellationToken)
     {
         var buffer = new byte[MaximumMessageBytes];
         var length = 0;
         while (length < buffer.Length)
         {
-            var read = stream.Read(buffer, length, buffer.Length - length);
+            var read = await stream.ReadAsync(
+                    buffer.AsMemory(length, buffer.Length - length),
+                    cancellationToken)
+                .ConfigureAwait(false);
             if (read <= 0)
             {
                 break;

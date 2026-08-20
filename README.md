@@ -9,8 +9,9 @@ page; it validates and attaches only files that arrive for the selected EDAs.
 **Choose Downloaded Files** is the manual recovery path. It also audits existing PCB projects, adding
 the parts it does not recognize and relinking the ones it does.
 
-The app is a Python backend (FastAPI) that serves a React single-page app inside a
-WebView2 window. The library itself is a git repository of one JSON file per part,
+The installed app is a native WPF shell with WebView2. It supervises an immutable,
+windowless Python worker (FastAPI) that serves the React single-page app; provider pages use a
+separate native WebView2 surface inside Stockroom's modal. The library itself is a git repository of one JSON file per part,
 with a SQLite index that is derived and never committed. Every write to a
 `.kicad_*` file goes through a byte-preserving s-expression layer inside a single
 git-backed transaction, so an edit either lands as one clean commit or leaves no
@@ -27,7 +28,7 @@ trace.
     app/frontend/            React + TypeScript + Tailwind SPA (source)
     app/frontend-dist/       The built SPA the backend serves (committed)
     tests/backend/           Backend test suite, mirroring the package tree
-    packaging/               Windows launcher build (PyInstaller)
+    packaging/               Windows MSIX/App Installer build and release tooling
     docs/                    Architecture, the add-a-feature guide, and the design contract
     scripts/                 Local dev and benchmarking harnesses
 
@@ -50,13 +51,14 @@ The backend is a stack, low level to high:
   orchestrates it.
 - `api/` is the FastAPI app and its routers, plus the per-launch bearer token and
   the job and SSE plumbing.
-- `host/` and `launcher/` are the WebView2 window and the frozen launcher that
-  provisions and runs it on Windows.
+- `host/` owns the source-development WebView bridge and worker lifecycle helpers;
+  `launcher/` is the frozen worker entry point. The visible installed shell lives in
+  `app/desktop/Stockroom.WindowHost/`.
 
 ### Frontend
 
 `app/frontend/src` holds the SPA. `pages/` has the top-level screens, `components/`
-the shared UI (styled primitives live in `components/primitives.tsx`), `api/` the
+the shared UI (the primitive import surface is `components/primitives.ts`), `api/` the
 typed client and the TanStack Query hooks, and `lib/` the router, theme, and
 view-model helpers. Design tokens (color, spacing, type, radius) live in
 `styles/index.css` and `tailwind.config.js`.
@@ -72,34 +74,39 @@ Set up both halves:
     uv sync
     cd app/frontend && npm ci
 
-The packaged app runs the WebView2 host (`stockroom.host.run`), which starts the
-backend (`stockroom.api.serve`) on a loopback port and loads the built SPA in a
-native window. Building and shipping the Windows exe is covered in
-`packaging/README.md`. For fast UI work, `npm run dev` serves the SPA with hot
-reload.
+For the isolated source-development loop, use
+`scripts\Start-Stockroom-Development.ps1`; its optional Start menu shortcut is
+named **Stockroom Development** and targets one exact checkout. The installed
+product is designed as a separate signed WPF/MSIX application. Building and
+shipping it is covered in `packaging/README.md`.
 
 ## Installing and updating
 
-Give each Windows user the `Stockroom.exe` attached to the latest
-[GitHub Release](https://github.com/sadadsh/stockroom/releases). They install it
-once by keeping the executable anywhere convenient and launching it. Portable
-Git, uv, and the WebView2 bootstrapper are bundled; KiCad remains optional.
+The future supported production route is a signed `Stockroom.appinstaller`
+published with a [GitHub Release](https://github.com/sadadsh/stockroom/releases).
+No production App Installer feed is published yet; the current unsigned fixture
+is verification evidence, not an installable release. Once published, Windows/MSIX
+owns the Start menu entry, Installed Apps registration, update checks, repair, and
+uninstall. Normal startup launches `Stockroom.WindowHost.exe`, which starts the
+package's immutable PyInstaller onedir `Backend\Stockroom Worker.exe`. That frozen
+worker does not invoke a checkout, `uv`, or a system/source Python environment.
 
-A version tag (`v*`) runs `.github/workflows/release.yml`, builds the executable,
-optionally Authenticode-signs it when the signing secrets exist, and publishes
-both the executable and its SHA-256 file. Existing installations reconcile their
-managed application checkout whenever Stockroom opens. While running, they check
-every two minutes and expose an explicit `Install And Restart` action when code is
-waiting.
-
-This is the current portable-launcher delivery model, not the final signed,
-atomic updater described in `docs/Stockroom VNext Architecture.md`. The launcher
-itself is not replaced in place, and application code currently converges through
-Git rather than a signed release-set manifest.
+Every main push triggers `.github/workflows/release.yml`; after the canonical Windows CI gate, a
+successful run publishes one normal immutable GitHub Release as
+`1.0.0.<GitHub run number>`. Manual workflow dispatch builds and verifies an Actions artifact but
+does not publish, and version tags do not create a competing release line. Production packaging
+requires the legitimate Authenticode certificate, publisher/feed configuration, pinned TUF root,
+and online-role signing keys; missing credentials are a hard blocker, never an unsigned fallback.
+Updates are accepted only from the signed App Installer/TUF release set, with generation-fenced
+adoption and rollback. See `packaging/README.md` for the exact trust and evidence boundaries.
 
 ## Verifying a change
 
-Two gates, both green before anything ships.
+The completion authority is the Windows aggregate gate:
+
+    powershell -ExecutionPolicy Bypass -File scripts\Gates.ps1
+
+Its individual layers can be run while developing:
 
 Backend:
 
@@ -119,9 +126,10 @@ Frontend:
 `npm run build` regenerates `app/frontend-dist/`, which the backend serves. Commit
 that rebuilt output in the same commit as the source change that produced it.
 
-Linux-green is necessary, not sufficient. The release gate is Windows, on the real
-library; CI runs the backend suite on both ubuntu-latest and windows-latest
-(`.github/workflows/ci.yml`).
+Windows CI runs the aggregate gate's backend, native,
+frontend, type, production-build, and committed-distribution checks, then builds
+the documented unsigned package fixture. The release workflow calls that same CI
+workflow before any signed package can publish.
 
 ## Adding a feature
 
@@ -144,7 +152,8 @@ recipe (a new endpoint, an API type, a page, a design token, editable copy, a sp
 
 - The UI follows `docs/design/design-rules.md`: named tokens over scattered
   literals, one small set of radii, Title Case on interactive labels, no em
-  dashes. `docs/design/north-star-ui.md` is the end state each screen aims at.
+  dashes. `docs/design/Stockroom Reliability And Design Freedom Decisions.md` is
+  the current design authority; `docs/design/north-star-ui.md` is historical context.
 - Commits are scoped (`git add <path>`, never `-A`) with a plain one-line message.
 - Nothing that touches a `.kicad_*` file bypasses the s-expression layer, and no
   mutation escapes a `Transaction`.

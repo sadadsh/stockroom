@@ -1,7 +1,15 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ProviderBrowserFrame } from "./ProviderBrowserFrame";
+
+const identity = {
+  componentId: "part-1",
+  providerId: "digikey",
+  routeId: "digikey-ultralibrarian",
+  sessionId: "session-1",
+};
 
 afterEach(() => {
   Reflect.deleteProperty(window, "__STOCKROOM_HOST__");
@@ -40,7 +48,7 @@ describe("ProviderBrowserFrame", () => {
 
     const view = (
       <ProviderBrowserFrame
-        componentId="part-1"
+        identity={identity}
         providerLabel="DigiKey"
         url="https://www.digikey.com/en/products/detail/example"
         canGoBack
@@ -52,13 +60,15 @@ describe("ProviderBrowserFrame", () => {
     expect(screen.getByRole("button", { name: "Back" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "Forward" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Reload" })).toBeVisible();
-    expect(screen.queryByRole("textbox", { name: "Provider Address" })).toBeNull();
-    expect(screen.queryByRole("button", { name: "Go" })).toBeNull();
+    expect(screen.getByRole("textbox", { name: "Provider Address" })).toHaveValue(
+      "https://www.digikey.com/en/products/detail/example",
+    );
+    expect(screen.getByRole("button", { name: "Go" })).toBeVisible();
     expect(screen.getByLabelText("Current provider address")).toHaveTextContent(
       "digikey.com/en/products/detail/example",
     );
     expect(setProviderViewport).toHaveBeenLastCalledWith({
-      componentId: "part-1",
+      ...identity,
       visible: true,
       x: 200,
       y: 160,
@@ -68,7 +78,7 @@ describe("ProviderBrowserFrame", () => {
     const stableCallCount = setProviderViewport.mock.calls.length;
     rendered.rerender(
       <ProviderBrowserFrame
-        componentId="part-1"
+        identity={identity}
         providerLabel="DigiKey"
         url="https://www.digikey.com/en/products/detail/example"
         canGoBack
@@ -82,13 +92,13 @@ describe("ProviderBrowserFrame", () => {
     viewportRect = rect(320, 240, 900, 560);
     rendered.rerender(
       <ProviderBrowserFrame
-        componentId="part-1"
+        identity={identity}
         providerLabel="DigiKey"
         url="https://www.digikey.com/en/products/detail/example"
       />,
     );
     expect(setProviderViewport).toHaveBeenLastCalledWith({
-      componentId: "part-1",
+      ...identity,
       visible: true,
       x: 320,
       y: 240,
@@ -98,12 +108,48 @@ describe("ProviderBrowserFrame", () => {
 
     rendered.unmount();
     expect(setProviderViewport).toHaveBeenLastCalledWith({
-      componentId: "part-1",
+      ...identity,
       visible: false,
       x: 0,
       y: 0,
       width: 0,
       height: 0,
     });
+  });
+
+  it("waits for acknowledged navigation and reports a refused command", async () => {
+    const user = userEvent.setup();
+    const providerCommand = vi.fn()
+      .mockResolvedValueOnce(true)
+      .mockResolvedValueOnce(false);
+    Object.defineProperty(window, "__STOCKROOM_HOST__", {
+      configurable: true,
+      value: { providerCommand },
+    });
+
+    render(
+      <ProviderBrowserFrame
+        identity={{ ...identity, providerId: "mouser", routeId: "mouser" }}
+        providerLabel="Mouser"
+        url="https://www.mouser.com/c/?q=LM358"
+      />,
+    );
+
+    const address = screen.getByRole("textbox", { name: "Provider Address" });
+    await user.clear(address);
+    await user.type(address, "https://www.digikey.com/en/products/result?keywords=LM358");
+    await user.click(screen.getByRole("button", { name: "Go" }));
+    await waitFor(() => expect(providerCommand).toHaveBeenCalledWith({
+      ...identity,
+      providerId: "mouser",
+      routeId: "mouser",
+      command: "navigate",
+      url: "https://www.digikey.com/en/products/result?keywords=LM358",
+    }));
+
+    await user.click(screen.getByRole("button", { name: "Reload" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "The embedded provider browser refused Reload.",
+    );
   });
 });

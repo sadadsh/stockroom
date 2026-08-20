@@ -25,7 +25,7 @@
  * the committed override and belongs to the commit pipeline, which is PHASE 4 - so nothing in this
  * module records who typed anything. It reports what the text says, and that is all it claims.
  */
-import { INDUSTRY_TERMS } from "./interfaceTerms";
+import { APPROVED_PRODUCT_TERMS, INDUSTRY_TERMS } from "./interfaceTerms";
 
 /**
  * Unicode U+0079, the letter this interface leaves out.
@@ -43,14 +43,16 @@ export const BLOCKED_LETTER = "y";
  * appears inside sentences this product authors ("no DigiKey API credential is set"), and spelling
  * a company's name differently would be a factual error, not a style choice.
  *
- * CATEGORY 2 - the standardised technical terms with no synonym - lives in `interfaceTerms.ts` as
- * `INDUSTRY_TERMS`, beside the one-line reason each entry carries and the test that caps its length.
+ * The standardised technical terms and the owner-approved product vocabulary live in
+ * `interfaceTerms.ts`, beside the one-line reason each entry carries and the tests that cap both
+ * lists.
  */
 export const PROPER_NAMES: readonly string[] = ["DigiKey"];
 
-/** Every permitted term, both categories, as plain words. */
+/** Every permitted term, across all three categories, as plain words. */
 export const ALLOWED_TERMS: readonly string[] = [
   ...PROPER_NAMES,
+  ...APPROVED_PRODUCT_TERMS.map((entry) => entry.term),
   ...INDUSTRY_TERMS.map((entry) => entry.term),
 ];
 

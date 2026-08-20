@@ -63,10 +63,16 @@ export function Text({
   id,
   values,
   children,
+  "data-design-id": callerDesignId,
+  "data-dev-id": callerDevId,
 }: {
   id: string;
   values?: CopyValues;
   children: string;
+  /** Build-generated call-site identity; wins over the reusable component fallback. */
+  "data-design-id"?: string;
+  /** Authored public identity; wins over every generated identity. */
+  "data-dev-id"?: string;
 }) {
   const {
     enabled,
@@ -77,13 +83,14 @@ export function Text({
     elementOverridesFor,
   } = useDevMode();
   const resolved = useResolvedCopy(id, children, values);
-  const designId = runtimeDesignId("copy", id);
+  const designId = callerDesignId ?? (callerDevId ? undefined : runtimeDesignId("copy", id));
+  const targetId = callerDevId ?? designId!;
 
   if (!enabled) {
     // The normal app remains wrapper-free unless the owner committed geometry/visibility for this
     // exact label. In that one case the stable span is the target the committed override requires.
-    return elementOverridesFor(designId)
-      ? <span data-design-id={designId}>{resolved}</span>
+    return elementOverridesFor(targetId)
+      ? <span data-dev-id={callerDevId} data-design-id={designId}>{resolved}</span>
       : <>{resolved}</>;
   }
 
@@ -92,7 +99,7 @@ export function Text({
   // until Edit is explicitly chosen.
   if (studioMode !== "edit") {
     return (
-      <span data-copy-id={id} data-copy-default={children} data-design-id={designId}>
+      <span data-copy-id={id} data-copy-default={children} data-dev-id={callerDevId} data-design-id={designId}>
         {resolved}
       </span>
     );
@@ -103,6 +110,7 @@ export function Text({
   return (
     <span
       data-copy-id={id}
+      data-dev-id={callerDevId}
       data-design-id={designId}
       // The raw TEMPLATE, not the substituted text: the panel edits the sentence with its
       // placeholders in it, and reading the rendered text back would bake this render's values in.

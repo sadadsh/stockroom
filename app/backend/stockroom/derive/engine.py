@@ -98,12 +98,11 @@ class Identity:
 
 
 class _CategoryView:
-    """The minimal record-shaped object `refile_category` and `derive_value` read.
+    """The minimal record-shaped object `derive_value` reads.
 
-    Both take "a record" but touch only `.category`, `.specs`, `.mpn`, `.description` and
-    `.alternates`. Passing this instead of the real record is what stops a derivation from
+    Passing this instead of the real record is what stops a derivation from
     reaching `assets` or `sources` - see the NameInputs docstring for why that matters - and it
-    is reuse-by-extraction rather than a second copy of either rule.
+    is reuse-by-extraction rather than a second copy of the value rule.
     """
 
     __slots__ = ("category", "specs", "mpn", "description", "alternates")
@@ -178,10 +177,9 @@ def derive_block(
 
     `current_category` is honoured, not overwritten: a part a PERSON filed somewhere real keeps
     that filing, because a vendor taxonomy is a suggestion for an UNFILED part and never an
-    override of a human decision (the guard inside `refile_category`, relied on here rather than
-    re-implemented).
+    override of a human decision.
     """
-    from stockroom.enrich.pipeline import refile_category
+    from stockroom.enrich.pipeline import suggested_category
     from stockroom.ingest.component_naming import derive_value
 
     merged = merged_result(identity, payloads)
@@ -212,12 +210,14 @@ def derive_block(
 
     # Category: the source's taxonomy for an unfiled part, the existing filing otherwise.
     category = (current_category or "").strip()
-    view = _CategoryView(category or UNFILED, specs, identity.mpn, description, {})
-    suggested = refile_category(view)
-    if suggested:
-        category = suggested
+    if not category or category == UNFILED:
+        suggested = suggested_category(merged)
+        if suggested:
+            category = suggested
     if not category:
-        category = (merged.category or "").strip() or UNFILED
+        category = UNFILED
+
+    view = _CategoryView(category, specs, identity.mpn, description, {})
 
     # The schematic/BOM Value reads the FILED category, so it is computed after filing: a
     # resistor filed "Other" would take the MPN branch and silently lose its parametric value.

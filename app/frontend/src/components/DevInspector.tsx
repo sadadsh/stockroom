@@ -33,9 +33,23 @@ import type { DevModeDraft } from "../lib/devModeDraft";
 import { usedVarsForElement } from "../lib/inspectVars";
 import { DEV_ID_BY_ID } from "../lib/devIds";
 import { devIdScope, sharedRoleOf } from "../lib/componentDevIds";
-import { DESIGN_TARGET_SELECTOR, designIdOf, ensureDesignIdentities, isGeneratedDesignId } from "../lib/designIdentity";
-import { TECHNICAL_CONTENT_SELECTOR } from "../design-studio/targetDomains";
+import {
+  DESIGN_TARGET_SELECTOR,
+  designIdOf,
+  ensureDesignIdentities,
+  exactDesignTargetAuthority,
+  isGeneratedDesignId,
+  isProtectedDesignRoot,
+  isRootProtectedDesignProperty,
+  type ExactDesignTargetAuthority,
+} from "../lib/designIdentity";
+import { elementsForTargetDomainOverride, TECHNICAL_CONTENT_SELECTOR } from "../design-studio/targetDomains";
 import { useOptionalDesignStudio } from "../design-studio/DesignStudioProvider";
+import {
+  DESIGN_TARGET_Z_INDEX_MAX,
+  DESIGN_TARGET_Z_INDEX_MIN,
+} from "../design-studio/designLayers";
+import { useEscapeDismiss } from "../lib/useEscapeDismiss";
 
 interface Badge {
   id: string;
@@ -50,8 +64,7 @@ interface Hover {
   rect: { left: number; top: number; width: number; height: number };
 }
 
-interface SelectedTarget {
-  id: string;
+interface SelectedTarget extends ExactDesignTargetAuthority {
   label: string;
   element: Element & ElementCSSInlineStyle;
 }
@@ -67,6 +80,7 @@ interface GesturePreview {
   baseWidth: number;
   baseHeight: number;
   baseRotation: number;
+  baseTransform: string;
   renderedLeft: number;
   renderedTop: number;
   renderedRight: number;
@@ -117,8 +131,10 @@ function snap(value: number, grid: number): number {
   return Math.round(value / grid) * grid;
 }
 
+const ROTATION_COMPONENT_RE = /rotate\((-?(?:\d+|\d*\.\d+))deg\)/;
+
 function rotationOf(value: string | undefined): number {
-  const match = /^rotate\((-?(?:\d+|\d*\.\d+))deg\)$/.exec(value?.trim() ?? "");
+  const match = ROTATION_COMPONENT_RE.exec(value?.trim() ?? "");
   return match ? Number(match[1]) : 0;
 }
 
@@ -132,6 +148,15 @@ function rotationValue(value: number): string {
   return `rotate(${Object.is(normalized, -0) ? 0 : normalized}deg)`;
 }
 
+function transformWithRotation(transform: string | undefined, rotation: number): string {
+  const nextRotation = rotationValue(rotation);
+  const current = transform?.trim() ?? "";
+  if (!current || current === "none") return nextRotation;
+  return ROTATION_COMPONENT_RE.test(current)
+    ? current.replace(ROTATION_COMPONENT_RE, nextRotation)
+    : `${current} ${nextRotation}`;
+}
+
 function gridFor(element: Element): number {
   const root = element.closest("[data-snap]");
   return root?.getAttribute("data-snap") === "on"
@@ -143,13 +168,46 @@ function rotationStepFor(element: Element): number {
   return element.closest("[data-snap]")?.getAttribute("data-snap") === "on" ? 15 : 1;
 }
 
-function isPreviewFrameTarget(element: Element): boolean {
-  return element.hasAttribute("data-design-product-root") || element.getAttribute("data-dev-id") === "shell.root";
+interface EffectivePaintSibling {
+  element: Element & ElementCSSInlineStyle;
+  index: number;
+  position: string;
+}
+
+function effectiveSiblingPaintEntries(element: Element): EffectivePaintSibling[] {
+  const parent = element.parentElement;
+  if (!parent) return [];
+  const parentDisplay = getComputedStyle(parent).display;
+  const flexOrGridItem = parentDisplay.includes("flex") || parentDisplay.includes("grid");
+  const entries: EffectivePaintSibling[] = [];
+  for (const sibling of Array.from(parent.children)) {
+    if (sibling === element || !("style" in sibling)) continue;
+    const style = getComputedStyle(sibling);
+    const value = Number.parseInt(style.zIndex, 10);
+    if (!Number.isFinite(value)) continue;
+    if (style.position === "static" && !flexOrGridItem) continue;
+    entries.push({
+      element: sibling as Element & ElementCSSInlineStyle,
+      index: value,
+      position: style.position,
+    });
+  }
+  return entries;
 }
 
 function displayLabel(id: string, element: Element): string {
   const text = element.textContent?.replace(/\s+/g, " ").trim();
   return text ? text.slice(0, 48) : labelFor(id, element) || id;
+}
+
+function selectedTargetFor(element: Element & ElementCSSInlineStyle): SelectedTarget | null {
+  const authority = exactDesignTargetAuthority(element);
+  if (!authority) return null;
+  return {
+    ...authority,
+    label: displayLabel(authority.id, element),
+    element,
+  };
 }
 
 function withElementChanges(
@@ -212,7 +270,7 @@ export function DevInspector() {
     enabled,
     inspect,
     showIds,
-    selectDevId,
+    selectTarget,
     selectVars,
     selectCopy,
     clearSelectedCopy,
@@ -222,6 +280,17 @@ export function DevInspector() {
   const [selection, setSelection] = useState<SelectedTarget[]>([]);
   const [selectionRect, setSelectionRect] = useState<Hover["rect"] | null>(null);
   const [selectionActionsOpen, setSelectionActionsOpen] = useState(false);
+  const selectionActionsButtonRef = useRef<HTMLButtonElement | null>(null);
+  const selectionActionsMenuRef = useRef<HTMLDivElement | null>(null);
+  const closeSelectionActions = useCallback(() => {
+    setSelectionActionsOpen(false);
+    window.setTimeout(() => selectionActionsButtonRef.current?.focus(), 0);
+  }, []);
+  useEscapeDismiss(selectionActionsOpen, closeSelectionActions);
+  useEffect(() => {
+    if (!selectionActionsOpen) return;
+    window.setTimeout(() => selectionActionsMenuRef.current?.querySelector<HTMLButtonElement>("button")?.focus(), 0);
+  }, [selectionActionsOpen]);
   const gestureRef = useRef<Gesture | null>(null);
   const draftRef = useRef(dev.draft);
   useEffect(() => {
@@ -229,7 +298,19 @@ export function DevInspector() {
   }, [dev.draft]);
 
   const commitChanges = useCallback((changes: ReadonlyMap<string, Record<string, string> | null>) => {
-    const next = withElementChanges(draftRef.current, changes);
+    const safeChanges = new Map<string, Record<string, string> | null>();
+    for (const [id, patch] of changes) {
+      if (patch === null) {
+        safeChanges.set(id, null);
+        continue;
+      }
+      const elements = elementsForTargetDomainOverride(id);
+      const safe = Object.fromEntries(Object.entries(patch).filter(
+        ([property]) => !elements.some((element) => isRootProtectedDesignProperty(element, property)),
+      ));
+      if (Object.keys(safe).length > 0) safeChanges.set(id, safe);
+    }
+    const next = withElementChanges(draftRef.current, safeChanges);
     if (studio) studio.replaceResolvedDraftAtomically(next);
     else dev.replaceDraft(next);
   }, [dev, studio]);
@@ -258,14 +339,17 @@ export function DevInspector() {
       if (!id) return false;
       e.preventDefault();
       e.stopPropagation();
-      const selected = { id, label: displayLabel(id, el), element: el as Element & ElementCSSInlineStyle };
+      const selected = selectedTargetFor(el as Element & ElementCSSInlineStyle);
+      if (!selected) return false;
       setSelection((current) => {
         if (!e.shiftKey) return [selected];
-        const withoutDuplicate = current.filter((item) => item.id !== id);
+        const withoutDuplicate = current.filter(
+          (item) => item.element !== selected.element,
+        );
         return [...withoutDuplicate, selected];
       });
       setSelectionActionsOpen(false);
-      selectDevId(id);
+      selectTarget(el);
       selectVars(usedVarsForElement(el));
       const copy = target?.closest("[data-copy-id]") ?? null;
       if (copy && (copy === el || copy.contains(el) || el.contains(copy))) {
@@ -315,24 +399,35 @@ export function DevInspector() {
       document.removeEventListener("pointerdown", onPointerDown, true);
       document.removeEventListener("click", onClick, true);
     };
-  }, [clearSelectedCopy, enabled, inspect, selectCopy, selectDevId, selectVars]);
+  }, [clearSelectedCopy, enabled, inspect, selectCopy, selectTarget, selectVars]);
 
   useEffect(() => {
-    if (!enabled || !inspect || !dev.selectedDevId) {
-      if ((!enabled || !inspect) && selection.length > 0) setSelection([]);
+    if (!enabled || !inspect || !dev.selectedTarget) {
+      if (selection.length > 0) setSelection([]);
       return;
     }
-    if (selection[selection.length - 1]?.id === dev.selectedDevId) return;
-    const element = Array.from(document.querySelectorAll(DESIGN_TARGET_SELECTOR))
-      .find((candidate) => designIdOf(candidate) === dev.selectedDevId);
-    if (element && "style" in element) {
+    if (selection[selection.length - 1]?.element === dev.selectedTarget.element) return;
+    const element = dev.selectedTarget.element;
+    if (element.isConnected && "style" in element) {
       setSelection([{
-        id: dev.selectedDevId,
-        label: displayLabel(dev.selectedDevId, element),
+        ...dev.selectedTarget,
+        label: displayLabel(dev.selectedTarget.id, element),
         element: element as Element & ElementCSSInlineStyle,
       }]);
     }
-  }, [dev.selectedDevId, enabled, inspect, selection]);
+  }, [dev.selectedTarget, enabled, inspect, selection]);
+
+  useEffect(() => {
+    if (!enabled || !inspect || selection.length === 0) return;
+    const observer = new MutationObserver(() => {
+      setSelection((current) => {
+        const connected = current.filter((target) => target.element.isConnected);
+        return connected.length === current.length ? current : connected;
+      });
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+    return () => observer.disconnect();
+  }, [enabled, inspect, selection.length]);
 
   useEffect(() => {
     measureSelection();
@@ -388,8 +483,8 @@ export function DevInspector() {
       if (!changed) return;
       gesture.changed = true;
       for (const preview of gesture.previews) {
-        const { element, id } = preview.target;
-        const activeOverride = activeElements[id];
+        const { element, overrideId } = preview.target;
+        const activeOverride = activeElements[overrideId];
         if (gesture.kind === "move") {
           element.style.position = activeOverride?.position === "absolute"
             ? "absolute"
@@ -399,7 +494,8 @@ export function DevInspector() {
           continue;
         }
         if (gesture.kind === "rotate") {
-          element.style.transform = rotationValue(
+          element.style.transform = transformWithRotation(
+            preview.baseTransform,
             snap(preview.baseRotation + angleDelta, rotationStepFor(element)),
           );
           continue;
@@ -455,7 +551,7 @@ export function DevInspector() {
           const value = preview.target.element.style.getPropertyValue(property);
           if (value) props[property] = value;
         }
-        changes.set(preview.target.id, props);
+        changes.set(preview.target.overrideId, props);
       }
       restoreGesturePreview(gesture);
       commitChanges(changes);
@@ -500,7 +596,9 @@ export function DevInspector() {
     function cycleTarget(event: KeyboardEvent) {
       if (!enabled || !inspect || event.key !== "Tab") return;
       const eventTarget = event.target;
-      if (eventTarget instanceof Element && eventTarget.matches("input, textarea, select, [contenteditable='true']")) return;
+      if (eventTarget instanceof Element && eventTarget.closest(
+        "input, textarea, select, button, a[href], [contenteditable='true'], [role='button'], [tabindex]:not([tabindex='-1']), [data-design-studio-chrome]",
+      )) return;
       const current = selection[selection.length - 1];
       if (!current) return;
       const next = event.shiftKey
@@ -509,19 +607,16 @@ export function DevInspector() {
       if (!next || !("style" in next)) return;
       const id = designIdOf(next);
       if (!id) return;
+      const target = selectedTargetFor(next as Element & ElementCSSInlineStyle);
+      if (!target) return;
       event.preventDefault();
-      const target = {
-        id,
-        label: displayLabel(id, next),
-        element: next as Element & ElementCSSInlineStyle,
-      };
       setSelection([target]);
-      selectDevId(id);
+      selectTarget(next);
       selectVars(usedVarsForElement(next));
     }
     window.addEventListener("keydown", cycleTarget);
     return () => window.removeEventListener("keydown", cycleTarget);
-  }, [enabled, inspect, selectDevId, selectVars, selection]);
+  }, [enabled, inspect, selectTarget, selectVars, selection]);
 
   const beginGesture = useCallback((event: ReactPointerEvent<HTMLButtonElement>, kind: GestureKind) => {
     event.preventDefault();
@@ -550,7 +645,7 @@ export function DevInspector() {
       startAngle: Math.atan2(event.clientY - (rect.top + rect.height / 2), event.clientX - (rect.left + rect.width / 2)) * 180 / Math.PI,
       changed: false,
       previews: selection.map((target) => {
-        const overrides = draftRef.current.elements[target.id] ?? {};
+        const overrides = draftRef.current.elements[target.overrideId] ?? {};
         const targetRect = target.element.getBoundingClientRect();
         const targetWidth = target.element instanceof HTMLElement && target.element.offsetWidth > 0
           ? target.element.offsetWidth
@@ -558,6 +653,10 @@ export function DevInspector() {
         const targetHeight = target.element instanceof HTMLElement && target.element.offsetHeight > 0
           ? target.element.offsetHeight
           : targetRect.height / scale;
+        const inlineTransform = target.element.style.transform;
+        const computedTransform = getComputedStyle(target.element).transform;
+        const baseTransform = overrides.transform
+          ?? (inlineTransform && inlineTransform !== "none" ? inlineTransform : computedTransform);
         return {
           target,
           original: {
@@ -572,7 +671,8 @@ export function DevInspector() {
           baseTop: px(overrides.top),
           baseWidth: px(overrides.width) || targetWidth,
           baseHeight: px(overrides.height) || targetHeight,
-          baseRotation: rotationOf(overrides.transform),
+          baseRotation: rotationOf(baseTransform),
+          baseTransform,
           renderedLeft: targetRect.left,
           renderedTop: targetRect.top,
           renderedRight: targetRect.right,
@@ -592,8 +692,8 @@ export function DevInspector() {
     const distance = gridFor(selection[selection.length - 1].element) * (event.shiftKey ? 10 : 1);
     const changes = new Map<string, Record<string, string>>();
     for (const target of selection) {
-      const overrides = draftRef.current.elements[target.id] ?? {};
-      changes.set(target.id, {
+      const overrides = draftRef.current.elements[target.overrideId] ?? {};
+      changes.set(target.overrideId, {
         position: overrides.position === "absolute" ? "absolute" : "relative",
         left: `${px(overrides.left) + direction[0] * distance}px`,
         top: `${px(overrides.top) + direction[1] * distance}px`,
@@ -616,7 +716,7 @@ export function DevInspector() {
     const sign = event.key === "ArrowRight" || event.key === "ArrowDown" ? 1 : -1;
     const changes = new Map<string, Record<string, string>>();
     for (const target of selection) {
-      const overrides = draftRef.current.elements[target.id] ?? {};
+      const overrides = draftRef.current.elements[target.overrideId] ?? {};
       const element = target.element;
       const width = px(overrides.width) || (element instanceof HTMLElement ? element.offsetWidth : element.getBoundingClientRect().width);
       const height = px(overrides.height) || (element instanceof HTMLElement ? element.offsetHeight : element.getBoundingClientRect().height);
@@ -637,7 +737,7 @@ export function DevInspector() {
           patch.top = `${px(overrides.top) + sign * distance}px`;
         }
       }
-      changes.set(target.id, patch);
+      changes.set(target.overrideId, patch);
     }
     commitChanges(changes);
   }, [commitChanges, selection]);
@@ -649,44 +749,49 @@ export function DevInspector() {
     const step = rotationStepFor(selection[selection.length - 1].element) * (event.shiftKey ? 10 : 1);
     const changes = new Map<string, Record<string, string>>();
     for (const target of selection) {
-      const current = draftRef.current.elements[target.id]?.transform;
-      changes.set(target.id, { transform: rotationValue(rotationOf(current) + direction * step) });
+      const inlineTransform = target.element.style.transform;
+      const computedTransform = getComputedStyle(target.element).transform;
+      const current = draftRef.current.elements[target.overrideId]?.transform
+        ?? (inlineTransform && inlineTransform !== "none" ? inlineTransform : computedTransform);
+      changes.set(target.overrideId, {
+        transform: transformWithRotation(current, rotationOf(current) + direction * step),
+      });
     }
     commitChanges(changes);
   }, [commitChanges, selection]);
 
   const hidden = selection.length > 0 && selection.every(
-    (target) => dev.draft.elements[target.id]?.visibility === "hidden",
+    (target) => dev.draft.elements[target.overrideId]?.visibility === "hidden",
   );
   const primary = selection[selection.length - 1];
   const selectionName = selection.length > 1 ? `${selection.length} Selected` : primary?.label ?? "Selection";
   const geometryEditable = selection.length > 0 && selection.every(
-    (target) => !isPreviewFrameTarget(target.element),
+    (target) => !isProtectedDesignRoot(target.element),
   );
 
   const toggleVisibility = useCallback(() => {
     const changes = new Map<string, Record<string, string>>();
-    for (const target of selection) changes.set(target.id, { visibility: hidden ? "visible" : "hidden" });
+    for (const target of selection) changes.set(target.overrideId, { visibility: hidden ? "visible" : "hidden" });
     commitChanges(changes);
   }, [commitChanges, hidden, selection]);
 
   const resetSelection = useCallback(() => {
-    commitChanges(new Map(selection.map((target) => [target.id, null])));
+    commitChanges(new Map(selection.map((target) => [target.overrideId, null])));
   }, [commitChanges, selection]);
 
   const toggleDetached = useCallback(() => {
-    const detached = selection.every((target) => dev.draft.elements[target.id]?.position === "absolute");
+    const detached = selection.every((target) => dev.draft.elements[target.overrideId]?.position === "absolute");
     const changes = new Map<string, Record<string, string>>();
     for (const target of selection) {
       if (detached) {
-        changes.set(target.id, { position: "relative" });
+        changes.set(target.overrideId, { position: "relative" });
         continue;
       }
       const parent = target.element.parentElement?.closest(DESIGN_TARGET_SELECTOR);
-      const parentId = parent ? designIdOf(parent) : null;
-      if (parentId) changes.set(parentId, { position: "relative" });
+      const parentAuthority = parent ? exactDesignTargetAuthority(parent) : null;
+      if (parentAuthority) changes.set(parentAuthority.overrideId, { position: "relative" });
       const element = target.element;
-      changes.set(target.id, {
+      changes.set(target.overrideId, {
         position: "absolute",
         left: `${element instanceof HTMLElement ? element.offsetLeft : 0}px`,
         top: `${element instanceof HTMLElement ? element.offsetTop : 0}px`,
@@ -699,11 +804,49 @@ export function DevInspector() {
 
   const adjustLayer = useCallback((delta: -1 | 1) => {
     const changes = new Map<string, Record<string, string>>();
+    const setLayer = (
+      authority: ExactDesignTargetAuthority,
+      index: number,
+      computedPosition?: string,
+    ) => {
+      const existing = changes.get(authority.overrideId) ?? {};
+      const patch: Record<string, string> = { ...existing, "z-index": String(index) };
+      const position = draftRef.current.elements[authority.overrideId]?.position
+        ?? computedPosition
+        ?? getComputedStyle(authority.element).position;
+      if ((position || "static") === "static") patch.position = "relative";
+      changes.set(authority.overrideId, patch);
+    };
     for (const target of selection) {
-      const override = draftRef.current.elements[target.id]?.["z-index"];
-      const computed = getComputedStyle(target.element).zIndex;
-      const current = Number.parseInt(override ?? computed, 10);
-      changes.set(target.id, { "z-index": String((Number.isFinite(current) ? current : 0) + delta) });
+      const override = draftRef.current.elements[target.overrideId]?.["z-index"];
+      const computedStyle = getComputedStyle(target.element);
+      const current = Number.parseInt(override ?? computedStyle.zIndex, 10);
+      const normalizedCurrent = Number.isFinite(current) ? current : 0;
+      const siblings = effectiveSiblingPaintEntries(target.element);
+      const siblingIndexes = siblings.map((sibling) => sibling.index);
+      const requested = siblingIndexes.length === 0
+        ? normalizedCurrent + delta
+        : delta > 0
+          ? Math.max(normalizedCurrent, ...siblingIndexes) + 1
+          : Math.min(normalizedCurrent, ...siblingIndexes) - 1;
+
+      if (requested > DESIGN_TARGET_Z_INDEX_MAX || requested < DESIGN_TARGET_Z_INDEX_MIN) {
+        const boundary = delta > 0 ? DESIGN_TARGET_Z_INDEX_MAX : DESIGN_TARGET_Z_INDEX_MIN;
+        const peerBoundary = boundary - delta;
+        const parent = target.element.parentElement;
+        if (parent) ensureDesignIdentities(parent);
+        for (const sibling of siblings) {
+          const saturated = delta > 0
+            ? sibling.index >= DESIGN_TARGET_Z_INDEX_MAX
+            : sibling.index <= DESIGN_TARGET_Z_INDEX_MIN;
+          if (!saturated) continue;
+          const authority = exactDesignTargetAuthority(sibling.element);
+          if (authority) setLayer(authority, peerBoundary, sibling.position);
+        }
+        setLayer(target, boundary, computedStyle.position);
+        continue;
+      }
+      setLayer(target, requested, computedStyle.position);
     }
     commitChanges(changes);
   }, [commitChanges, selection]);
@@ -785,14 +928,14 @@ export function DevInspector() {
           <div className="pointer-events-auto absolute bottom-full left-0 mb-2 flex items-center gap-1 rounded-control border border-line2 bg-popover p-1 shadow-pop">
             <span className="max-w-40 truncate px-1 text-2xs font-semibold text-t1">{selectionName}</span>
             {geometryEditable ? <button type="button" aria-label={`Move ${selectionName}`} title={`Move ${selectionName}`} onPointerDown={(event) => beginGesture(event, "move")} onKeyDown={moveByKeyboard} className="rounded-control bg-acc px-2 py-1 text-xs font-semibold text-acc-on">Move</button> : null}
-            <button type="button" aria-label={`${hidden ? "Show" : "Hide"} ${selectionName}`} onClick={toggleVisibility} className="rounded-control px-1.5 py-1 text-xs text-t1 hover:bg-control-hover">{hidden ? "Show" : "Hide"}</button>
+            {geometryEditable ? <button type="button" aria-label={`${hidden ? "Show" : "Hide"} ${selectionName}`} onClick={toggleVisibility} className="rounded-control px-1.5 py-1 text-xs text-t1 hover:bg-control-hover">{hidden ? "Show" : "Hide"}</button> : null}
             <div className="relative">
-              <button type="button" aria-expanded={selectionActionsOpen} aria-label={`More actions for ${selectionName}`} onClick={() => setSelectionActionsOpen((open) => !open)} className="rounded-control px-2 py-1 text-xs text-t1 hover:bg-control-hover">More</button>
-              {selectionActionsOpen ? <div className="absolute left-0 top-full mt-1 grid min-w-36 gap-0.5 rounded-control bg-popover p-1 shadow-pop">
+              <button ref={selectionActionsButtonRef} type="button" aria-expanded={selectionActionsOpen} aria-label={`More actions for ${selectionName}`} onClick={() => selectionActionsOpen ? closeSelectionActions() : setSelectionActionsOpen(true)} className="rounded-control px-2 py-1 text-xs text-t1 hover:bg-control-hover">More</button>
+              {selectionActionsOpen ? <div ref={selectionActionsMenuRef} className="absolute left-0 top-full mt-1 grid min-w-36 gap-0.5 rounded-control bg-popover p-1 shadow-pop">
                 {geometryEditable ? <button type="button" aria-label={`Rotate ${selectionName}`} title={`Rotate ${selectionName}`} onPointerDown={(event) => beginGesture(event, "rotate")} onKeyDown={rotateByKeyboard} className="rounded-control px-2 py-1 text-left text-xs text-t1 hover:bg-control-hover">Rotate</button> : null}
-                {geometryEditable ? <button type="button" aria-label={`${dev.draft.elements[primary.id]?.position === "absolute" ? "Flow" : "Detach"} ${selectionName}`} onClick={toggleDetached} className="rounded-control px-2 py-1 text-left text-xs text-t1 hover:bg-control-hover">{dev.draft.elements[primary.id]?.position === "absolute" ? "Return To Flow" : "Detach"}</button> : null}
-                <button type="button" aria-label={`Bring ${selectionName} Forward`} onClick={() => adjustLayer(1)} className="rounded-control px-2 py-1 text-left text-xs text-t1 hover:bg-control-hover">Bring Forward</button>
-                <button type="button" aria-label={`Send ${selectionName} Backward`} onClick={() => adjustLayer(-1)} className="rounded-control px-2 py-1 text-left text-xs text-t1 hover:bg-control-hover">Send Backward</button>
+                {geometryEditable ? <button type="button" aria-label={`${dev.draft.elements[primary.overrideId]?.position === "absolute" ? "Flow" : "Detach"} ${selectionName}`} onClick={toggleDetached} className="rounded-control px-2 py-1 text-left text-xs text-t1 hover:bg-control-hover">{dev.draft.elements[primary.overrideId]?.position === "absolute" ? "Return To Flow" : "Detach"}</button> : null}
+                {geometryEditable ? <button type="button" aria-label={`Bring ${selectionName} Forward`} onClick={() => adjustLayer(1)} className="rounded-control px-2 py-1 text-left text-xs text-t1 hover:bg-control-hover">Bring Forward</button> : null}
+                {geometryEditable ? <button type="button" aria-label={`Send ${selectionName} Backward`} onClick={() => adjustLayer(-1)} className="rounded-control px-2 py-1 text-left text-xs text-t1 hover:bg-control-hover">Send Backward</button> : null}
                 <button type="button" aria-label={`Reset ${selectionName}`} onClick={resetSelection} className="rounded-control px-2 py-1 text-left text-xs text-t1 hover:bg-control-hover">Reset</button>
               </div> : null}
             </div>

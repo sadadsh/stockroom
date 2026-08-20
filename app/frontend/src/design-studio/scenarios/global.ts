@@ -53,6 +53,7 @@ function globalFixtures(id: GlobalScenarioId): ScenarioFixture[] {
             ...(item.response as Record<string, unknown>),
             state: "up_to_date",
             update_available: false,
+            frontend_revision: "1111111111111111111111111111111111111111",
             current_revision: "1111111111111111111111111111111111111111",
             target_revision: "1111111111111111111111111111111111111111",
             detail: "The backend is current, but this window is still running the previous interface.",

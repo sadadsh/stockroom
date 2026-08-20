@@ -59,13 +59,44 @@ def _ci_violations(text: str) -> list[str]:
         ("type-step", "name: Type check backend"),
         ("type-command", f"run: uv run ty check {TYPE_TARGET}"),
         ("frozen-sync", "uv sync --frozen"),
+        ("ruff-step", "name: Run Ruff"),
+        ("ruff-command", "uv run ruff check app/backend scripts tests"),
         ("readonly-checkout", "persist-credentials: false"),
         ("readonly-permissions", "permissions:\n  contents: read"),
+        ("actionlint-step", "name: Validate workflows with pinned actionlint"),
+        (
+            "actionlint-archive",
+            "actionlint_1.7.12_windows_amd64.zip",
+        ),
+        (
+            "actionlint-sha256",
+            "6e7241b51e6817ea6a047693d8e6fed13b31819c9a0dd6c5a726e1592d22f6e9",
+        ),
+        (
+            "actionlint-command",
+            "& $actionlint .github/workflows/ci.yml .github/workflows/release.yml",
+        ),
         ("native-sdk-step", "name: Install Pinned .NET SDK"),
         ("native-sdk-version", 'dotnet-version: "10.0.302"'),
         ("native-test-step", "name: Run Native Window Host Suite"),
         ("native-locked-restore", "dotnet restore $project --locked-mode --nologo"),
         ("native-no-restore-test", "--configuration Release --no-restore --nologo"),
+        (
+            "serialized-performance-budgets",
+            'not live_enrich and (global_windows_mutex or performance_budget or serial_only)',
+        ),
+        ("frontend-install-step", "name: Install frontend dependencies"),
+        ("frontend-frozen-install", "npm.cmd --prefix app/frontend ci"),
+        ("frontend-test-step", "name: Run frontend suite"),
+        ("frontend-test-command", "npm.cmd --prefix app/frontend run test:run -- --maxWorkers=1"),
+        ("frontend-type-step", "name: Type check frontend"),
+        ("frontend-type-command", "npm.cmd --prefix app/frontend run typecheck"),
+        ("frontend-build-step", "name: Verify production build and committed distribution"),
+        ("frontend-build-command", "npm.cmd --prefix app/frontend run build"),
+        ("frontend-dist-status", "git status --porcelain --untracked-files=all -- app/frontend-dist"),
+        ("package-fixture-step", "name: Run Windows package fixture"),
+        ("package-fixture-command", r".\packaging\Build-Windows-Package.ps1 `"),
+        ("package-fixture-mode", "-Mode Fixture `"),
     )
     for name, contract in required:
         if contract not in text:
@@ -95,6 +126,15 @@ def test_ci_enforces_backend_types() -> None:
     text = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
 
     assert _ci_violations(text) == []
+
+
+def test_release_repository_excludes_generated_agent_tooling() -> None:
+    frontend = ROOT / "app" / "frontend"
+    assert list(frontend.glob("**/skills/frontend check/SKILL.md")) == []
+    assert not (ROOT / "doctor.config.jsonc").exists()
+    assert not (ROOT / "scripts" / "workflows" / "rebuild-library.js").exists()
+    assert "frontend check" not in (frontend / "package.json").read_text(encoding="utf-8")
+    assert "frontend check" not in (ROOT / ".pre-commit-config.yaml").read_text(encoding="utf-8")
 
 
 def test_windows_detector_rejects_label_only_known_bad_gate() -> None:
@@ -146,12 +186,31 @@ def test_ci_detector_rejects_a_named_but_non_enforcing_type_step() -> None:
     assert _ci_violations(known_bad) == [
         "type-command",
         "frozen-sync",
+        "ruff-step",
+        "ruff-command",
         "readonly-checkout",
         "readonly-permissions",
+        "actionlint-step",
+        "actionlint-archive",
+        "actionlint-sha256",
+        "actionlint-command",
         "native-sdk-step",
         "native-sdk-version",
         "native-test-step",
         "native-locked-restore",
         "native-no-restore-test",
+        "serialized-performance-budgets",
+        "frontend-install-step",
+        "frontend-frozen-install",
+        "frontend-test-step",
+        "frontend-test-command",
+        "frontend-type-step",
+        "frontend-type-command",
+        "frontend-build-step",
+        "frontend-build-command",
+        "frontend-dist-status",
+        "package-fixture-step",
+        "package-fixture-command",
+        "package-fixture-mode",
         "floating-action-ref",
     ]

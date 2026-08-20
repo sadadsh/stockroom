@@ -17,14 +17,16 @@ SPEC.loader.exec_module(progress)
 
 
 def _plan() -> dict:
+    now = progress._utc_now()
     return {
         "title": "Stockroom",
         "progress_schema": 2,
         "product_scope": "Windows-only dual-EDA library.",
         "now": "Run the exact current acceptance slice.",
-        "now_updated": "2026-07-29 16:10:25 -04:00",
+        "now_updated": now.strftime("%Y-%m-%d %H:%M UTC"),
         "active_work": {
-            "last_updated": progress._utc_now().strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "snapshot_status": "current",
+            "last_updated": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
             "objective": "Land the fail-closed workflow foundation.",
             "refresh_policy": (
                 "Manually refreshed at meaningful checkpoints; "
@@ -35,7 +37,7 @@ def _plan() -> dict:
                     "id": "kernel",
                     "name": "Workflow Kernel",
                     "status": "active",
-                    "owner": "development tool · kernel",
+                    "owner": "Stockroom Development · kernel",
                     "evidence": "The durable store exists in isolation.",
                     "blocker": "",
                     "next_action": "Finish the migration fence.",
@@ -44,7 +46,7 @@ def _plan() -> dict:
                     "id": "host",
                     "name": "Host Bakeoff",
                     "status": "verification",
-                    "owner": "development tool · host",
+                    "owner": "Stockroom Development · host",
                     "evidence": "One bounded challenger proof exists.",
                     "blocker": "The full bakeoff remains.",
                     "next_action": "Run the remaining comparisons.",
@@ -53,7 +55,7 @@ def _plan() -> dict:
                     "id": "aggregate",
                     "name": "Aggregate Gate",
                     "status": "pending",
-                    "owner": "development tool · verification",
+                    "owner": "Stockroom Development · verification",
                     "evidence": "Parallel changes have not settled.",
                     "blocker": "The candidate is still moving.",
                     "next_action": "Run after convergence.",
@@ -130,15 +132,16 @@ def test_old_done_boolean_remains_readable_but_explicit_lifecycle_wins() -> None
 
 def test_render_refuses_to_present_the_raw_counter_as_product_readiness(monkeypatch) -> None:
     monkeypatch.setattr(progress, "activity", lambda: [])
-    rendered = progress.render_html(_plan())
+    plan = _plan()
+    rendered = progress.render_html(plan)
     assert rendered.startswith('<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">')
     assert rendered.endswith("</body>\n</html>\n")
     assert "Product readiness has no aggregate percentage" in rendered
-    assert "development tool Active Work" in rendered
-    assert "Manual checkpoint snapshot" in rendered
+    assert "Development Progress" in rendered
+    assert "Current development checkpoint" in rendered
     assert "Manually refreshed at meaningful checkpoints" in rendered
     assert "Workflow Kernel" in rendered
-    assert "development tool · kernel" in rendered
+    assert "Stockroom Development · kernel" in rendered
     assert ">Active<" in rendered
     assert ">Verification<" in rendered
     assert ">Pending<" in rendered
@@ -146,7 +149,7 @@ def test_render_refuses_to_present_the_raw_counter_as_product_readiness(monkeypa
     assert "Next action" in rendered
     assert "Working on now" in rendered
     assert "Run the exact current acceptance slice." in rendered
-    assert "2026-07-29 16:10:25 -04:00" in rendered
+    assert plan["now_updated"] in rendered
     assert "Owner Outcome Gates" in rendered
     assert "Independent gates; never averaged" in rendered
     assert "Engineering Checklist History" in rendered
@@ -222,7 +225,7 @@ def test_active_work_preserves_utf8_and_escapes_summary_and_full_evidence(
     plan = _plan()
     stream = plan["active_work"]["workstreams"][0]
     stream["name"] = 'KiCad <check> & "review"'
-    stream["owner"] = "development tool · café"
+    stream["owner"] = "Stockroom Development · café"
     stream["evidence"] = (
         "KiCad ↔ Altium · café is safe. Full <evidence> & exact bytes remain available."
     )
@@ -289,10 +292,38 @@ def test_check_rejects_stale_active_work_snapshot(capsys) -> None:
     assert "active_work.last_updated is stale" in capsys.readouterr().out
 
 
+def test_historical_development_progress_is_explicit_without_fabricating_currency(
+    monkeypatch, capsys
+) -> None:
+    monkeypatch.setattr(progress, "activity", lambda: [])
+    plan = _plan()
+    plan["active_work"].update(
+        {
+            "snapshot_status": "historical",
+            "last_updated": "2026-07-30T02:16:04Z",
+            "refresh_policy": (
+                "This historical checkpoint was manually recorded. "
+                "It is not current or real-time telemetry."
+            ),
+        }
+    )
+    plan["now_updated"] = "2026-07-29 22:16 EDT"
+
+    assert progress.cmd_check(plan) == 0
+    assert "plan OK" in capsys.readouterr().out
+    rendered = progress.render_html(plan)
+    assert "Development Progress" in rendered
+    assert "Historical checkpoint" in rendered
+    assert "Objective at this checkpoint" in rendered
+    assert "Checkpoint at last refresh" in rendered
+    assert "Working on now" not in rendered
+
+
 @pytest.mark.parametrize(
     ("missing", "message"),
     [
         ("active_work", "active_work must be an object"),
+        ("snapshot_status", "active_work.snapshot_status must be current or historical"),
         ("objective", "active_work.objective must be a non-empty string"),
         ("workstreams", "active_work.workstreams must contain 3 to 6 workstreams"),
     ],

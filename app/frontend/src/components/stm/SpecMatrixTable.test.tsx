@@ -1,8 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+// @ts-expect-error Vitest runs this stylesheet contract in Node; the browser bundle excludes Node types.
+import { readFileSync } from "node:fs";
 import { SpecMatrixTable } from "./SpecMatrixTable";
 import type { McuSpecRow } from "../../api/types";
+
+const APP_STYLES = readFileSync("src/styles/index.css", "utf8");
 
 function row(over: Partial<McuSpecRow>): McuSpecRow {
   return {
@@ -70,6 +74,59 @@ describe("SpecMatrixTable", () => {
     expect(screen.getByText("All 2,000 parts shown")).toBeInTheDocument();
   });
 
+  it("keeps routine row separators quieter than the data they divide", () => {
+    render(<SpecMatrixTable rows={ROWS} activePart={null} onSelectPart={vi.fn()} />);
+
+    const firstRow = screen.getByText("STM32F407VETx").closest("button");
+    expect(firstRow).toHaveClass("stm-spec-matrix-row", "hover:bg-[var(--c-hover)]");
+    expect(firstRow).not.toHaveClass("border-line/60");
+
+    const quietRule = APP_STYLES.match(/\.stm-spec-matrix-row\s*\{(?<body>[^}]*)\}/)?.groups?.body;
+    expect(quietRule).toMatch(
+      /border-bottom:\s*1px\s+solid\s+color-mix\(in srgb,\s*var\(--c-line\)\s+\d+%,\s*transparent\)/,
+    );
+  });
+
+  it("exposes the wide matrix as one keyboard-reachable horizontal region", () => {
+    render(<SpecMatrixTable rows={ROWS} activePart={null} onSelectPart={vi.fn()} />);
+
+    const scroller = screen.getByRole("region", {
+      name: "STM32 specification matrix. Scroll across for more columns.",
+    });
+    expect(scroller).toBe(screen.getByTestId("spec-matrix-scroll"));
+    expect(scroller).toHaveAttribute("tabindex", "0");
+    expect(scroller).toHaveClass("stm-spec-matrix-scroll");
+  });
+
+  it("cues concealed columns and updates the cue as the person scrolls", () => {
+    render(<SpecMatrixTable rows={ROWS} activePart={null} onSelectPart={vi.fn()} />);
+    const scroller = screen.getByTestId("spec-matrix-scroll");
+    Object.defineProperties(scroller, {
+      clientWidth: { configurable: true, value: 600 },
+      scrollWidth: { configurable: true, value: 1_200 },
+      scrollLeft: { configurable: true, value: 0, writable: true },
+    });
+
+    fireEvent.scroll(scroller);
+    const rightCue = screen.getByTestId("spec-matrix-overflow-right");
+    expect(rightCue).toHaveTextContent("More columns");
+    expect(rightCue).toHaveClass("right-0", "top-0", "bg-[var(--c-sticky)]");
+    expect(rightCue).not.toHaveClass("right-2", "top-9");
+    expect(screen.queryByTestId("spec-matrix-overflow-left")).not.toBeInTheDocument();
+
+    scroller.scrollLeft = 300;
+    fireEvent.scroll(scroller);
+    const leftCue = screen.getByTestId("spec-matrix-overflow-left");
+    expect(leftCue).toHaveTextContent("Earlier columns");
+    expect(leftCue).toHaveClass("left-0");
+    expect(screen.getByTestId("spec-matrix-overflow-right")).toHaveTextContent("More columns");
+
+    scroller.scrollLeft = 600;
+    fireEvent.scroll(scroller);
+    expect(screen.getByTestId("spec-matrix-overflow-left")).toHaveTextContent("Earlier columns");
+    expect(screen.queryByTestId("spec-matrix-overflow-right")).not.toBeInTheDocument();
+  });
+
   it("strips the Arm Cortex- prefix from the Core cell so the tier is readable", () => {
     render(
       <SpecMatrixTable
@@ -94,6 +151,17 @@ describe("SpecMatrixTable", () => {
     expect(screen.queryByRole("button", { name: /^Series/ })).toBeNull();
     await userEvent.click(within(picker).getByLabelText("Series"));
     expect(screen.getByRole("button", { name: /^Series/ })).toBeInTheDocument();
+  });
+
+  it("uses the registered sort direction marks instead of font arrows", async () => {
+    render(<SpecMatrixTable rows={ROWS} activePart={null} onSelectPart={vi.fn()} />);
+    const series = screen.getByRole("button", { name: /^Series/ });
+    await userEvent.click(series);
+    expect(series.querySelector("svg.ico")).not.toBeNull();
+    expect(series.textContent).not.toMatch(/[↑↓]/);
+    await userEvent.click(series);
+    expect(series.querySelector("svg.ico")).not.toBeNull();
+    expect(series.textContent).not.toMatch(/[↑↓]/);
   });
 
   it("consumes Escape when closing the Columns popover", async () => {
@@ -140,6 +208,14 @@ describe("SpecMatrixTable", () => {
     await userEvent.type(screen.getByLabelText("Search Parts"), "H743");
     expect(screen.getByText("STM32H743ZITx")).toBeInTheDocument();
     expect(screen.queryByText("STM32F407VETx")).toBeNull();
+  });
+
+  it("keeps the search glyph bounded when adding caller styling", () => {
+    render(<SpecMatrixTable rows={ROWS} activePart={null} onSelectPart={vi.fn()} />);
+    const search = screen.getByLabelText("Search Parts");
+    const glyph = search.parentElement?.querySelector("svg.ico");
+    expect(glyph).not.toBeNull();
+    expect(glyph).toHaveClass("h-3.5", "w-3.5");
   });
 
   it("clicking a row calls onSelectPart with the row's part (ref_name)", async () => {

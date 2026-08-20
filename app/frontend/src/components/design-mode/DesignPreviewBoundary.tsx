@@ -4,7 +4,8 @@ import { useText } from "../../lib/copy";
 interface DesignPreviewBoundaryProps {
   children: ReactNode;
   resetKey: string;
-  onRecover: () => void;
+  onRecover: () => void | Promise<void>;
+  onRenderSuccess?: () => void;
 }
 
 interface RecoveryCopy {
@@ -19,6 +20,7 @@ interface PreviewBoundaryProps extends DesignPreviewBoundaryProps {
 
 interface DesignPreviewBoundaryState {
   error: Error | null;
+  recovering: boolean;
 }
 
 /** Keeps Design Studio chrome operable even when one product subtree cannot render. */
@@ -26,16 +28,22 @@ class PreviewBoundary extends Component<
   PreviewBoundaryProps,
   DesignPreviewBoundaryState
 > {
-  state: DesignPreviewBoundaryState = { error: null };
+  state: DesignPreviewBoundaryState = { error: null, recovering: false };
 
   static getDerivedStateFromError(error: Error): DesignPreviewBoundaryState {
-    return { error };
+    return { error, recovering: false };
+  }
+
+  componentDidMount(): void {
+    if (!this.state.error) this.props.onRenderSuccess?.();
   }
 
   componentDidUpdate(previous: DesignPreviewBoundaryProps): void {
     if (this.state.error && previous.resetKey !== this.props.resetKey) {
-      this.setState({ error: null });
+      this.setState({ error: null, recovering: false });
+      return;
     }
+    if (!this.state.error) this.props.onRenderSuccess?.();
   }
 
   componentDidCatch(error: Error, info: ErrorInfo): void {
@@ -43,7 +51,23 @@ class PreviewBoundary extends Component<
   }
 
   private recover = () => {
-    this.props.onRecover();
+    if (this.state.recovering) return;
+    this.setState({ recovering: true });
+    try {
+      const recovery = this.props.onRecover();
+      if (recovery instanceof Promise) {
+        void recovery.then(
+          () => this.setState({ error: null, recovering: false }),
+          () => this.setState({ recovering: false }),
+        );
+        return;
+      }
+      // Undo may legitimately be empty (for example, the first render failed before any edit).
+      // Clearing the boundary remounts only after recovery has restored renderable state.
+      this.setState({ error: null, recovering: false });
+    } catch {
+      this.setState({ recovering: false });
+    }
   };
 
   render() {
@@ -55,6 +79,7 @@ class PreviewBoundary extends Component<
         <button
           type="button"
           onClick={this.recover}
+          disabled={this.state.recovering}
           className="mt-3 rounded-control bg-acc px-3 py-1.5 text-xs font-semibold text-acc-on"
         >
           {this.props.copy.action}
@@ -71,11 +96,11 @@ export function DesignPreviewBoundary(props: DesignPreviewBoundaryProps) {
   );
   const detail = useText(
     "design-studio.preview-recovery.detail",
-    "Undo the last design change, then continue editing.",
+    "Recover the product preview, then continue editing.",
   );
   const action = useText(
     "design-studio.preview-recovery.action",
-    "Undo Last Design Change",
+    "Recover Preview",
   );
   return <PreviewBoundary {...props} copy={{ title, detail, action }} />;
 }

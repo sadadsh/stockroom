@@ -19,6 +19,7 @@ import { DEFAULT_DESIGN_GRID_SIZE, finiteDesignGridSize } from "../../design-stu
 import { DesignPreviewBoundary } from "./DesignPreviewBoundary";
 import { InspectorPanel } from "./InspectorPanel";
 import { Icon } from "../Icon";
+import { DESIGN_STUDIO_GRID_Z_INDEX } from "../../design-studio/designLayers";
 
 const LEFT_WIDTH_KEY = "stockroom.design-studio.left-width";
 const RIGHT_WIDTH_KEY = "stockroom.design-studio.right-width";
@@ -137,6 +138,7 @@ export function DesignStudioShell({ children }: { children: ReactNode }) {
   const [lastScenario] = useState(() => readPref("design_studio_last_scenario", LAST_SCENARIO_KEY, parseString, "global.real-data"));
   const [preferredMode] = useState(() => readPref("design_studio_mode", MODE_KEY, parseMode, "preview"));
   const previewRegionRef = useRef<HTMLDivElement | null>(null);
+  const lastRenderableProduct = useRef({ document: studio.document, draft: dev.draft });
   const [previewRegionWidth, setPreviewRegionWidth] = useState(0);
   const closingRef = useRef(false);
   const restoredOpenRef = useRef(false);
@@ -158,6 +160,10 @@ export function DesignStudioShell({ children }: { children: ReactNode }) {
   const inspectorLabel = useText("design-studio.panel.inspector", "Inspector");
   const developerLabel = useText("design-studio.developer", "Developer Tools");
   const drawersLabel = useText("design-studio.drawers", "Design Studio Drawers");
+  const unsavedCloseLabel = useText(
+    "design-studio.close-unsaved",
+    "Draft is not saved. Design Studio remains open.",
+  );
 
   const mode = dev.studioMode;
   const changeMode = useCallback((next: "preview" | "edit") => {
@@ -173,13 +179,37 @@ export function DesignStudioShell({ children }: { children: ReactNode }) {
     return () => window.removeEventListener(PREVIEW_EFFECT_BLOCKED_EVENT, showBlockedEffect);
   }, [toast]);
 
-  const close = useCallback(() => {
+  const close = useCallback(async () => {
+    if (closingRef.current) return;
     closingRef.current = true;
+    let closed = false;
+    try {
+      closed = await studio.close();
+    } catch {
+      closed = false;
+    }
+    if (!closed) {
+      closingRef.current = false;
+      toast(unsavedCloseLabel, "err");
+      return;
+    }
     changeMode("preview");
     setPresentation(false);
-    studio.close();
     focusStudioEntry();
-  }, [changeMode, studio]);
+  }, [changeMode, studio, toast, unsavedCloseLabel]);
+  const rememberRenderableProduct = useCallback(() => {
+    lastRenderableProduct.current = { document: studio.document, draft: dev.draft };
+  }, [dev.draft, studio.document]);
+  const recoverProductPreview = useCallback(async () => {
+    dev.selectTarget(null);
+    changeMode("preview");
+    if (studio.activeScenario) {
+      await studio.exitScenario();
+      return;
+    }
+    const renderable = lastRenderableProduct.current;
+    studio.restoreRenderableState(renderable.document, renderable.draft);
+  }, [changeMode, dev.selectTarget, studio.activeScenario, studio.exitScenario, studio.restoreRenderableState]);
   const changePresentation = useCallback((next: boolean) => {
     if (next) dev.setStudioMode("preview");
     setPresentation(next);
@@ -256,10 +286,13 @@ export function DesignStudioShell({ children }: { children: ReactNode }) {
   const fitScale = zoom === 0
     ? Math.min(1, Math.max(0.1, ((previewRegionWidth || viewportWidth) - 24) / viewportWidth))
     : zoom / 100;
+  const previewStageStyle: CSSProperties = {
+    width: `${viewportWidth * fitScale}px`,
+  };
   const previewStyle: CSSProperties = {
     width: `${viewportWidth}px`,
     transform: `scale(${fitScale})`,
-    transformOrigin: "top center",
+    transformOrigin: "top left",
   };
   const previewRegionStyle = {
     "--design-studio-grid-size": `${gridSize}px`,
@@ -360,7 +393,7 @@ export function DesignStudioShell({ children }: { children: ReactNode }) {
               title={screensLabel}
               className="grid h-9 place-items-center rounded-control text-t2 hover:bg-control-hover hover:text-t1 aria-pressed:bg-control-pressed aria-pressed:text-t1"
             >
-              <Icon id="nav.components" className="h-4 w-4" />
+              <Icon id="design.screens" className="h-4 w-4" />
             </button>
             <button
               type="button"
@@ -370,7 +403,7 @@ export function DesignStudioShell({ children }: { children: ReactNode }) {
               title={layersLabel}
               className="grid h-9 place-items-center rounded-control text-t2 hover:bg-control-hover hover:text-t1 aria-pressed:bg-control-pressed aria-pressed:text-t1"
             >
-              <Icon id="finder.filter" className="h-4 w-4" />
+              <Icon id="design.layers" className="h-4 w-4" />
             </button>
           </nav>
         ) : null}
@@ -391,7 +424,7 @@ export function DesignStudioShell({ children }: { children: ReactNode }) {
                   onClick={() => setLeftDrawer(null)}
                   className="rounded-control px-2 py-1 text-xs text-t2 hover:bg-control-hover hover:text-t1"
                 >
-                  ×
+                  <Icon id="action.close" className="h-3.5 w-3.5" />
                 </button>
               </div>
               <DesignPreviewBoundary resetKey={`${leftDrawer}:${studio.activeScenario?.id ?? "real-data"}`} onRecover={() => setLeftDrawer(null)}>
@@ -427,28 +460,45 @@ export function DesignStudioShell({ children }: { children: ReactNode }) {
           }
         >
           <div
-            data-design-product-root="true"
-            data-product-interaction={studio.enabled ? (mode === "edit" ? "blocked" : "enabled") : undefined}
-            onAuxClickCapture={studio.enabled && mode === "edit" ? blockProductInteraction : undefined}
-            onChangeCapture={studio.enabled && mode === "edit" ? blockProductInteraction : undefined}
-            onClickCapture={studio.enabled && mode === "edit" ? blockProductInteraction : undefined}
-            onContextMenuCapture={studio.enabled && mode === "edit" ? blockProductInteraction : undefined}
-            onDoubleClickCapture={studio.enabled && mode === "edit" ? blockProductInteraction : undefined}
-            onDragStartCapture={studio.enabled && mode === "edit" ? blockProductInteraction : undefined}
-            onDropCapture={studio.enabled && mode === "edit" ? blockProductInteraction : undefined}
-            onInputCapture={studio.enabled && mode === "edit" ? blockProductInteraction : undefined}
-            onKeyDownCapture={studio.enabled && mode === "edit" ? blockProductInteraction : undefined}
-            onKeyUpCapture={studio.enabled && mode === "edit" ? blockProductInteraction : undefined}
-            onPointerDownCapture={studio.enabled && mode === "edit" ? blockProductInteraction : undefined}
-            onPointerUpCapture={studio.enabled && mode === "edit" ? blockProductInteraction : undefined}
-            onSubmitCapture={studio.enabled && mode === "edit" ? blockProductInteraction : undefined}
-            className={studio.enabled ? "relative mx-auto min-h-full overflow-hidden border border-line bg-surface shadow-pop" : "contents"}
-            style={studio.enabled ? previewStyle : undefined}
+            data-design-preview-stage={studio.enabled ? "true" : undefined}
+            className={studio.enabled ? "mx-auto min-h-full" : "contents"}
+            style={studio.enabled ? previewStageStyle : undefined}
           >
-            <DesignPreviewBoundary resetKey={JSON.stringify(dev.draft)} onRecover={dev.undo}>
-              <ArrangePreferencesProvider snap={snap} gridSize={gridSize}>{children}</ArrangePreferencesProvider>
-            </DesignPreviewBoundary>
-            {studio.enabled && mode === "edit" && grid ? <div aria-hidden="true" data-design-grid-overlay="true" className="design-studio-preview-grid-overlay pointer-events-none absolute inset-0 z-[180]" /> : null}
+            <div
+              data-design-product-root="true"
+              data-product-interaction={studio.enabled ? (mode === "edit" ? "blocked" : "enabled") : undefined}
+              onAuxClickCapture={studio.enabled && mode === "edit" ? blockProductInteraction : undefined}
+              onChangeCapture={studio.enabled && mode === "edit" ? blockProductInteraction : undefined}
+              onClickCapture={studio.enabled && mode === "edit" ? blockProductInteraction : undefined}
+              onContextMenuCapture={studio.enabled && mode === "edit" ? blockProductInteraction : undefined}
+              onDoubleClickCapture={studio.enabled && mode === "edit" ? blockProductInteraction : undefined}
+              onDragStartCapture={studio.enabled && mode === "edit" ? blockProductInteraction : undefined}
+              onDropCapture={studio.enabled && mode === "edit" ? blockProductInteraction : undefined}
+              onInputCapture={studio.enabled && mode === "edit" ? blockProductInteraction : undefined}
+              onKeyDownCapture={studio.enabled && mode === "edit" ? blockProductInteraction : undefined}
+              onKeyUpCapture={studio.enabled && mode === "edit" ? blockProductInteraction : undefined}
+              onPointerDownCapture={studio.enabled && mode === "edit" ? blockProductInteraction : undefined}
+              onPointerUpCapture={studio.enabled && mode === "edit" ? blockProductInteraction : undefined}
+              onSubmitCapture={studio.enabled && mode === "edit" ? blockProductInteraction : undefined}
+              className={studio.enabled ? "relative min-h-full overflow-hidden border border-line bg-surface shadow-pop" : "contents"}
+              style={studio.enabled ? previewStyle : undefined}
+            >
+              <DesignPreviewBoundary
+                resetKey={JSON.stringify(dev.draft)}
+                onRecover={recoverProductPreview}
+                onRenderSuccess={rememberRenderableProduct}
+              >
+                <ArrangePreferencesProvider snap={snap} gridSize={gridSize}>{children}</ArrangePreferencesProvider>
+              </DesignPreviewBoundary>
+              {studio.enabled && mode === "edit" && grid ? (
+                <div
+                  aria-hidden="true"
+                  data-design-grid-overlay="true"
+                  className="design-studio-preview-grid-overlay pointer-events-none absolute inset-0"
+                  style={{ zIndex: DESIGN_STUDIO_GRID_Z_INDEX }}
+                />
+              ) : null}
+            </div>
           </div>
           {studio.enabled ? (
             <div data-design-studio-chrome="true" className="sticky bottom-2 left-2 z-10 w-fit rounded-control border border-line bg-popover/90 px-2 py-1 text-2xs text-t2" data-dev-id="design.pan-cue">
@@ -479,10 +529,10 @@ export function DesignStudioShell({ children }: { children: ReactNode }) {
                   onClick={() => developerOpen ? setDeveloperOpen(false) : changeMode("preview")}
                   className="rounded-control px-2 py-1 text-xs text-t2 hover:bg-control-hover hover:text-t1"
                 >
-                  ×
+                  <Icon id="action.close" className="h-3.5 w-3.5" />
                 </button>
               </div>
-              <DesignPreviewBoundary resetKey={`${dev.selectedDevId ?? "none"}:${JSON.stringify(dev.draft)}`} onRecover={dev.undo}>
+              <DesignPreviewBoundary resetKey={`${dev.selectedDevId ?? "none"}:${JSON.stringify(dev.draft)}`} onRecover={recoverProductPreview}>
                 {developerOpen
                   ? <DevPanel fixturePreview={studio.activeScenario !== null} onClose={() => setDeveloperOpen(false)} />
                   : <div className="min-h-0 flex-1 overflow-y-auto"><InspectorPanel /></div>}

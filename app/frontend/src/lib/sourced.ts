@@ -44,6 +44,7 @@ const SOURCE_LABELS: Record<string, string> = {
   scrape: "Product Page",
   // everything else that can answer
   datasheet: "Datasheet",
+  manufacturer_datasheet: "Manufacturer Datasheet",
   manual: "Entered by Hand",
   passive: "Part Number", // a passive MPN encodes its own value, tolerance and case size
   heuristic: "Inferred",

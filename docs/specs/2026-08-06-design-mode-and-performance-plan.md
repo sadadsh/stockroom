@@ -307,5 +307,4 @@ Copy layer and letter rule as enforced (allowlist capped at 4; part data untouch
 token and devIds parity; no blue, no amber, copper stays; states never colour-alone;
 accessible names complete; every behavioural fix ships with a test proven non-vacuous
 (revert it, watch it fail — two known vacuous-test shapes are documented in the files
-that fixed them); frontend check stays 100 and `doctor.config.jsonc` gains no entry
-without a written mechanism.
+that fixed them); the repository-native frontend and accessibility gates remain clean.

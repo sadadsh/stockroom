@@ -105,6 +105,8 @@ class AppContext:
     service_generation: int = 0
     service_mode: str = "standalone"
     release_id: str = ""
+    # Independent one-launch credential used only for the packaged worker readiness proof.
+    startup_proof_token: str = ""
     # Sanitized fail-closed state for a packaged host whose signed built-in
     # release is intact but whose coordinator/update bootstrap could not start.
     # Never store the raw exception here: health is intentionally unauthenticated.

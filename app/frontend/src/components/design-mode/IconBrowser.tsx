@@ -1,10 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
-import { fontAwesomeCatalogEntries, loadOfflineIconCollections, offlineIconFamilies, searchOfflineIcons } from "../../design-studio/offlineIconRegistry";
+import {
+  DEFAULT_OFFLINE_ICON_FAMILY,
+  loadOfflineIconCollections,
+  offlineIconFamilies,
+  searchOfflineIcons,
+  type OfflineIconFamily,
+} from "../../design-studio/offlineIconRegistry";
 import { useCopyFormatter, useText } from "../../lib/copy";
 import type { IconCatalogEntry } from "../../lib/iconRegistry";
 import { sanitizeIconMarkup } from "../iconResolve";
 
-const MAX_VISIBLE_RESULTS = 500;
+const ICON_RESULT_PAGE_SIZE = 200;
 
 function fittedBody(entry: IconCatalogEntry, targetViewBox: string): string {
   const values = targetViewBox.trim().split(/\s+/).map(Number);
@@ -21,29 +27,34 @@ function fittedBody(entry: IconCatalogEntry, targetViewBox: string): string {
 export function IconBrowser({
   onSelect,
   targetViewBox,
+  autoFocus = false,
 }: {
   onSelect: (entry: IconCatalogEntry) => void;
   targetViewBox: string;
+  autoFocus?: boolean;
 }) {
   const [query, setQuery] = useState("");
-  const [family, setFamily] = useState("");
-  const [extraEntries, setExtraEntries] = useState<readonly IconCatalogEntry[]>([]);
-  const entries = useMemo(() => searchOfflineIcons(query, family, extraEntries), [extraEntries, family, query]);
-  const visibleEntries = entries.slice(0, MAX_VISIBLE_RESULTS);
+  const [family, setFamily] = useState<OfflineIconFamily>(DEFAULT_OFFLINE_ICON_FAMILY);
+  const [visibleLimit, setVisibleLimit] = useState(ICON_RESULT_PAGE_SIZE);
+  const [familyEntries, setFamilyEntries] = useState<readonly IconCatalogEntry[]>([]);
+  const entries = useMemo(() => searchOfflineIcons(query, family, familyEntries), [familyEntries, family, query]);
+  const visibleEntries = entries.slice(0, visibleLimit);
   const families = useMemo(() => offlineIconFamilies(), []);
   useEffect(() => {
     let active = true;
-    void loadOfflineIconCollections().then((loaded) => { if (active) setExtraEntries(loaded); });
+    setFamilyEntries([]);
+    void loadOfflineIconCollections(family).then((loaded) => { if (active) setFamilyEntries(loaded); });
     return () => { active = false; };
-  }, []);
+  }, [family]);
+  useEffect(() => setVisibleLimit(ICON_RESULT_PAGE_SIZE), [family, query]);
   const catalogAria = useText("design-studio.icon-catalog.aria", "Offline Icon Catalog");
   const searchLabel = useText("design-studio.icon-catalog.search", "Search Icon Catalog");
   const searchPlaceholder = useText("design-studio.icon-catalog.search-placeholder", "Search labels, terms, or icon sets");
   const resultsAria = useText("design-studio.icon-catalog.results", "Icon Search Results");
   const selectAria = useCopyFormatter("design-studio.icon-catalog.select", "Select {icon} from {family}");
   const countLabel = useCopyFormatter("design-studio.icon-catalog.count", "{count} offline icons");
-  const totalLabel = useText("design-studio.icon-catalog.total", "Total");
-  const allLibrariesLabel = useText("design-studio.icon-catalog.all-libraries", "All Catalogs");
+  const progressLabel = useCopyFormatter("design-studio.icon-catalog.progress", "{shown} of {count} icons shown");
+  const showMoreLabel = useText("design-studio.icon-catalog.show-more", "Show More Icons");
   const libraryLabel = useText("design-studio.icon-catalog.library", "Icon Catalog");
   return (
     <section className="mt-3 pt-3" aria-label={catalogAria}>
@@ -52,6 +63,7 @@ export function IconBrowser({
         <span className="sr-only">{searchLabel}</span>
         <input
           type="search"
+          autoFocus={autoFocus}
           aria-label={searchLabel}
           value={query}
           onChange={(event) => setQuery(event.currentTarget.value)}
@@ -59,8 +71,7 @@ export function IconBrowser({
           className="w-full rounded-control bg-field px-2 py-1.5 text-2xs text-t1 outline-none focus:ring-1 focus:ring-focus"
         />
       </label>
-      <select aria-label={libraryLabel} value={family} onChange={(event) => setFamily(event.currentTarget.value)} className="rounded-control bg-field px-2 text-2xs text-t1">
-        <option value="">{allLibrariesLabel}</option>
+      <select aria-label={libraryLabel} value={family} onChange={(event) => setFamily(event.currentTarget.value as OfflineIconFamily)} className="rounded-control bg-field px-2 text-2xs text-t1">
         {families.map((item) => <option key={item} value={item}>{item}</option>)}
       </select>
       </div>
@@ -80,8 +91,20 @@ export function IconBrowser({
               </button>
           ))}
         </div>
+        {visibleEntries.length < entries.length ? (
+          <button
+            type="button"
+            onClick={() => setVisibleLimit((current) => Math.min(entries.length, current + ICON_RESULT_PAGE_SIZE))}
+            className="mt-2 w-full rounded-control bg-raise2 px-3 py-2 text-xs font-semibold text-t1 hover:bg-control-hover"
+          >
+            {showMoreLabel}
+          </button>
+        ) : null}
       </div>
-      <p className="mt-2 text-2xs text-t3">{countLabel({ count: entries.length.toLocaleString() })} · {(fontAwesomeCatalogEntries().length + extraEntries.length).toLocaleString()} {totalLabel}</p>
+      <p className="mt-2 text-2xs text-t3">
+        {progressLabel({ shown: visibleEntries.length.toLocaleString(), count: entries.length.toLocaleString() })}
+        {" · "}{countLabel({ count: entries.length.toLocaleString() })}
+      </p>
     </section>
   );
 }

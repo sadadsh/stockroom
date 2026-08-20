@@ -452,7 +452,7 @@ Acceptance requires:
   viewport;
 - keyboard, focus, reduced-motion, DPI, and WebView2 inspection;
 - measured first interaction and screen-change latency with no refetch blanking;
-- ASTRYX Doctor, frontend check triage, npm audit, `git diff --check`, deterministic dist, and
+- ASTRYX checks, npm audit, `git diff --check`, deterministic dist, and
   `scripts/Gates.ps1`;
 - a fresh Stockroom Development launch from the final branch head;
 - `HEAD == origin/development`, with only approved ignored runtime artifacts left untracked.

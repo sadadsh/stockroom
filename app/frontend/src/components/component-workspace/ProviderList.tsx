@@ -1,5 +1,4 @@
-import { Text, useText } from "../../lib/copy";
-import { Icon } from "../Icon";
+import { Text, useCopyFormatter, useText } from "../../lib/copy";
 import type { ManageModelsProvider } from "./manageModelsModel";
 
 export function ProviderList({
@@ -17,14 +16,18 @@ export function ProviderList({
     "component-browser.manage-models-providers-aria",
     "CAD model providers",
   );
+  const openProviderTitle = useCopyFormatter(
+    "component-browser.manage-models-open-provider",
+    "Open {provider}",
+  );
 
   return (
     <div
       data-dev-id="component-browser.provider-list"
-      className="flex flex-none items-center gap-2 border-b border-line bg-band px-2 py-1.5"
+      className="flex flex-none items-center gap-2 border-b border-line bg-band px-3 py-2"
     >
-      <span className="ui-section-title flex-none">
-        <Text id="component-browser.manage-models-providers">Providers</Text>
+      <span className="ui-eyebrow flex-none">
+        <Text id="component-browser.manage-models-providers">Open A Provider</Text>
       </span>
       <div
         role="radiogroup"
@@ -38,6 +41,7 @@ export function ProviderList({
             role="radio"
             data-dev-role="component-browser.provider-row"
             aria-checked={provider.row.id === selectedId}
+            title={openProviderTitle({ provider: provider.row.label })}
             disabled={disabled || !provider.reachable}
             tabIndex={
               provider.row.id === selectedId
@@ -46,10 +50,11 @@ export function ProviderList({
                 : -1
             }
             className={
-              "flex h-8 flex-none items-center gap-1.5 rounded-control border px-3 text-left " +
+              "flex h-8 flex-none items-center gap-1.5 rounded-control px-3 text-left transition-colors " +
+              "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus " +
               (provider.row.id === selectedId
-                ? "border-acc bg-control-pressed"
-                : "border-transparent hover:bg-control-hover")
+                ? "bg-control-pressed"
+                : "bg-control-top hover:bg-control-hover")
             }
             onClick={() => onSelect(provider.row.id)}
             onKeyDown={(event) => {
@@ -76,8 +81,12 @@ export function ProviderList({
               buttons?.[targetIndex]?.focus();
             }}
           >
-            <Icon id="detail.provider" className="h-3.5 w-3.5 flex-none text-t3" />
             <span className="whitespace-nowrap text-xs font-medium text-t1">{provider.row.label}</span>
+            {provider.complete ? (
+              <span className="whitespace-nowrap rounded-full bg-ok/10 px-1.5 py-0.5 text-[10px] font-semibold text-ok-text">
+                <Text id="component-browser.manage-models-all-three">All 3</Text>
+              </span>
+            ) : null}
           </button>
         ))}
       </div>

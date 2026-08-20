@@ -724,7 +724,12 @@ function SortControl({
                   }
                 >
                   {o.label}
-                  {on ? <span className="font-mono text-2xs text-t3">{sort.dir === "asc" ? "↑" : "↓"}</span> : null}
+                  {on ? (
+                    <Icon
+                      id={sort.dir === "asc" ? "action.sort-asc" : "action.sort-desc"}
+                      className="h-3 w-3 text-t3"
+                    />
+                  ) : null}
                 </button>
               );
             })}

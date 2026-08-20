@@ -102,17 +102,21 @@ describe("Components Design Studio scenarios", () => {
   it("shows every provider as one compact choice in Manage Models", async () => {
     const { liveRequest } = await mountScenario("components.manage-models-ready");
     expect(screen.queryByRole("dialog")).toBeNull();
-    expect(screen.getByText(/Downloads follow (KiCad|Altium Designer)/)).toBeVisible();
-    const providers = within(screen.getByRole("radiogroup", { name: "CAD model providers" }))
-      .getAllByRole("radio");
-    expect(providers.map((provider) => provider.textContent)).toEqual([
-      "Ultra Librarian",
-      "SnapMagic",
-      "SamacSys",
-      "TraceParts",
-      "CADENAS",
-    ]);
-    expect(providers[4]).toBeDisabled();
+    const edaSelection = screen.getByRole("group", { name: "Requested EDA files" });
+    const kicad = within(edaSelection).getByRole("checkbox", { name: "KiCad" });
+    const altium = within(edaSelection).getByRole("checkbox", { name: "Altium Designer" });
+    expect(kicad).toBeVisible();
+    expect(altium).toBeVisible();
+    expect(kicad).toBeChecked();
+    expect(altium).not.toBeChecked();
+    expect(within(edaSelection).getByText("+ shared 3D")).toBeVisible();
+    const providerList = within(screen.getByRole("radiogroup", { name: "CAD model providers" }));
+    expect(providerList.getAllByRole("radio")).toHaveLength(5);
+    expect(providerList.getByRole("radio", { name: "Ultra Librarian All 3" })).toBeEnabled();
+    expect(providerList.getByRole("radio", { name: "SnapMagic All 3" })).toBeEnabled();
+    expect(providerList.getByRole("radio", { name: "SamacSys" })).toBeEnabled();
+    expect(providerList.getByRole("radio", { name: "TraceParts" })).toBeEnabled();
+    expect(providerList.getByRole("radio", { name: "CADENAS" })).toBeDisabled();
     expect(liveRequest).not.toHaveBeenCalled();
   });
 });

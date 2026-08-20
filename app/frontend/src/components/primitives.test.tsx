@@ -83,6 +83,26 @@ describe("TabStrip devIdBase passthrough", () => {
   });
 });
 
+describe("reusable primitive design identity", () => {
+  it("keeps each caller identity authoritative over the primitive implementation identity", () => {
+    render(
+      <>
+        <Button data-design-id="auto.first-call.1234567">First Call</Button>
+        <Button data-design-id="auto.second-call.1234567">Second Call</Button>
+      </>,
+    );
+
+    expect(screen.getByRole("button", { name: "First Call" })).toHaveAttribute(
+      "data-design-id",
+      "auto.first-call.1234567",
+    );
+    expect(screen.getByRole("button", { name: "Second Call" })).toHaveAttribute(
+      "data-design-id",
+      "auto.second-call.1234567",
+    );
+  });
+});
+
 describe("RouteHeader's count", () => {
   it("sits NEXT TO the panel name, not flushed to the far edge", () => {
     // Same defect as the spec-group counts, in the twin nobody looked at. On the owner's real

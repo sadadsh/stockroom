@@ -277,7 +277,7 @@ export function SpecificationsTitleStripPart() {
  * length of the list, which is the whole point of both.
  */
 export function SpecificationsToolbarChrome({ children }: RegionChromeProps) {
-  return <div className="flex flex-none flex-col gap-1 border-b border-line px-2 py-1">{children}</div>;
+  return <div className="flex flex-none flex-col gap-1 bg-band/35 px-2 py-1.5">{children}</div>;
 }
 
 export function SpecificationsSearchPart() {
@@ -311,9 +311,19 @@ export function SpecificationsFiltersPart() {
   const filtersLabel = useText("component-browser.spec-filters", "Filter specifications");
   if (!workspace || !column) return null;
   const { filter, onFilter } = workspace.specifications;
-  const { specificationGroups, keySpecifications } = workspace.dossier;
+  const { specificationGroups, keySpecifications, qualitySummary } = workspace.dossier;
+  const expectedGaps = qualitySummary.completeness.missingExpected.length;
+  const recommendedGaps = qualitySummary.completeness.missingRecommended.length;
+  const gaps = [
+    expectedGaps > 0
+      ? `${formatCount(expectedGaps)} expected ${expectedGaps === 1 ? "gap" : "gaps"}`
+      : "",
+    recommendedGaps > 0
+      ? `${formatCount(recommendedGaps)} recommended ${recommendedGaps === 1 ? "gap" : "gaps"}`
+      : "",
+  ].filter(Boolean).join(" · ");
   return (
-    <div role="group" aria-label={filtersLabel} className="flex items-center gap-1">
+    <div role="group" aria-label={filtersLabel} className="flex flex-wrap items-center gap-1">
       {SPEC_FILTERS.map((candidate) => {
         const count =
           candidate === "all"
@@ -343,6 +353,14 @@ export function SpecificationsFiltersPart() {
           </button>
         );
       })}
+      {gaps ? (
+        <span
+          data-dev-id="component-browser.spec-gaps"
+          className="ui-component-metadata ml-auto"
+        >
+          {gaps}
+        </span>
+      ) : null}
     </div>
   );
 }
@@ -544,7 +562,7 @@ function SpecSection({
       ref={headingRef}
       data-dev-id={devId}
       data-spec-section={sectionId}
-      className="border-b border-line last:border-b-0"
+      className="pb-1 last:pb-0"
     >
       <h3>
         <button
@@ -553,11 +571,10 @@ function SpecSection({
           aria-expanded={open}
           onClick={() => setOpen((current) => !current)}
           className={
-            // A RULE, not a filled band: see the note on `SourcingSection`. The label's weight and
-            // the hairline under it are the two signals a panel header needs, and a filled field
-            // behind them - repeated once per specification family - is the third that made one
-            // screen carry about fifteen coloured bars.
-            "flex h-[21px] w-full items-center gap-2 border-b border-line px-2 text-left " +
+            // Type weight, height and the breathing room after each group carry the hierarchy.
+            // Repeating a rule and a filled band for every family recreated the wall of lines the
+            // compact property rows deliberately removed.
+            "flex h-[24px] w-full items-center gap-2 px-2 text-left " +
             "transition-colors hover:bg-[var(--c-hover)] focus-visible:outline " +
             "focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus"
           }

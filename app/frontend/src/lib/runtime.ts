@@ -25,7 +25,12 @@ export function apiBase(): string {
   const injected =
     typeof window !== "undefined" ? window.__API_BASE__ : undefined;
   if (injected && injected.trim()) return trimTrailingSlash(injected.trim());
-  const fromEnv = import.meta.env.VITE_API_BASE as string | undefined;
+  // Like the development token below, this value is useful only for the browser dev server.
+  // Production uses the served same-origin API or the native host injection; gating the read also
+  // lets the bundler eliminate a machine-local `.env` value from the shipped JavaScript.
+  const fromEnv = import.meta.env.DEV
+    ? (import.meta.env.VITE_API_BASE as string | undefined)
+    : undefined;
   if (fromEnv && fromEnv.trim()) return trimTrailingSlash(fromEnv.trim());
   if (
     typeof window !== "undefined" &&

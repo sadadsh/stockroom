@@ -633,13 +633,13 @@ describe("the clipboard control", () => {
     await open(makeDossier({ identity: { mpn: "  SN74LVC1G08DBVR " } }));
 
     const button = node("component-browser.copy-mpn");
-    const labelBefore = button.textContent;
+    const labelBefore = button.textContent?.trim();
     await user.click(button);
     // Byte for byte: no trim, no case change, no appended package.
     expect(writeText).toHaveBeenCalledWith("  SN74LVC1G08DBVR ");
     await waitFor(() => expect(button.querySelector('[data-copied="true"]')).not.toBeNull());
     // The label is unchanged and the glyph box is fixed, so nothing beside it moves.
-    expect(button.textContent).toBe(labelBefore);
+    expect(button.textContent?.trim()).toBe(labelBefore);
     expect(button.querySelector('[data-copied="true"]')!.className).toContain("h-3.5 w-3.5");
     // Shortening the visible text must never shorten what a screen reader hears: the accessible
     // name carries the whole phrase before AND after the confirmation.

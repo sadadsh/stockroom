@@ -1,117 +1,109 @@
-# Dev Mode
+# Design Studio
 
-Dev Mode is Stockroom's source-backed interface editor. Press `Ctrl+Shift+D` on Windows to open
-the Design panel. Changes preview immediately in the running app; **Save To Source** writes the
-validated override modules, and **Publish To Main** verifies, builds, commits, and pushes only the
-Dev Mode-owned files.
+Design Studio is Stockroom's in-app interface editor. Press `Ctrl+Shift+D` on Windows to open it.
+The editor has two modes:
 
-It is intentionally not a second settings system. Saved changes become normal application source
-and therefore ship to every checkout and installation through the existing `main` update channel.
+- **Preview** operates Stockroom normally.
+- **Edit** selects and changes visible Stockroom UI without triggering the product action beneath it.
 
-## Editing Model
+The fixed toolbar provides Exit, Preview/Edit, the current screen or state, theme, Undo/Redo, view
+controls, draft status, and **Apply To This PC**. Screens and Layers are optional drawers. The View
+menu owns viewport, zoom, the visible grid, 1-64 px grid and snap size, snapping, presentation mode,
+and the separate developer tools.
 
-Use **Inspect** and select an element in the app, or search the catalogue of registered Dev IDs.
-The panel exposes six facets:
+## Draft, Apply, And Ship
 
-- **Tokens** changes shared color, typography, radius, shadow, and spacing primitives.
-- **Copy** changes registered interface wording.
-- **Icon** replaces a registered icon with sanitized SVG geometry or another registered icon, and
-  controls its stroke width, treatment, accessible label, and inline alignment.
-- **Box** edits the selected element's dimensions, spacing, position and inset, overflow, gradient,
-  border, shadow, grid, and flex alignment. Fill Width, Row, Stack, Wrap, and Hide are repeatable
-  presets.
-- **Text** edits a closed set of font families, transforms, wrapping, and truncation rules.
-- **Behavior** changes a compatible single-choice control between Dropdown, Segmented Control,
-  Radio Group, and Searchable Picker, or disables it. The value, options, validation, and change
-  callback do not change with the presentation.
+Design work has three deliberately separate states:
 
-Undo and Redo keep the latest 50 working snapshots in the current session. `Ctrl+Z` and
-`Ctrl+Shift+Z` work while focus is outside a text editor. **Reset All** returns the working design to
-the committed baseline.
+1. **Draft** autosaves the personal design document. It is visible in Design Studio but does not
+   change the normal app.
+2. **Applied To This PC** changes only after **Apply To This PC** is pressed. The applied document
+   lives outside release directories, survives updates, and can be reset from Settings.
+3. **Shipped** is a developer release action through source control. Applying a personal design
+   never commits, pushes, or changes another installation.
 
-## Source Contract
+`Ctrl+Shift` during launch bypasses an applied design for recovery. A failed editor render recovers
+the last renderable product preview instead of replacing Stockroom with a blank surface.
 
-Saving regenerates exactly these files:
+## Selection And Identity
 
-- `app/frontend/src/lib/token.overrides.ts`
-- `app/frontend/src/lib/copy.overrides.ts`
-- `app/frontend/src/lib/icon.overrides.ts`
-- `app/frontend/src/lib/element.overrides.ts`
-- `app/frontend/src/lib/behavior.overrides.ts`
-- `app/frontend/src/lib/layout.overrides.ts`
+In Edit, click the visible element you mean to change. Shift-click adds another target and Tab moves
+through related parent and child targets. The selection outline provides one move grip, eight resize
+handles, visibility, and reset controls. Hidden targets remain available as ghost rows in Layers.
 
-Promoting a complete personal document also records its named variations in
-`app/frontend/src/lib/design.variations.ts`. Six built-in starting points are always available:
-Full Data, Compact, Purchasing, CAD Review, Minimal, and Custom. Personal variations can be
-created, deleted, or assigned a non-cyclic parent; inherited patches remain sparse instead of
-flattening into the currently selected appearance.
+Every Stockroom-owned JSX element receives a deterministic `data-design-id` during the production
+build, so a developer does not need to add an ID merely to make new UI editable. Authored
+`data-dev-id` values remain authoritative semantic identities when they exist; use one for a stable
+product boundary that must retain meaning across refactors or scenario assertions. Imperative
+Stockroom DOM uses the same identity contract. Provider-page internals and raw CAD geometry are not
+Stockroom UI, but their Stockroom-owned containers and presentation controls remain editable.
 
-`layout.overrides.ts` carries the committed arrangement (Design Mode Phase 4) and, beside it,
-`LAYOUT_COMMITTED_ISSUES` - the validator's reading of that arrangement at the moment it was
-committed. That list is a record rather than a cache: live validation may differ as data, tokens and
-the piece registry move, and both readings are worth having. `copy.overrides.ts` carries a second
-export too, `OWNER_AUTHORED_COPY_IDS`, marking the rewordings the owner typed themselves so the
-interface-letter gate exempts them while still binding everything the application authors.
+The default Layers view shows useful product boundaries. **All Elements** reveals generated wrapper
+and boundary targets without turning the normal view into implementation noise.
 
-The backend validates every payload before writing any file. CSS is restricted to the editor's
-property/value grammar, SVG is parsed and rebuilt from a safe element and attribute allowlist, and
-behavior presets are closed enums. A packaged app without its source checkout refuses to pretend it
-saved.
+## Editing
 
-## Publishing Contract
+The compact inspector groups controls under **Layout**, **Appearance**, **Content**, and
+**Advanced**. Box, text, and icon domains are separate: changing visible text does not rename an
+unrelated wrapper, and changing an icon does not recolor technical CAD geometry. Safe controls cover
+layout, sizing, flow or detached placement, spacing, stacking, visibility, color, border, shadow,
+typography, text content, icon asset and treatment, interaction states, and validated advanced CSS.
+Executable JavaScript and unsafe HTML are never accepted.
 
-Publishing is available only from the managed Stockroom source checkout on `main`. **Make App
-Default** is one backend transaction: it validates the personal document and both theme/variation
-translations before changing source, snapshots every owned source and distribution path, writes the
-validated modules, builds, and then commits and pushes. A clean checkout does not offer an empty
-publish, and foreign dirty files show a blocker instead of failing late. Stockroom then:
+Move and resize gestures use the selected View preference:
 
-1. refuses unrelated dirty files;
-2. fetches GitHub and requires local `HEAD` to equal `origin/main`;
-3. translates the base plus every supported named variation in both themes without flattening the
-   active selection;
-4. runs TypeScript validation and the production frontend build without opening command windows;
-5. rechecks the dirty-file boundary;
-6. commits only the owned override/variation modules and `app/frontend-dist`; and
-7. pushes `main`, reporting a push failure rather than claiming success.
+- **Snap** rounds movement to the current 1-64 px grid.
+- **Free** preserves exact pixel placement.
+- **Flow** keeps the target in layout.
+- **Detached** positions it freely inside its nearest stable container.
 
-Any save/build/commit/push failure restores the pre-transaction source and distribution snapshot;
-push failure also reverts the local promotion commit. The personal document remains intact for
-recovery and retry.
+Arrow keys move the selection; Shift increases the step. Each gesture is one undo entry and Escape
+cancels the active gesture. Arrange controls also expose rotation and forward/backward layer order.
+Reset is available for one property, one target, the current screen, the active theme or variation,
+and the full personal design.
 
-The confirmation step accepts a one-line commit message. It does not force-push or merge divergent
-history.
+Static interface wording should still use `<Text id="area.name">Default text</Text>` or `useText`
+for attributes. That authored copy identity supplies a stable default and targeted content editing;
+it is not the mechanism that exposes surrounding layout elements.
 
-## Extending Coverage
+## Screens, States, And CAD Presentation
 
-Every registered `data-dev-id` can use the Box editor. A control needs the semantic
-`AdaptiveChoice` primitive before the Behavior editor can safely change its presentation. This
-boundary is deliberate: Dev Mode can reshape the interface extensively, but it does not rewrite
-arbitrary JSX or silently change application meaning.
+Screens contains every production Design Studio scenario and its meaningful data, loading, empty,
+error, permission, modal, theme, and responsive states. Fixture Preview Data blocks API mutations,
+native pickers, provider visibility, navigation, downloads, updater, EDA, filesystem, and source
+actions. Real Data is the only route to real product operations.
 
-## Acceptance And Preview Isolation
+CAD viewports expose presentation only. Symbol, footprint, and 3D controls can change visible
+layers, colors, opacity, grid, axes, background, tint, and material treatment. They never move
+engineering primitives or rewrite CAD source.
 
-`scripts/Verify-DesignStudio.ps1` is the deterministic Design Studio acceptance entry point. Its
-browser case list is generated from the production scenario registry during `npm run build` and
-written to `app/frontend-dist/design-studio-scenarios.json`; the browser harness does not maintain
-a second scenario list. The current projection contains 190 scenarios.
+## Persistence Contract
 
-Cases whose ordinary product markup would otherwise look identical carry a visible Preview State
-notice inside the fixture product. It names the exact condition and its meaning. Both the jsdom
-floor and the Chromium matrix compare rendered product DOM and reject duplicate cases; a renamed
-default render is not accepted as another state.
+Design Document schema v2 stores global target identities, Light and Dark theme patches,
+variations, flow/detached geometry, CAD presentation, and unresolved post-update edits. Version 1
+documents migrate automatically. Unresolved identities remain visible for remapping instead of
+being discarded.
 
-The browser matrix opens every projected scenario in dark and light themes at 1,366 x 872,
-1,600 x 1,000, and 1,920 x 1,200. It verifies the registered visible targets, Browse/Inspect/Arrange
-click-through, editor-panel collapse and expansion, all inspector domains, and browser console
-health. Every scenario carries an authority-derived interactive/layout/text/icon boundary and a
-domain-owned state contract; acceptance asserts its expected targets and distinguishing rendered
-DOM. It rejects every external/native/product effect while a fixture is active,
-including API mutations, host file and folder pickers, provider visibility, navigation, downloads,
-updater, EDA, and source actions. A blocked action explains itself in the visible Studio toast.
-The one exception is the local `/api/design-studio/personal` autosave: acceptance makes a real
-token edit, stops the service, restarts it with the same task-owned configuration, and requires the
-exact value to return.
+The local activation API is:
+
+- `POST /api/design-studio/apply-local`
+- `DELETE /api/design-studio/apply-local`
+
+Personal Draft autosave uses the Design Studio personal-document API. Applying is intentionally
+unavailable while Preview Data is active.
+
+## Verification
+
+`scripts/Verify-DesignStudio.ps1` is the deterministic acceptance entry point. Its browser case list
+is generated from the production scenario registry during `npm run build` and written to
+`app/frontend-dist/design-studio-scenarios.json`; the browser harness does not maintain a second
+scenario list.
+
+The browser matrix renders every projected scenario in both themes and supported viewports. It
+checks visible targets, Preview/Edit, drawers, inspector domains, interaction isolation, draft
+restart persistence, and console health. Component and provider cases use the production
+**CAD Models > Manage Models** workspace while keeping the third-party provider document outside
+the editable target tree.
 
 Run the complete entry point from the repository root:
 
@@ -119,30 +111,6 @@ Run the complete entry point from the repository root:
 powershell -ExecutionPolicy Bypass -File scripts\Verify-DesignStudio.ps1
 ```
 
-`-BrowserOnly` runs the production projection and browser matrix; `-SkipBrowser` runs the full
-frontend, deterministic-build, and repository-gate portion. The wrapper writes only to its
-task-owned evidence and configuration directories. Fixture previews never call component,
-project, provider, credential, updater, EDA, filesystem, or source-promotion mutations. Real Data
-mode remains the only route to real product operations, and packaged builds must refuse source
-promotion when a writable managed source checkout is unavailable.
-
-The automated matrix is browser-rendered product proof, not native-host, provider-account, EDA,
-credential, or signed-release proof. Those layers remain separately recorded whenever the real
-Windows owner state prevents an isolated current-source run.
-
-Component and provider cases use the production **CAD Models > Manage Models** workspace. They
-cover complete, partial, unavailable, active, validation, attached, invalid-file, and recovery
-states while keeping the provider document itself outside the editable target tree. The provider
-list, browser chrome, status, and recovery controls remain inspectable; fixture activation cannot
-open the native provider WebView or file picker.
-
-The Studio remembers the last scenario/case, viewport and custom width, data mode, zoom, grid,
-snap, and presentation preference in the existing machine-preferences record. Fixture restore is
-fail-closed and retries if persisted state is temporarily unavailable. The canvas offers a visible
-Fit control and pan cue; keyboard arrow and pointer-drag panning keep the 1,920 px viewport usable
-without concealing the editor rails.
-
-Fixture preview blocks product effects before dispatch. This includes API operations, native file
-and folder pickers, same-tab and new-window external links, auxiliary-click navigation, downloads,
-provider visibility, updater actions, EDA launches, and source promotion. Personal design GET/PUT
-and the dedicated closing-window keepalive handoff are the only live service requests allowed.
+`-BrowserOnly` runs the production projection and browser matrix. `-SkipBrowser` runs the frontend,
+deterministic-build, and repository-gate portion. Browser proof does not replace native Windows,
+provider-account, EDA, credential, or signed-release acceptance.

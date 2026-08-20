@@ -3,6 +3,11 @@ route (the host polls it to know the server is up before opening the window)."""
 
 from __future__ import annotations
 
+import hashlib
+import hmac
+import os
+import re
+
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
 
@@ -29,6 +34,29 @@ def health(request: Request) -> JSONResponse:
         "service_mode": expected_mode,
         "coordinator_status": "unmanaged",
     }
+    # The native host has not sent its API bearer when it performs this probe. Instead it supplies
+    # a fresh public nonce and verifies this HMAC against an independent one-use startup secret
+    # inherited only by the process it spawned. Binding the exact PID and release prevents a local
+    # process that won the reserved loopback port from impersonating a ready packaged worker and
+    # receiving the real bearer during WebView navigation.
+    startup_nonce = request.headers.get("X-Stockroom-Startup-Nonce", "")
+    startup_secret = getattr(ctx, "startup_proof_token", "")
+    if (
+        isinstance(startup_secret, str)
+        and startup_secret
+        and re.fullmatch(r"[0-9a-f]{64}", startup_nonce)
+    ):
+        process_id = os.getpid()
+        proof_message = (
+            f"stockroom-packaged-worker-v1\0{payload['release_id']}\0"
+            f"{process_id}\0{startup_nonce}"
+        ).encode("ascii")
+        payload["startup_process_id"] = process_id
+        payload["startup_proof"] = hmac.new(
+            startup_secret.encode("ascii"),
+            proof_message,
+            hashlib.sha256,
+        ).hexdigest()
     control = getattr(ctx, "service_control", None)
     authority_required = bool(
         getattr(ctx, "service_authority_required", False)

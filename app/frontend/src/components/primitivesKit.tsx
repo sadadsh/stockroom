@@ -17,6 +17,7 @@
 import { useState } from "react";
 import type { ButtonHTMLAttributes, HTMLAttributes, KeyboardEvent, ReactNode } from "react";
 import { Text } from "../lib/copy";
+import { Icon } from "./Icon";
 import {
   UI_CONTROL_LABEL,
   UI_PANEL_TITLE,
@@ -270,25 +271,7 @@ function CompactIconButton({
 // <MotionConfig reducedMotion="user"> plus this class, so a user who asked for stillness gets a
 // static ring rather than a spin.
 function ButtonSpinner() {
-  return (
-    <svg
-      aria-hidden
-      viewBox="0 0 16 16"
-      className="h-3.5 w-3.5 flex-none animate-spin motion-reduce:animate-none"
-    >
-      <circle
-        cx="8"
-        cy="8"
-        r="6"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeDasharray="28"
-        strokeDashoffset="10"
-      />
-    </svg>
-  );
+  return <Icon id="status.loading" className="h-3.5 w-3.5 flex-none animate-spin motion-reduce:animate-none" />;
 }
 
 /*

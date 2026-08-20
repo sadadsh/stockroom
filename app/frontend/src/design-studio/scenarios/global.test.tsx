@@ -76,6 +76,15 @@ describe("global Design Studio scenarios", () => {
     expect(updates).toHaveTextContent("Restart Required");
   });
 
+  it("shows the current About state instead of duplicating the open state", async () => {
+    await mountScenario("global.about.current");
+
+    const current = document.querySelector('[data-dev-id="about.current"]');
+    expect(current).toBeVisible();
+    expect(current).toHaveTextContent("Current");
+    expect(document.querySelector('[data-dev-id="about.stale"]')).toBeNull();
+  });
+
   it.each([
     ["global.onboarding.open", "onboarding.gate"],
     ["global.about.open", "about.root"],

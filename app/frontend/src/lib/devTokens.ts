@@ -719,7 +719,7 @@ export const DEV_TOKENS: DevToken[] = [
     group: "Icons",
     kind: "number",
     themed: false,
-    default: { dark: "1.8" },
+    default: { dark: "2" },
     range: { min: 0.5, max: 3, step: 0.1 },
   },
 ];

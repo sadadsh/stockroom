@@ -243,6 +243,31 @@ def test_value_only_override_keeps_the_decoded_power():
     assert refined.record.specs["Resistance"] == "10 kOhm"
 
 
+def test_manual_passive_value_cannot_keep_original_official_provenance():
+    record = build_passive_record(
+        "RC0603FR-0710KL",
+        value="11 kOhm",
+        datasheet_url="https://x/y.pdf",
+        specs={"Resistance": "1.1 kOhm"},
+        enrichment={"Resistance": {"source": "mouser", "confidence": "high"}},
+    ).record
+
+    assert record.specs["Resistance"] == "11 kOhm"
+    assert record.enrichment["Resistance"].source == "manual"
+
+
+def test_exact_passive_value_keeps_matching_official_provenance():
+    record = build_passive_record(
+        "ERJ-P03F1101V",
+        datasheet_url="https://x/y.pdf",
+        specs={"Resistance": "1.1 kOhm"},
+        enrichment={"Resistance": {"source": "mouser", "confidence": "high"}},
+    ).record
+
+    assert record.specs["Resistance"] == "1.1 kOhm"
+    assert record.enrichment["Resistance"].source == "mouser"
+
+
 def test_decoded_kind_without_a_package_asks_only_for_the_package():
     # A Murata LQ inductor decodes its KIND but not its package; the needs-input
     # signal must carry the kind and not claim a total decode failure.

@@ -156,7 +156,27 @@ def _sort_key(item: Candidate, pinned: str) -> tuple[int, int, int, int, int, st
     )
 
 
-def resolve(candidates: Sequence[Candidate], *, pinned_source: str = "") -> Resolution:
+_DISCOVERY_ONLY_SOURCES: frozenset[str] = frozenset(
+    {"scrape", "jsonld", "opengraph", "next_data", "heuristic", "microdata", "nuxt"}
+)
+
+
+def _discovery_only_source(source: object) -> bool:
+    key = str(source or "").strip().casefold()
+    return (
+        key in _DISCOVERY_ONLY_SOURCES
+        or key == "lcsc"
+        or key.startswith(("lcsc_", "lcsc-"))
+        or key.endswith(("_scrape", "-scrape", "_web", "-web"))
+    )
+
+
+def resolve(
+    candidates: Sequence[Candidate],
+    *,
+    pinned_source: str = "",
+    exclude_discovery_sources: bool = False,
+) -> Resolution:
     """Rank every candidate and name the disagreement, without dropping any of them.
 
     `resolved` rather than `conflicting` when a reviewed decision is in force: the sources still
@@ -167,6 +187,10 @@ def resolve(candidates: Sequence[Candidate], *, pinned_source: str = "") -> Reso
     is the whole mechanism behind a preferred-source control: the field keeps every candidate it
     had, keeps reporting the disagreement, and follows the pinned source as that source is
     refreshed - which a copied literal value could not do.
+
+    `exclude_discovery_sources` keeps LCSC and parsed browser evidence in `candidates` while
+    preventing it from becoming the displayed component fact. Imported and unattributed legacy
+    values remain readable; only data known to come from the discovery-only lanes is excluded.
     """
     if not candidates:
         return Resolution(preferred=None, candidates=(), conflict_state="none")
@@ -174,17 +198,23 @@ def resolve(candidates: Sequence[Candidate], *, pinned_source: str = "") -> Reso
     has_fixed_authority = any(
         specification_authority_rank(item.source) is not None for item in candidates
     )
+    eligible = tuple(
+        item
+        for item in candidates
+        if not exclude_discovery_sources
+        or not _discovery_only_source(item.source)
+    )
     in_force = (
         pinned
-        if not has_fixed_authority and any(item.source.casefold() == pinned for item in candidates)
+        if not has_fixed_authority and any(item.source.casefold() == pinned for item in eligible)
         else ""
     )
     ordered = tuple(sorted(candidates, key=lambda item: _sort_key(item, in_force)))
-    preferred = ordered[0]
+    preferred = next((item for item in ordered if item in eligible), None)
     distinct = {comparable_key(item.normalized) for item in ordered}
     if len(distinct) <= 1:
         state = "none"
-    elif preferred.tier == "manual_override" or in_force:
+    elif preferred is not None and (preferred.tier == "manual_override" or in_force):
         state = "resolved"
     else:
         state = "conflicting"

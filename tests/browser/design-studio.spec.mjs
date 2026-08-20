@@ -8,7 +8,7 @@ import { pathToFileURL } from "node:url";
 const repo = path.resolve(process.env.STOCKROOM_REPOSITORY_ROOT ?? process.cwd());
 const evidenceRoot = path.resolve(
   process.env.STOCKROOM_DESIGN_STUDIO_EVIDENCE ??
-    path.join(repo, ".work plans", "sdd", "2026-08-11-in-app-design-studio", "task-15-evidence", "browser"),
+    path.join(repo, "work", "Design Studio Evidence", "browser"),
 );
 const registryPath = path.join(repo, "app", "frontend-dist", "design-studio-scenarios.json");
 const playwrightCore = process.env.STOCKROOM_PLAYWRIGHT_CORE;
@@ -22,6 +22,10 @@ const matrix = [
 ];
 const themes = ["dark", "light"];
 const scenarioLimit = Number(process.env.STOCKROOM_BROWSER_SCENARIO_LIMIT ?? "0");
+const scenarioIds = String(process.env.STOCKROOM_BROWSER_SCENARIO_ID ?? "")
+  .split(",")
+  .map((id) => id.trim())
+  .filter(Boolean);
 
 function safeName(value) {
   return value.replace(/[^a-zA-Z0-9._-]+/g, "-");
@@ -34,17 +38,65 @@ from pathlib import Path
 repo = Path(sys.argv[1]).resolve()
 sys.path.insert(0, str(repo / "app" / "backend"))
 from stockroom.api.serve import build_context
+from stockroom.api.routers import onboarding as onboarding_router
+from stockroom.eda.primary_policy import PrimaryEdaPolicy
 from stockroom.host.run import run_windowed
+from stockroom.store import guided_setup
 from stockroom.store.machine_config import MachineConfig
-from stockroom.store.onboarding import bootstrap_library
+from stockroom.store.onboarding import bootstrap_library, complete_onboarding
+from stockroom.vcs.repo import GitRepo
 def open_window(base_url, token):
     print("STOCKROOM_BROWSER_BOOTSTRAP " + json.dumps({"baseUrl": base_url, "token": token}), flush=True)
     while True:
         time.sleep(30)
-library = bootstrap_library(MachineConfig.load())
 config = MachineConfig.load()
-config.onboarded = True
-config.save()
+library = bootstrap_library(config)
+PrimaryEdaPolicy(config).request_switch("kicad")
+repo = GitRepo(library)
+remote = "https://github.com/stockroom-design-studio/browser-acceptance.git"
+if not repo.remote_url("origin"):
+    repo.add_remote("origin", remote)
+guided_setup.record_repository(
+    config,
+    owner="stockroom-design-studio",
+    name="browser-acceptance",
+    visibility="private",
+    url=remote,
+)
+guided_setup.record_tool_connection(config, tool="kicad", receipt={"verified": True})
+guided_setup.record_source_decision(config, skipped=True)
+complete_onboarding(config)
+guided_setup.record_completion(config)
+
+def browser_github_status(*args, **kwargs):
+    return {
+        "available": True,
+        "version": "browser-acceptance",
+        "authenticated": True,
+        "online": True,
+        "viewer": {"login": "stockroom-design-studio", "name": "Design Studio Browser"},
+        "owners": [{"login": "stockroom-design-studio", "kind": "user"}],
+        "verified_repository": {
+            "owner": "stockroom-design-studio",
+            "name": "browser-acceptance",
+            "url": remote,
+            "visibility": "private",
+            "permission": "admin",
+            "writable": True,
+        },
+    }
+
+def browser_tool_connection(ctx):
+    return {
+        "tool": "kicad",
+        "installed": True,
+        "connected": True,
+        "restart_required": False,
+        "detail": "KiCad is connected for this disposable browser acceptance run.",
+    }
+
+onboarding_router._github_status = browser_github_status
+guided_setup.current_tool_connection = browser_tool_connection
 context = build_context(library, cold=True)
 run_windowed(ctx=context, open_window=open_window)
 `;
@@ -100,6 +152,18 @@ async function stopStockroom(host) {
     });
     host.child.kill();
   });
+}
+
+async function openBootstrappedStockroom(page, baseUrl) {
+  const onboardingResponse = page.waitForResponse((response) => {
+    const url = new URL(response.url());
+    return url.pathname === "/api/onboarding" && response.request().method() === "GET" && response.ok();
+  });
+  await page.goto(baseUrl, { waitUntil: "networkidle" });
+  const onboarding = await (await onboardingResponse).json();
+  assert.equal(onboarding.primary_eda, "kicad", "browser acceptance must confirm one Primary CAD Tool");
+  assert.equal(onboarding.onboarded, true, "browser acceptance must explicitly complete Guided Setup");
+  assert.equal(onboarding.guided_setup.ready, true, "browser acceptance must start from authoritative Ready state");
 }
 
 function createStudio(page, baseUrl) {
@@ -164,7 +228,62 @@ async function assertVisibleTargets(page, scenario) {
   await root.waitFor({ state: "attached" });
   for (const target of scenario.expectedTargets) {
     const locator = page.locator(`[data-dev-id="${target}"], [data-dev-role="${target}"]`).first();
-    await locator.waitFor({ state: "visible", timeout: 15_000 });
+    try {
+      await locator.waitFor({ state: "attached", timeout: 15_000 });
+      const bounds = await locator.boundingBox();
+      const minimumWidth = target === "settings.vendor-login-row" ? 320 : 1;
+      assert.ok(
+        bounds && bounds.width >= minimumWidth && bounds.height >= 1,
+        `${scenario.id} target ${target} must occupy useful layout space (minimum ${minimumWidth}px wide)`,
+      );
+      await locator.waitFor({ state: "visible", timeout: 15_000 });
+    } catch (error) {
+      await page.screenshot({
+        path: path.join(evidenceRoot, `${safeName(scenario.id)}--missing-${safeName(target)}.png`),
+        fullPage: false,
+      });
+      const diagnostic = await page.evaluate((targetId) => {
+        const matches = [...document.querySelectorAll(`[data-dev-id="${targetId}"], [data-dev-role="${targetId}"]`)];
+        return {
+          body: (document.body.innerText ?? "").slice(0, 2500),
+          matches: matches.slice(0, 4).map((element) => {
+            const style = getComputedStyle(element);
+            const rect = element.getBoundingClientRect();
+            const ancestors = [];
+            let current = element.parentElement;
+            while (current && ancestors.length < 8) {
+              const currentRect = current.getBoundingClientRect();
+              const currentStyle = getComputedStyle(current);
+              ancestors.push({
+                tag: current.tagName,
+                className: current.className,
+                devId: current.getAttribute("data-dev-id"),
+                rect: [currentRect.x, currentRect.y, currentRect.width, currentRect.height],
+                box: [currentStyle.width, currentStyle.minWidth, currentStyle.maxWidth],
+                grid: [currentStyle.gridColumn, currentStyle.justifySelf, currentStyle.alignSelf],
+                transform: currentStyle.transform,
+                overflow: currentStyle.overflow,
+              });
+              current = current.parentElement;
+            }
+            return {
+              display: style.display,
+              visibility: style.visibility,
+              opacity: style.opacity,
+              transform: style.transform,
+              transition: style.transition,
+              animation: style.animation,
+              rect: [rect.x, rect.y, rect.width, rect.height],
+              client: [element.clientWidth, element.clientHeight],
+              scroll: [element.scrollWidth, element.scrollHeight],
+              ancestors,
+              parent: element.parentElement?.outerHTML.slice(0, 800) ?? "",
+            };
+          }),
+        };
+      }, target);
+      throw new Error(`Scenario ${scenario.id} did not expose ${target}:\n${JSON.stringify(diagnostic, null, 2)}`, { cause: error });
+    }
   }
   let previous = "";
   for (let attempt = 0; attempt < 30; attempt += 1) {
@@ -200,7 +319,7 @@ async function representativeClickThrough(page, studio) {
   if ((await grid.getAttribute("aria-pressed")) !== "true") await grid.click();
   const snap = page.getByRole("button", { name: "Snap", exact: true });
   if ((await snap.getAttribute("aria-pressed")) !== "true") await snap.click();
-  await page.getByLabel("Grid Size Exact", { exact: true }).fill("12");
+  await page.getByLabel("Grid And Snap Size Exact", { exact: true }).fill("12");
   await page.getByRole("button", { name: "View", exact: true }).click();
   await page.locator('[aria-label="Stockroom Preview"][data-grid-size="12"][data-snap="on"]').waitFor({ state: "visible" });
   await exerciseControl(page.getByRole("button", { name: /^Move / }).first());
@@ -246,7 +365,7 @@ try {
   const page = await context.newPage();
   const consoleErrors = [];
   page.on("pageerror", (error) => consoleErrors.push(error.stack ?? error.message));
-  await page.goto(baseUrl, { waitUntil: "networkidle" });
+  await openBootstrappedStockroom(page, baseUrl);
   try {
     await page.locator("[data-design-studio-entry]").waitFor({ state: "visible", timeout: 30_000 });
   } catch (error) {
@@ -263,7 +382,18 @@ try {
   const studio = createStudio(page, baseUrl);
   const renderedStates = new Map();
 
-  const scenarios = scenarioLimit > 0 ? registry.scenarios.slice(0, scenarioLimit) : registry.scenarios;
+  const selectedScenarioIds = new Set(scenarioIds);
+  const selectedScenarios = scenarioIds.length
+    ? registry.scenarios.filter((scenario) => selectedScenarioIds.has(scenario.id))
+    : registry.scenarios;
+  if (scenarioIds.length) {
+    assert.equal(
+      selectedScenarios.length,
+      selectedScenarioIds.size,
+      `Unknown Design Studio scenario: ${scenarioIds.filter((id) => !selectedScenarios.some((scenario) => scenario.id === id)).join(", ")}`,
+    );
+  }
+  const scenarios = scenarioLimit > 0 ? selectedScenarios.slice(0, scenarioLimit) : selectedScenarios;
   for (const scenario of scenarios) {
     await studio.open(scenario.id);
     renderedStates.set(scenario.id, await assertVisibleTargets(page, scenario));

@@ -78,6 +78,12 @@ def candidate_to_dto(c: StagingCandidate) -> dict:
         "alternates": {k: list(v) for k, v in c.alternates.items()},
         "enrichment": dict(c.enrichment),
         "catalog": {key: dict(value) for key, value in c.catalog.items()},
+        "official_payloads": {
+            key: dict(value) for key, value in c.official_payloads.items()
+        },
+        "official_evidence": {
+            key: dict(value) for key, value in c.official_evidence.items()
+        },
         # provenance carries the datasheet source_url that to_staged_part records
         # on the committed part, so it must survive the inspect -> edit -> commit trip
         "provenance": (
@@ -127,6 +133,16 @@ def dto_to_candidate(d: dict) -> StagingCandidate:
             str(key): dict(value)
             for key, value in (d.get("catalog") or {}).items()
             if isinstance(value, dict)
+        },
+        official_payloads={
+            str(key): dict(value)
+            for key, value in (d.get("official_payloads") or {}).items()
+            if key in {"mouser", "digikey"} and isinstance(value, dict)
+        },
+        official_evidence={
+            str(key): dict(value)
+            for key, value in (d.get("official_evidence") or {}).items()
+            if key in {"mouser", "digikey"} and isinstance(value, dict)
         },
     )
 

@@ -1,7 +1,8 @@
 [project]
 name = "stockroom"
-version = "0.7.0"
-description = "KiCad V10 component-library manager"
+version = "1.0.0"
+description = "Windows component-library manager for KiCad V10 and Altium"
+license = { file = "LICENSE" }
 requires-python = ">=3.12"
 dependencies = [
     "easyeda2kicad>=1.0.1",

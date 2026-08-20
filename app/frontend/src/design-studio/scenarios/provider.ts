@@ -39,6 +39,18 @@ const TITLES: Record<ProviderFixtureState, string> = {
   complete: "Complete",
 };
 
+const BROWSER_VISIBLE_STATES = new Set<ProviderFixtureState>([
+  "loading",
+  "ready",
+  "sign-in",
+  "waiting-for-person",
+  "format-selection",
+  "download-armed",
+  "one-file",
+  "multiple-files",
+  "partial-retained",
+]);
+
 export const providerScenarios: readonly DesignScenario[] = providerScenarioIds.map((id) => {
   const state = id.slice("provider.".length) as ProviderFixtureState;
   return {
@@ -52,6 +64,11 @@ export const providerScenarios: readonly DesignScenario[] = providerScenarioIds.
       components: { cadView: "manage-models" },
       provider: { state },
     },
-    expectedTargets: ["component-browser.manage-models", "component-browser.provider-viewport"],
+    expectedTargets: [
+      "component-browser.manage-models",
+      BROWSER_VISIBLE_STATES.has(state)
+        ? "component-browser.provider-viewport"
+        : "component-browser.provider-status",
+    ],
   } satisfies DesignScenario;
 });

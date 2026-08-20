@@ -72,7 +72,9 @@ export function captureRequirementsForEdas(edas: readonly CaptureEda[]): Require
   if (selected.has("kicad")) {
     return selected.has("altium") ? [...KICAD_REQS, ...ALTIUM_REQS] : [...KICAD_REQS];
   }
-  return [...ALTIUM_REQS];
+  // The model is shared by both EDA projections. Its historical requirement key says KiCad,
+  // but an Altium-only task still needs one model and a dual-EDA task must never request two.
+  return [...ALTIUM_REQS, "kicad_model"];
 }
 
 export const REQ_LABELS: Record<Requirement, string> = {

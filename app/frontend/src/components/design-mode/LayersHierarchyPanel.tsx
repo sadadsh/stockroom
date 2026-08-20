@@ -5,7 +5,11 @@ import { targetLayersFor } from "../../design-studio/targetCoverage";
 import { useDevMode } from "../../lib/devMode";
 import { useText } from "../../lib/copy";
 import { BUILT_IN_VARIATIONS } from "../../design-studio/document";
-import { designIdOf, ensureDesignIdentities } from "../../lib/designIdentity";
+import {
+  DESIGN_TARGET_SELECTOR,
+  exactDesignTargetAuthority,
+  isProtectedDesignRoot,
+} from "../../lib/designIdentity";
 
 type TreeView = "layers" | "hierarchy";
 
@@ -37,12 +41,14 @@ export function LayersHierarchyPanel() {
   const variations = Object.values(studio.document.variations);
   const parentVariations = variations.filter((variation) => variation.id !== studio.activeVariationId);
   const builtInIds = useMemo<Set<string>>(() => new Set(BUILT_IN_VARIATIONS.map((variation) => variation.id)), []);
-  const targets = useMemo(
-    () => targetLayersFor(document, DEV_IDS),
-    [studio.activeScenario, studio.document, dev.selectedDevId, dev.draft.elements],
-  );
+  const targets = useMemo(() => {
+    const productRoot = document.querySelector("[data-design-product-root]");
+    return productRoot ? targetLayersFor(productRoot, DEV_IDS) : [];
+  }, [studio.activeScenario, studio.document, dev.selectedDevId, dev.draft.elements]);
   const visibleTargets = targets.filter(
-    (target) => allElements || target.meaningful || dev.draft.elements[target.ownerDevId ?? ""]?.visibility === "hidden",
+    (target) => allElements
+      || target.meaningful
+      || (target.overrideId !== null && dev.draft.elements[target.overrideId]?.visibility === "hidden"),
   );
 
   const replaceElementVisibility = (ids: readonly string[], hidden: boolean) => {
@@ -63,9 +69,13 @@ export function LayersHierarchyPanel() {
   const hideScreenContents = () => {
     const root = document.querySelector("[data-design-product-root]");
     if (!root) return;
-    ensureDesignIdentities(root);
-    const id = designIdOf(root);
-    if (id) replaceElementVisibility([id], true);
+    const ids: string[] = [];
+    for (const element of root.querySelectorAll(DESIGN_TARGET_SELECTOR)) {
+      if (isProtectedDesignRoot(element)) continue;
+      const id = exactDesignTargetAuthority(element)?.overrideId;
+      if (id) ids.push(id);
+    }
+    replaceElementVisibility(ids, true);
   };
 
   const showAllHidden = () => {
@@ -233,8 +243,8 @@ export function LayersHierarchyPanel() {
             </button>
             <button
               type="button"
-              disabled={!dev.selectedDevId}
-              onClick={() => dev.selectedDevId && replaceElementVisibility([dev.selectedDevId], true)}
+              disabled={!dev.selectedTarget || isProtectedDesignRoot(dev.selectedTarget.element)}
+              onClick={() => dev.selectedTarget && replaceElementVisibility([dev.selectedTarget.overrideId], true)}
               className="rounded-control px-2 py-1 text-left text-2xs text-t2 hover:bg-raise2 disabled:text-t5"
             >
               {hideSelectedLabel}
@@ -247,19 +257,22 @@ export function LayersHierarchyPanel() {
             </button>
           </div>
           {visibleTargets.map((entry) => {
-            const isHidden = dev.draft.elements[entry.ownerDevId ?? ""]?.visibility === "hidden";
+            const isHidden = entry.overrideId !== null
+              && dev.draft.elements[entry.overrideId]?.visibility === "hidden";
             return (
             <button
               key={entry.key}
               type="button"
               data-target-key={entry.key}
               data-target-depth={entry.depth}
-              onClick={() => entry.ownerDevId && dev.selectDevId(entry.ownerDevId)}
+              disabled={entry.overrideId === null}
+              onClick={() => entry.overrideId && dev.selectTarget(entry.element)}
               className={
                 "block w-full truncate rounded-control py-1 text-left text-xs hover:bg-raise2 " +
                 (view === "hierarchy" ? "pr-2" : "px-2") +
-                (dev.selectedDevId === entry.ownerDevId ? " bg-acc-soft text-t1" : " text-t2") +
-                (isHidden ? " opacity-60 outline outline-1 outline-dashed outline-line2" : "")
+                (dev.selectedTarget?.overrideId === entry.overrideId ? " bg-acc-soft text-t1" : " text-t2") +
+                (isHidden ? " opacity-60 outline outline-1 outline-dashed outline-line2" : "") +
+                (entry.overrideId === null ? " cursor-not-allowed opacity-50" : "")
               }
               style={view === "hierarchy" ? { paddingLeft: `${8 + entry.depth * 12}px` } : undefined}
               title={entry.id}

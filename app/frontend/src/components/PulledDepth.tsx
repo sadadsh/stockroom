@@ -27,7 +27,7 @@ function money(value: number, currency: string): string {
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex flex-col gap-0.5 rounded-control border border-line2 bg-field px-3 py-2">
+    <div className="flex flex-col gap-0.5 bg-field px-3 py-2">
       <span className="text-2xs font-medium text-t3">{label}</span>
       <span className="text-sm font-medium text-t1">{value}</span>
     </div>
@@ -113,7 +113,7 @@ function RelatedProducts({
   const products = relatedProducts(value);
   if (!products.length) return null;
   return (
-    <section className="rounded-control border border-line2 bg-field p-2.5">
+    <section className="bg-field p-2.5">
       <div className="flex items-baseline justify-between gap-3">
         <h4 className="text-xs font-semibold text-t1">{label}</h4>
         <span className="text-2xs tabular-nums text-t3">{products.length}</span>
@@ -150,7 +150,7 @@ function RelatedProducts({
 
 function CatalogProductDataBlock({ data }: { data: CatalogProductData }) {
   return (
-    <div className="flex flex-col gap-2 border-t border-line pt-3">
+    <div className="flex flex-col gap-2 pt-2">
       <div className="flex flex-wrap items-center gap-2">
         <Eyebrow>
           <Text id="depth.product-data">Product Data</Text>
@@ -300,7 +300,7 @@ export function PulledDepth({ result }: { result: EnrichmentResult }) {
       ) : null}
       {breaks.length > 0 ? (
         <div
-          className="max-h-44 overflow-y-auto border-t border-line pt-3"
+          className="max-h-44 overflow-y-auto pt-2"
           role="region"
           aria-label={priceLadderLabel}
           tabIndex={0}

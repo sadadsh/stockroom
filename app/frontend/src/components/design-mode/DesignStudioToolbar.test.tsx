@@ -53,7 +53,7 @@ function renderToolbar(mode: "preview" | "edit" = "preview") {
   );
 }
 
-describe("DesignStudioToolbar local Commit", () => {
+describe("DesignStudioToolbar local Apply", () => {
   beforeEach(() => {
     applyLocal.mockReset();
     studio.activeScenario = null;
@@ -66,7 +66,7 @@ describe("DesignStudioToolbar local Commit", () => {
   it("shows Draft Only before a design is explicitly committed", () => {
     renderToolbar();
     expect(screen.getByText("Draft")).toBeVisible();
-    expect(screen.getByRole("button", { name: "Commit" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Apply To This PC" })).toBeEnabled();
   });
 
   it("keeps secondary display controls inside one View menu", async () => {
@@ -78,21 +78,39 @@ describe("DesignStudioToolbar local Commit", () => {
 
     expect(screen.getByLabelText("Viewport")).toBeVisible();
     expect(screen.getByRole("button", { name: "Presentation" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Grid" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Snap" })).toBeVisible();
+    expect(screen.getByRole("slider", { name: "Grid And Snap Size" })).toHaveValue("8");
   });
 
-  it("restores direct grid, snap, and shared size controls in Edit", () => {
+  it("lets Escape close only the View menu", async () => {
+    renderToolbar();
+    const user = userEvent.setup();
+    const view = screen.getByRole("button", { name: "View" });
+    await user.click(view);
+    expect(screen.getByLabelText("Viewport")).toBeVisible();
+
+    await user.keyboard("{Escape}");
+
+    expect(screen.queryByLabelText("Viewport")).not.toBeInTheDocument();
+    expect(view).toHaveFocus();
+  });
+
+  it("keeps grid, snap, and shared size controls inside View in Edit", async () => {
     renderToolbar("edit");
 
     expect(screen.getByRole("group", { name: "Studio Mode" })).toBeVisible();
+    expect(screen.queryByRole("group", { name: "Edit Grid Controls" })).not.toBeInTheDocument();
+    await userEvent.setup().click(screen.getByRole("button", { name: "View" }));
     const controls = screen.getByRole("group", { name: "Edit Grid Controls" });
     expect(within(controls).getByRole("button", { name: "Grid" })).toBeVisible();
     expect(within(controls).getByRole("button", { name: "Snap" })).toBeVisible();
     expect(within(controls).getByRole("slider", { name: "Grid And Snap Size" })).toHaveValue("8");
   });
 
-  it("uses one clear Commit action and a short Exit action", () => {
+  it("uses one clear Apply action and a short Exit action", () => {
     renderToolbar();
-    expect(screen.getByRole("button", { name: "Commit" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Apply To This PC" })).toBeVisible();
     expect(screen.getByRole("button", { name: "Exit" })).toBeVisible();
     expect(screen.queryByRole("button", { name: "Set" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Close Design Studio" })).not.toBeInTheDocument();
@@ -103,7 +121,7 @@ describe("DesignStudioToolbar local Commit", () => {
     studio.appliedMatchesDraft = true;
     const { rerender } = renderToolbar();
     expect(screen.getByText("Applied · 12345678")).toBeVisible();
-    expect(screen.getByRole("button", { name: "Committed" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Applied" })).toBeDisabled();
 
     studio.appliedMatchesDraft = false;
     rerender(<DesignStudioToolbar
@@ -125,15 +143,15 @@ describe("DesignStudioToolbar local Commit", () => {
       onSnapChange={vi.fn()}
       onClose={vi.fn()}
     />);
-    expect(screen.getByText("Uncommitted Changes")).toBeVisible();
-    expect(screen.getByRole("button", { name: "Commit" })).toBeEnabled();
+    expect(screen.getByText("Draft Changes")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Apply To This PC" })).toBeEnabled();
   });
 
-  it("reports a failed Commit instead of leaving an old applied revision looking current", () => {
+  it("reports a failed Apply instead of leaving an old applied revision looking current", () => {
     studio.appliedRevision = "1234567890abcdef";
     studio.appliedState = "error";
     renderToolbar();
-    expect(screen.getByText("Commit Failed")).toBeVisible();
+    expect(screen.getByText("Apply Failed")).toBeVisible();
   });
 
   it("never applies a fixture-backed preview", async () => {
@@ -141,16 +159,17 @@ describe("DesignStudioToolbar local Commit", () => {
     studio.activeScenarioId = studio.activeScenario.id;
     renderToolbar();
 
-    const button = screen.getByRole("button", { name: "Commit" });
+    expect(screen.getByText("Preview Data")).toBeVisible();
+    const button = screen.getByRole("button", { name: "Apply To This PC" });
     expect(button).toBeDisabled();
     await userEvent.setup().click(button);
     expect(applyLocal).not.toHaveBeenCalled();
   });
 
-  it("applies the personal draft only after the person presses Commit", async () => {
+  it("applies the personal draft only after the person presses Apply", async () => {
     renderToolbar();
 
-    await userEvent.setup().click(screen.getByRole("button", { name: "Commit" }));
+    await userEvent.setup().click(screen.getByRole("button", { name: "Apply To This PC" }));
     expect(applyLocal).toHaveBeenCalledOnce();
   });
 });

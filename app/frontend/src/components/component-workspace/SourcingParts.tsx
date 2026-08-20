@@ -12,6 +12,7 @@
  */
 import type { ReactNode } from "react";
 import { Icon } from "../Icon";
+import type { IconId } from "../../lib/iconRegistry";
 
 /**
  * A quiet heading row with at most one action. Primary content can keep its rows open; secondary
@@ -106,7 +107,7 @@ export function SourcingDisclosure({
 }: {
   devId: string;
   label: ReactNode;
-  icon?: string | null;
+  icon?: IconId | null;
   children: ReactNode;
 }) {
   return (

@@ -68,6 +68,6 @@ public sealed class NativeEntryContractTests
     [Fact]
     public void NativeHostCarriesOneCoherentProductVersion()
     {
-        Assert.Equal("0.7.0.0", LauncherDiagnostics.ProductVersion());
+        Assert.Equal("1.0.0.0", LauncherDiagnostics.ProductVersion());
     }
 }

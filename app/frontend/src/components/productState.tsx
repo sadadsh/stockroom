@@ -28,6 +28,7 @@
 import type { HTMLAttributes, ReactNode } from "react";
 import { Text, useText } from "../lib/copy";
 import { Button, Dot, SectionHeading, type BadgeTone } from "./primitives";
+import { Icon } from "./Icon";
 
 function cx(...parts: Array<string | false | null | undefined>): string {
   return parts.filter(Boolean).join(" ");
@@ -247,23 +248,7 @@ export function LoadingState(props: ProductStateProps) {
       state="loading"
       live="polite"
       leading={
-        <svg
-          aria-hidden
-          viewBox="0 0 16 16"
-          className="h-3 w-3 flex-none animate-spin motion-reduce:animate-none"
-        >
-          <circle
-            cx="8"
-            cy="8"
-            r="6"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeDasharray="28"
-            strokeDashoffset="10"
-          />
-        </svg>
+        <Icon id="status.loading" className="h-3 w-3 flex-none animate-spin motion-reduce:animate-none" />
       }
     />
   );

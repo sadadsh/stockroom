@@ -12,7 +12,8 @@ import type {
 import { Text, useText } from "../../lib/copy";
 import { useToast } from "../../lib/toast";
 import { Badge, Button, Dot } from "../primitives";
-import { BoardIcon, GitIcon } from "../icons";
+import { GitIcon } from "../icons";
+import { Icon } from "../Icon";
 import { ProjectPlacementStage } from "./ProjectPlacementStage";
 import { ProjectInspectorFacts } from "./ProjectInspectorFacts";
 import { AdaptiveChoice } from "../AdaptiveChoice";
@@ -43,6 +44,17 @@ export function ProjectDesignWorkbench({
   );
   const claimLabel = useText("projects.overview.file-claim", "Claim Needed");
   const missingLabel = useText("projects.overview.file-missing", "Missing");
+  const pcbKindLabel = useText("projects.document-type.pcb", "PCB");
+  const schematicKindLabel = useText(
+    "projects.document-type.schematic",
+    "Schematic",
+  );
+  const projectKindLabel = useText("projects.document-type.project", "Project");
+  const kindLabels = {
+    pcb: pcbKindLabel,
+    schematic: schematicKindLabel,
+    project: projectKindLabel,
+  } as const;
 
   // A chosen file that the project no longer offers falls back to the first one DURING
   // render. Writing the fallback back into state took an extra render to settle, which
@@ -86,11 +98,23 @@ export function ProjectDesignWorkbench({
         <div className="min-h-0 flex-1 overflow-y-auto">
           {workspace.documents.map((document) => {
             const selected = document.document_id === selectedDocumentId && !selectedPlacement;
-            const context = documentContext(document);
+            const fileName = documentFileName(document);
+            const baseName = documentBaseName(document);
+            const kindLabel = kindLabels[document.kind];
+            const context = documentDirectory(document);
+            const statusLabel = !document.exists
+              ? missingLabel
+              : document.lock_required
+                ? claimLabel
+                : "";
             return (
               <button
                 key={document.document_id}
                 type="button"
+                aria-label={[baseName, kindLabel, fileName, statusLabel]
+                  .filter(Boolean)
+                  .join(", ")}
+                title={fileName}
                 onClick={() => selectDocument(document.document_id)}
                 className={
                   "relative flex w-full items-center gap-2.5 border-b border-line px-2.5 py-2.5 text-left " +
@@ -111,13 +135,12 @@ export function ProjectDesignWorkbench({
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-medium text-t1">
-                    {document.label}
+                    {baseName}
                   </span>
-                  {context ? (
-                    <span className="mt-0.5 block truncate font-mono text-2xs text-t3">
-                      {context}
-                    </span>
-                  ) : null}
+                  <span className="mt-0.5 block truncate text-2xs text-t3">
+                    {kindLabel}
+                    {context ? <span className="font-mono"> · {context}</span> : null}
+                  </span>
                 </span>
                 {!document.exists ? (
                   <span className="flex-none text-2xs font-medium text-err-text">
@@ -180,7 +203,10 @@ export function ProjectDesignWorkbench({
             value={selectedDocumentId}
             onChange={selectDocument}
             className="h-9 w-full"
-            options={workspace.documents.map((document) => ({ value: document.document_id, label: document.label }))}
+            options={workspace.documents.map((document) => ({
+              value: document.document_id,
+              label: `${documentBaseName(document)} · ${kindLabels[document.kind]}`,
+            }))}
           />
         </label>
         {selectedPlacement ? (
@@ -439,13 +465,7 @@ function RepositorySummary({
 }
 
 function DocumentGlyph({ kind }: { kind: "project" | "schematic" | "pcb" }) {
-  return kind === "pcb" ? (
-    <BoardIcon />
-  ) : (
-    <span className="font-mono text-2xs font-semibold">
-      {kind === "schematic" ? "SCH" : "PRJ"}
-    </span>
-  );
+  return <Icon id={`document.${kind}`} className="h-4 w-4" />;
 }
 
 function formatNumber(value: number) {
@@ -461,16 +481,22 @@ function sameDocumentPath(left: string, right: string) {
   return normalize(left) === normalize(right);
 }
 
-function documentContext(document: ProjectDocument) {
+function documentFileName(document: ProjectDocument) {
   const normalizedPath = document.path.replaceAll("\\", "/");
-  const normalizedLabel = document.label.replaceAll("\\", "/");
-  if (normalizedPath.toLocaleLowerCase() === normalizedLabel.toLocaleLowerCase()) {
-    return "";
-  }
+  return normalizedPath.split("/").pop() || document.label;
+}
+
+function documentBaseName(document: ProjectDocument) {
+  const fileName = documentFileName(document);
+  return fileName.replace(
+    /\.(?:kicad_(?:pcb|sch|pro)|pcbdoc|schdoc|prjpcb)$/i,
+    "",
+  ) || fileName;
+}
+
+function documentDirectory(document: ProjectDocument) {
+  const normalizedPath = document.path.replaceAll("\\", "/");
   const parts = normalizedPath.split("/");
-  const fileName = parts.pop() ?? "";
-  if (fileName.toLocaleLowerCase() === normalizedLabel.toLocaleLowerCase()) {
-    return parts.join("/");
-  }
-  return normalizedPath;
+  parts.pop();
+  return parts.join("/");
 }

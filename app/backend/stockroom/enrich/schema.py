@@ -16,8 +16,10 @@ from typing import Any
 
 # Bump when the canonical shape changes; a stored EnrichmentResult records the
 # version it was produced under so a reader can migrate or discard it.
-# v2: added country_of_origin + tariff_rate (the Mouser page's own US-import fields).
-SCHEMA_VERSION = 3
+# v5: binds every successful official payload to its query, canonical identity,
+# and the exact values selected from it.  Old cache rows are deliberately missed:
+# raw bytes without that identity binding are not safe initial-add evidence.
+SCHEMA_VERSION = 5
 
 # Confidence ranked low -> high so a merge can compare sources.
 CONFIDENCE_RANK: dict[str, int] = {"low": 0, "medium": 1, "high": 2}
@@ -213,6 +215,18 @@ class EnrichmentResult:
     # indistinguishable from a part the distributor simply does not carry. Values are fixed
     # vocabulary only; no exception text or credential material ever lands here.
     source_states: dict[str, str] = field(default_factory=dict)
+    # Complete decoded JSON returned by successful official distributor calls. These bytes are
+    # not presentation data: the initial Add carries them to sourced/<id>/<provider>.json so a
+    # later naming or derivation rule can be replayed without an immediate network Refresh.
+    official_payloads: dict[str, dict] = field(default_factory=dict)
+    # Provider-keyed identity bindings for ``official_payloads``.  The raw response remains
+    # byte-for-byte evidence; this parallel index says which query produced it, which canonical
+    # manufacturer MPN it proved, and which of its values were selected into the review.
+    official_evidence: dict[str, dict] = field(default_factory=dict)
+    # Authorities that independently proved the requested MPN. Official API providers are
+    # represented by their successful source state; this list carries the non-API exception:
+    # a manufacturer datasheet whose text contained the exact known MPN.
+    identity_authorities: list[str] = field(default_factory=list)
     # Official keyword-search candidates returned when no exact manufacturer part number exists.
     # They are display-only recovery choices and never contribute identity or part fields until the
     # person explicitly chooses one and Stockroom performs a new exact lookup.
@@ -288,6 +302,13 @@ class EnrichmentResult:
             self.catalog.setdefault(key, dict(val))
         for key, val in other.source_states.items():
             self.source_states.setdefault(key, val)
+        for key, val in other.official_payloads.items():
+            self.official_payloads.setdefault(key, dict(val))
+        for key, val in other.official_evidence.items():
+            self.official_evidence.setdefault(key, dict(val))
+        for authority in other.identity_authorities:
+            if authority not in self.identity_authorities:
+                self.identity_authorities.append(authority)
         for key, values in other.identity_suggestions.items():
             existing = self.identity_suggestions.setdefault(key, [])
             for value in values:

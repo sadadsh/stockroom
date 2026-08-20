@@ -78,6 +78,7 @@ beforeEach(() => {
     state: "up_to_date",
     current_revision: BACKEND_REVISION,
     target_revision: BACKEND_REVISION,
+    frontend_revision: BUNDLE_REVISION,
     behind: 0,
   } as never);
 });
@@ -87,7 +88,7 @@ function AddPartProbe() {
   return <div data-testid="addpart-open">{String(isOpen)}</div>;
 }
 
-function renderShell(initial: "components" | "stm" | "settings" = "components") {
+function renderShell(initial: "components" | "assets" | "stm" | "settings" = "components") {
   window.history.replaceState({}, "", `/#route=${initial}`);
   const qc = new QueryClient({
     defaultOptions: { queries: { retry: false } },
@@ -145,6 +146,7 @@ describe("AppShell status bar", () => {
       state: "up_to_date",
       current_revision: "222222222222",
       target_revision: "222222222222",
+      frontend_revision: "222222222222",
       behind: 0,
     } as never);
     renderShell();
@@ -266,6 +268,12 @@ describe("AppShell status bar", () => {
     renderShell("stm");
     expect(document.querySelector('[data-dev-id="shell.statusbar"]')).toHaveTextContent("STM Viewer");
     expect(screen.queryByText(/Could Not Load Components/)).toBeNull();
+  });
+
+  it("names Assets instead of falling through to Settings", () => {
+    renderShell("assets");
+    expect(document.querySelector('[data-dev-id="shell.statusbar"]')).toHaveTextContent("Assets");
+    expect(document.querySelector('[data-dev-id="shell.statusbar"]')).not.toHaveTextContent("Settings");
   });
 
   it("does not expose the retired profile switcher", async () => {

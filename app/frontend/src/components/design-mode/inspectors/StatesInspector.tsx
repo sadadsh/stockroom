@@ -10,6 +10,7 @@ import { setDraftElementProperty } from "../../../lib/devModeDraft";
 import { useOptionalDesignStudio } from "../../../design-studio/DesignStudioProvider";
 import type { DomainInspectorProps } from "./types";
 import { VisualCssControl } from "./VisualCssControl";
+import { isRootProtectedDesignProperty } from "../../../lib/designIdentity";
 
 export function StatesInspector({ inspection, affectedTargetIds }: DomainInspectorProps) {
   const dev = useDevMode();
@@ -47,7 +48,8 @@ export function StatesInspector({ inspection, affectedTargetIds }: DomainInspect
         <section className="mt-3 pt-3">
           <h4 className="ui-property-label">{appearanceLabel}</h4>
           {(["color", "background-color", "border-color", "opacity", "box-shadow", "transform"] as const).map((property) => {
-            const overrideId = `${inspection.id}::state:${state}`;
+            const overrideId = `${inspection.overrideId}::state:${state}`;
+            const protectedProperty = isRootProtectedDesignProperty(inspection.target, property);
             return (
               <label key={`${state}-${property}`} className="grid grid-cols-[minmax(0,1fr)_104px] items-center gap-2 py-1 text-xs text-t2">
                 {property.split("-").map((part) => part[0].toUpperCase() + part.slice(1)).join(" ")}
@@ -55,7 +57,9 @@ export function StatesInspector({ inspection, affectedTargetIds }: DomainInspect
                   property={property}
                   ariaLabel={propertyAria({ property: property.split("-").map((part) => part[0].toUpperCase() + part.slice(1)).join(" ") })}
                   value={dev.elementOverridesFor(overrideId)?.[property] ?? getComputedStyle(inspection.target).getPropertyValue(property)}
+                  disabled={protectedProperty}
                   onCommit={(value) => {
+                    if (protectedProperty) return;
                     const stateIds = affectedTargetIds.map((id) => `${id}::state:${state}`);
                     if (studio && isThemeSpecificElementProp(property)) {
                       studio.replaceResolvedDraftAtomically(

@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import App from "../../App";
@@ -10,6 +10,10 @@ import { ThemeProvider } from "../../lib/theme";
 import { ToastProvider } from "../../lib/toast";
 import { DesignStudioProvider, useDesignStudio } from "../../design-studio/DesignStudioProvider";
 import { useDevMode } from "../../lib/devMode";
+import {
+  DEV_MODE_HISTORY_GESTURE_END_EVENT,
+  DEV_MODE_HISTORY_GESTURE_START_EVENT,
+} from "../../lib/devModeHistory";
 import { DevInspector } from "../DevInspector";
 import { DesignStudioShell } from "./DesignStudioShell";
 
@@ -147,6 +151,73 @@ function InteractionProduct({ onAction }: { onAction: () => void }) {
   );
 }
 
+function PersistenceProduct() {
+  const studio = useDesignStudio();
+  const dev = useDevMode();
+  return (
+    <div data-dev-id="shell.root">
+      <button type="button" data-design-studio-entry onClick={studio.open}>Open Persistence Studio</button>
+      <button type="button" onClick={() => dev.setCopy("rail.about", "Unsaved Shell Edit")}>Make Draft Edit</button>
+    </div>
+  );
+}
+
+function DuplicateLayersProduct() {
+  const studio = useDesignStudio();
+  const dev = useDevMode();
+  return (
+    <main data-dev-id="shell.root">
+      <button type="button" data-design-studio-entry onClick={studio.open}>Open Duplicate Studio</button>
+      <section data-dev-id="rail.root">
+        <button type="button" data-dev-id="rail.about" data-testid="duplicate-first">First About</button>
+      </section>
+      <section data-dev-id="settings.root">
+        <button type="button" data-dev-id="rail.about" data-testid="duplicate-second">Second About</button>
+      </section>
+      <output data-testid="duplicate-selection">
+        {dev.selectedTarget?.element.getAttribute("data-testid") ?? "none"}
+      </output>
+    </main>
+  );
+}
+
+function DeterministicCrashProduct() {
+  const studio = useDesignStudio();
+  const dev = useDevMode();
+  if (dev.draft.elements["crash.preview"]?.display === "none") {
+    throw new Error("deterministic design draft crash");
+  }
+  return (
+    <div>
+      <button type="button" data-design-studio-entry onClick={studio.open}>Open Crash Studio</button>
+      <button
+        type="button"
+        onClick={() => {
+          window.dispatchEvent(new Event(DEV_MODE_HISTORY_GESTURE_START_EVENT));
+          dev.setCopy("unrelated.copy", "Preserve Me");
+          dev.setElementProp("unrelated.target", "color", "#123456");
+        }}
+      >
+        Prepare Unrelated Design
+      </button>
+      <button type="button" onClick={() => dev.setElementProp("crash.preview", "display", "none")}>Arm Deterministic Crash</button>
+      <output data-testid="crash-draft">{JSON.stringify(dev.draft)}</output>
+      <output data-testid="crash-can-undo">{String(dev.canUndo)}</output>
+    </div>
+  );
+}
+
+function ScenarioCrashProduct() {
+  const studio = useDesignStudio();
+  if (studio.activeScenario) throw new Error("deterministic scenario crash");
+  return (
+    <div>
+      <button type="button" data-design-studio-entry onClick={studio.open}>Open Scenario Crash Studio</button>
+      <button type="button" onClick={() => void studio.activateScenario("global.onboarding.open")}>Arm Scenario Crash</button>
+    </div>
+  );
+}
+
 function renderInteractionProduct(onAction: () => void) {
   return render(
     <Providers>
@@ -220,6 +291,118 @@ afterEach(() => {
 });
 
 describe("DesignStudioShell", () => {
+  it("awaits persistence and visibly keeps Design Studio open when Exit cannot save", async () => {
+    render(
+      <Providers>
+        <DesignStudioShell><PersistenceProduct /></DesignStudioShell>
+      </Providers>,
+    );
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Open Persistence Studio" }));
+    await user.click(screen.getByRole("button", { name: "Make Draft Edit" }));
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockImplementation(async (input, init) => {
+      if (init?.method === "PUT" && String(input).includes("/api/design-studio/personal")) {
+        return {
+          ok: false,
+          status: 503,
+          json: async () => ({ detail: "unavailable" }),
+        } as Response;
+      }
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ schema_version: 1, document: null, revision: 0 }),
+      } as Response;
+    });
+
+    await user.click(screen.getByRole("button", { name: "Exit" }));
+
+    expect(screen.getByRole("region", { name: "Stockroom Preview" })).toBeVisible();
+    expect(screen.getByRole("status")).toHaveTextContent("Draft is not saved. Design Studio remains open.");
+  });
+
+  it("selects and hides one duplicate occurrence while retaining its exact ghost row", async () => {
+    render(
+      <Providers>
+        <DesignStudioShell><DuplicateLayersProduct /></DesignStudioShell>
+      </Providers>,
+    );
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Open Duplicate Studio" }));
+    const sidebar = await openDrawer("Layers");
+    const duplicateRows = within(sidebar).getAllByRole("button", {
+      name: /Legacy About target · \d of 2/,
+    });
+
+    await user.click(duplicateRows[1]!);
+    expect(screen.getByTestId("duplicate-selection")).toHaveTextContent("duplicate-second");
+    await user.click(within(sidebar).getByRole("button", { name: "Hide Selected" }));
+
+    expect(screen.getByTestId("duplicate-first")).not.toHaveStyle({ visibility: "hidden" });
+    expect(screen.getByTestId("duplicate-second")).toHaveStyle({ visibility: "hidden" });
+    expect(within(sidebar).getByRole("button", {
+      name: /Legacy About target · 2 of 2 · Hidden/,
+    })).toBeVisible();
+  });
+
+  it("recovers the last renderable draft without deleting unrelated edits or requiring undo", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const fetchMock = vi.mocked(fetch);
+    render(
+      <Providers>
+        <DesignStudioShell><DeterministicCrashProduct /></DesignStudioShell>
+      </Providers>,
+    );
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Open Crash Studio" }));
+    await user.click(screen.getByRole("button", { name: "Prepare Unrelated Design" }));
+    expect(screen.getByTestId("crash-can-undo")).toHaveTextContent("false");
+    expect(JSON.parse(screen.getByTestId("crash-draft").textContent ?? "{}")).toMatchObject({
+      copy: { "unrelated.copy": "Preserve Me" },
+      elements: { "unrelated.target": { color: "#123456" } },
+    });
+    await user.click(screen.getByRole("button", { name: "Arm Deterministic Crash" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Preview stopped");
+
+    await user.click(screen.getByRole("button", { name: "Recover Preview" }));
+
+    expect(await screen.findByRole("button", { name: "Arm Deterministic Crash" })).toBeVisible();
+    expect(JSON.parse(screen.getByTestId("crash-draft").textContent ?? "{}")).toMatchObject({
+      copy: { "unrelated.copy": "Preserve Me" },
+      elements: { "unrelated.target": { color: "#123456" } },
+    });
+    expect(JSON.parse(screen.getByTestId("crash-draft").textContent ?? "{}").elements["crash.preview"]).toBeUndefined();
+    await waitFor(() => expect(fetchMock.mock.calls.some(
+      ([input, init]) => String(input).includes("/api/design-studio/personal") && init?.method === "PUT",
+    )).toBe(true));
+    const personalWrites = fetchMock.mock.calls.filter(
+      ([input, init]) => String(input).includes("/api/design-studio/personal") && init?.method === "PUT",
+    );
+    const savedBody = String(personalWrites[personalWrites.length - 1]?.[1]?.body);
+    expect(savedBody).toContain("Preserve Me");
+    expect(savedBody).toContain("unrelated.target");
+    expect(savedBody).not.toContain("crash.preview");
+    window.dispatchEvent(new Event(DEV_MODE_HISTORY_GESTURE_END_EVENT));
+  });
+
+  it("exits a deterministic non-draft scenario crash before remounting", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    render(
+      <Providers>
+        <DesignStudioShell><ScenarioCrashProduct /></DesignStudioShell>
+      </Providers>,
+    );
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Open Scenario Crash Studio" }));
+    await user.click(screen.getByRole("button", { name: "Arm Scenario Crash" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Preview stopped");
+
+    await user.click(screen.getByRole("button", { name: "Recover Preview" }));
+
+    expect(await screen.findByRole("button", { name: "Arm Scenario Crash" })).toBeVisible();
+  });
+
   it("opens canvas-first with Preview active and every drawer closed", async () => {
     renderApp();
     await userEvent.setup().click(await screen.findByRole("button", { name: "Design Studio" }));
@@ -245,6 +428,16 @@ describe("DesignStudioShell", () => {
     expect(screen.getByLabelText("Zoom")).toHaveValue("0");
   });
 
+  it("names the Screens and Layers drawers with their own truthful icons", async () => {
+    renderApp();
+    await userEvent.setup().click(await screen.findByRole("button", { name: "Design Studio" }));
+
+    expect(screen.getByRole("button", { name: "Screens" }).querySelector("[data-icon-id]"))
+      .toHaveAttribute("data-icon-id", "design.screens");
+    expect(screen.getByRole("button", { name: "Layers" }).querySelector("[data-icon-id]"))
+      .toHaveAttribute("data-icon-id", "design.layers");
+  });
+
   it("blocks product actions in Edit while preserving selection and Preview interaction", async () => {
     const action = vi.fn();
     renderInteractionProduct(action);
@@ -268,7 +461,7 @@ describe("DesignStudioShell", () => {
     await renderStudio();
     await openView();
     const preview = screen.getByRole("region", { name: "Stockroom Preview" });
-    const frame = preview.firstElementChild as HTMLElement;
+    const frame = preview.querySelector<HTMLElement>('[data-design-product-root="true"]')!;
     const viewport = screen.getByLabelText("Viewport");
 
     expect(viewport).toHaveValue("desktop-1366");
@@ -311,6 +504,7 @@ describe("DesignStudioShell", () => {
   it("changes the visible and snapping grid from 1 to 64 pixels", async () => {
     await renderStudio();
     await userEvent.setup().click(screen.getByRole("button", { name: "Edit" }));
+    await openView();
     const gridSize = screen.getByRole("slider", { name: "Grid And Snap Size" });
     const preview = screen.getByRole("region", { name: "Stockroom Preview" });
 
@@ -324,7 +518,10 @@ describe("DesignStudioShell", () => {
     fireEvent.change(gridSize, { target: { value: "24" } });
     expect(preview).toHaveAttribute("data-grid-size", "24");
     expect(Number.parseFloat(preview.style.getPropertyValue("--design-studio-grid-size"))).toBeGreaterThan(20);
-    expect(preview.querySelector('[data-design-grid-overlay="true"]')).toBeInTheDocument();
+    const overlay = preview.querySelector<HTMLElement>('[data-design-grid-overlay="true"]');
+    expect(overlay).toBeInTheDocument();
+    expect(overlay?.style.zIndex).toBe("10000");
+    expect(Number(overlay?.style.zIndex)).toBeGreaterThan(9999);
     fireEvent.change(gridSize, { target: { value: "100" } });
     expect(gridSize).toHaveValue("64");
   });
@@ -335,7 +532,7 @@ describe("DesignStudioShell", () => {
     await userEvent.setup().selectOptions(screen.getByLabelText("Viewport"), "desktop-1920");
     await userEvent.setup().selectOptions(screen.getByLabelText("Zoom"), "0");
     const preview = screen.getByRole("region", { name: "Stockroom Preview" });
-    const frame = preview.firstElementChild as HTMLElement;
+    const frame = preview.querySelector<HTMLElement>('[data-design-product-root="true"]')!;
 
     expect(frame.style.width).toBe("1920px");
     expect(frame.style.transform).toMatch(/^scale\(/);
@@ -384,19 +581,54 @@ describe("DesignStudioShell", () => {
     await userEvent.setup().selectOptions(screen.getByLabelText("Viewport"), "desktop-1920");
     await userEvent.setup().selectOptions(screen.getByLabelText("Zoom"), "0");
     const preview = screen.getByRole("region", { name: "Stockroom Preview" });
-    const frame = preview.firstElementChild as HTMLElement;
+    const frame = preview.querySelector<HTMLElement>('[data-design-product-root="true"]')!;
     Object.defineProperty(preview, "clientWidth", { configurable: true, value: 1000 });
 
     fireEvent(window, new Event("resize"));
-    notifyResize();
+    act(() => notifyResize());
 
     await waitFor(() => expect(frame.style.transform).toBe("scale(0.5083333333333333)"));
+  });
+
+  it("fits the complete 1366 canvas between Layers and Inspector and keeps its right edge editable", async () => {
+    let notifyResize: () => void = () => undefined;
+    class ResizeObserverStub {
+      constructor(callback: ResizeObserverCallback) {
+        notifyResize = () => callback([], this as unknown as ResizeObserver);
+      }
+      observe() {}
+      disconnect() {}
+      unobserve() {}
+    }
+    vi.stubGlobal("ResizeObserver", ResizeObserverStub);
+    const action = vi.fn();
+    renderInteractionProduct(action);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Open Design Studio" }));
+    await user.click(screen.getByRole("button", { name: "Edit" }));
+    await openDrawer("Layers");
+    const preview = screen.getByRole("region", { name: "Stockroom Preview" });
+    Object.defineProperty(preview, "clientWidth", { configurable: true, value: 700 });
+
+    act(() => notifyResize());
+
+    const stage = preview.querySelector<HTMLElement>('[data-design-preview-stage="true"]');
+    const frame = preview.querySelector<HTMLElement>('[data-design-product-root="true"]')!;
+    expect(screen.getByRole("complementary", { name: "Layers" })).toBeVisible();
+    expect(screen.getByRole("complementary", { name: "Inspector" })).toBeVisible();
+    expect(stage).toBeInTheDocument();
+    expect(Number.parseFloat(stage?.style.width ?? "")).toBeCloseTo(676, 5);
+    expect(frame.style.transformOrigin).toBe("top left");
+
+    await user.click(screen.getByRole("button", { name: "Product Action" }));
+    expect(screen.getByTestId("interaction-selection")).toHaveTextContent("interaction.action");
+    expect(action).not.toHaveBeenCalled();
   });
 
   it("never steals arrow or pointer input from controls inside the preview", async () => {
     await renderStudio();
     const preview = screen.getByRole("region", { name: "Stockroom Preview" });
-    const frame = preview.firstElementChild as HTMLElement;
+    const frame = preview.querySelector<HTMLElement>('[data-design-product-root="true"]')!;
     const slider = document.createElement("input");
     slider.type = "range";
     frame.append(slider);
@@ -412,6 +644,11 @@ describe("DesignStudioShell", () => {
   it("lists only rendered stable targets and exposes their hierarchy without index keys", async () => {
     await renderStudio();
     const sidebar = await openDrawer("Layers");
+    const close = within(sidebar).getByRole("button", { name: "Close Drawer" });
+    expect(close.querySelector("svg.ico")).not.toBeNull();
+    expect(close).toHaveTextContent("");
+    expect(within(sidebar).queryAllByRole("button", { name: /Icon · design\.(?:screens|layers)/ })).toHaveLength(0);
+    expect(within(sidebar).queryAllByRole("button", { name: /Icon · action\.close/ })).toHaveLength(0);
     const rail = within(sidebar).getByRole("button", { name: "Navigation rail" });
     expect(rail).toHaveAttribute("data-target-key", "dev:rail.root");
     expect(within(sidebar).queryByRole("button", { name: "About dialog" })).toBeNull();
@@ -421,7 +658,7 @@ describe("DesignStudioShell", () => {
     expect(sidebar.innerHTML).not.toContain("data-target-index");
   });
 
-  it("keeps hidden targets as ghost rows and can blank then restore the product", async () => {
+  it("keeps hidden targets as ghost rows and blanks contents without hiding the preview root", async () => {
     await renderStudio();
     const sidebar = await openDrawer("Layers");
     const rail = within(sidebar).getByRole("button", { name: "Navigation rail" });
@@ -433,7 +670,9 @@ describe("DesignStudioShell", () => {
     const productRoot = screen.getByRole("region", { name: "Stockroom Preview" })
       .querySelector("[data-design-product-root]") as HTMLElement;
     await userEvent.setup().click(within(sidebar).getByRole("button", { name: "Hide Screen Contents" }));
-    expect(productRoot).toHaveStyle({ visibility: "hidden" });
+    expect(productRoot.style.visibility).toBe("");
+    expect(productRoot.querySelector<HTMLElement>('[data-dev-id="shell.root"]')?.style.visibility ?? "").toBe("");
+    expect(productRoot.querySelectorAll('[style*="visibility: hidden"]').length).toBeGreaterThan(1);
 
     await userEvent.setup().click(within(sidebar).getByRole("button", { name: "Show All Hidden" }));
     expect(productRoot.style.visibility).toBe("");
@@ -444,9 +683,14 @@ describe("DesignStudioShell", () => {
     await renderStudio();
     const sidebar = await openDrawer("Layers");
     expect(within(sidebar).getByRole("button", { name: "All Elements" })).toHaveAttribute("aria-pressed", "false");
+    const internalGenerated = /Element · auto\.(?:icon|primitives-kit)\./;
+    expect(within(sidebar).queryAllByRole("button", { name: internalGenerated })).toHaveLength(0);
     const before = within(sidebar).queryAllByRole("button", { name: /Element · auto\./ }).length;
     await userEvent.setup().click(within(sidebar).getByRole("button", { name: "All Elements" }));
     const after = within(sidebar).getAllByRole("button", { name: /Element · auto\./ }).length;
+    const revealedInternal = within(sidebar).getAllByRole("button", { name: internalGenerated });
+    expect(revealedInternal.some((entry) => entry.textContent?.includes("auto.primitives-kit."))).toBe(true);
+    expect(within(sidebar).queryAllByRole("button", { name: /Icon · design\.(?:screens|layers)/ })).toHaveLength(0);
     expect(after).toBeGreaterThan(before);
   });
 

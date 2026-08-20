@@ -312,7 +312,7 @@ function SpecificationEvidence({
       // OPAQUE. `bg-band/60` compounded against whatever row it opened under, so the attached
       // evidence read differently on an even row than on an odd one; the alternating-row tint is
       // the surface a data row actually sits on, so the drawer takes it outright.
-      className="flex flex-col gap-1 border-t border-line/60 bg-row-alt px-2 py-1.5 pl-[10rem]"
+      className="flex flex-col gap-1 bg-row-alt px-2 py-2 pl-[10rem]"
     >
       {preferred ? (
         <p className="ui-component-metadata">

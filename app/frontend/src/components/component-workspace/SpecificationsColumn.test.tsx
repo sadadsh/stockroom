@@ -28,6 +28,18 @@ const MOUSER = makeCandidate({
 
 function dossier(): ComponentDossier {
   return makeDossierWith({
+    qualitySummary: {
+      completeness: {
+        score: 0.6,
+        expectedPresent: 3,
+        expectedTotal: 5,
+        recommendedPresent: 1,
+        recommendedTotal: 2,
+        missingExpected: ["input_voltage", "output_voltage"],
+        missingRecommended: ["quiescent_current"],
+        basis: "ics",
+      },
+    },
     keySpecifications: [
       makeSpecification({
         key: "supply_voltage",
@@ -180,7 +192,7 @@ describe("searching the specification sheet", () => {
     expect(searchBox()).toHaveValue("pin count");
     expect(
       document.querySelectorAll(devIdSelector("component-browser.spec-filter")),
-    ).toHaveLength(4);
+    ).toHaveLength(3);
   });
 
   it("says nothing matched rather than showing an empty sheet", async () => {
@@ -189,6 +201,18 @@ describe("searching the specification sheet", () => {
     await user.type(searchBox(), "flux capacitance");
     expect(visibleRowKeys()).toEqual([]);
     expect(screen.getByText("No specification matches this filter.")).toBeInTheDocument();
+  });
+});
+
+describe("category gaps", () => {
+  it("summarizes absent schema fields without fabricating specification rows", () => {
+    open();
+
+    expect(screen.getByText("2 expected gaps · 1 recommended gap")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Missing/ })).toBeNull();
+    expect(visibleRowKeys()).not.toContain("input_voltage");
+    expect(visibleRowKeys()).not.toContain("output_voltage");
+    expect(visibleRowKeys()).not.toContain("quiescent_current");
   });
 });
 

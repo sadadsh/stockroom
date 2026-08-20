@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Rail } from "./Rail";
 import { DevModeProvider } from "../lib/devMode";
@@ -25,6 +25,7 @@ const { state, navigate, updateState } = vi.hoisted(() => ({
     target_release_id: "",
     current_revision: "",
     target_revision: "",
+    frontend_revision: "",
     isPending: false,
     isFetching: false,
     isError: false,
@@ -50,6 +51,7 @@ vi.mock("../api/queries", () => ({
       target_release_id: updateState.target_release_id,
       current_revision: updateState.current_revision,
       target_revision: updateState.target_revision,
+      frontend_revision: updateState.frontend_revision,
     },
     isPending: updateState.isPending,
     isFetching: updateState.isFetching,
@@ -77,6 +79,7 @@ describe("Rail", () => {
     updateState.target_release_id = "";
     updateState.current_revision = BACKEND_REVISION;
     updateState.target_revision = BACKEND_REVISION;
+    updateState.frontend_revision = BUNDLE_REVISION;
     updateState.isPending = false;
     updateState.isFetching = false;
     updateState.isError = false;
@@ -93,6 +96,15 @@ describe("Rail", () => {
     expect(screen.queryByRole("button", { name: /Ingest|Add Parts/ })).toBeNull();
     expect(screen.queryByRole("button", { name: /Duplicates/ })).toBeNull();
     expect(screen.queryByRole("button", { name: /Doctor/ })).toBeNull();
+  });
+
+  it("gives Design Studio its own semantic glyph instead of reusing Settings", () => {
+    render(<DevModeProvider><Rail /></DevModeProvider>);
+    fireEvent.keyDown(window, { key: "D", ctrlKey: true, shiftKey: true });
+    const designStudio = screen.getByRole("button", { name: "Design Studio" });
+    const glyph = designStudio.querySelector("svg");
+    expect(glyph).toHaveAttribute("data-icon-id", "nav.design-studio");
+    expect(glyph).not.toHaveAttribute("data-icon-id", "nav.settings");
   });
 
   it("marks Library active for the default route and navigates on click", async () => {
@@ -163,6 +175,7 @@ describe("Rail", () => {
     if (!BUNDLE_REVISION) return;
     updateState.current_revision = "222222222222";
     updateState.target_revision = "222222222222";
+    updateState.frontend_revision = "222222222222";
     render(<Rail />);
     expect(screen.getByText("Restart Required")).toBeInTheDocument();
     expect(screen.queryByText("Current")).toBeNull();

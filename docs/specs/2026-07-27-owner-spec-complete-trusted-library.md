@@ -177,9 +177,9 @@ be begun at exhausted context.
 > *"we need to think of the best schema for everything i want, i feel like we are building on a
 > shitty schema"* / *"i meant in general, look at every schema in our app too."*
 
-**"Always remember to update" is the failure mode, not the fix.** Per the self-optimizing rule in
-`~/.local-tools/local instructions`, an objectively checkable rule belongs in a HOOK, because a hook cannot be
-skipped or forgotten. What is mechanically checkable here, and therefore gateable:
+**"Always remember to update" is the failure mode, not the fix.** An objectively checkable rule
+belongs in a repository gate because a gate cannot be skipped or forgotten. What is mechanically
+checkable here, and therefore gateable:
 
 - a persisted dataclass gained/lost/renamed a field while its `SCHEMA_VERSION` did not change
 - a `to_dict` / `from_dict` pair no longer covers every field of its own dataclass
@@ -195,7 +195,7 @@ yardstick. This is the backlog, ordered as the owner chose.
 
 | # | schema | defect | evidence |
 |---|---|---|---|
-| 1 | `store/index.py` parts table | **single-tool and single-asset.** `footprint_name`, `model_file`, `datasheet_file`, `purchase_url` are all singular and implicitly KiCad; there is NO Altium column, so the index cannot express "has an Altium footprint". Exactly the flat-implicitly-KiCad anti-pattern this repo's local instructions forbids. | the DDL |
+| 1 | `store/index.py` parts table | **single-tool and single-asset.** `footprint_name`, `model_file`, `datasheet_file`, `purchase_url` are all singular and implicitly KiCad; there is NO Altium column, so the index cannot express "has an Altium footprint". This is the flat, implicitly KiCad anti-pattern rejected by the repository architecture. | the DDL |
 | 2 | same | `DROP TABLE IF EXISTS parts` - full rebuild, no incremental path. ~100 MB of JSON re-read per sync at 10k parts. | the DDL |
 | 3 | same | `is_complete INTEGER` + `missing TEXT` bake presence-as-completeness into SQL, the defect the owner hit as "not trusted". | the DDL |
 | 4 | `model/part.py` | `passive: bool` is a two-valued part class. The register already contains mechanical parts (M3 holes) and a ring LED integral to its button, both excluded BY HAND because they fit neither value. | record + register |

@@ -6,6 +6,7 @@ import {
   type UpdateStandingView,
 } from "../lib/updateStanding";
 import { Dot, type BadgeTone } from "./primitives";
+import { Icon } from "./Icon";
 
 const STANDING_TONE = {
   checking: "text-t3",
@@ -72,7 +73,11 @@ export function RunningVersionIndicator({
     restart_required: useText("update.standing.restart-required", "Restart Required"),
     unknown: useText("update.standing.unknown", "Unknown"),
   };
-  const running = runningVersion(view.currentRevision, buildVersion);
+  const running = runningVersion(
+    view.currentRevision,
+    buildVersion,
+    view.standing === "restart_required",
+  );
   // The SECOND identity: the update's target while one is available, and the backend's own revision
   // while this window still runs an older bundle. A disagreement is information, so both sides of
   // it are on screen instead of one quietly winning.
@@ -108,9 +113,7 @@ export function RunningVersionIndicator({
           <span className="font-mono tabular-nums text-t2">{running.value}</span>
           {other ? (
             <>
-              <span aria-hidden className="text-line2">
-                →
-              </span>
+              <Icon id="relation.transition" className="h-3 w-3 text-line2" />
               <span className="font-mono tabular-nums text-t2">
                 {otherPrefix}
                 {other.value}

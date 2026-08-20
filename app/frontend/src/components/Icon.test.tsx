@@ -4,7 +4,7 @@ import { Icon } from "./Icon";
 import { sanitizeIconBody } from "./iconResolve";
 import { ThemeProvider } from "../lib/theme";
 import { DevModeProvider, useDevMode } from "../lib/devMode";
-import { ICON_BY_ID } from "../lib/iconRegistry";
+import { ICON_BY_ID, type IconId } from "../lib/iconRegistry";
 import { ICON_OVERRIDES } from "../lib/icon.overrides";
 import { runtimeDesignId } from "../lib/designIdentity";
 import { applyElementOverrides } from "../lib/applyElementOverrides";
@@ -25,7 +25,7 @@ describe("Icon - default rendering", () => {
     const svg = renderIcon({ id: "action.add" });
     expect(svg).not.toBeNull();
     const path = svg?.querySelector("path");
-    expect(path?.getAttribute("d")).toBe("M12 5v14M5 12h14");
+    expect(path?.getAttribute("d")).toBe("M12 5l0 14");
   });
 
   it("applies the shared .ico class + stroke-width so --icon-stroke retunes primary icons", () => {
@@ -33,8 +33,7 @@ describe("Icon - default rendering", () => {
     expect(svg?.classList.contains("ico")).toBe(true);
     expect(svg?.getAttribute("viewBox")).toBe("0 0 24 24");
     expect(svg?.getAttribute("stroke")).toBe("currentColor");
-    // 1.9 is the offline fallback; the .ico class routes the live weight through --icon-stroke.
-    expect(svg?.getAttribute("stroke-width")).toBe("1.9");
+    expect(svg?.getAttribute("stroke-width")).toBe("2");
   });
 
   it("merges the caller className alongside .ico, or defaults the size when none is given", () => {
@@ -44,14 +43,13 @@ describe("Icon - default rendering", () => {
     expect(renderIcon({ id: "action.add" })?.getAttribute("class")).toBe("ico h-3.5 w-3.5");
   });
 
-  it("renders a bespoke icon with its own size + weight and no .ico class", () => {
+  it("renders historical bespoke inventory entries through the same shared frame", () => {
     const svg = renderIcon({ id: "action.search" });
-    expect(svg?.classList.contains("ico")).toBe(false);
-    expect(svg?.getAttribute("width")).toBe("14");
-    expect(svg?.getAttribute("height")).toBe("14");
+    expect(svg?.classList.contains("ico")).toBe(true);
+    expect(svg?.getAttribute("class")).toBe("ico h-3.5 w-3.5");
     expect(svg?.getAttribute("stroke-width")).toBe("2");
     expect(svg).toHaveAttribute("aria-hidden", "true");
-    expect(svg?.querySelector("circle")?.getAttribute("r")).toBe("8");
+    expect(svg?.querySelectorAll("path")).toHaveLength(2);
   });
 
   it("renders an art glyph with its rectangular size and theme-var markup", () => {
@@ -63,7 +61,7 @@ describe("Icon - default rendering", () => {
 });
 
 describe("Icon - overrides", () => {
-  it("applies per-icon stroke, solid treatment, alignment, and accessibility to every category", () => {
+  it("keeps legacy solid treatment visible for an outline icon", () => {
     ICON_OVERRIDES["action.search"] = {
       strokeWidth: 3,
       treatment: "solid",
@@ -72,8 +70,10 @@ describe("Icon - overrides", () => {
     };
     const svg = renderIcon({ id: "action.search" });
     expect(svg).toHaveAttribute("stroke-width", "3");
-    expect(svg).toHaveAttribute("fill", "currentColor");
-    expect(svg).toHaveAttribute("stroke", "none");
+    expect(svg).toHaveAttribute("fill", "none");
+    expect(svg).toHaveAttribute("stroke", "currentColor");
+    expect(svg).toHaveAttribute("data-icon-treatment", "legacy-solid-fallback");
+    expect(svg?.querySelectorAll("path, circle, rect, line, polyline, polygon, ellipse").length).toBeGreaterThan(0);
     expect(svg).toHaveStyle({ verticalAlign: "middle" });
     expect(svg).toHaveAttribute("aria-label", "Search inventory");
     expect(svg?.querySelector("title")).toHaveTextContent("Search inventory");
@@ -107,13 +107,13 @@ describe("Icon - overrides", () => {
   it("falls back to the registry default when swapToId targets an unknown id", () => {
     ICON_OVERRIDES["action.add"] = { swapToId: "not.a.real.icon" };
     const svg = renderIcon({ id: "action.add" });
-    expect(svg?.querySelector("path")?.getAttribute("d")).toBe("M12 5v14M5 12h14");
+    expect(svg?.querySelector("path")?.getAttribute("d")).toBe("M12 5l0 14");
   });
 });
 
 describe("Icon - safety", () => {
   it("is a no-op for an unknown id", () => {
-    const { container } = render(<Icon id="does.not.exist" />);
+    const { container } = render(<Icon id={"does.not.exist" as IconId} />);
     expect(container.querySelector("svg")).toBeNull();
     expect(container.innerHTML).toBe("");
   });
@@ -155,7 +155,7 @@ describe("Icon - safety", () => {
 // override state and the dev-mode toggle, so a test can prove a working edit renders live (D-02).
 const OVERRIDE_BODY = '<circle cx="12" cy="12" r="5"/>';
 
-function Controls({ id }: { id: string }) {
+function Controls({ id }: { id: IconId }) {
   const dm = useDevMode();
   return (
     <>
@@ -173,7 +173,7 @@ function Controls({ id }: { id: string }) {
   );
 }
 
-function renderProvided(id: string) {
+function renderProvided(id: IconId) {
   const utils = render(
     <ThemeProvider>
       <DevModeProvider>
@@ -194,7 +194,7 @@ describe("Icon - context-driven overrides (dev mode v2)", () => {
   it("renders a working-state body override live under a provider (no committed module edit)", () => {
     const { getByText, svg } = renderProvided("action.add");
     // Before any edit the provider resolves the committed path: the registry default.
-    expect(svg()?.querySelector("path")?.getAttribute("d")).toBe("M12 5v14M5 12h14");
+    expect(svg()?.querySelector("path")?.getAttribute("d")).toBe("M12 5l0 14");
 
     fireEvent.click(getByText("set-body"));
     // The working override now renders live: body replaced, frame (primary .ico preset) intact.
@@ -215,7 +215,7 @@ describe("Icon - context-driven overrides (dev mode v2)", () => {
 
   it("with no provider renders the registry default with its stable runtime design identity", () => {
     const svg = renderIcon({ id: "action.add" });
-    expect(svg?.querySelector("path")?.getAttribute("d")).toBe("M12 5v14M5 12h14");
+    expect(svg?.querySelector("path")?.getAttribute("d")).toBe("M12 5l0 14");
     expect(svg?.getAttribute("data-icon-id")).toBeNull();
     expect(svg?.getAttribute("data-design-id")).toBe(runtimeDesignId("icon", "action.add"));
   });
@@ -231,7 +231,7 @@ describe("Icon - context-driven overrides (dev mode v2)", () => {
   it("an entry with neither body nor swap in working-state resolves exactly as committed", () => {
     // A provider with an empty working-state resolves the same registry default as the module path.
     const { svg } = renderProvided("action.add");
-    expect(svg()?.querySelector("path")?.getAttribute("d")).toBe("M12 5v14M5 12h14");
+    expect(svg()?.querySelector("path")?.getAttribute("d")).toBe("M12 5l0 14");
   });
 });
 

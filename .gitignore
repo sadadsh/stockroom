@@ -32,20 +32,20 @@ Thumbs.db
 /packaging/webview2/
 /mingit.zip
 
-# work plans SDD scratch (ledger, task briefs, review packages)
+# Developer-local planning scratch (ledger, task briefs, review packages)
 .work plans/
 
-# Developer-local external tool Code settings + personal commands (ledger hook references a private path)
+# Developer-local assistant settings and personal commands
 .local-tools/
 
-# external tool instructions: local only, never pushed (owner directive)
+# Developer-local instruction file; never publish it
 /local instructions
 
-# automation workflow design docs: local only, never pushed (owner directive)
+# Temporary design and research work; durable authority belongs under the product docs
 docs/work plans/
 docs/research/
 
-# GSD spec-driven-development working state: local only, never pushed (like docs/work plans/)
+# Spec-driven-development working state; local only
 .planning/
 .gsd/
 
@@ -84,6 +84,7 @@ libraries/*/altium/*.DbLib
 .agents/
 .superdesign/
 /skills-lock.json
+/app/frontend/**/skills/frontend check/
 
 # S8 cold-rebuild harness run outputs (local only)
 scripts/out/

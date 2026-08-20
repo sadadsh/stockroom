@@ -15,6 +15,7 @@ import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from stockroom.dossier.official_evidence import validate_official_payloads
 from stockroom.eda.registry import all_tools, get_tool
 from stockroom.ingest.describe import apply_clean_identity
 from stockroom.kicad.category_lib import create_empty_symbol_lib, ensure_footprint_lib
@@ -22,6 +23,7 @@ from stockroom.kicad.footprint import Footprint
 from stockroom.kicad.symbol_lib import SymbolLib
 from stockroom.model.cad_variant import CadVariantPointer
 from stockroom.model.category import category_nickname
+from stockroom.model.mpn import mpn_identity_key
 from stockroom.model.part import (
     Asset,
     AssetOrigin,
@@ -234,6 +236,107 @@ class StagedPart:
     enrichment: dict = field(default_factory=dict)
     alternates: dict = field(default_factory=dict)
     catalog: dict = field(default_factory=dict)
+    official_payloads: dict[str, dict] = field(default_factory=dict)
+    official_evidence: dict[str, dict] = field(default_factory=dict)
+
+
+def _same_selected_value(actual: object, expected: object) -> bool:
+    """Wire-format equality for a reviewed value (type differences are presentation-only)."""
+
+    return str(actual).strip() == str(expected).strip()
+
+
+def _staged_enrichment(
+    specs: dict,
+    enrichment: dict,
+    bindings: dict[str, dict],
+) -> dict[str, EnrichmentField]:
+    """Retain official provenance only while the committed value still matches it."""
+
+    out: dict[str, EnrichmentField] = {}
+    for key, value in enrichment.items():
+        if not isinstance(value, dict):
+            continue
+        source = str(value.get("source", ""))
+        confidence = str(value.get("confidence", ""))
+        provider = source.strip().lower()
+        if provider in bindings:
+            selected = bindings[provider].get("selected_values") or {}
+            if key not in selected or key not in specs or not _same_selected_value(
+                specs[key], selected[key]
+            ):
+                source = "manual"
+                confidence = ""
+        out[str(key)] = EnrichmentField(source=source, confidence=confidence)
+    return out
+
+
+def _record_enrichment(
+    record: PartRecord,
+    bindings: dict[str, dict],
+) -> None:
+    """Mutation-layer backstop for passive/import callers that bypass the review UI."""
+
+    for key, value in list(record.enrichment.items()):
+        provider = value.source.strip().lower()
+        if provider not in bindings:
+            continue
+        selected = bindings[provider].get("selected_values") or {}
+        if key not in selected or key not in record.specs or not _same_selected_value(
+            record.specs[key], selected[key]
+        ):
+            record.enrichment[key] = EnrichmentField(source="import", confidence="")
+
+
+_SELECTED_SPEC_ALIASES = {
+    "package": "Package",
+    "lifecycle": "Lifecycle",
+    "lead_time": "Lead Time",
+    "country_of_origin": "Country of Origin",
+    "tariff_rate": "Tariff Rate",
+}
+
+
+def _indexed_binding(
+    binding: dict,
+    *,
+    mpn: str,
+    manufacturer: str,
+    description: str,
+    datasheet_url: str,
+    specs: dict,
+    purchase: list[Purchase],
+) -> dict:
+    """Keep only provider-selected values that are still exact in the committed record."""
+
+    actual: dict[str, object] = {
+        "mpn": mpn,
+        "manufacturer": manufacturer,
+        "description": description,
+        "datasheet_url": datasheet_url,
+        **specs,
+    }
+    for canonical, label in _SELECTED_SPEC_ALIASES.items():
+        if label in specs:
+            actual[canonical] = specs[label]
+    provider = str(binding.get("provider", "")).strip().lower()
+    for offer in purchase:
+        offer_provider = re.sub(r"[^a-z0-9]", "", offer.vendor.lower())
+        if offer_provider != re.sub(r"[^a-z0-9]", "", provider):
+            continue
+        actual["product_url"] = offer.url
+        if offer.stock is not None:
+            actual["stock"] = offer.stock
+        break
+    selected = binding.get("selected_values") or {}
+    return {
+        **binding,
+        "selected_values": {
+            str(key): expected
+            for key, expected in selected.items()
+            if key in actual and _same_selected_value(actual[key], expected)
+        },
+    }
 
 
 class IncompleteError(ValueError):
@@ -244,6 +347,18 @@ class IncompleteError(ValueError):
     def __init__(self, missing: list[str]):
         self.missing = list(missing)
         super().__init__("cannot add an incomplete part; missing: " + ", ".join(missing))
+
+
+class MpnConflictError(ValueError):
+    """An add resolved to an MPN already owned by this library."""
+
+    code = "mpn_conflict"
+
+    def __init__(self, requested_mpn: str, existing_part_id: str, existing_mpn: str):
+        self.requested_mpn = requested_mpn
+        self.existing_part_id = existing_part_id
+        self.existing_mpn = existing_mpn
+        super().__init__(f"MPN {requested_mpn!r} already exists as {existing_mpn!r}")
 
 
 def staged_missing_fields(staged: "StagedPart") -> list[str]:
@@ -377,6 +492,15 @@ class LibraryOps:
         self.lib = profile.library
         self.cli = cli
 
+    def _reject_mpn_collision(self, mpn: str) -> None:
+        """Refuse an exact or normalized re-add before any library write."""
+        requested_key = mpn_identity_key(mpn)
+        if not requested_key or not self.lib.parts_dir.exists():
+            return
+        for path in sorted(self.lib.parts_dir.glob("*.json")):
+            existing = PartRecord.loads(path.read_text(encoding="utf-8"))
+            if mpn_identity_key(existing.mpn) == requested_key:
+                raise MpnConflictError(mpn, existing.id or path.stem, existing.mpn)
 
     # -- workspace hygiene (Batch 2) ------------------------------------------
     #
@@ -449,6 +573,23 @@ class LibraryOps:
         # category lib; refuse honestly before any write.
         if staged.symbol_source is not None and not staged.entry_name:
             raise ValueError("a staged symbol needs an entry name to merge under")
+        official_bindings = validate_official_payloads(
+            staged.mpn,
+            staged.official_payloads,
+            staged.official_evidence,
+        )
+        indexed_bindings = {
+            provider: _indexed_binding(
+                binding,
+                mpn=staged.mpn,
+                manufacturer=staged.manufacturer,
+                description=staged.description,
+                datasheet_url=str(getattr(staged.datasheet_meta, "source_url", "") or ""),
+                specs=staged.specs,
+                purchase=staged.purchase,
+            )
+            for provider, binding in official_bindings.items()
+        }
         part_id = new_part_id(self.lib.parts_dir, staged.mpn, staged.display_name)
         nickname = category_nickname(staged.category)
         sym_lib_path = self.lib.symbol_lib_path(staged.category)
@@ -462,12 +603,18 @@ class LibraryOps:
             for d in (self.lib.parts_dir, self.lib.models_dir, self.lib.datasheets_dir, pretty_dir)
             if not d.exists()
         ]
-        self.lib.parts_dir.mkdir(parents=True, exist_ok=True)
-        self.lib.models_dir.mkdir(parents=True, exist_ok=True)
-        self.lib.datasheets_dir.mkdir(parents=True, exist_ok=True)
-
+        if staged.official_payloads:
+            sourced_root = self.repo.root / "sourced"
+            sourced_part = sourced_root / part_id
+            fresh_dirs.extend(
+                directory for directory in (sourced_root, sourced_part) if not directory.exists()
+            )
         with Transaction(self.repo) as txn:
+            self._reject_mpn_collision(staged.mpn)
             txn.track_dir(*fresh_dirs)
+            self.lib.parts_dir.mkdir(parents=True, exist_ok=True)
+            self.lib.models_dir.mkdir(parents=True, exist_ok=True)
+            self.lib.datasheets_dir.mkdir(parents=True, exist_ok=True)
             # Every asset step is conditional: the primary add flow lands a part on its
             # identity + sourcing alone (owner 2026-07-16 / 2026-07-24) and the guided
             # capture attaches both EDA formats afterwards. A file-less add fabricates
@@ -570,11 +717,11 @@ class LibraryOps:
                 provenance=staged.provenance,
                 purchase=list(staged.purchase),
                 specs=dict(staged.specs),
-                enrichment={
-                    k: EnrichmentField(source=v.get("source", ""),
-                                       confidence=v.get("confidence", ""))
-                    for k, v in staged.enrichment.items() if isinstance(v, dict)
-                },
+                enrichment=_staged_enrichment(
+                    staged.specs,
+                    staged.enrichment,
+                    official_bindings,
+                ),
                 alternates={
                     k: [SourcedValue.from_dict(a) for a in entries if isinstance(a, dict)]
                     for k, entries in staged.alternates.items()
@@ -585,6 +732,25 @@ class LibraryOps:
                     if isinstance(value, dict)
                 },
             )
+            if staged.official_payloads:
+                import json
+
+                from stockroom.model.sourced import write_payload
+
+                evidence_time = now or _utc_now()
+                for provider, payload in staged.official_payloads.items():
+                    if provider not in {"mouser", "digikey"} or not isinstance(payload, dict):
+                        continue
+                    rel = write_payload(
+                        self.repo.root,
+                        record.id,
+                        provider,
+                        json.dumps(payload, indent=1, ensure_ascii=False),
+                    )
+                    entry = record.record_source(provider, fetched_at=evidence_time, file=rel)
+                    entry.extra["state"] = "success"
+                    entry.extra.update(indexed_bindings[provider])
+                    txn.track(self.repo.root / rel)
             if staged.symbol_source is not None:
                 sym_lib = SymbolLib.load(sym_lib_path)
                 sym = sym_lib.get_symbol(staged.entry_name)
@@ -617,7 +783,15 @@ class LibraryOps:
             )
         return record
 
-    def add_passive_part(self, record: PartRecord, require_complete: bool = True) -> PartRecord:
+    def add_passive_part(
+        self,
+        record: PartRecord,
+        require_complete: bool = True,
+        *,
+        official_payloads: dict[str, dict] | None = None,
+        official_evidence: dict[str, dict] | None = None,
+        now: str = "",
+    ) -> PartRecord:
         """Commit a file-less passive part. A passive references KiCad STOCK
         symbol/footprint/3D by lib_id (the generic package is already in KiCad), so no
         asset files are copied and no category symbol lib entry is created: this writes
@@ -636,15 +810,58 @@ class LibraryOps:
             display_name=record.display_name, description=record.description,
             mpn=record.mpn, manufacturer=record.manufacturer,
         )
+        official_payloads = official_payloads or {}
+        official_bindings = validate_official_payloads(
+            record.mpn,
+            official_payloads,
+            official_evidence or {},
+        )
+        _record_enrichment(record, official_bindings)
+        indexed_bindings = {
+            provider: _indexed_binding(
+                binding,
+                mpn=record.mpn,
+                manufacturer=record.manufacturer,
+                description=record.description,
+                datasheet_url=str(getattr(record.datasheet, "source_url", "") or ""),
+                specs=record.specs,
+                purchase=record.purchase,
+            )
+            for provider, binding in official_bindings.items()
+        }
         part_id = new_part_id(self.lib.parts_dir, record.mpn, record.display_name)
         record.id = part_id
         fresh_dirs = [self.lib.parts_dir] if not self.lib.parts_dir.exists() else []
-        self.lib.parts_dir.mkdir(parents=True, exist_ok=True)
+        if official_payloads:
+            sourced_root = self.repo.root / "sourced"
+            sourced_part = sourced_root / part_id
+            fresh_dirs.extend(
+                directory for directory in (sourced_root, sourced_part) if not directory.exists()
+            )
         json_path = self.lib.parts_dir / f"{part_id}.json"
         sym = _kicad(record).symbol
         fp = _kicad(record).footprint
         with Transaction(self.repo) as txn:
+            self._reject_mpn_collision(record.mpn)
             txn.track_dir(*fresh_dirs)
+            self.lib.parts_dir.mkdir(parents=True, exist_ok=True)
+            if official_payloads:
+                from stockroom.model.sourced import write_payload
+
+                evidence_time = now or _utc_now()
+                for provider, payload in official_payloads.items():
+                    if provider not in {"mouser", "digikey"} or not isinstance(payload, dict):
+                        continue
+                    rel = write_payload(
+                        self.repo.root,
+                        record.id,
+                        provider,
+                        json.dumps(payload, indent=1, ensure_ascii=False),
+                    )
+                    entry = record.record_source(provider, fetched_at=evidence_time, file=rel)
+                    entry.extra["state"] = "success"
+                    entry.extra.update(indexed_bindings[provider])
+                    txn.track(self.repo.root / rel)
             json_path.write_text(record.dumps(), encoding="utf-8")
             txn.track(json_path)
             txn.commit(
@@ -675,10 +892,11 @@ class LibraryOps:
         part_id = new_part_id(self.lib.parts_dir, record.mpn, record.display_name)
         record.id = part_id
         fresh_dirs = [self.lib.parts_dir] if not self.lib.parts_dir.exists() else []
-        self.lib.parts_dir.mkdir(parents=True, exist_ok=True)
         json_path = self.lib.parts_dir / f"{part_id}.json"
         with Transaction(self.repo) as txn:
+            self._reject_mpn_collision(record.mpn)
             txn.track_dir(*fresh_dirs)
+            self.lib.parts_dir.mkdir(parents=True, exist_ok=True)
             json_path.write_text(record.dumps(), encoding="utf-8")
             txn.track(json_path)
             txn.commit(_reference_commit_message(record))

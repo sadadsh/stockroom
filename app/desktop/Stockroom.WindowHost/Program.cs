@@ -46,23 +46,25 @@ internal static class Program
     {
         Application? application = null;
         WebViewWindowHost? host = null;
-        var pendingActivation = 0;
+        var readyHost = new TaskCompletionSource<WebViewWindowHost>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
         using var activation = SingleInstanceActivation.Acquire(
-            () =>
+            async cancellationToken =>
             {
-                Interlocked.Exchange(ref pendingActivation, 1);
-                var dispatcher = application?.Dispatcher;
-                if (dispatcher is not null)
+                try
                 {
-                    _ = dispatcher.BeginInvoke(
-                        () =>
-                        {
-                            if (host is not null)
-                            {
-                                host.Focus();
-                                Interlocked.Exchange(ref pendingActivation, 0);
-                            }
-                        });
+                    var focusedHost = await readyHost.Task
+                        .WaitAsync(cancellationToken)
+                        .ConfigureAwait(false);
+                    return await focusedHost.FocusAsync(cancellationToken)
+                        .ConfigureAwait(false);
+                }
+                catch (Exception exception)
+                {
+                    LauncherDiagnostics.Write(
+                        "existing-window-focus-failed",
+                        exception: exception);
+                    return false;
                 }
             });
         if (!activation.IsPrimary)
@@ -103,6 +105,7 @@ internal static class Program
         };
         var exitCode = 0;
         DispatcherTimer? closeTimer = null;
+        WorkerLivenessMonitor? workerLiveness = null;
         application.Startup += async (_, _) =>
         {
             try
@@ -115,26 +118,56 @@ internal static class Program
                 await host.InitializeAsync().ConfigureAwait(true);
                 host.PrepareHidden(DateTimeOffset.UtcNow.AddSeconds(30).ToUnixTimeMilliseconds());
                 host.Show();
-                host.Focus();
-                Interlocked.Exchange(ref pendingActivation, 0);
+                _ = await host.FocusAsync(CancellationToken.None).ConfigureAwait(true);
+                readyHost.TrySetResult(host);
                 closeTimer = new DispatcherTimer(TimeSpan.FromMilliseconds(200), DispatcherPriority.Normal, (_, _) =>
                 {
                     if (host.Health().TryGetValue("close_requested", out var requested)
                         && requested is true)
                     {
                         closeTimer?.Stop();
-                        host.Shutdown();
-                    }
-                    else if (Interlocked.Exchange(ref pendingActivation, 0) == 1)
-                    {
-                        host.Focus();
+                        if (workerLiveness is null)
+                        {
+                            host.Shutdown();
+                        }
+                        else
+                        {
+                            workerLiveness.BeginIntentionalShutdown(host.Shutdown);
+                        }
                     }
                 }, application.Dispatcher);
                 closeTimer.Start();
+                workerLiveness = WorkerLivenessMonitor.Start(
+                    worker.WaitForExitAsync,
+                    workerExitCode =>
+                    {
+                        LauncherDiagnostics.Write(
+                            "worker-exited-after-ready",
+                            $"exit_code={workerExitCode}");
+                        Interlocked.Exchange(ref exitCode, 1);
+                    },
+                    async _ =>
+                    {
+                        try
+                        {
+                            await application.Dispatcher.InvokeAsync(
+                                    () => application.Shutdown(1),
+                                    DispatcherPriority.Send)
+                                .Task
+                                .ConfigureAwait(false);
+                        }
+                        catch (Exception exception)
+                        {
+                            LauncherDiagnostics.Write(
+                                "worker-exit-shutdown-failed",
+                                exception: exception);
+                        }
+                    });
                 LauncherDiagnostics.Write("native-host-ready", $"release={worker.ReleaseId}");
             }
             catch (Exception exception)
             {
+                readyHost.TrySetCanceled();
                 exitCode = 1;
                 LauncherDiagnostics.Write("native-host-initialization-failed", exception: exception);
                 application.Shutdown(1);
@@ -146,11 +179,44 @@ internal static class Program
         }
         finally
         {
+            workerLiveness?.BeginIntentionalShutdown();
+            var monitorCompleted = WaitForWorkerMonitor(workerLiveness);
             closeTimer?.Stop();
             host?.Dispose();
-            LauncherDiagnostics.Write("native-host-stopped", $"exit_code={exitCode}");
+            worker.Dispose();
+            if (!monitorCompleted)
+            {
+                _ = WaitForWorkerMonitor(workerLiveness);
+            }
+            workerLiveness?.Dispose();
+            LauncherDiagnostics.Write(
+                "native-host-stopped",
+                $"exit_code={Volatile.Read(ref exitCode)}");
         }
         return exitCode;
+    }
+
+    private static bool WaitForWorkerMonitor(WorkerLivenessMonitor? monitor)
+    {
+        if (monitor is null)
+        {
+            return true;
+        }
+        try
+        {
+            if (monitor.Completion.Wait(TimeSpan.FromSeconds(2)))
+            {
+                return true;
+            }
+            LauncherDiagnostics.Write("worker-liveness-stop-timeout");
+        }
+        catch (Exception exception)
+        {
+            LauncherDiagnostics.Write(
+                "worker-liveness-monitor-failed",
+                exception: exception);
+        }
+        return false;
     }
 
     private static int RunManagedChild(

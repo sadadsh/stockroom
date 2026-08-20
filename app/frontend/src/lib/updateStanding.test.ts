@@ -247,6 +247,7 @@ describe("deriveUpdateStanding", () => {
           state: "up_to_date",
           current_revision: "2222222222222",
           target_revision: "2222222222222",
+          frontend_revision: "2222222222222",
         } as never,
         checking: false,
         failed: false,
@@ -280,16 +281,17 @@ describe("deriveUpdateStanding", () => {
   it("claims a mismatch only between identities that are comparable", () => {
     // The same short revision at two lengths is one revision, and a production release ID is not a
     // Git revision at all - "disagreeing" with either would be an invented fact, not a reported one.
-    expect(staleFrontend({ update_available: false, current_revision: "1111111abc" }, "0.1.0+1111111")).toBeNull();
+    expect(staleFrontend({ update_available: false, frontend_revision: "1111111abc" }, "0.1.0+1111111")).toBeNull();
     expect(
       staleFrontend(
-        { update_available: false, channel: "production", current_revision: "release-1.2.3.4" },
+        { update_available: false, channel: "production", frontend_revision: "release-1.2.3.4" },
         "0.1.0+1111111",
       ),
     ).toBeNull();
     // No revision in the bundle (a plain package version) is no evidence either way.
-    expect(staleFrontend({ update_available: false, current_revision: "222222222222" }, "0.1.0")).toBeNull();
-    expect(staleFrontend({ update_available: false, current_revision: "222222222222" }, "0.1.0+1111111")).toEqual({
+    expect(staleFrontend({ update_available: false, frontend_revision: "222222222222" }, "0.1.0")).toBeNull();
+    expect(staleFrontend({ update_available: false, current_revision: "222222222222" }, "0.1.0+1111111")).toBeNull();
+    expect(staleFrontend({ update_available: false, frontend_revision: "222222222222" }, "0.1.0+1111111")).toEqual({
       bundle: "1111111",
       backend: "222222222222",
     });
@@ -346,12 +348,13 @@ describe("revision labels", () => {
     // built at aaaaaaa, which is the defect written down as an expectation: the running version is
     // whatever JavaScript is executing, and that is the bundle. The backend's revision is still
     // reported, next to it, under the `restart_required` standing that names the disagreement.
-    expect(runningVersion("123456789abc", "0.1.0+aaaaaaa")).toEqual({
+    expect(runningVersion("123456789abc", "0.1.0+aaaaaaa", true)).toEqual({
       value: "aaaaaaa",
       kind: "revision",
     });
-    // Agreeing identities (the same revision at two lengths) still resolve to the backend's.
-    expect(runningVersion("123456789abc", "0.1.0+1234567")).toEqual({
+    // A settled window reports the backend's Git/release identity; the content digest is a
+    // different identity kind and wins only when the derived standing proves a stale window.
+    expect(runningVersion("123456789abc", "0.1.0+aaaaaaa")).toEqual({
       value: "1234567",
       kind: "revision",
     });

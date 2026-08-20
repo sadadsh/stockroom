@@ -9,7 +9,7 @@
  */
 import { useSyncExternalStore } from "react";
 import { api } from "../api/client";
-import type { EnrichmentResult } from "../api/types";
+import type { EnrichmentResult, OfficialEvidenceBinding } from "../api/types";
 
 export const UI_SESSION_SCHEMA = "stockroom.ui-session" as const;
 export const UI_SESSION_VERSION = 3 as const;
@@ -195,6 +195,8 @@ export interface IntakeDraftCandidate {
     values: { value: JsonValue; source: string; confidence: string }[];
   }[];
   enrichment: { key: string; source: string; confidence: string }[];
+  official_payloads?: Record<string, Record<string, JsonValue>>;
+  official_evidence?: Record<string, OfficialEvidenceBinding>;
   datasheet_url: string;
   conflicts: {
     key: string;
@@ -242,7 +244,7 @@ const MAX_TEXT = 512;
 const MAX_ID = 192;
 const MAX_COLLECTION = 64;
 const MAX_OFFSET = 10_000_000;
-const MAX_DRAFT_BYTES = 256 * 1024;
+const MAX_DRAFT_BYTES = 2 * 1024 * 1024;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export function defaultUiSession(): UiSessionSnapshotV2 {

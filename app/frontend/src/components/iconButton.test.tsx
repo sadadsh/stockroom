@@ -29,7 +29,7 @@ describe("IconButton compact", () => {
     // lives where a Windows toolbar puts it - in aria-label and title - which costs no layout.
     render(<IconButton compact icon={<TrashIcon />} label="Delete Part?" />);
     const button = screen.getByRole("button", { name: "Delete Part?" });
-    expect(button.textContent).toBe("");
+    expect(button.textContent?.trim()).toBe("");
     expect(button.className).toMatch(/w-\[\d+px\]/);
     expect(button.className).not.toContain("grid-cols-");
   });

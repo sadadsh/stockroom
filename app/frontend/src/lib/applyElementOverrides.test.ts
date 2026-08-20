@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { applyElementOverrides, startElementOverrideObserver } from "./applyElementOverrides";
+import { exactDesignTargetAuthority, releaseExactDesignTargetAuthority } from "./designIdentity";
 
 // Each test seeds real nodes under document.body; clear them so state never leaks between tests.
 afterEach(() => {
@@ -23,6 +24,88 @@ describe("applyElementOverrides", () => {
     const el = nodeWithId("x.y");
     applyElementOverrides({ "x.y": { width: "240px" } });
     expect(el.style.getPropertyValue("width")).toBe("240px");
+  });
+
+  it("reapplies a persisted occurrence override to the same semantic branch after restart", () => {
+    const markup = `
+      <main data-dev-id="shell.root">
+        <section data-dev-id="rail.root"><button data-dev-id="rail.about">Rail About</button></section>
+        <section data-dev-id="settings.root"><button data-dev-id="rail.about">Settings About</button></section>
+      </main>
+    `;
+    document.body.innerHTML = markup;
+    const firstButtons = document.querySelectorAll<HTMLElement>('[data-dev-id="rail.about"]');
+    const overrideId = exactDesignTargetAuthority(firstButtons[1])?.overrideId;
+    expect(overrideId).toMatch(/^auto\.occurrence\./);
+
+    document.body.innerHTML = markup;
+    const restartedButtons = document.querySelectorAll<HTMLElement>('[data-dev-id="rail.about"]');
+    applyElementOverrides({ [overrideId!]: { width: "222px" } });
+
+    expect(restartedButtons[0].style.width).toBe("");
+    expect(restartedButtons[1].style.width).toBe("222px");
+  });
+
+  it("rebinds a unique semantic override only to the same deterministic remount", () => {
+    const firstRoot = document.createElement("section");
+    firstRoot.innerHTML = '<button data-design-id="auto.fixture.0abc123">Original</button>';
+    document.body.append(firstRoot);
+    const first = firstRoot.firstElementChild!;
+    expect(exactDesignTargetAuthority(first)?.overrideId).toBe("auto.fixture.0abc123");
+    applyElementOverrides({ "auto.fixture.0abc123": { width: "211px" } });
+    expect(first).toHaveStyle({ width: "211px" });
+
+    firstRoot.remove();
+    const restartedRoot = document.createElement("section");
+    restartedRoot.innerHTML = '<button data-design-id="auto.fixture.0abc123">Restarted</button>';
+    document.body.append(restartedRoot);
+    const restarted = restartedRoot.firstElementChild!;
+    applyElementOverrides({ "auto.fixture.0abc123": { width: "211px" } });
+
+    expect(restarted).toHaveStyle({ width: "211px" });
+    restartedRoot.remove();
+  });
+
+  it("does not let a retired binding from an earlier product root poison a later mount", () => {
+    const firstRoot = document.createElement("main");
+    firstRoot.dataset.designProductRoot = "true";
+    firstRoot.innerHTML = '<button data-design-id="auto.fixture.0abc123">First Mount</button>';
+    document.body.append(firstRoot);
+    const authority = exactDesignTargetAuthority(firstRoot.firstElementChild!)!;
+    releaseExactDesignTargetAuthority(authority);
+    firstRoot.remove();
+
+    const nextRoot = document.createElement("main");
+    nextRoot.dataset.designProductRoot = "true";
+    nextRoot.innerHTML = '<button data-design-id="auto.fixture.0abc123">Later Mount</button>';
+    document.body.append(nextRoot);
+    const later = nextRoot.firstElementChild!;
+    applyElementOverrides({ "auto.fixture.0abc123": { width: "211px" } });
+
+    expect(later).toHaveStyle({ width: "211px" });
+  });
+
+  it("does not migrate an unselected semantic override to a peer after ambiguity", () => {
+    const root = document.createElement("main");
+    root.dataset.designProductRoot = "true";
+    root.innerHTML = '<button data-design-id="auto.fixture.0abc123" data-testid="original">Original</button>';
+    document.body.append(root);
+    const original = root.firstElementChild!;
+    expect(exactDesignTargetAuthority(original)?.overrideId).toBe("auto.fixture.0abc123");
+    const override = { "auto.fixture.0abc123": { width: "211px" } };
+    applyElementOverrides(override);
+
+    const peer = document.createElement("button");
+    peer.dataset.designId = "auto.fixture.0abc123";
+    peer.dataset.testid = "peer";
+    root.append(peer);
+    applyElementOverrides(override);
+    expect(original).toHaveStyle({ width: "211px" });
+    expect(peer).not.toHaveStyle({ width: "211px" });
+
+    original.remove();
+    applyElementOverrides(override);
+    expect(peer).not.toHaveStyle({ width: "211px" });
   });
 
   it("clears exactly the dropped property when it is absent from current but was in previous", () => {
@@ -66,6 +149,7 @@ describe("applyElementOverrides", () => {
     applyElementOverrides(state);
     const sheet = document.querySelector<HTMLStyleElement>("#stockroom-design-state-overrides");
     expect(sheet?.textContent).toContain("data-dev-id");
+    expect(sheet?.textContent).not.toContain("data-dev-role");
     expect(sheet?.textContent).toContain(":hover");
     expect(sheet?.textContent).toContain('[data-design-preview-state="hover"]');
     expect(sheet?.textContent).toContain("color:#123456");
@@ -87,5 +171,50 @@ describe("applyElementOverrides", () => {
       "healthy.node": { width: "200px" },
     })).not.toThrow();
     expect(healthy.style.width).toBe("200px");
+  });
+
+  it("never applies visibility or destructive geometry to the product preview root", () => {
+    const root = nodeWithId("preview.root");
+    root.setAttribute("data-design-product-root", "true");
+
+    applyElementOverrides({
+      "preview.root": {
+        display: "none",
+        visibility: "hidden",
+        position: "absolute",
+        width: "1px",
+        height: "1px",
+        transform: "rotate(90deg)",
+        opacity: "0",
+        overflow: "hidden",
+        padding: "0",
+        gap: "0",
+        "z-index": "-999",
+        filter: "brightness(0)",
+        "background-color": "#123456",
+      },
+    });
+
+    expect(root.style.display).toBe("");
+    expect(root.style.visibility).toBe("");
+    expect(root.style.position).toBe("");
+    expect(root.style.width).toBe("");
+    expect(root.style.height).toBe("");
+    expect(root.style.transform).toBe("");
+    expect(root.style.opacity).toBe("");
+    expect(root.style.overflow).toBe("");
+    expect(root.style.padding).toBe("");
+    expect(root.style.gap).toBe("");
+    expect(root.style.zIndex).toBe("");
+    expect(root.style.filter).toBe("");
+    expect(root.style.backgroundColor).toBe("rgb(18, 52, 86)");
+
+    applyElementOverrides({
+      "preview.root::state:hover": { transform: "rotate(90deg)", opacity: "0" },
+    });
+    expect(document.querySelector("#stockroom-design-state-overrides")?.textContent ?? "")
+      .not.toContain("transform");
+    expect(document.querySelector("#stockroom-design-state-overrides")?.textContent ?? "")
+      .not.toContain("opacity");
   });
 });

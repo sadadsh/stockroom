@@ -16,6 +16,7 @@ interface OriginalIcon {
   opacity: string;
   verticalAlign: string;
   ariaHidden: string | null;
+  treatment: string | null;
 }
 
 interface AppliedIconBody {
@@ -57,6 +58,7 @@ function remember(icon: SVGElement): OriginalIcon {
     opacity: icon.style.opacity,
     verticalAlign: icon.style.verticalAlign,
     ariaHidden: icon.getAttribute("aria-hidden"),
+    treatment: icon.getAttribute("data-icon-treatment"),
   };
   originals.set(icon, original);
   return original;
@@ -92,6 +94,7 @@ function restore(icon: SVGElement): void {
   icon.style.opacity = original.opacity;
   icon.style.verticalAlign = original.verticalAlign;
   setAttribute(icon, "aria-hidden", original.ariaHidden);
+  setAttribute(icon, "data-icon-treatment", original.treatment);
 }
 
 function apply(icon: SVGElement, override: IconOverride): void {
@@ -116,11 +119,13 @@ function apply(icon: SVGElement, override: IconOverride): void {
   if (override.strokeWidth !== undefined) setAttribute(icon, "stroke-width", String(override.strokeWidth));
   else setAttribute(icon, "stroke-width", original.strokeWidth);
   if (override.treatment === "solid") {
-    setAttribute(icon, "fill", "currentColor");
-    setAttribute(icon, "stroke", "none");
+    setAttribute(icon, "fill", original.fill);
+    setAttribute(icon, "stroke", original.stroke);
+    setAttribute(icon, "data-icon-treatment", "legacy-solid-fallback");
   } else {
     setAttribute(icon, "fill", original.fill);
     setAttribute(icon, "stroke", original.stroke);
+    setAttribute(icon, "data-icon-treatment", original.treatment);
   }
   icon.style.opacity = override.treatment === "muted" ? "0.55" : original.opacity;
   icon.style.verticalAlign = override.alignment ?? original.verticalAlign;

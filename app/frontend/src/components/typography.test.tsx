@@ -202,6 +202,10 @@ describe("a status is not a button", () => {
     expect(el.className).toContain("text-warn");
     expect(el.className).not.toMatch(/cursor-pointer|hover:bg-|active:|focus-visible:outline/);
     expect(el.closest("button")).toBeNull();
+    const mark = el.querySelector("svg");
+    expect(mark).toHaveClass("ico");
+    expect(mark).toHaveAttribute("viewBox", "0 0 24 24");
+    expect(mark).toHaveAttribute("stroke-width", "2");
   });
 
   it("the Badge that feature code already uses is a status too, not a pill button", () => {

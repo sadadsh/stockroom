@@ -146,6 +146,26 @@ internal sealed class SensitiveCredential : IDisposable
         }
     }
 
+    internal bool VerifyHmacHex(ReadOnlySpan<byte> message, string candidate)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        if (candidate.Length != 64)
+        {
+            return false;
+        }
+        var expected = Encoding.ASCII.GetBytes(HmacHex(message));
+        var actual = Encoding.ASCII.GetBytes(candidate);
+        try
+        {
+            return CryptographicOperations.FixedTimeEquals(expected, actual);
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(expected);
+            CryptographicOperations.ZeroMemory(actual);
+        }
+    }
+
     public void Dispose()
     {
         if (_disposed)

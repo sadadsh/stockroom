@@ -58,7 +58,7 @@ Pick the smallest recipe that fits — most features are one or two of these com
 
 ## Add a component
 
-- Compose it from `components/primitives.tsx` (`Panel`, `Field`, `Button`, `Badge`, `TabStrip`,
+- Compose it from `components/primitives.ts` (`Panel`, `Field`, `Button`, `Badge`, `TabStrip`,
   `SegmentedControl`, ...). Do not re-derive a card/border/shadow string — that is what the
   primitives are for.
 - Style with tokens only: `bg-raise` / `bg-surface`, `text-t1` / `text-t2` / `text-t3`,
@@ -71,28 +71,33 @@ Pick the smallest recipe that fits — most features are one or two of these com
 1. Add the variable to `styles/index.css` — a value on `:root` (dark) and on
    `:root[data-theme="light"]` (light); a theme-agnostic value (like a radius) only needs `:root`.
 2. Map it in `tailwind.config.js` (e.g. `raise: "var(--c-raise)"`).
-3. To make it live-nudgeable in dev mode, add one row to `lib/devTokens.ts` (its var, label, group,
+3. To make it live-nudgeable in Design Studio, add one row to `lib/devTokens.ts` (its var, label, group,
    kind, whether it is theme-specific, and its default). That is the whole change.
 
 ## Make UI copy editable
 
 - Wrap a static label in `<Text id="area.name">Default text</Text>` (`lib/copy.tsx`). It renders
-  the default unless an override exists, and becomes click-to-edit in dev mode.
+  the default unless an override exists and gives Design Studio a stable, targeted copy identity.
 - For copy in an attribute (a `placeholder`, `aria-label`, `title`) use
   `const label = useText("area.name", "Default")` and pass `label`.
-- Saved rewordings ship from `lib/copy.overrides.ts` for everyone. Use a stable, unique `id`.
+- Personal rewordings stay in Draft until **Apply To This PC** activates them on that machine.
+  Shipping copy for everyone remains a separate developer release action. Use a stable, unique `id`.
 
-## Make an element editable in Dev Mode
+## Make an element editable in Design Studio
 
-- Give the meaningful layout or control boundary a stable `data-dev-id` and register the same ID in
-  `lib/devIds.ts`. This enables selection, catalogue search, and the complete Box editor.
+- Stockroom-owned JSX receives a deterministic `data-design-id` during the production build, so a
+  new element is editable without manual registration.
+- Give a meaningful layout or control boundary a stable `data-dev-id` and register the same ID in
+  `lib/devIds.ts` when it needs an authoritative semantic identity across refactors or scenario
+  assertions. Authored IDs take precedence over generated identities.
 - For a single-choice control whose presentation may change, use `AdaptiveChoice` instead of a raw
   `<select>`. Pass the existing value, options, disabled state, and change handler unchanged. Dev
-  Mode can then switch it among Dropdown, Segmented Control, Radio Group, and Searchable Picker
+  Design Studio can then switch it among Dropdown, Segmented Control, Radio Group, and Searchable Picker
   without changing its semantics.
-- Add the ID to the parity tests. Confirm the live edit in the real Windows host, in both themes,
-  and exercise Undo/Redo before saving.
-- The full source and publishing contract is in [Dev Mode](design/Dev%20Mode.md).
+- If you authored an ID, add it to the parity tests. Confirm selection and the live edit in the real
+  Windows host, in both themes, and exercise Undo/Redo before applying.
+- The full identity, Draft, Apply To This PC, and release contract is in
+  [Design Studio](design/Dev%20Mode.md).
 
 ## Add a parametric spec / attribute
 
@@ -121,8 +126,10 @@ the frontend renders what it is given and owns none of this.
 
 ## Before you call it done
 
-- Backend: `QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest tests/backend -q`
-- Frontend: `cd app/frontend && npm run test:run && npm run typecheck && npm run build`
+- Canonical Windows gate: `powershell -ExecutionPolicy Bypass -File scripts\Gates.ps1`
+- Backend focus: `uv run pytest tests/backend -q`
+- Frontend focus: from `app/frontend`, run `npm run test:run`, `npm run typecheck`, and
+  `npm run build`.
 - Commit the regenerated `app/frontend-dist/` in the **same** commit as its source — that is what
   the backend serves.
 - New behaviour gets a test. A UI change gets looked at in both themes.

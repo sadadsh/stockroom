@@ -67,6 +67,8 @@ function ShellStatusBar() {
         <span className="text-t2">
           {route === "projects" ? (
             <Text id="shell.status.section-projects">Projects</Text>
+          ) : route === "assets" ? (
+            <Text id="shell.status.section-assets">Assets</Text>
           ) : route === "stm" ? (
             <Text id="shell.status.section-stm">STM Viewer</Text>
           ) : (

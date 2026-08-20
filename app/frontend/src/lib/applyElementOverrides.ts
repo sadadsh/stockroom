@@ -16,17 +16,20 @@
  * from an older revision, so an override that is no longer valid must be IGNORED rather than allowed
  * to throw during boot.
  *
- * INSTANCE vs SHARED: which elements an id reaches is decided by the id itself, in
- * `lib/componentDevIds.ts`. An id carrying a `[value]` segment names exactly one element; a
- * catalogue id names a role and reaches every element carrying it as `data-dev-id` OR as
- * `data-dev-role`. Selection goes through `CSS.escape`, so a record id holding a quote, a bracket or
- * a backslash is a miss, never a thrown selector.
+ * Every override resolves through exact `data-dev-id` or generated `data-design-id` matches.
+ * `data-dev-role` is descriptive and never broadens an edit implicitly. Selection goes through
+ * `CSS.escape`, so a record id holding a quote, a bracket or a backslash is a miss, never a thrown
+ * selector.
  */
 import {
   elementsForTargetDomainOverride,
   parseTargetDomainOverrideId,
 } from "../design-studio/targetDomains";
 import { isApplicableElementOverride } from "./elementLayout";
+import {
+  designOverrideSelector,
+  isRootProtectedDesignProperty,
+} from "./designIdentity";
 
 // devId -> (cssProp -> value). Mirrors ELEMENT_OVERRIDES exactly.
 export type ElementOverrides = Record<string, Record<string, string>>;
@@ -34,19 +37,8 @@ export type ElementOverrides = Record<string, Record<string, string>>;
 const STATE_STYLE_ID = "stockroom-design-state-overrides";
 const STATE_OVERRIDE_RE = /^(.*)::state:(hover|focus|active|selected|disabled)$/;
 
-function attributeSelector(attribute: string, value: string): string {
-  if (typeof CSS !== "undefined" && typeof CSS.escape === "function") {
-    return `[${attribute}=${CSS.escape(value)}]`;
-  }
-  return `[${attribute}="${value.replace(/["\\]/g, "\\$&")}"]`;
-}
-
 function stateSelectors(targetId: string, state: string): string[] {
-  const bases = [
-    attributeSelector("data-dev-id", targetId),
-    attributeSelector("data-dev-role", targetId),
-    attributeSelector("data-design-id", targetId),
-  ];
+  const bases = [designOverrideSelector(targetId)];
   const preview = bases.map((base) => `${base}[data-design-preview-state="${state}"]`);
   if (state === "selected") return [...bases.map((base) => `${base}[aria-selected="true"]`), ...preview];
   if (state === "disabled") {
@@ -65,7 +57,14 @@ function writeStateOverrides(overrides: ElementOverrides): void {
   for (const [id, props] of Object.entries(overrides)) {
     const match = STATE_OVERRIDE_RE.exec(id);
     if (!match) continue;
-    const declarations = Object.entries(props).map(([property, value]) => `${property}:${value}`).join(";");
+    const targetElements = elementsForTargetDomainOverride(match[1]);
+    const safeDeclarations: string[] = [];
+    for (const [property, value] of Object.entries(props)) {
+      if (!targetElements.some((element) => isRootProtectedDesignProperty(element, property))) {
+        safeDeclarations.push(`${property}:${value}`);
+      }
+    }
+    const declarations = safeDeclarations.join(";");
     if (declarations) rules.push(`${stateSelectors(match[1], match[2]).join(",")} {${declarations}}`);
   }
   document.getElementById(STATE_STYLE_ID)?.remove();
@@ -100,6 +99,10 @@ function writeOverrideProperty(id: string, property: string, value: string | nul
   for (const element of elementsForTargetDomainOverride(id)) {
     const target = styled(element);
     if (!target) continue;
+    if (isRootProtectedDesignProperty(element, property)) {
+      target.style.removeProperty(property);
+      continue;
+    }
     if (value === null) target.style.removeProperty(property);
     else target.style.setProperty(property, value);
     if (domain === "icon" && property === "color") {

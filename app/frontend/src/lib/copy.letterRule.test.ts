@@ -59,7 +59,12 @@
  * IS.
  */
 import { describe, it, expect } from "vitest";
-import { BLOCKED_TERMS, INDUSTRY_TERMS, suggestReplacement } from "./interfaceTerms";
+import {
+  APPROVED_PRODUCT_TERMS,
+  BLOCKED_TERMS,
+  INDUSTRY_TERMS,
+  suggestReplacement,
+} from "./interfaceTerms";
 // The allowlist and the judgement moved to `lib/letterRule.ts` so Design Mode's copy editor can run
 // the SAME rule live on text the owner types (plan 1.5). They are imported rather than restated:
 // the allowlist is the one place this rule can be defeated wholesale, and a second copy of it in the
@@ -393,6 +398,14 @@ describe("the interface-letter rule on the copy layer", () => {
     expect(unreasoned).toEqual([]);
   });
 
+  it("holds approved product vocabulary to a short, argued list", () => {
+    expect(APPROVED_PRODUCT_TERMS.length).toBeLessThanOrEqual(6);
+    const unreasoned = APPROVED_PRODUCT_TERMS
+      .filter((term) => term.why.trim().length < 40)
+      .map((term) => term.term);
+    expect(unreasoned).toEqual([]);
+  });
+
   it("shares one allowlist with the live editor, and that allowlist is not empty", () => {
     // The judgement moved to `lib/letterRule.ts` so Design Mode can run it on text the owner types.
     // Killing mutation: return the text unchanged from `judgedText`, or empty either allowlist
@@ -403,7 +416,8 @@ describe("the interface-letter rule on the copy layer", () => {
     expect(judged("DigiKey")).not.toContain(BLOCKED);
     expect(judged("Symbol")).not.toContain(BLOCKED);
     expect(judged("{quantity} parts")).not.toContain(BLOCKED);
-    expect(judged("Apply")).toContain(BLOCKED);
+    expect(judged("Apply")).not.toContain(BLOCKED);
+    expect(judged("Only")).toContain(BLOCKED);
     expect(judged("Layered")).toContain(BLOCKED);
   });
 });

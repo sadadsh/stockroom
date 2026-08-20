@@ -6,7 +6,7 @@ import { Icon } from "../Icon";
 import { ExternalIcon } from "../icons";
 import { EmptyState } from "../primitives";
 import { SourcingDisclosure, SourcingSection } from "./SourcingParts";
-import { groupOffersByProvider, type OfferGroup } from "./offerFacts";
+import { groupOffersByProvider, suggestedProvider, type OfferGroup } from "./offerFacts";
 import { useSupplyFailureText } from "./provenanceText";
 
 /** Keep the last usable list visible while a refresh is in flight. */
@@ -41,13 +41,14 @@ export function OffersSection({
   const fullRecordLabel = useText("component-browser.offers-all", "View Full Sourcing Record");
   const shown = useRetainedOffers(offers, refreshing);
   const groups = groupOffersByProvider(shown);
+  const suggested = suggestedProvider(shown);
 
   return (
     <SourcingSection
       devId="component-browser.offers"
       title={(
         <span className="flex items-center gap-1.5">
-          <Icon id="action.enrich" className="h-3.5 w-3.5 text-t3" />
+          <Icon id="detail.offers" className="h-3.5 w-3.5 text-t3" />
           <Text id="component-browser.price-breaks-title">Price Breaks</Text>
         </span>
       )}
@@ -79,7 +80,11 @@ export function OffersSection({
       ) : (
         <ul data-dev-id="component-browser.offers-table" aria-label={ledgerLabel} className="min-w-0">
           {groups.map((group) => (
-            <ProviderGroup key={group.provider || group.providerLabel} group={group} />
+            <ProviderGroup
+              key={group.provider || group.providerLabel}
+              group={group}
+              suggested={(group.provider || group.providerLabel) === suggested}
+            />
           ))}
         </ul>
       )}
@@ -107,7 +112,7 @@ function FullRecordAction({ label, onClick }: { label: string; onClick: () => vo
   );
 }
 
-function ProviderGroup({ group }: { group: OfferGroup }) {
+function ProviderGroup({ group, suggested }: { group: OfferGroup; suggested: boolean }) {
   const count = group.offers.length;
   const primary = group.offers[0]!;
   const firstTier = primary.priceBreaks[0] ?? null;
@@ -119,6 +124,11 @@ function ProviderGroup({ group }: { group: OfferGroup }) {
     <li data-sourcing-provider={group.provider} className="mb-1 last:mb-0">
       <div className="flex min-h-[30px] items-center gap-2 bg-row-alt/45 px-2 py-1">
         <span className="ui-row-secondary min-w-0 flex-1 truncate text-t1">{group.providerLabel}</span>
+        {suggested ? (
+          <span className="ui-component-metadata flex-none text-t2">
+            <Text id="component-browser.offer-suggested">Suggested</Text>
+          </span>
+        ) : null}
         {firstTier ? (
           <dl className="flex-none">
             <PriceBreakPill entry={firstTier} currency={primary.currency} compact />
@@ -261,7 +271,7 @@ function PriceBreakPill({
     <div
       data-price-break-pill
       className={
-        "grid min-w-0 grid-cols-[minmax(2.5rem,1fr)_auto] items-baseline gap-2 rounded-full bg-raise2 "
+        "grid min-w-0 grid-cols-[minmax(2.5rem,1fr)_auto] items-baseline gap-2 "
         + (compact ? "px-2 py-0.5" : "px-2 py-1")
       }
     >

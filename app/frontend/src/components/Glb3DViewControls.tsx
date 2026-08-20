@@ -8,6 +8,7 @@ import type { PlacementAssessment } from "../lib/placementAssessment";
 import type { PlacementMode, RenderMode, ViewMode } from "../lib/threeScene";
 import { Text, useCopyFormatter, useText } from "../lib/copy";
 import { Icon } from "./Icon";
+import type { IconId } from "../lib/iconRegistry";
 
 /**
  * How much of the control surface is VISIBLE at rest. `bar` is the historical compact strip,
@@ -503,13 +504,13 @@ const PLACEMENT_MODES: {
   mode: PlacementMode;
   label: string;
   hint: string;
-  icon: string;
+  icon: IconId;
 }[] = [
   {
     mode: "auto",
     label: "Auto",
     hint: "Use KiCad placement when it passes conservative sanity checks; otherwise show the model frame",
-    icon: "action.enrich",
+    icon: "view.placement-auto",
   },
   {
     mode: "kicad",
@@ -615,7 +616,7 @@ function PlacementControls({
 
 // The dev-id is written out in FULL rather than built as `detail.model-view-${mode}`: the parity
 // gate scans source text, so an interpolated id is invisible to it and to anyone grepping for it.
-const SHADING: { mode: RenderMode; label: string; hint: string; devId: string; icon: string }[] = [
+const SHADING: { mode: RenderMode; label: string; hint: string; devId: string; icon: IconId }[] = [
   {
     mode: "realistic",
     label: "Source Color",
@@ -655,7 +656,7 @@ function LayerToggle({
   hint: string;
   onToggle: () => void;
   /** Registry icon id. Only used in `compact` mode. */
-  icon?: string;
+  icon?: IconId;
   /** ICON-ONLY. The mini tile is ~280px and ten text chips wrapped to three rows there, taking a third
    *  of the stage; the owner chose icon-only for the tile (2026-07-26). The modal has room and keeps
    *  its labels. The NAME is never lost - `title` and `aria-label` both carry it. */
@@ -688,7 +689,7 @@ function LayerToggle({
   );
 }
 
-const VIEWS: { mode: ViewMode; label: string; hint: string; devId: string; icon: string }[] = [
+const VIEWS: { mode: ViewMode; label: string; hint: string; devId: string; icon: IconId }[] = [
   {
     mode: "iso",
     label: "Isometric",

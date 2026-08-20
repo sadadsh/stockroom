@@ -16,8 +16,11 @@ from urllib.parse import quote
 
 from stockroom.enrich.apply import (
     conflict_entries,
+    identity_evidence,
+    identity_projection,
     ordered_specification_answers,
     spec_updates,
+    specification_evidence,
 )
 from stockroom.enrich.cache import TtlCache
 from stockroom.enrich.datasheet import extract_datasheet_specs, fetch_datasheet
@@ -34,6 +37,7 @@ from stockroom.enrich.ratelimit import SlidingWindowLimiter
 from stockroom.enrich.registry import (
     DEFAULT_WANT,
     SourceRegistry,
+    bind_official_payload,
     record_vendor_offer,
     source_state,
 )
@@ -46,7 +50,7 @@ from stockroom.enrich.schema import (
 )
 from stockroom.enrich.sites import SITE_EXTRACTORS
 from stockroom.ingest.staging import StagingCandidate
-from stockroom.model.part import Provenance, Purchase
+from stockroom.model.part import Purchase
 from stockroom.model.spec_hygiene import normalize_spec_key, normalize_spec_value
 from stockroom.scrape.validate import validate_product
 
@@ -137,9 +141,19 @@ def fill_category(result: EnrichmentResult) -> None:
     # classified at all. DigiKey's "Circuit Protection" names no component kind while LCSC's "ESD
     # Protection Diodes / TVS Diodes" does, and the real library had the unclassifiable one in the
     # slot. The tiers stay ordered, so this widens the search without blending it.
-    guess = _best_category(_classification_signals(result))
+    guess = suggested_category(result)
     if guess:
         result.category = guess
+
+
+def suggested_category(result: EnrichmentResult) -> str:
+    """A category supported by permitted source evidence, or ``""``.
+
+    Raw official payloads already carry source-tagged answers. Keeping this as a result-level
+    operation lets both live enrichment and offline derivation use those tags without projecting
+    them through a provenance-free record view first.
+    """
+    return _best_category(_classification_signals(result))
 
 
 def _best_category(texts) -> str:
@@ -180,19 +194,33 @@ def _record_classification_signals(record):
     result reads its conflict maps - they hold the same losers."""
     seen: set[str] = set()
 
-    def tier(primary, alternates):
+    def tier(key, primary):
         out = []
-        for value in [primary, *[a.value for a in alternates]]:
-            text = str(value or "").strip()
+        stored = alternates.get(key, [])
+        entry = (getattr(record, "enrichment", None) or {}).get(key)
+        primary_answer = (
+            None
+            if stored or not str(primary or "").strip()
+            else Sourced(
+                primary,
+                str(getattr(entry, "source", "") or ""),
+                str(getattr(entry, "confidence", "") or ""),
+            )
+        )
+        candidates = [
+            Sourced(answer.value, answer.source, answer.confidence)
+            for answer in stored
+        ]
+        for answer in ordered_specification_answers(primary_answer, candidates):
+            text = str(answer.value or "").strip()
             if text and text not in seen:
                 seen.add(text)
                 out.append(text)
         return out
 
     alternates = getattr(record, "alternates", {}) or {}
-    yield from tier(record.specs.get("Product Category"),
-                    alternates.get("Product Category", []))
-    yield from tier(record.description, alternates.get("description", []))
+    yield from tier("Product Category", record.specs.get("Product Category"))
+    yield from tier("description", record.description)
 
 
 def _classification_signals(result: EnrichmentResult):
@@ -213,9 +241,9 @@ def _classification_signals(result: EnrichmentResult):
                 out.append(text)
         return out
 
-    yield from tier(result.specs.get("Product Category"),
-                    result.spec_conflicts.get("Product Category", []))
-    yield from tier(result.description, result.field_conflicts.get("description", []))
+    specifications = dict(specification_evidence(result))
+    yield from tier(None, list(specifications.get("Product Category", ())))
+    yield from tier(None, list(identity_evidence(result, "description")))
 
 
 def _is_substantive(result: EnrichmentResult) -> bool:
@@ -614,12 +642,13 @@ class EnrichmentPipeline:
 
     def enrich_from_product_url(self, candidate: StagingCandidate, url: str,
                                 overwrite: set[str] | None = None) -> StagingCandidate:
-        """Fill a candidate's blank identity straight from a distributor product page
-        the user pasted (a purchase link). The pasted link is a direct primary source,
-        so we fetch THAT exact page (never an MPN search) and read mpn/manufacturer/
-        description/datasheet/price from its schema.org Product data. Per-field (never
-        clobbers an existing value unless opted in) and never raises: a dead link or an
-        unparseable page contributes nothing (enrichment never blocks)."""
+        """Read a pasted distributor page as lookup and offer discovery evidence.
+
+        The exact page may recover the MPN needed for the official API lookup and may update
+        its own purchase offer. Its identity copy, datasheet link, and specification table do
+        not cross the component-fact authority boundary. A dead or unparseable link remains a
+        no-op and never blocks enrichment.
+        """
         overwrite = overwrite or set()
         url = (url or "").strip()
         if not url:
@@ -632,13 +661,10 @@ class EnrichmentPipeline:
         result = validate_product(extract_all(page.text, page.final_url or url, SITE_EXTRACTORS))
         _drop_thin_description(result)  # never leak a challenge/thin shell's text as a description
 
-        for field_name, attr in _CANDIDATE_FIELDS.items():
-            sourced = getattr(result, field_name)
-            if sourced is None:
-                continue
-            if not getattr(candidate, attr, "") or attr in overwrite:
-                setattr(candidate, attr, str(sourced.value))
-        _copy_specs(candidate, result, overwrite)
+        # Browser HTML may recover the exact MPN needed to ask the official APIs, but its
+        # catalogue copy is discovery evidence: never component identity or engineering facts.
+        if result.mpn is not None and (not candidate.mpn or "mpn" in overwrite):
+            candidate.mpn = str(result.mpn.value)
 
         # Attach the scraped price/stock to the purchase entry the user pasted, keeping
         # its vendor and url intact (a pasted Mouser link stays a Mouser link).
@@ -652,15 +678,6 @@ class EnrichmentPipeline:
             if stock is not None and (existing.stock is None or "purchase" in overwrite):
                 existing.stock = stock
 
-        # Thread the datasheet onto provenance and fetch+store the PDF (the passport's
-        # datasheet requirement checks a stored path), mirroring enrich_candidate.
-        if result.datasheet_url is not None:
-            if candidate.provenance is None:
-                candidate.provenance = Provenance(source="manual")
-            if not candidate.provenance.source_url or "datasheet" in overwrite:
-                candidate.provenance.source_url = str(result.datasheet_url.value)
-            if candidate.datasheet_path is None or "datasheet" in overwrite:
-                self.fetch_and_store_datasheet(candidate, str(result.datasheet_url.value))
         return candidate
 
     def _distributor_adapters(self, vendor: str):
@@ -690,8 +707,9 @@ class EnrichmentPipeline:
             if self.mouser_limiter is not None:
                 self.mouser_limiter.acquire()
             emit(progress, Stage.FETCHING, f"querying {display.get(name, name)}")
+            queried_token = lookup_token
             try:
-                partial = adapter.lookup(lookup_token)
+                partial = adapter.lookup(queried_token)
             except Exception:  # noqa: BLE001 - an adapter must never break the paste path
                 result.source_states[name] = "failed"
                 continue
@@ -707,6 +725,16 @@ class EnrichmentPipeline:
                 # The first (pasted-link) distributor resolves its own order number. Every other
                 # distributor is queried with the manufacturer MPN that answer established.
                 lookup_token = canonical_mpn
+            payload = getattr(adapter, "last_payload", None)
+            if result.source_states[name] == "success" and isinstance(payload, dict):
+                bind_official_payload(
+                    result,
+                    name,
+                    payload,
+                    queried_mpn=queried_token,
+                    canonical_mpn=partial_mpn or canonical_mpn or queried_token,
+                    partial=partial,
+                )
             # Keep THIS vendor's own buy link, price ladder and live stock, so both survive even
             # though the merged result keeps a single primary of each. The pasted vendor's link is
             # set to the pasted url below. Same helper the registry walk uses, so the paste path
@@ -880,8 +908,8 @@ class EnrichmentPipeline:
     def enrich_candidate(self, candidate: StagingCandidate,
                          overwrite: set[str] | None = None) -> StagingCandidate:
         overwrite = overwrite or set()
-        # A pasted purchase link is a direct primary source: scrape THAT page first so
-        # a candidate with only a distributor link still fills everything (owner ask).
+        # A pasted purchase link is read first only to recover a lookup MPN and its own offer.
+        # Official APIs and an identity-matched manufacturer PDF own component facts.
         if candidate.purchase and candidate.purchase[0].url:
             self.enrich_from_product_url(candidate, candidate.purchase[0].url, overwrite)
         mpn = candidate.mpn or candidate.entry_name or candidate.display_name
@@ -900,8 +928,13 @@ class EnrichmentPipeline:
             if not candidate.category or candidate.category == "Other" or "category" in overwrite:
                 candidate.category = result.category
 
+        selected_identity = identity_projection(result)
         for field_name, attr in _CANDIDATE_FIELDS.items():
-            sourced = getattr(result, field_name)
+            sourced = (
+                result.mpn
+                if field_name == "mpn"
+                else selected_identity.get(field_name)
+            )
             if sourced is None:
                 continue
             current = getattr(candidate, attr, "")
@@ -921,18 +954,19 @@ class EnrichmentPipeline:
 
         # thread a datasheet URL onto provenance so M3's to_staged_part wires the
         # Datasheet meta (source_url), without overwriting an existing one
-        if result.datasheet_url is not None and candidate.provenance is not None:
+        selected_datasheet = selected_identity.get("datasheet_url")
+        if selected_datasheet is not None and candidate.provenance is not None:
             if not candidate.provenance.source_url or "datasheet" in overwrite:
-                candidate.provenance.source_url = str(result.datasheet_url.value)
+                candidate.provenance.source_url = str(selected_datasheet.value)
 
         # actually FETCH+store the PDF so the passport's datasheet requirement can be
         # met (the gate checks a stored datasheet_path, not just a URL). Per-field:
         # only if the candidate has no datasheet yet (or datasheet is opted in). A
         # failed/HTML datasheet link never blocks: datasheet_path is simply left unset.
-        if result.datasheet_url is not None and (
+        if selected_datasheet is not None and (
             candidate.datasheet_path is None or "datasheet" in overwrite
         ):
-            self.fetch_and_store_datasheet(candidate, str(result.datasheet_url.value))
+            self.fetch_and_store_datasheet(candidate, str(selected_datasheet.value))
         return candidate
 
     def datasheet_fill(self, candidate: StagingCandidate) -> StagingCandidate:
@@ -949,6 +983,8 @@ class EnrichmentPipeline:
                 candidate.datasheet_path, known_mpn=candidate.mpn
             )
         except (EnrichError, OSError):
+            return candidate
+        if "manufacturer_datasheet" not in result.identity_authorities:
             return candidate
         for field_name, attr in _CANDIDATE_FIELDS.items():
             sourced = getattr(result, field_name, None)
@@ -998,6 +1034,10 @@ class _MouserSource:
         """The adapter's own classification of its last call, for the per-source state."""
         return str(getattr(self._adapter, "last_status", "") or "")
 
+    @property
+    def last_payload(self) -> dict | None:
+        return getattr(self._adapter, "last_payload", None)
+
     def enrich(self, mpn, category, remaining, progress=None):
         # Pace the Mouser API path (the exact ban scenario the KiCost limiter exists to
         # prevent). Without this a bulk enrich of many uncached parts fires unthrottled and
@@ -1023,6 +1063,10 @@ class _DigiKeySource:
     def last_status(self) -> str:
         """The adapter's own classification of its last call, for the per-source state."""
         return str(getattr(self._adapter, "last_status", "") or "")
+
+    @property
+    def last_payload(self) -> dict | None:
+        return getattr(self._adapter, "last_payload", None)
 
     def enrich(self, mpn, category, remaining, progress=None):
         # Shares the Mouser limiter (both are paced distributor APIs guarded against the
@@ -1070,6 +1114,13 @@ def _result_to_cache(r: EnrichmentResult) -> dict:
         # the per-source verdicts (a cache hit must keep showing the same degraded state the
         # stored answer was produced under, never silently upgrade to "fine")
         "source_states": dict(r.source_states),
+        "official_payloads": {
+            key: dict(value) for key, value in r.official_payloads.items()
+        },
+        "official_evidence": {
+            key: dict(value) for key, value in r.official_evidence.items()
+        },
+        "identity_authorities": list(r.identity_authorities),
         "identity_suggestions": {
             key: list(values) for key, values in r.identity_suggestions.items()
         },
@@ -1112,6 +1163,21 @@ def _result_from_cache(d: dict, category: str) -> EnrichmentResult:
     r.source_states = {
         str(key): str(value) for key, value in (d.get("source_states") or {}).items()
     }
+    r.official_payloads = {
+        str(key): dict(value)
+        for key, value in (d.get("official_payloads") or {}).items()
+        if isinstance(value, dict)
+    }
+    r.official_evidence = {
+        str(key): dict(value)
+        for key, value in (d.get("official_evidence") or {}).items()
+        if isinstance(value, dict)
+    }
+    r.identity_authorities = [
+        str(value)
+        for value in (d.get("identity_authorities") or [])
+        if isinstance(value, str)
+    ]
     r.identity_suggestions = {
         str(key): [str(value) for value in values if isinstance(value, str)]
         for key, values in (d.get("identity_suggestions") or {}).items()

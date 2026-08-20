@@ -13,7 +13,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import Response
 
 from stockroom.api.errors import ApiError
-from stockroom.enrich.apply import spec_updates, specification_evidence
+from stockroom.enrich.apply import identity_projection, spec_updates, specification_evidence
 from stockroom.enrich.pipeline import EnrichmentPipeline
 from stockroom.enrich.schema import SOURCED_FIELDS, EnrichmentResult, Sourced
 
@@ -58,7 +58,7 @@ def _sourced_dto(s: Sourced | None) -> dict | None:
     return {"value": s.value, "source": s.source, "confidence": s.confidence}
 
 
-def _add_plan(r: EnrichmentResult) -> dict | None:
+def _add_plan(r: EnrichmentResult, *, description: Sourced | None = None) -> dict | None:
     """The passive-or-not determination the unified Add-A-Part flow branches on: the
     {kind, package, value, tolerance} a file-less passive add needs, or None when the
     part is not an addable file-less passive (it then takes the drop-the-assets path)."""
@@ -72,11 +72,12 @@ def _add_plan(r: EnrichmentResult) -> dict | None:
         category=r.category,
         package=v(r.package),
         specs={k: str(s.value) for k, s in r.specs.items() if s is not None},
-        description=v(r.description),
+        description=v(description),
     )
 
 
 def _result_dto(r: EnrichmentResult) -> dict:
+    selected_identity = identity_projection(r)
     selected_specs = {
         label: {
             "value": value,
@@ -89,6 +90,25 @@ def _result_dto(r: EnrichmentResult) -> dict:
         label: [_sourced_dto(sourced) for sourced in answers]
         for label, answers in specification_evidence(r)
     }
+    official_evidence: dict[str, dict] = {}
+    for provider, raw_binding in getattr(r, "official_evidence", {}).items():
+        if not isinstance(raw_binding, dict):
+            continue
+        provider_key = str(provider).strip().lower()
+        selected_values: dict[str, object] = {}
+        for name in SOURCED_FIELDS:
+            sourced = selected_identity.get(name, getattr(r, name))
+            if sourced is not None and str(sourced.source).strip().lower() == provider_key:
+                selected_values[name] = sourced.value
+        for label, sourced in selected_specs.items():
+            if str(sourced.get("source", "")).strip().lower() == provider_key:
+                selected_values[label] = sourced.get("value")
+        official_evidence[provider_key] = {
+            "provider": provider_key,
+            "queried_mpn": str(raw_binding.get("queried_mpn", "")),
+            "canonical_mpn": str(raw_binding.get("canonical_mpn", "")),
+            "selected_values": selected_values,
+        }
     return {
         "category": r.category,
         # A2: the FULL pulled depth, not just identity + specs. Every single-valued canonical
@@ -97,7 +117,10 @@ def _result_dto(r: EnrichmentResult) -> dict:
         # again: the Mouser path filled a part's origin and its real US import tariff and the UI
         # could never see either. Iterating means a field added to the schema reaches the UI by
         # construction.
-        **{name: _sourced_dto(getattr(r, name)) for name in SOURCED_FIELDS},
+        **{
+            name: _sourced_dto(selected_identity.get(name, getattr(r, name)))
+            for name in SOURCED_FIELDS
+        },
         "dist_pns": dict(r.dist_pns),
         # every vendor's own ladder + stock for the comparison view (owner 2026-07-24)
         "dist_price_breaks": {
@@ -130,11 +153,18 @@ def _result_dto(r: EnrichmentResult) -> dict:
         },
         # The passive determination for the unified Add-A-Part flow (null = non-passive,
         # needs the symbol/footprint/3D dropped).
-        "add_plan": _add_plan(r),
+        "add_plan": _add_plan(r, description=selected_identity["description"]),
         # The honest per-source verdict for each official distributor API:
         # success / unavailable / failed / not_configured. Fixed vocabulary only - never an
         # exception body, a key, or a URL.
         "source_states": dict(r.source_states),
+        "official_payloads": {
+            key: dict(value)
+            for key, value in getattr(r, "official_payloads", {}).items()
+            if isinstance(value, dict)
+        },
+        "official_evidence": official_evidence,
+        "identity_authorities": list(getattr(r, "identity_authorities", [])),
         "identity_suggestions": {
             key: list(values) for key, values in r.identity_suggestions.items()
         },

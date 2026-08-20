@@ -1,8 +1,9 @@
 # legacy/ - reference source to port, not shippable code
 
 These modules were copied from the old Hardware app (the public `Hardware` repo, `tools/`,
-on 2026-07-12) as the **reference source for the reuse-by-extraction plan** in the perfected
-direction spec (`docs/work plans/specs/2026-07-12-perfected-rewrite-direction.md`, section 2.1).
+on 2026-07-12) as reference source for the reuse-by-extraction plan. The dated working spec is
+intentionally not retained as product authority; this file preserves the bounded extraction map,
+and [the current architecture](../docs/architecture.md) owns the shipped system boundaries.
 
 No em dashes anywhere (standing owner rule).
 

@@ -1,4 +1,4 @@
-import { cleanup, screen, within } from "@testing-library/react";
+import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { settingsScenarios } from "./settings";
 import { mountScenario } from "./testHarness";
@@ -76,6 +76,30 @@ afterEach(cleanup);
 describe("Settings Design Studio scenarios", () => {
   it("registers the complete literal Settings inventory", () => {
     expect(settingsScenarios.map((scenario) => scenario.id)).toEqual(SETTINGS_SCENARIO_INVENTORY);
+  });
+
+  it("drives the Catalog Checkouts error through its authoritative onboarding read", () => {
+    const scenario = settingsScenarios.find((candidate) => candidate.id === "settings.libraries.error");
+    const failedReads = scenario?.fixtures
+      .filter((fixture) => fixture.behavior?.state === "error")
+      .map((fixture) => fixture.path);
+
+    expect(failedReads).toEqual(["/api/onboarding"]);
+  });
+
+  it("keeps the boot-ready app mounted when Catalog Checkouts revalidation fails", async () => {
+    const mounted = await mountScenario("settings.libraries.error");
+
+    expect(document.querySelector('[data-dev-id="settings.root"]')).toBeInTheDocument();
+    await waitFor(() =>
+      expect(mounted.queryClient.getQueryState(["onboarding"])?.status).toBe("error"),
+    );
+    await waitFor(() =>
+      expect(
+        document.querySelector('[data-dev-id="settings.profiles"] [data-product-state="error"]'),
+      ).toBeVisible(),
+    );
+    expect(document.querySelector('[data-dev-id="onboarding.setup-error"]')).toBeNull();
   });
 
   it.each(SETTINGS_SCENARIO_INVENTORY)("mounts the real Settings surface for %s", async (id) => {

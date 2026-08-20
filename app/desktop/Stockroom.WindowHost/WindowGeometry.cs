@@ -345,10 +345,10 @@ internal static class WindowsWindowGeometry
         _ = NativeMethods.ShowWindow(windowHandle, command);
     }
 
-    internal static void Focus(IntPtr windowHandle)
+    internal static bool Focus(IntPtr windowHandle)
     {
         _ = NativeMethods.ShowWindow(windowHandle, 9);
-        _ = NativeMethods.SetForegroundWindow(windowHandle);
+        return NativeMethods.SetForegroundWindow(windowHandle);
     }
 
     internal static IReadOnlyDictionary<string, object?> Capture(

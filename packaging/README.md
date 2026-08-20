@@ -1,6 +1,7 @@
 # Stockroom Windows Packaging
 
-Stockroom ships as a signed x64 MSIX. Windows launches
+Stockroom's future production delivery is a signed x64 MSIX through App Installer;
+no signed production feed has been published yet. Windows launches
 `WindowHost\Stockroom.WindowHost.exe`, the self-contained .NET 10 WPF host. The
 host starts one immutable PyInstaller onedir backend from the package's verified
 release set.
@@ -30,8 +31,8 @@ Run the fixture from the repository root on Windows:
 ```powershell
 .\packaging\Build-Windows-Package.ps1 `
   -Mode Fixture `
-  -Version 0.7.0.0 `
-  -MinimumHostVersion 0.7.0.0 `
+  -Version 1.0.0.0 `
+  -MinimumHostVersion 1.0.0.0 `
   -OutputRoot "work\Windows Package Proof"
 ```
 
@@ -104,7 +105,11 @@ signature boundary. Signing occurs after the unsigned reproducibility proof.
 
 ## Release workflow
 
-`.github\workflows\release.yml` invokes only the production packager. Configure:
+`.github\workflows\release.yml` first calls the canonical Windows CI workflow;
+only after that gate passes does it invoke the production packager. A successful
+push to `main` publishes one normal immutable GitHub Release as
+`1.0.0.<GitHub run number>`. Manual dispatch builds and verifies the Actions
+artifact without publishing; version tags do not trigger this workflow. Configure:
 
 - secrets `WINDOWS_CERT_BASE64` and `WINDOWS_CERT_PASSWORD`;
 - secrets `STOCKROOM_TUF_TARGETS_KEY_BASE64`,
@@ -124,8 +129,7 @@ removes each secret file before upload, and publishes only:
 - build evidence; and
 - checksums.
 
-A tagged release cannot replace an existing published asset. Manual runs produce
-an Actions artifact without creating a GitHub release.
+An automatic main-push release cannot replace an existing published asset.
 
 ## Update ownership
 
@@ -195,7 +199,7 @@ uv run pytest tests\backend\packaging -q
 uv run ruff check packaging tests\backend\packaging
 uv run ty check packaging tests\backend\packaging --python-platform win32
 
-D:\Workspace\System\Capabilities\Bin\dotnet-sdk.cmd test `
+dotnet test `
   tests\native\Stockroom.WindowHost.Tests\Stockroom.WindowHost.Tests.csproj `
   --configuration Release
 ```

@@ -44,7 +44,8 @@ describe("provider-download Design Studio scenarios", () => {
   it("clicks through the real Manage Models browser without live product I/O", async () => {
     const { user, liveRequest } = await mountScenario("provider.download-armed");
     const workspace = await screen.findByTestId("manage-models-workspace");
-    const browser = await screen.findByRole("region", { name: "Ultra Librarian Browser" });
+    const browser = await screen.findByRole("dialog", { name: "Ultra Librarian Browser" });
+    expect(within(browser).getByRole("region", { name: "Ultra Librarian Browser Page" })).toBeVisible();
     expect(within(workspace).getByRole("status")).toHaveTextContent("Download capture ready");
     expect(within(browser).getByRole("button", { name: "Back" })).toBeEnabled();
     expect(within(browser).getByRole("button", { name: "Forward" })).toBeEnabled();

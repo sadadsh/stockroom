@@ -58,26 +58,31 @@ function Harness() {
   return (
     <ThemeProvider>
       <DevModeProvider>
-        <div className="flex flex-col">
-          {CANDIDATES.map((id) => (
-            <div
-              key={id}
-              data-dev-id={candidateDevId(id)}
-              data-dev-role={CANDIDATE_ROLE}
-              className="text-t1"
-            >
-              {id}
-            </div>
-          ))}
-        </div>
-        <div data-dev-id="component-browser.tabs" className="flex">
-          <button type="button" data-dev-id={componentTabDevId("stm32h743vit6")}>
-            Tab One
-          </button>
-          <button type="button" data-dev-id={componentTabDevId("tpd6e05u06rvzr")}>
-            Tab Two
-          </button>
-        </div>
+        <main data-design-product-root="true" data-dev-id="fixture.preview-root">
+          <div className="flex flex-col">
+            {CANDIDATES.map((id) => (
+              <div
+                key={id}
+                data-dev-id={candidateDevId(id)}
+                data-dev-role={CANDIDATE_ROLE}
+                className="text-t1"
+              >
+                {id}
+              </div>
+            ))}
+          </div>
+          <div data-dev-id="component-browser.tabs" className="flex">
+            <button type="button" data-dev-id={componentTabDevId("stm32h743vit6")}>
+              Tab One
+            </button>
+            <button type="button" data-dev-id={componentTabDevId("tpd6e05u06rvzr")}>
+              Tab Two
+            </button>
+          </div>
+          <button type="button" data-testid="same-id-first" data-design-id="auto.same-action.1234567">Same First</button>
+          <button type="button" data-testid="same-id-second" data-design-id="auto.same-action.1234567">Same Second</button>
+          <button type="button" data-testid="same-id-third" data-design-id="auto.same-action.1234567">Same Third</button>
+        </main>
         <DevPanel />
         <DevInspector />
       </DevModeProvider>
@@ -184,8 +189,39 @@ describe("hover uses product labels", () => {
   });
 });
 
-describe("the Box tab writes under the contract the person chose", () => {
-  it("edits this instance by default, and every one of these on request", () => {
+describe("the Box tab writes to the exact selected target", () => {
+  it("edits the clicked second occurrence without changing same-id peers", () => {
+    render(<Harness />);
+    toggleDevMode();
+    const first = screen.getByTestId("same-id-first") as HTMLElement;
+    const second = screen.getByTestId("same-id-second") as HTMLElement;
+    const third = screen.getByTestId("same-id-third") as HTMLElement;
+    inspectClick(second);
+    fireEvent.click(screen.getByRole("tab", { name: "Box" }));
+
+    fireEvent.change(screen.getByLabelText("Width value"), { target: { value: "222px" } });
+
+    expect(first.style.width).toBe("");
+    expect(second.style.width).toBe("222px");
+    expect(third.style.width).toBe("");
+  });
+
+  it("cannot hide, fill, or resize the product preview root", () => {
+    render(<Harness />);
+    toggleDevMode();
+    const root = document.querySelector<HTMLElement>('[data-dev-id="fixture.preview-root"]')!;
+    inspectClick(root);
+    fireEvent.click(screen.getByRole("tab", { name: "Box" }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Fill Width" }));
+    fireEvent.click(screen.getByRole("button", { name: "Hide" }));
+    fireEvent.change(screen.getByLabelText("Width value"), { target: { value: "1px" } });
+
+    expect(root.style.display).toBe("");
+    expect(root.style.width).toBe("");
+  });
+
+  it("never offers or performs implicit role expansion", () => {
     render(<Harness />);
     toggleDevMode();
     const second = document.querySelector(
@@ -202,13 +238,10 @@ describe("the Box tab writes under the contract the person chose", () => {
     ) as HTMLElement;
     expect(first.style.getPropertyValue("width")).toBe("");
 
-    // Switch the contract: the same field now writes the shared role, so every card moves.
-    fireEvent.click(screen.getByRole("button", { name: "Every One Of These" }));
+    expect(screen.queryByRole("button", { name: "Every One Of These" })).not.toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("Padding value"), { target: { value: "8px" } });
-    for (const id of CANDIDATES) {
-      const node = document.querySelector(`[data-dev-id="${candidateDevId(id)}"]`) as HTMLElement;
-      expect(node.style.getPropertyValue("padding")).toBe("8px");
-    }
+    expect((second as HTMLElement).style.getPropertyValue("padding")).toBe("8px");
+    expect(first.style.getPropertyValue("padding")).toBe("");
     // The instance edit is still exactly where it was.
     expect((second as HTMLElement).style.getPropertyValue("width")).toBe("240px");
     expect(first.style.getPropertyValue("width")).toBe("");

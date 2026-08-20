@@ -43,6 +43,7 @@ import { useText } from "../../lib/copy";
 import { useDevMode } from "../../lib/devMode";
 import { layoutPlacements, type LayoutDocument } from "../../layout/document";
 import { resolveWorkspaceLayout } from "../../layout/resolveWorkspaceLayout";
+import { Icon } from "../Icon";
 import { draftThemeTokens } from "../../layout/validateContrast";
 import { validateDocument } from "../../layout/validateDocument";
 import type { IssueSubject, ValidatorIssue } from "../../layout/validatorIssues";
@@ -173,7 +174,7 @@ export function IssuesSection({
         onClick={() => setOpen(!open)}
         className="flex w-full items-center gap-1.5 px-3.5 py-2 ui-property-label hover:text-t2"
       >
-        <span aria-hidden="true">{open ? "▾" : "▸"}</span>
+        <Icon id={open ? "design.disclosure-open" : "design.disclosure-closed"} className="h-3 w-3" />
         {title}
         <span data-dev-id="design.issues-count" className="ml-auto font-mono text-t3">
           {`${warnings.length} / ${notes.length}`}

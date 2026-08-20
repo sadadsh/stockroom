@@ -1,29 +1,32 @@
 import { api } from "../api/client";
-import type { CaptureState } from "./captureRequirements";
+import type { CaptureAttachmentProposal } from "../api/types";
+import type { CaptureEda, CaptureState } from "./captureRequirements";
 import { pickHostFiles } from "./hostFilePicker";
 
 interface RecoveryDependencies {
   pick: typeof pickHostFiles;
   attach: typeof api.attachSelectedCaptureFiles;
-  add: typeof api.addPartFiles;
+  propose: typeof api.proposePartFiles;
 }
 
 export interface CaptureRecoveryResult {
   selected: number;
   accepted: number;
-  outcome: "canceled" | "queued" | "attached";
+  outcome: "canceled" | "queued" | "proposed";
+  proposal?: CaptureAttachmentProposal;
 }
 
 const DEFAULT_DEPENDENCIES: RecoveryDependencies = {
   pick: pickHostFiles,
   attach: (input) => api.attachSelectedCaptureFiles(input),
-  add: (input) => api.addPartFiles(input),
+  propose: (input) => api.proposePartFiles(input),
 };
 
 export async function recoverCaptureFiles(
   componentId: string,
   active: CaptureState,
   dependencies: RecoveryDependencies = DEFAULT_DEPENDENCIES,
+  edas: readonly CaptureEda[] = ["kicad"],
 ): Promise<CaptureRecoveryResult> {
   const paths = await dependencies.pick("cad-recovery");
   if (paths.length === 0) return { selected: 0, accepted: 0, outcome: "canceled" };
@@ -46,6 +49,11 @@ export async function recoverCaptureFiles(
     return { selected: paths.length, accepted: result.queued_files, outcome: "queued" };
   }
 
-  const result = await dependencies.add({ partId: componentId, paths });
-  return { selected: paths.length, accepted: result.attached.length, outcome: "attached" };
+  const proposal = await dependencies.propose({ partId: componentId, paths, edas: [...edas] });
+  return {
+    selected: paths.length,
+    accepted: proposal.attachments.length,
+    outcome: "proposed",
+    proposal,
+  };
 }
