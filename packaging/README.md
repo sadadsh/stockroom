@@ -42,6 +42,12 @@ The artifact directory contains only the MSIX, build evidence, and checksums. It
 contains no App Installer file, TUF feed, private key, certificate, or password.
 The Microsoft Store is the package's only update authority.
 
+Before packing either reproducibility stage, the build scans every staged PE
+file's Authenticode certificate table. The build fails if any table is truncated,
+misaligned, or structurally invalid because Microsoft cannot re-sign an MSIX that
+contains such a binary. Unused Tk/Tcl GUI modules are excluded from the worker;
+Stockroom's supported desktop UI is the native WPF/WebView2 host.
+
 ## Unsigned fixture
 
 Run the fixture from the repository root on Windows:

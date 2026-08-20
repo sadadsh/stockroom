@@ -83,12 +83,14 @@ a = Analysis(
     # Stockroom's Windows host is WebView2/WinForms.  Exclude unrelated GUI
     # backends so optional packages on the build runner cannot alter the payload.
     excludes=[
+        "_tkinter",
         "PyQt5",
         "PyQt6",
         "PySide2",
         "PySide6",
         "gtk",
         "qtpy",
+        "tkinter",
     ],
     noarchive=False,
 )

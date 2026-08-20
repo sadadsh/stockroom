@@ -325,6 +325,7 @@ function Set-ReproducibleTimestamp {
 
 $UvPath = (Get-Command uv -ErrorAction Stop).Source
 $MakeAppx = Find-WindowsSdkTool -Name "makeappx.exe"
+$PeCertificateCheck = Join-Path $PackagingRoot "pe_certificate_check.py"
 $SignTool = Find-WindowsSdkTool -Name "signtool.exe"
 $SigningCertificateProvided = $IsDirectProduction
 $Certificate = $null
@@ -759,6 +760,9 @@ function Initialize-PackageStage {
         $bundleArguments += @("--tuf-root-path", $TufRootPath)
     }
     Invoke-Checked -FilePath $UvPath -Arguments $bundleArguments
+    Invoke-Checked -FilePath $UvPath -Arguments @(
+        "run", "--frozen", "python", $PeCertificateCheck, "--root", $stage
+    )
     Set-ReproducibleTimestamp -Root $stage
     return $stage
 }
