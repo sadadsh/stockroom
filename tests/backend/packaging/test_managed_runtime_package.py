@@ -92,6 +92,23 @@ def _build_fixture(executable: Path, bundle: Path) -> dict[str, str]:
     )
 
 
+def _build_store(executable: Path, bundle: Path) -> dict[str, str]:
+    return build_release_bundle(
+        mode="Store",
+        executable=executable,
+        window_host_root=_window_host_publish(executable.parent / "Store Window Host Publish"),
+        cad_converter_root=_cad_converter_publish(executable.parent / "Store CAD Converter Publish"),
+        github_cli_root=_github_cli_publish(executable.parent / "Store GitHub CLI Publish"),
+        bundle_root=bundle,
+        version="1.0.42.0",
+        minimum_host_version="1.0.0.0",
+        feed_base_uri="",
+        source_revision="1123456789012345678901234567890123456789",
+        source_date_epoch=1704067200,
+        tuf_root_path=None,
+    )
+
+
 def test_fixture_release_bundle_is_complete_valid_and_reproducible(
     tmp_path: Path,
 ) -> None:
@@ -179,6 +196,26 @@ def test_fixture_release_bundle_is_complete_valid_and_reproducible(
         "Support/Licenses/Font Awesome Free License.txt",
         "Support/Licenses/GitHub CLI MIT.txt",
     }
+
+
+def test_store_release_bundle_contains_only_the_immutable_initial_release(
+    tmp_path: Path,
+) -> None:
+    executable = tmp_path / "Store Worker.exe"
+    executable.write_bytes(b"MZstore-worker")
+    bundle = tmp_path / "Store" / "Update"
+
+    evidence = _build_store(executable, bundle)
+
+    assert evidence["release_id"] == "release-1.0.42.0"
+    assert evidence["root_sha256"] == ""
+    assert not (bundle / "Root.json").exists()
+    assert not (bundle / "Update Feed.json").exists()
+    verify_local_release_set(
+        bundle / "Initial Release" / evidence["release_id"],
+        expected_release_id=evidence["release_id"],
+        expected_manifest_sha256=evidence["manifest_sha256"],
+    )
 
 
 def test_production_bundle_requires_a_valid_offline_root(tmp_path: Path) -> None:

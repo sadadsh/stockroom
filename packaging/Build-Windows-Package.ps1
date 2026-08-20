@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [ValidateSet("Fixture", "Production")]
+    [ValidateSet("Fixture", "Production", "Store")]
     [string]$Mode = "Fixture",
 
     [string]$Version = "1.0.0.0",
@@ -25,6 +25,9 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
+$IsFixture = $Mode -ceq "Fixture"
+$IsDirectProduction = $Mode -ceq "Production"
+$IsStore = $Mode -ceq "Store"
 
 $RepositoryRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
 $PackagingRoot = [IO.Path]::GetFullPath($PSScriptRoot)
@@ -73,7 +76,7 @@ if ($OutputRoot -eq [IO.Path]::GetPathRoot($OutputRoot)) {
     throw "OutputRoot cannot be a drive root."
 }
 
-if ($Mode -eq "Fixture") {
+if ($IsFixture) {
     if (
         -not [string]::IsNullOrWhiteSpace($TufRootPath) -or
         $TufTargetsKeyPaths.Count -gt 0 -or
@@ -88,6 +91,36 @@ if ($Mode -eq "Fixture") {
     if ([string]::IsNullOrWhiteSpace($FeedBaseUri)) {
         $FeedBaseUri = "https://updates.example.invalid/stockroom/development/x64"
     }
+}
+elseif ($IsStore) {
+    $StoreIdentityPath = Join-Path $PackagingRoot "StoreIdentity.json"
+    $StoreIdentity = Get-Content -Raw -LiteralPath $StoreIdentityPath | ConvertFrom-Json
+    if (
+        $StoreIdentity.schema -cne "stockroom-microsoft-store-identity/1" -or
+        $StoreIdentity.package_name -cne "Sadad.Stockroom" -or
+        $StoreIdentity.publisher -cne "CN=6586C41B-410B-4C94-8631-F025DB362E47" -or
+        $StoreIdentity.store_id -cne "9NQ6HP17PH4H"
+    ) {
+        throw "The checked-in Microsoft Store identity is invalid."
+    }
+    if (
+        -not [string]::IsNullOrWhiteSpace($FeedBaseUri) -or
+        -not [string]::IsNullOrWhiteSpace($SigningCertificatePath) -or
+        -not [string]::IsNullOrWhiteSpace($TufRootPath) -or
+        $TufTargetsKeyPaths.Count -gt 0 -or
+        $TufSnapshotKeyPaths.Count -gt 0 -or
+        $TufTimestampKeyPaths.Count -gt 0
+    ) {
+        throw "Store mode refuses direct-feed, signing-certificate, and TUF key inputs."
+    }
+    if (
+        -not [string]::IsNullOrWhiteSpace($Publisher) -and
+        $Publisher -cne [string]$StoreIdentity.publisher
+    ) {
+        throw "Store mode requires the exact Partner Center publisher."
+    }
+    $Publisher = [string]$StoreIdentity.publisher
+    $FeedBaseUri = ""
 }
 else {
     if ([string]::IsNullOrWhiteSpace($Publisher)) {
@@ -134,6 +167,9 @@ if ($ProtocolVersion -le 0) {
 }
 if ($Version -notmatch '^(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)$') {
     throw "Version must be a canonical four-part numeric version."
+}
+if ($IsStore -and [int]($Version.Split('.')[3]) -ne 0) {
+    throw "Store package version fourth component must be zero."
 }
 if ($MinimumHostVersion -notmatch '^(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)$') {
     throw "MinimumHostVersion must be a canonical four-part numeric version."
@@ -290,15 +326,15 @@ function Set-ReproducibleTimestamp {
 $UvPath = (Get-Command uv -ErrorAction Stop).Source
 $MakeAppx = Find-WindowsSdkTool -Name "makeappx.exe"
 $SignTool = Find-WindowsSdkTool -Name "signtool.exe"
-$SigningCertificateProvided = $Mode -eq "Production"
+$SigningCertificateProvided = $IsDirectProduction
 $Certificate = $null
 $CertificatePassword = ""
 
-if ($Mode -eq "Fixture" -and -not [string]::IsNullOrWhiteSpace($SigningCertificatePath)) {
+if ($IsFixture -and -not [string]::IsNullOrWhiteSpace($SigningCertificatePath)) {
     throw "Fixture mode refuses a signing certificate."
 }
 
-if ($Mode -eq "Production") {
+if ($IsDirectProduction) {
     $SigningCertificatePath = [IO.Path]::GetFullPath($SigningCertificatePath)
     if (-not (Test-Path -LiteralPath $SigningCertificatePath -PathType Leaf)) {
         throw "Signing certificate does not exist: $SigningCertificatePath"
@@ -403,7 +439,9 @@ function Get-PinnedGitHubCli {
 }
 
 $GitHubCliRoot = Get-PinnedGitHubCli
-$ContractRoot = Initialize-OutputDirectory -Path (Join-Path $ArtifactsRoot "Package Contract")
+$ContractRoot = Initialize-OutputDirectory -Path (
+    Join-Path $(if ($IsStore) { $WorkRoot } else { $ArtifactsRoot }) "Package Contract"
+)
 $SeedRoot = Initialize-OutputDirectory -Path (Join-Path $WorkRoot "Contract Seed")
 $SeedPackage = Join-Path $SeedRoot "Package"
 $SeedAppInstaller = Join-Path $SeedRoot "Stockroom.appinstaller"
@@ -599,7 +637,7 @@ if (-not $SkipReproducibilityProof) {
     }
 }
 
-if ($Mode -eq "Production") {
+if ($IsDirectProduction) {
     Invoke-Checked -FilePath $SignTool -Arguments @(
         "sign",
         "/fd", "SHA256",
@@ -640,9 +678,13 @@ if ($Mode -eq "Production") {
     )
 }
 
-if ($Mode -eq "Fixture") {
+if ($IsFixture) {
     $PackageFileName = "Stockroom.Development_${Version}_x64_unsigned.msix"
     $AppInstallerFileName = "Stockroom.Development.appinstaller"
+}
+elseif ($IsStore) {
+    $PackageFileName = "Stockroom_${Version}_x64_store.msix"
+    $AppInstallerFileName = "Stockroom.Store.NotCreated.appinstaller"
 }
 else {
     $PackageFileName = "Stockroom_${Version}_x64.msix"
@@ -701,7 +743,7 @@ function Initialize-PackageStage {
         }
         $bundleArguments += @("--compatible-from-release-id", $predecessor)
     }
-    if ($Mode -eq "Production") {
+    if ($IsDirectProduction) {
         $bundleArguments += @("--tuf-root-path", $TufRootPath)
     }
     Invoke-Checked -FilePath $UvPath -Arguments $bundleArguments
@@ -718,7 +760,7 @@ $FirstStage = Initialize-PackageStage `
     -GitHubCliRoot $GitHubCliRoot `
     -AppInstallerPath $FinalAppInstaller
 
-$PayloadInventory = Join-Path $ArtifactsRoot "Payload Manifest.json"
+$PayloadInventory = Join-Path $(if ($IsStore) { $WorkRoot } else { $ArtifactsRoot }) "Payload Manifest.json"
 Invoke-Checked -FilePath $UvPath -Arguments @(
     "run", "--frozen", "python", "-m", $ContractModule, "inventory",
     "--root", $FirstStage,
@@ -740,7 +782,7 @@ Invoke-Checked -FilePath $UvPath -Arguments @(
     "--source-date-epoch", [string]$SourceDateEpoch
 )
 
-if ($Mode -eq "Production") {
+if ($IsDirectProduction) {
     Invoke-Checked -FilePath $SignTool -Arguments @(
         "sign",
         "/fd", "SHA256",
@@ -772,17 +814,17 @@ else {
         $ErrorActionPreference = $priorPreference
     }
     if ($executableVerifyExitCode -eq 0) {
-        throw "Fixture executable unexpectedly has an Authenticode signature."
+        throw "Unsigned package executable unexpectedly has an Authenticode signature."
     }
     if ($packageVerifyExitCode -eq 0) {
-        throw "Fixture MSIX unexpectedly has an Authenticode signature."
+        throw "Unsigned package MSIX unexpectedly has an Authenticode signature."
     }
     $ExecutableSignatureStatus = "NotSigned"
     $PackageSignatureStatus = "NotSigned"
 }
 
 $ReproduciblePackageHash = $null
-if (-not $SkipReproducibilityProof -and $Mode -eq "Fixture") {
+if (-not $SkipReproducibilityProof -and ($IsFixture -or $IsStore)) {
     $SecondAppInstaller = Join-Path $WorkRoot "Stockroom.Development.Second.appinstaller"
     $SecondStage = Initialize-PackageStage `
         -Name "Package 2" `
@@ -809,7 +851,7 @@ if (-not $SkipReproducibilityProof -and $Mode -eq "Fixture") {
     if ((Get-Sha256 -Path $FinalPackage) -cne $ReproduciblePackageHash) {
         throw "MSIX reproducibility failed: the two unsigned package digests differ."
     }
-    if ((Get-Sha256 -Path $FinalAppInstaller) -cne (Get-Sha256 -Path $SecondAppInstaller)) {
+    if (-not $IsStore -and (Get-Sha256 -Path $FinalAppInstaller) -cne (Get-Sha256 -Path $SecondAppInstaller)) {
         throw "App Installer reproducibility failed."
     }
 }
@@ -944,86 +986,98 @@ if (
     throw "The exact packaged --port worker failed its managed handoff proof."
 }
 
-$ReleaseFeedRoot = Initialize-OutputDirectory -Path (
-    Join-Path $WorkRoot "Release Feed Repository"
-)
-$ReleaseFeedArchiveName = "Stockroom_TUF_Feed_${Version}.zip"
-$ReleaseFeedArchivePath = Join-Path $ArtifactsRoot $ReleaseFeedArchiveName
-$ReleaseFeedEvidencePath = Join-Path $ArtifactsRoot "Release Feed Evidence.json"
-$releaseFeedArguments = @(
-    "run", "--frozen", "python", "-m", $ReleaseFeedModule,
-    "--mode", $Mode,
-    "--feed-base-uri", $FeedBaseUri,
-    "--root", (Join-Path $UnpackedRoot "Update\Root.json"),
-    "--release-directory", $PackagedReleaseDirectory,
-    "--release-id", $BundleEvidence.release_id,
-    "--manifest-sha256", $BundleEvidence.manifest_sha256,
-    "--metadata-version", [string]$TufMetadataVersion,
-    "--repository-root", $ReleaseFeedRoot,
-    "--archive", $ReleaseFeedArchivePath,
-    "--evidence", $ReleaseFeedEvidencePath
-)
-if ($Mode -eq "Production") {
-    foreach ($keyPath in $TufTargetsKeyPaths) {
-        $releaseFeedArguments += @("--targets-key", $keyPath)
-    }
-    foreach ($keyPath in $TufSnapshotKeyPaths) {
-        $releaseFeedArguments += @("--snapshot-key", $keyPath)
-    }
-    foreach ($keyPath in $TufTimestampKeyPaths) {
-        $releaseFeedArguments += @("--timestamp-key", $keyPath)
-    }
-}
-Invoke-Checked -FilePath $UvPath -Arguments $releaseFeedArguments
-$ReleaseFeedEvidence = Get-Content -Raw -LiteralPath $ReleaseFeedEvidencePath |
-    ConvertFrom-Json
-if (
-    $ReleaseFeedEvidence.schema -cne "stockroom-release-feed/1" -or
-    $ReleaseFeedEvidence.mode -cne $Mode.ToLowerInvariant() -or
-    $ReleaseFeedEvidence.release_id -cne $BundleEvidence.release_id -or
-    $ReleaseFeedEvidence.manifest_sha256 -cne $BundleEvidence.manifest_sha256 -or
-    [int]$ReleaseFeedEvidence.metadata_version -ne $TufMetadataVersion -or
-    $ReleaseFeedEvidence.root.sha256 -cne $BundleEvidence.root_sha256 -or
-    $ReleaseFeedEvidence.archive.path -cne $ReleaseFeedArchiveName -or
-    $ReleaseFeedEvidence.deployment.feed_base_uri -cne $FeedBaseUri.TrimEnd("/") -or
-    $ReleaseFeedEvidence.archive.sha256 -cne (
-        Get-Sha256 -Path $ReleaseFeedArchivePath
-    ) -or
-    -not $ReleaseFeedEvidence.validation.consistent_snapshot_layout -or
-    -not $ReleaseFeedEvidence.validation.online_role_thresholds -or
-    -not $ReleaseFeedEvidence.validation.trusted_updater_round_trip
-) {
-    throw "The exact packaged release did not produce a valid signed TUF feed."
-}
-if (
-    $Mode -eq "Production" -and (
-        $ReleaseFeedEvidence.deployment.state -cne "staged-not-deployed" -or
-        -not $ReleaseFeedEvidence.deployment.external_action_required
+$ReleaseFeedArchiveName = $null
+$ReleaseFeedArchivePath = $null
+$ReleaseFeedEvidencePath = $null
+$ReleaseFeedEvidence = $null
+if (-not $IsStore) {
+    $ReleaseFeedRoot = Initialize-OutputDirectory -Path (
+        Join-Path $WorkRoot "Release Feed Repository"
     )
-) {
-    throw "Production TUF feed evidence omitted its external deployment boundary."
+    $ReleaseFeedArchiveName = "Stockroom_TUF_Feed_${Version}.zip"
+    $ReleaseFeedArchivePath = Join-Path $ArtifactsRoot $ReleaseFeedArchiveName
+    $ReleaseFeedEvidencePath = Join-Path $ArtifactsRoot "Release Feed Evidence.json"
+    $releaseFeedArguments = @(
+        "run", "--frozen", "python", "-m", $ReleaseFeedModule,
+        "--mode", $Mode,
+        "--feed-base-uri", $FeedBaseUri,
+        "--root", (Join-Path $UnpackedRoot "Update\Root.json"),
+        "--release-directory", $PackagedReleaseDirectory,
+        "--release-id", $BundleEvidence.release_id,
+        "--manifest-sha256", $BundleEvidence.manifest_sha256,
+        "--metadata-version", [string]$TufMetadataVersion,
+        "--repository-root", $ReleaseFeedRoot,
+        "--archive", $ReleaseFeedArchivePath,
+        "--evidence", $ReleaseFeedEvidencePath
+    )
+    if ($IsDirectProduction) {
+        foreach ($keyPath in $TufTargetsKeyPaths) {
+            $releaseFeedArguments += @("--targets-key", $keyPath)
+        }
+        foreach ($keyPath in $TufSnapshotKeyPaths) {
+            $releaseFeedArguments += @("--snapshot-key", $keyPath)
+        }
+        foreach ($keyPath in $TufTimestampKeyPaths) {
+            $releaseFeedArguments += @("--timestamp-key", $keyPath)
+        }
+    }
+    Invoke-Checked -FilePath $UvPath -Arguments $releaseFeedArguments
+    $ReleaseFeedEvidence = Get-Content -Raw -LiteralPath $ReleaseFeedEvidencePath |
+        ConvertFrom-Json
+    if (
+        $ReleaseFeedEvidence.schema -cne "stockroom-release-feed/1" -or
+        $ReleaseFeedEvidence.mode -cne $Mode.ToLowerInvariant() -or
+        $ReleaseFeedEvidence.release_id -cne $BundleEvidence.release_id -or
+        $ReleaseFeedEvidence.manifest_sha256 -cne $BundleEvidence.manifest_sha256 -or
+        [int]$ReleaseFeedEvidence.metadata_version -ne $TufMetadataVersion -or
+        $ReleaseFeedEvidence.root.sha256 -cne $BundleEvidence.root_sha256 -or
+        $ReleaseFeedEvidence.archive.path -cne $ReleaseFeedArchiveName -or
+        $ReleaseFeedEvidence.deployment.feed_base_uri -cne $FeedBaseUri.TrimEnd("/") -or
+        $ReleaseFeedEvidence.archive.sha256 -cne (
+            Get-Sha256 -Path $ReleaseFeedArchivePath
+        ) -or
+        -not $ReleaseFeedEvidence.validation.consistent_snapshot_layout -or
+        -not $ReleaseFeedEvidence.validation.online_role_thresholds -or
+        -not $ReleaseFeedEvidence.validation.trusted_updater_round_trip
+    ) {
+        throw "The exact packaged release did not produce a valid signed TUF feed."
+    }
+    if (
+        $IsDirectProduction -and (
+            $ReleaseFeedEvidence.deployment.state -cne "staged-not-deployed" -or
+            -not $ReleaseFeedEvidence.deployment.external_action_required
+        )
+    ) {
+        throw "Production TUF feed evidence omitted its external deployment boundary."
+    }
 }
 
 Copy-Item -LiteralPath (Join-Path $FirstStage "AppxManifest.xml") `
     -Destination (Join-Path $ContractRoot "AppxManifest.xml")
-Copy-Item -LiteralPath $FinalAppInstaller `
-    -Destination (Join-Path $ContractRoot $AppInstallerFileName)
+$FinalExecutableArtifact = Join-Path $(if ($IsStore) { $WorkRoot } else { $ArtifactsRoot }) "Stockroom.WindowHost.exe"
+if (-not $IsStore) {
+    Copy-Item -LiteralPath $FinalAppInstaller `
+        -Destination (Join-Path $ContractRoot $AppInstallerFileName)
+}
 Copy-Item -LiteralPath (Join-Path $FirstStage "WindowHost\Stockroom.WindowHost.exe") `
-    -Destination (Join-Path $ArtifactsRoot "Stockroom.WindowHost.exe")
+    -Destination $FinalExecutableArtifact
 
 $GitDirty = [bool](& git -C $RepositoryRoot status --porcelain)
 $PackageHash = Get-Sha256 -Path $FinalPackage
-$AppInstallerHash = Get-Sha256 -Path $FinalAppInstaller
-$FinalExecutableHash = Get-Sha256 -Path (Join-Path $ArtifactsRoot "Stockroom.WindowHost.exe")
+$AppInstallerHash = if ($IsStore) { $null } else { Get-Sha256 -Path $FinalAppInstaller }
+$FinalExecutableHash = Get-Sha256 -Path $FinalExecutableArtifact
 $ManifestHash = Get-Sha256 -Path (Join-Path $ContractRoot "AppxManifest.xml")
 
-$SigningState = if ($Mode -eq "Production") {
+$SigningState = if ($IsDirectProduction) {
     "authenticode-signed"
+}
+elseif ($IsStore) {
+    "store-unsigned"
 }
 else {
     "unsigned-development-fixture"
 }
-$SigningBlocker = if ($Mode -eq "Production") {
+$SigningBlocker = if ($IsDirectProduction -or $IsStore) {
     $null
 }
 else {
@@ -1059,22 +1113,22 @@ $Evidence = [ordered]@{
         python_hash_seed = 1
     }
     contract = [ordered]@{
-        package_name = if ($Mode -eq "Fixture") { "Stockroom.Desktop.Development" } else { "Stockroom.Desktop" }
+        package_name = if ($IsFixture) { "Stockroom.Desktop.Development" } elseif ($IsStore) { "Sadad.Stockroom" } else { "Stockroom.Desktop" }
         publisher = $Publisher
         version = $Version
         minimum_host_version = $MinimumHostVersion
         protocol_version = $ProtocolVersion
-        tuf_metadata_version = $TufMetadataVersion
+        tuf_metadata_version = if ($IsStore) { $null } else { $TufMetadataVersion }
         architecture = "x64"
         feed_base_uri = $FeedBaseUri.TrimEnd("/")
         rollback_release_id = $RollbackReleaseId
         compatible_from_release_ids = @($CompatibleFromReleaseIds)
-        appinstaller_schema = "http://schemas.microsoft.com/appx/appinstaller/2021"
-        on_launch_hours_between_checks = 0
-        show_prompt = $false
-        update_blocks_activation = $false
-        automatic_background_task = $true
-        force_update_from_any_version = $false
+        appinstaller_schema = if ($IsStore) { $null } else { "http://schemas.microsoft.com/appx/appinstaller/2021" }
+        on_launch_hours_between_checks = if ($IsStore) { $null } else { 0 }
+        show_prompt = if ($IsStore) { $null } else { $false }
+        update_blocks_activation = if ($IsStore) { $null } else { $false }
+        automatic_background_task = if ($IsStore) { $null } else { $true }
+        force_update_from_any_version = if ($IsStore) { $null } else { $false }
     }
     tools = [ordered]@{
         uv = [ordered]@{
@@ -1124,7 +1178,7 @@ $Evidence = [ordered]@{
         workflow_coordinator_running = $true
         packaged_frontend_served = [bool]$WorkerProbeReceipt.frontend_served
         packaged_worker_handoff = $true
-        signed_tuf_release_feed = $true
+        signed_tuf_release_feed = -not $IsStore
     }
     managed_runtime = [ordered]@{
         release_id = $BundleEvidence.release_id
@@ -1140,45 +1194,46 @@ $Evidence = [ordered]@{
         launch_receipt_schema = $ProbeReceipt.schema
         native_host = [bool]$ProbeReceipt.native_host
         packaged_worker = [bool]$ProbeReceipt.packaged_worker
-        update_channel = "production"
-        update_check_interval_seconds = 60.0
+        update_channel = if ($IsStore) { "microsoft-store" } else { "production" }
+        update_check_interval_seconds = if ($IsStore) { 0.0 } else { 60.0 }
         worker_handoff_receipt_schema = $WorkerProbeReceipt.schema
         worker_candidate_generation = [int]$WorkerProbeReceipt.candidate_generation
         worker_restored_generation = [int]$WorkerProbeReceipt.restored_generation
         worker_exact_executable_sha256 = $WorkerProbeReceipt.exact_worker_sha256
         worker_exact_cad_converter_sha256 = $WorkerProbeReceipt.exact_cad_converter_sha256
     }
-    release_feed = [ordered]@{
-        schema = $ReleaseFeedEvidence.schema
-        metadata_version = [int]$ReleaseFeedEvidence.metadata_version
-        release_id = $ReleaseFeedEvidence.release_id
-        manifest_sha256 = $ReleaseFeedEvidence.manifest_sha256
-        root_sha256 = $ReleaseFeedEvidence.root.sha256
-        archive_sha256 = $ReleaseFeedEvidence.archive.sha256
-        feed_base_uri = $ReleaseFeedEvidence.deployment.feed_base_uri
-        trusted_updater_round_trip = [bool](
-            $ReleaseFeedEvidence.validation.trusted_updater_round_trip
-        )
-        deployment_state = $ReleaseFeedEvidence.deployment.state
-        external_action_required = [bool](
-            $ReleaseFeedEvidence.deployment.external_action_required
-        )
-        production_deployment_blocker = if ($Mode -eq "Production") {
-            "Deploy the signed archive's metadata/ and targets/ trees to the configured HTTPS feed origin; package CI deliberately cannot attest that external hosting step."
-        } else { $null }
-    }
+    release_feed = if ($IsStore) { $null } else { [ordered]@{
+            schema = $ReleaseFeedEvidence.schema
+            metadata_version = [int]$ReleaseFeedEvidence.metadata_version
+            release_id = $ReleaseFeedEvidence.release_id
+            manifest_sha256 = $ReleaseFeedEvidence.manifest_sha256
+            root_sha256 = $ReleaseFeedEvidence.root.sha256
+            archive_sha256 = $ReleaseFeedEvidence.archive.sha256
+            feed_base_uri = $ReleaseFeedEvidence.deployment.feed_base_uri
+            trusted_updater_round_trip = [bool](
+                $ReleaseFeedEvidence.validation.trusted_updater_round_trip
+            )
+            deployment_state = $ReleaseFeedEvidence.deployment.state
+            external_action_required = [bool](
+                $ReleaseFeedEvidence.deployment.external_action_required
+            )
+            production_deployment_blocker = if ($IsDirectProduction) {
+                "Deploy the signed archive's metadata/ and targets/ trees to the configured HTTPS feed origin; package CI deliberately cannot attest that external hosting step."
+            } else { $null }
+        } }
     reproducibility = [ordered]@{
         checked = -not $SkipReproducibilityProof
         pyinstaller_payloads_match = if ($SkipReproducibilityProof) { $null } else { $true }
         first_unsigned_executable_sha256 = $FirstExecutableHash
         second_unsigned_executable_sha256 = $SecondExecutableHash
-        unsigned_fixture_packages_match = if ($Mode -eq "Fixture" -and -not $SkipReproducibilityProof) { $true } else { $null }
-        second_unsigned_fixture_package_sha256 = $ReproduciblePackageHash
+        unsigned_fixture_packages_match = if ($IsFixture -and -not $SkipReproducibilityProof) { $true } else { $null }
+        unsigned_store_packages_match = if ($IsStore -and -not $SkipReproducibilityProof) { $true } else { $null }
+        second_unsigned_package_sha256 = $ReproduciblePackageHash
     }
     outputs = [ordered]@{
         executable = [ordered]@{
             path = "Stockroom.WindowHost.exe"
-            size = (Get-Item -LiteralPath (Join-Path $ArtifactsRoot "Stockroom.WindowHost.exe")).Length
+            size = (Get-Item -LiteralPath $FinalExecutableArtifact).Length
             sha256 = $FinalExecutableHash
         }
         msix = [ordered]@{
@@ -1186,11 +1241,11 @@ $Evidence = [ordered]@{
             size = (Get-Item -LiteralPath $FinalPackage).Length
             sha256 = $PackageHash
         }
-        appinstaller = [ordered]@{
-            path = $AppInstallerFileName
-            size = (Get-Item -LiteralPath $FinalAppInstaller).Length
-            sha256 = $AppInstallerHash
-        }
+        appinstaller = if ($IsStore) { $null } else { [ordered]@{
+                path = $AppInstallerFileName
+                size = (Get-Item -LiteralPath $FinalAppInstaller).Length
+                sha256 = $AppInstallerHash
+            } }
         appx_manifest = [ordered]@{
             path = "Package Contract/AppxManifest.xml"
             sha256 = $ManifestHash
@@ -1199,16 +1254,16 @@ $Evidence = [ordered]@{
             path = "Payload Manifest.json"
             sha256 = Get-Sha256 -Path $PayloadInventory
         }
-        release_feed = [ordered]@{
-            path = $ReleaseFeedArchiveName
-            size = (Get-Item -LiteralPath $ReleaseFeedArchivePath).Length
-            sha256 = Get-Sha256 -Path $ReleaseFeedArchivePath
-        }
-        release_feed_evidence = [ordered]@{
-            path = "Release Feed Evidence.json"
-            size = (Get-Item -LiteralPath $ReleaseFeedEvidencePath).Length
-            sha256 = Get-Sha256 -Path $ReleaseFeedEvidencePath
-        }
+        release_feed = if ($IsStore) { $null } else { [ordered]@{
+                path = $ReleaseFeedArchiveName
+                size = (Get-Item -LiteralPath $ReleaseFeedArchivePath).Length
+                sha256 = Get-Sha256 -Path $ReleaseFeedArchivePath
+            } }
+        release_feed_evidence = if ($IsStore) { $null } else { [ordered]@{
+                path = "Release Feed Evidence.json"
+                size = (Get-Item -LiteralPath $ReleaseFeedEvidencePath).Length
+                sha256 = Get-Sha256 -Path $ReleaseFeedEvidencePath
+            } }
     }
 }
 
@@ -1220,17 +1275,26 @@ $utf8 = [Text.UTF8Encoding]::new($false)
     $utf8
 )
 
-$Sums = @(
-    "$FinalExecutableHash  Stockroom.WindowHost.exe"
-    "$PackageHash  $PackageFileName"
-    "$AppInstallerHash  $AppInstallerFileName"
-    "$ManifestHash  Package Contract/AppxManifest.xml"
-    "$(Get-Sha256 -Path $PayloadInventory)  Payload Manifest.json"
-    "$(Get-Sha256 -Path $ReleaseFeedArchivePath)  $ReleaseFeedArchiveName"
-    "$(Get-Sha256 -Path $ReleaseFeedEvidencePath)  Release Feed Evidence.json"
-) -join "`n"
+$ChecksumsFileName = if ($IsStore) { "Checksums.sha256" } else { "SHA256SUMS.txt" }
+$Sums = if ($IsStore) {
+    @(
+        "$PackageHash  $PackageFileName"
+        "$(Get-Sha256 -Path $EvidencePath)  Build Evidence.json"
+    ) -join "`n"
+}
+else {
+    @(
+        "$FinalExecutableHash  Stockroom.WindowHost.exe"
+        "$PackageHash  $PackageFileName"
+        "$AppInstallerHash  $AppInstallerFileName"
+        "$ManifestHash  Package Contract/AppxManifest.xml"
+        "$(Get-Sha256 -Path $PayloadInventory)  Payload Manifest.json"
+        "$(Get-Sha256 -Path $ReleaseFeedArchivePath)  $ReleaseFeedArchiveName"
+        "$(Get-Sha256 -Path $ReleaseFeedEvidencePath)  Release Feed Evidence.json"
+    ) -join "`n"
+}
 [IO.File]::WriteAllText(
-    (Join-Path $ArtifactsRoot "SHA256SUMS.txt"),
+    (Join-Path $ArtifactsRoot $ChecksumsFileName),
     $Sums + "`n",
     [Text.Encoding]::ASCII
 )
@@ -1240,5 +1304,7 @@ Write-Output "Windows package proof complete."
 Write-Output "Mode: $Mode"
 Write-Output "Executable SHA-256: $FinalExecutableHash"
 Write-Output "MSIX SHA-256:       $PackageHash"
-Write-Output "AppInstaller SHA-256: $AppInstallerHash"
+if (-not $IsStore) {
+    Write-Output "AppInstaller SHA-256: $AppInstallerHash"
+}
 Write-Output "Evidence: $EvidencePath"

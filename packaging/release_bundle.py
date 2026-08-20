@@ -700,8 +700,8 @@ def build_release_bundle(
     protocol_version: int = 1,
 ) -> dict[str, str]:
     normalized_mode = mode.casefold()
-    if normalized_mode not in {"fixture", "production"}:
-        raise ReleaseBundleError("mode must be Fixture or Production")
+    if normalized_mode not in {"fixture", "production", "store"}:
+        raise ReleaseBundleError("mode must be Fixture, Production, or Store")
     executable = Path(executable).resolve(strict=True)
     if executable.is_dir():
         worker_root = executable
@@ -789,7 +789,7 @@ def build_release_bundle(
         minimum_host_version,
         package_version=version,
     )
-    feed = _validated_base_uri(feed_base_uri)
+    feed = "" if normalized_mode == "store" else _validated_base_uri(feed_base_uri)
     release_id = f"release-{version}"
     bundle_root = Path(bundle_root).resolve()
     bundle_root.mkdir(parents=True, exist_ok=True)
@@ -802,10 +802,14 @@ def build_release_bundle(
                 "production requires an offline-authored pinned TUF root"
             )
         root_bytes = _validate_root(Path(tuf_root_path).resolve(strict=True).read_bytes())
-    else:
+    elif normalized_mode == "fixture":
         if tuf_root_path is not None:
             raise ReleaseBundleError("fixture mode refuses a production TUF root")
         root_bytes = _fixture_root()
+    else:
+        if tuf_root_path is not None:
+            raise ReleaseBundleError("Store mode refuses a direct-update TUF root")
+        root_bytes = b""
     if rollback_release_id is None:
         if normalized_mode == "production":
             raise ReleaseBundleError(
@@ -1095,18 +1099,19 @@ def build_release_bundle(
     manifest_path.write_bytes(manifest_bytes)
     manifest_sha256 = _sha256(manifest_bytes)
 
-    (bundle_root / "Root.json").write_bytes(root_bytes)
-    (bundle_root / "Update Feed.json").write_bytes(
-        _canonical_bytes(
-            {
-                "current_manifest_sha256": manifest_sha256,
-                "current_release_id": release_id,
-                "metadata_base_url": f"{feed}/metadata/",
-                "schema_version": 1,
-                "target_base_url": f"{feed}/targets/",
-            }
+    if normalized_mode != "store":
+        (bundle_root / "Root.json").write_bytes(root_bytes)
+        (bundle_root / "Update Feed.json").write_bytes(
+            _canonical_bytes(
+                {
+                    "current_manifest_sha256": manifest_sha256,
+                    "current_release_id": release_id,
+                    "metadata_base_url": f"{feed}/metadata/",
+                    "schema_version": 1,
+                    "target_base_url": f"{feed}/targets/",
+                }
+            )
         )
-    )
     verify_local_release_set(
         release_root,
         expected_release_id=release_id,
@@ -1125,14 +1130,14 @@ def build_release_bundle(
         "minimum_host_version": host_version_floor,
         "release_id": release_id,
         "rollback_release_id": rollback_release_id,
-        "root_sha256": _sha256(root_bytes),
+        "root_sha256": _sha256(root_bytes) if root_bytes else "",
         "window_host_sha256": window_host_sha256,
     }
 
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--mode", required=True, choices=("Fixture", "Production"))
+    parser.add_argument("--mode", required=True, choices=("Fixture", "Production", "Store"))
     parser.add_argument("--executable", required=True, type=Path)
     parser.add_argument("--window-host-root", required=True, type=Path)
     parser.add_argument("--cad-converter-root", required=True, type=Path)
