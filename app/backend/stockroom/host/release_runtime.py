@@ -1932,6 +1932,15 @@ def host_update_mode() -> HostUpdateMode:
     if requested == "microsoft_store":
         return HostUpdateMode.MICROSOFT_STORE
     if bool(getattr(sys, "frozen", False)):
+        configured_store_root = os.environ.get("STOCKROOM_STORE_PACKAGE_ROOT", "").strip()
+        executable_root = Path(sys.executable).resolve().parent
+        has_store_marker = bool(configured_store_root) or any(
+            (parent / "Support" / "Distribution.json").is_file()
+            for parent in (executable_root, *executable_root.parents)
+        )
+        if has_store_marker:
+            _store_package_root()
+            return HostUpdateMode.MICROSOFT_STORE
         return HostUpdateMode.PRODUCTION
     if not requested or requested in {"development", "development_source"}:
         return HostUpdateMode.DEVELOPMENT_SOURCE

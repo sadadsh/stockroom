@@ -7,6 +7,21 @@ import os
 from pathlib import Path
 
 
+def _managed_update_runtime_factory():
+    from stockroom.host.release_runtime import (
+        HostUpdateMode,
+        create_production_update_runtime,
+        create_store_update_runtime,
+        host_update_mode,
+    )
+
+    return (
+        create_store_update_runtime
+        if host_update_mode() is HostUpdateMode.MICROSOFT_STORE
+        else create_production_update_runtime
+    )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--port", required=True, type=int)
@@ -135,10 +150,9 @@ def main() -> None:
     served_app = app
     if coordinator:
         from stockroom.host.proxy import SwitchableBackendProxy
-        from stockroom.host.release_runtime import create_production_update_runtime
 
         proxy = SwitchableBackendProxy(app)
-        production_update_runtime = create_production_update_runtime(
+        production_update_runtime = _managed_update_runtime_factory()(
             proxy,
             context=ctx,
             public_base_url=public_base_url,

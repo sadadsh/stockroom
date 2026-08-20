@@ -1373,6 +1373,48 @@ def test_store_host_update_mode_is_distinct_from_direct_production(monkeypatch) 
     assert host_update_mode() is HostUpdateMode.MICROSOFT_STORE
 
 
+def test_frozen_store_package_identity_selects_store_mode_without_launcher_environment(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    package_root = tmp_path / "Package"
+    worker = package_root / "Update" / "Initial Release" / "release-1.0.42.0" / "Backend" / "Stockroom Worker.exe"
+    worker.parent.mkdir(parents=True)
+    worker.write_bytes(b"worker")
+    support = package_root / "Support"
+    support.mkdir()
+    (support / "Distribution.json").write_text(
+        json.dumps(
+            {
+                "channel": "microsoft-store",
+                "package_name": "Sadad.Stockroom",
+                "publisher": "CN=6586C41B-410B-4C94-8631-F025DB362E47",
+                "schema": "stockroom-distribution/1",
+                "store_id": "9NQ6HP17PH4H",
+                "store_uri": "https://apps.microsoft.com/detail/9NQ6HP17PH4H",
+                "version": "1.0.42.0",
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(sys, "frozen", True, raising=False)
+    monkeypatch.setattr(sys, "executable", str(worker))
+    monkeypatch.delenv("STOCKROOM_UPDATE_MODE", raising=False)
+    monkeypatch.delenv("STOCKROOM_STORE_PACKAGE_ROOT", raising=False)
+
+    assert host_update_mode() is HostUpdateMode.MICROSOFT_STORE
+
+
+def test_managed_worker_uses_store_runtime_for_store_packages(monkeypatch) -> None:
+    from stockroom.host import worker
+    from stockroom.host.release_runtime import create_store_update_runtime
+
+    monkeypatch.delattr(sys, "frozen", raising=False)
+    monkeypatch.setenv("STOCKROOM_UPDATE_MODE", "microsoft_store")
+
+    assert worker._managed_update_runtime_factory() is create_store_update_runtime
+
+
 def test_store_runtime_never_constructs_or_activates_a_direct_update_feed(
     tmp_path: Path,
     monkeypatch,
