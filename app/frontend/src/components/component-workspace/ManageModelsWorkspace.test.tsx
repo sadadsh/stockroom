@@ -688,6 +688,30 @@ describe("ManageModelsWorkspace", () => {
     expect(onOpenProvider).toHaveBeenCalledTimes(1);
   });
 
+  it("closes browser chrome while the native provider route is still preparing", async () => {
+    const user = userEvent.setup();
+    const dossier = makeDossier();
+    dossier.cadSourceCoverage.rows = [providerRow("complete", true)];
+
+    render(
+      <ManageModelsWorkspace
+        componentId="part-1"
+        dossier={dossier}
+        onView={vi.fn()}
+        onOpenProvider={vi.fn().mockImplementation(() => new Promise(() => undefined))}
+      />,
+    );
+
+    await user.click(screen.getByRole("radio", { name: /SnapEDA/ }));
+    expect(screen.getByRole("dialog", { name: "SnapEDA Browser" })).toBeVisible();
+
+    await user.click(screen.getByRole("button", { name: "Close" }));
+
+    expect(screen.queryByRole("dialog", { name: "SnapEDA Browser" })).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Show Provider" }));
+    expect(screen.getByRole("dialog", { name: "SnapEDA Browser" })).toBeVisible();
+  });
+
   it("hides and restores the provider without ending its active visit", async () => {
     const user = userEvent.setup();
     const dossier = makeDossier();

@@ -149,7 +149,7 @@ export function ProviderBrowserFrame({
       role="region"
       aria-label={browserLabel({ provider: providerLabel })}
       data-testid="provider-browser-pane"
-      className="flex min-h-0 flex-1 flex-col"
+      className="flex h-full min-h-0 flex-1 flex-col"
     >
       <div className="flex h-[36px] flex-none items-center gap-1 border-b border-line bg-band px-2">
         <Button

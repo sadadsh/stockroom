@@ -57,6 +57,7 @@ describe("ProviderBrowserFrame", () => {
     );
     const rendered = render(view);
 
+    expect(screen.getByRole("region", { name: "DigiKey Browser Page" })).toHaveClass("h-full");
     expect(screen.getByRole("button", { name: "Back" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "Forward" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Reload" })).toBeVisible();

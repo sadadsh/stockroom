@@ -58,12 +58,11 @@ export function ProviderBrowserModal({
       onClose();
       return;
     }
-    const outcome = await sendProviderCommand(identity, "close");
-    if (!outcome.accepted) {
-      setOpenError(outcome.error);
-      return;
-    }
+    const closeCommand = sendProviderCommand(identity, "close");
+    // The React surface is always recoverable. Its viewport cleanup hides the native page even
+    // when a superseded host route refuses this stale identity-bound command.
     onClose();
+    await closeCommand.catch(() => undefined);
   }, [identity, onClose]);
   const retry = useCallback(() => {
     setOpenError("");

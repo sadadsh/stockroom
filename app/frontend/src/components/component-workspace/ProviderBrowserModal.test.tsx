@@ -74,4 +74,17 @@ describe("ProviderBrowserModal recovery", () => {
     expect(retry).toHaveBeenCalledTimes(1);
     expect(screen.queryByText("The first page did not open.")).toBeNull();
   });
+
+  it("closes the modal even when a stale native route refuses the close command", async () => {
+    const onClose = vi.fn();
+    bridge.command.mockResolvedValue({
+      accepted: false,
+      error: "The embedded provider browser refused Close.",
+    });
+    render(modal({ onClose }));
+
+    await userEvent.click(screen.getByRole("button", { name: "Close" }));
+
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+  });
 });

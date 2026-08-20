@@ -699,3 +699,16 @@ covered by the timestamp formatter tests. This keeps UTC CI and the local Window
 without forcing production timestamps into the wrong timezone. A deliberately broad Design Studio
 inspector integration may use an explicit per-test timeout when it exercises lazy icon-catalog loading;
 the timeout belongs to the test boundary and does not weaken any product response-time contract.
+
+### The Provider Browser Frame Owns The Modal Body
+
+The provider browser is a native surface placed inside Stockroom's React modal. Its React frame must
+fill the modal body before publishing native viewport geometry; a content-sized frame can collapse to
+toolbar height and cause the host to reject the route as too small, leaving a misleading blank or
+perpetually opening browser. The frame therefore owns the full available body height, and focused tests
+cover that sizing contract.
+
+Close is always a recoverable Stockroom action. It dismisses the React modal immediately, including
+while the native route is still preparing or when a stale identity-bound native close command is
+refused. The exact task remains active in the background, and Show Provider restores the same page
+without restarting the download workflow.

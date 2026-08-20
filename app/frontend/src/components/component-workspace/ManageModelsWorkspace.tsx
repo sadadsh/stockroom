@@ -108,6 +108,7 @@ export function ManageModelsWorkspace({
   const [recovering, setRecovering] = useState(false);
   const [openingProviderId, setOpeningProviderId] = useState<string | null>(null);
   const openingProviderRef = useRef<string | null>(null);
+  const [hiddenOpeningProviderId, setHiddenOpeningProviderId] = useState<string | null>(null);
   const [queuedProviderId, setQueuedProviderId] = useState<string | null>(null);
   const [applying, setApplying] = useState(false);
   const [hiddenRouteToken, setHiddenRouteToken] = useState<string | null>(null);
@@ -168,6 +169,7 @@ export function ManageModelsWorkspace({
     async (providerId: string) => {
       if (openingProviderRef.current) return;
       const provider = providers.find((candidate) => candidate.row.id === providerId);
+      setHiddenOpeningProviderId(null);
       if (!provider?.row.captureAvailable) {
         if (!provider?.row.url) {
           setActivityMessage("This provider has no verified page for this component.");
@@ -364,12 +366,15 @@ export function ManageModelsWorkspace({
       && (
         (activeManualBrowser && hiddenManualSessionId !== manualBrowser?.session_id)
         || scenarioBrowserVisible
-        || (activeNativeRoute && hiddenRouteToken !== capture?.active.routeToken)
+        || (activeNativeRoute
+          && hiddenRouteToken !== capture?.active.routeToken
+          && hiddenOpeningProviderId !== selectedProvider?.row.id)
       ),
   );
   const browserPreparing = Boolean(
     selectedProviderKey
       && !activeNativeRoute
+      && hiddenOpeningProviderId !== selectedProvider?.row.id
       && (
         (openingProviderId === selectedProvider?.row.id && selectedProvider?.row.captureAvailable)
         || (activeManualBrowser && manualBrowser?.state === "starting")
@@ -446,6 +451,9 @@ export function ManageModelsWorkspace({
     : null;
   function hideActiveProvider() {
     setScenarioBrowserDismissed(true);
+    if (browserPreparing && selectedProvider?.row.captureAvailable) {
+      setHiddenOpeningProviderId(selectedProvider.row.id);
+    }
     if (activeManualBrowser && manualBrowser) {
       setHiddenManualSessionId(manualBrowser.session_id);
     }
@@ -456,6 +464,7 @@ export function ManageModelsWorkspace({
   }
 
   async function showActiveProvider() {
+    setHiddenOpeningProviderId(null);
     if (activeManualBrowser && manualBrowser) {
       setHiddenManualSessionId(null);
       setActivityMessage("Provider ready");
@@ -641,6 +650,7 @@ export function ManageModelsWorkspace({
         disabled={anotherCaptureBusy || openingProviderId !== null}
         onSelect={(providerId) => {
           setSelectedProviderId(providerId);
+          setHiddenOpeningProviderId(null);
           setScenarioBrowserDismissed(false);
           const provider = providers.find((candidate) => candidate.row.id === providerId);
           if (captureBusy && capture) {
@@ -844,7 +854,8 @@ export function ManageModelsWorkspace({
         data-provider-state={scenarioProviderState}
         className="flex min-h-[40px] flex-none items-center justify-end gap-2 border-t border-line bg-band px-3"
       >
-        {(activeNativeRoute || activeManualBrowser) && !browserOpen ? (
+        {(activeNativeRoute || activeManualBrowser || hiddenOpeningProviderId === selectedProvider?.row.id)
+          && !browserOpen ? (
           <Button
             type="button"
             small
