@@ -102,7 +102,7 @@ jobs:
       - name: Run backend suite - serialized Windows state
         run: >-
           uv run pytest tests/backend -q -p no:randomly
-          -m "not live_enrich and (global_windows_mutex or performance_budget or serial_only)"
+          -m "not live_enrich and (global_windows_mutex or serial_only) and not performance_budget"
           -n 0
       - name: Run backend suite - parallel safe
         run: >-

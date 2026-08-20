@@ -680,3 +680,13 @@ Generated assistant skill copies, autonomous prompt workflows, private instructi
 tool-specific configuration are local development artifacts rather than product authority. They are
 removed from version control and ignored at their generated locations. Frontend acceptance remains
 owned by the repository's type, test, accessibility, build, browser, and native gates.
+
+### Wall-Clock Performance Runs On Controlled Hardware
+
+The 1,000-identity workflow simulation keeps its 35-second acceptance budget on the supported
+Stockroom workstation through `scripts/Gates.ps1`. A shared GitHub-hosted runner is not a comparable
+performance instrument: the exact accepted source completed the measured call in 23.27 seconds on
+the supported PC but required 375.27 seconds on the hosted runner's virtual SQLite storage. GitHub
+CI therefore runs the smaller exact-once scale case and all ordinary backend behavior, while the
+controlled workstation gate alone enforces the absolute wall-clock budget. This separates functional
+regression detection from variable host performance without weakening the product budget.
