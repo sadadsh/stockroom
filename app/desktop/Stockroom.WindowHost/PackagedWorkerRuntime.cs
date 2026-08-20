@@ -77,8 +77,7 @@ internal sealed class PackagedWorkerRuntime : IDisposable
         start.Environment["STOCKROOM_RELEASE_ID"] = release.ReleaseId;
         start.Environment["STOCKROOM_SERVICE_MODE"] = "coordinator";
         start.Environment["STOCKROOM_SERVICE_CONTROL_TOKEN"] = string.Empty;
-        start.Environment["STOCKROOM_UPDATE_MODE"] = "production";
-        start.Environment["STOCKROOM_UPDATE_BUNDLE_ROOT"] = release.UpdateRoot;
+        ConfigureUpdateEnvironment(start, release);
         if (!string.IsNullOrWhiteSpace(packageProbeScope))
         {
             start.Environment["STOCKROOM_PACKAGE_PROBE_SCOPE"] = packageProbeScope;
@@ -148,6 +147,24 @@ internal sealed class PackagedWorkerRuntime : IDisposable
             runtime.Dispose();
             throw;
         }
+    }
+
+    internal static void ConfigureUpdateEnvironment(
+        ProcessStartInfo start,
+        PackagedRelease release)
+    {
+        start.Environment["STOCKROOM_UPDATE_MODE"] = release.UpdateMode;
+        if (release.UpdateMode == "microsoft_store")
+        {
+            start.Environment.Remove("STOCKROOM_UPDATE_BUNDLE_ROOT");
+            start.Environment["STOCKROOM_STORE_URI"] = release.StoreUri;
+            start.Environment["STOCKROOM_STORE_PACKAGE_ROOT"] = Path.GetFullPath(
+                Path.Combine(release.UpdateRoot, ".."));
+            return;
+        }
+        start.Environment.Remove("STOCKROOM_STORE_URI");
+        start.Environment.Remove("STOCKROOM_STORE_PACKAGE_ROOT");
+        start.Environment["STOCKROOM_UPDATE_BUNDLE_ROOT"] = release.UpdateRoot;
     }
 
     public void Dispose()
@@ -518,16 +535,62 @@ internal sealed record PackagedRelease(
     string ReleaseId,
     string ReleaseDirectory,
     string WorkerExecutable,
-    string UpdateRoot)
+    string UpdateRoot,
+    string UpdateMode,
+    string StoreUri)
 {
     internal static PackagedRelease Resolve(string packageRoot)
     {
         var updateRoot = Path.GetFullPath(Path.Combine(packageRoot, "Update"));
-        var descriptorPath = Path.Combine(updateRoot, "Update Feed.json");
-        using var descriptor = JsonDocument.Parse(File.ReadAllBytes(descriptorPath));
-        var releaseId = descriptor.RootElement
-            .GetProperty("current_release_id")
-            .GetString();
+        var markerPath = Path.Combine(packageRoot, "Support", "Distribution.json");
+        string? releaseId;
+        string updateMode;
+        string storeUri;
+        if (File.Exists(markerPath))
+        {
+            using var marker = JsonDocument.Parse(File.ReadAllBytes(markerPath));
+            var root = marker.RootElement;
+            var keys = root.EnumerateObject().Select(property => property.Name).ToHashSet(
+                StringComparer.Ordinal);
+            var expectedKeys = new HashSet<string>(
+                [
+                    "channel",
+                    "package_name",
+                    "publisher",
+                    "schema",
+                    "store_id",
+                    "store_uri",
+                    "version",
+                ],
+                StringComparer.Ordinal);
+            var version = root.GetProperty("version").GetString();
+            storeUri = root.GetProperty("store_uri").GetString() ?? string.Empty;
+            if (!keys.SetEquals(expectedKeys)
+                || root.GetProperty("schema").GetString() != "stockroom-distribution/1"
+                || root.GetProperty("channel").GetString() != "microsoft-store"
+                || root.GetProperty("package_name").GetString() != "Sadad.Stockroom"
+                || root.GetProperty("publisher").GetString()
+                    != "CN=6586C41B-410B-4C94-8631-F025DB362E47"
+                || root.GetProperty("store_id").GetString() != "9NQ6HP17PH4H"
+                || storeUri != "https://apps.microsoft.com/detail/9NQ6HP17PH4H"
+                || string.IsNullOrWhiteSpace(version)
+                || File.Exists(Path.Combine(updateRoot, "Update Feed.json")))
+            {
+                throw new WindowHostException("Microsoft Store distribution marker is invalid");
+            }
+            releaseId = $"release-{version}";
+            updateMode = "microsoft_store";
+        }
+        else
+        {
+            var descriptorPath = Path.Combine(updateRoot, "Update Feed.json");
+            using var descriptor = JsonDocument.Parse(File.ReadAllBytes(descriptorPath));
+            releaseId = descriptor.RootElement
+                .GetProperty("current_release_id")
+                .GetString();
+            updateMode = "production";
+            storeUri = string.Empty;
+        }
         if (string.IsNullOrWhiteSpace(releaseId)
             || releaseId.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
         {
@@ -546,7 +609,13 @@ internal sealed record PackagedRelease(
         {
             throw new WindowHostException("packaged worker is unavailable");
         }
-        return new PackagedRelease(releaseId, releaseDirectory, worker, updateRoot);
+        return new PackagedRelease(
+            releaseId,
+            releaseDirectory,
+            worker,
+            updateRoot,
+            updateMode,
+            storeUri);
     }
 }
 

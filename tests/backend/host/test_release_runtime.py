@@ -32,6 +32,7 @@ from stockroom.host.release_runtime import (
     _numeric_version,
     _prefer_newer_packaged_release,
     create_production_update_runtime,
+    create_store_update_runtime,
     host_update_mode,
 )
 from stockroom.host.run import _serve_in_thread
@@ -1363,6 +1364,102 @@ def test_frozen_product_identity_cannot_be_downgraded_to_source_git(
     monkeypatch.setenv("STOCKROOM_UPDATE_MODE", "development")
 
     assert host_update_mode() is HostUpdateMode.PRODUCTION
+
+
+def test_store_host_update_mode_is_distinct_from_direct_production(monkeypatch) -> None:
+    monkeypatch.delattr(sys, "frozen", raising=False)
+    monkeypatch.setenv("STOCKROOM_UPDATE_MODE", "microsoft_store")
+
+    assert host_update_mode() is HostUpdateMode.MICROSOFT_STORE
+
+
+def test_store_runtime_never_constructs_or_activates_a_direct_update_feed(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    from stockroom.host import release_runtime
+
+    package_root = tmp_path / "Package"
+    release = _release(
+        package_root / "Update" / "Initial Release",
+        "release-1.0.42.0",
+        rollback_release_id="release-bootstrap",
+        mode="ok",
+        package_version="1.0.42.0",
+    )
+    support = package_root / "Support"
+    support.mkdir()
+    (support / "Distribution.json").write_text(
+        json.dumps(
+            {
+                "channel": "microsoft-store",
+                "package_name": "Sadad.Stockroom",
+                "publisher": "CN=6586C41B-410B-4C94-8631-F025DB362E47",
+                "schema": "stockroom-distribution/1",
+                "store_id": "9NQ6HP17PH4H",
+                "store_uri": "https://apps.microsoft.com/detail/9NQ6HP17PH4H",
+                "version": "1.0.42.0",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    class Lifecycle:
+        def __init__(self, *args, **kwargs):
+            del args, kwargs
+
+        def start(self, service_control, service_fence):
+            del service_control
+            return service_fence
+
+        def stop(self, handle, *, timeout):
+            del handle, timeout
+
+    monkeypatch.setattr(release_runtime, "ContextServiceLifecycle", Lifecycle)
+
+    def reject_repository(*args, **kwargs):
+        del args, kwargs
+        raise AssertionError("Store runtime constructed a direct TUF repository")
+
+    monkeypatch.setattr(release_runtime, "TrustedReleaseRepository", reject_repository)
+    context = SimpleNamespace()
+    proxy = SwitchableBackendProxy(_local_app(release.release_id, 1))
+    runtime = create_store_update_runtime(
+        proxy,
+        context=context,
+        public_base_url="http://127.0.0.1:12345",
+        token="host-token",
+        reload_window=lambda _url: None,
+        manage_native_window=False,
+        package_root=package_root,
+        data_root=tmp_path / "Data",
+        authority_scope=_authority_scope(tmp_path),
+    )
+    try:
+        runtime.start()
+        assert runtime.activate_ready() is False
+        assert runtime.status() == {
+            "automatic_apply": True,
+            "automatic_on_launch": True,
+            "blocking_reason": None,
+            "channel": "microsoft-store",
+            "check_interval_seconds": 0,
+            "convergence_phase": "store_managed",
+            "current_release_id": release.release_id,
+            "current_revision": release.release_id,
+            "detail": "Microsoft Store manages installation and updates.",
+            "generation": runtime.status()["generation"],
+            "next_attempt_at": None,
+            "retry_attempt": 0,
+            "state": "store_managed",
+            "store_uri": "https://apps.microsoft.com/detail/9NQ6HP17PH4H",
+            "target_release_id": "",
+            "target_revision": "",
+            "update_available": False,
+        }
+        assert context.service_mode == "coordinator"
+    finally:
+        runtime.close()
 
 
 def test_host_rehearsal_accepts_signed_direct_compatibility_across_skipped_release(

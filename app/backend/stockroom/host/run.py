@@ -501,9 +501,11 @@ def run_windowed(
         HostUpdateMode,
         UnavailableProductionUpdateRuntime,
         create_production_update_runtime,
+        create_store_update_runtime,
         host_update_mode,
         production_data_root,
         verified_packaged_release_identity,
+        verified_store_packaged_release_identity,
     )
     from stockroom.host.webview_fetch import WebViewRenderedDomFetcher
 
@@ -513,7 +515,7 @@ def run_windowed(
     production_state_root: Path | None = None
     if owns_context:
         if os.name == "nt":
-            if update_mode is HostUpdateMode.PRODUCTION:
+            if update_mode in {HostUpdateMode.PRODUCTION, HostUpdateMode.MICROSOFT_STORE}:
                 production_state_root = production_data_root()
                 managed_service_state_root = (
                     production_state_root / "Service State"
@@ -643,9 +645,14 @@ def run_windowed(
 
             if getattr(ctx, "provider_browser_surface", None) is None:
                 setattr(ctx, "provider_browser_surface", InAppProviderBrowserSurface(base_url))
-        if update_mode is HostUpdateMode.PRODUCTION:
+        if update_mode in {HostUpdateMode.PRODUCTION, HostUpdateMode.MICROSOFT_STORE}:
             try:
-                production_update_runtime = create_production_update_runtime(
+                runtime_factory = (
+                    create_store_update_runtime
+                    if update_mode is HostUpdateMode.MICROSOFT_STORE
+                    else create_production_update_runtime
+                )
+                production_update_runtime = runtime_factory(
                     backend_proxy,
                     context=ctx,
                     public_base_url=base_url,
@@ -659,7 +666,11 @@ def run_windowed(
                 )
             except Exception:  # noqa: BLE001 - keep the signed built-in UI observable
                 try:
-                    packaged_release_id = verified_packaged_release_identity()
+                    packaged_release_id = (
+                        verified_store_packaged_release_identity()
+                        if update_mode is HostUpdateMode.MICROSOFT_STORE
+                        else verified_packaged_release_identity()
+                    )
                 except Exception:  # noqa: BLE001 - never invent an unverified identity
                     packaged_release_id = ""
                 blocker = "production_service_bootstrap_failed"
@@ -677,6 +688,16 @@ def run_windowed(
                 production_update_runtime = UnavailableProductionUpdateRuntime(
                     blocker=blocker,
                     release_id=packaged_release_id,
+                    channel=(
+                        "microsoft-store"
+                        if update_mode is HostUpdateMode.MICROSOFT_STORE
+                        else "production"
+                    ),
+                    store_uri=(
+                        "https://apps.microsoft.com/detail/9NQ6HP17PH4H"
+                        if update_mode is HostUpdateMode.MICROSOFT_STORE
+                        else ""
+                    ),
                 )
             setattr(ctx, "update_convergence", production_update_runtime)
             provider_surface = getattr(
@@ -699,7 +720,7 @@ def run_windowed(
         server, thread = _serve_in_thread(backend_proxy, port)
         if (
             enable_source_convergence
-            and update_mode is not HostUpdateMode.PRODUCTION
+            and update_mode not in {HostUpdateMode.PRODUCTION, HostUpdateMode.MICROSOFT_STORE}
             and app_repo is not None
             and development_service_authority is None
         ):
@@ -795,7 +816,7 @@ def run_windowed(
                 ).start()
         elif (
             enable_source_convergence
-            and update_mode is not HostUpdateMode.PRODUCTION
+            and update_mode not in {HostUpdateMode.PRODUCTION, HostUpdateMode.MICROSOFT_STORE}
             and app_repo is not None
             and development_service_authority is not None
         ):

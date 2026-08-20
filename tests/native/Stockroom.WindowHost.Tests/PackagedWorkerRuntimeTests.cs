@@ -38,6 +38,58 @@ public sealed class PackagedWorkerRuntimeTests
     }
 
     [Fact]
+    public void StorePackagePassesOnlyTheMicrosoftStoreUpdateAuthority()
+    {
+        var root = TestDirectory();
+        try
+        {
+            var support = Path.Combine(root, "Support");
+            var releaseDirectory = Path.Combine(
+                root,
+                "Update",
+                "Initial Release",
+                "release-1.0.42.0");
+            Directory.CreateDirectory(support);
+            Directory.CreateDirectory(Path.Combine(releaseDirectory, "Backend"));
+            File.WriteAllText(
+                Path.Combine(support, "Distribution.json"),
+                """
+                {
+                  "channel": "microsoft-store",
+                  "package_name": "Sadad.Stockroom",
+                  "publisher": "CN=6586C41B-410B-4C94-8631-F025DB362E47",
+                  "schema": "stockroom-distribution/1",
+                  "store_id": "9NQ6HP17PH4H",
+                  "store_uri": "https://apps.microsoft.com/detail/9NQ6HP17PH4H",
+                  "version": "1.0.42.0"
+                }
+                """);
+            File.WriteAllBytes(
+                Path.Combine(releaseDirectory, "Backend", "Stockroom Worker.exe"),
+                "MZ"u8.ToArray());
+
+            var release = PackagedRelease.Resolve(root);
+            var start = new ProcessStartInfo();
+            PackagedWorkerRuntime.ConfigureUpdateEnvironment(start, release);
+
+            Assert.Equal("release-1.0.42.0", release.ReleaseId);
+            Assert.Equal("microsoft_store", release.UpdateMode);
+            Assert.Equal(
+                "https://apps.microsoft.com/detail/9NQ6HP17PH4H",
+                release.StoreUri);
+            Assert.Equal("microsoft_store", start.Environment["STOCKROOM_UPDATE_MODE"]);
+            Assert.False(start.Environment.ContainsKey("STOCKROOM_UPDATE_BUNDLE_ROOT"));
+            Assert.Equal(
+                root,
+                start.Environment["STOCKROOM_STORE_PACKAGE_ROOT"]);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task PostReadyCrashDrainsFinalOutputBeforeDiagnosticAndHostShutdown()
     {
         var root = TestDirectory();

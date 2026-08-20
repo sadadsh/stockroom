@@ -77,6 +77,40 @@ def test_check_uses_the_hosts_observable_automatic_convergence_state(client, app
     assert convergence.activated is True
 
 
+def test_store_managed_installation_refuses_direct_update_activation(client, app_ctx):
+    class _StoreConvergence:
+        activated = False
+
+        def status(self):
+            return {
+                "state": "store_managed",
+                "channel": "microsoft-store",
+                "store_uri": "https://apps.microsoft.com/detail/9NQ6HP17PH4H",
+                "update_available": False,
+            }
+
+        def activate_ready(self):
+            self.activated = True
+            return True
+
+    convergence = _StoreConvergence()
+    app_ctx.update_convergence = convergence
+
+    checked = client.get("/api/update/check")
+    applied = client.post("/api/update/apply")
+
+    assert checked.status_code == 200
+    assert checked.json()["channel"] == "microsoft-store"
+    assert applied.status_code == 409
+    assert applied.json() == {
+        "detail": "Microsoft Store manages installation and updates.",
+        "state": "store_managed",
+        "store_uri": "https://apps.microsoft.com/detail/9NQ6HP17PH4H",
+        "updated": False,
+    }
+    assert convergence.activated is False
+
+
 def test_handed_off_worker_reads_the_host_convergence_status_file(client, app_ctx, tmp_path):
     expected = {
         "update_available": False,

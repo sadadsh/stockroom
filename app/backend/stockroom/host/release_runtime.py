@@ -8,6 +8,7 @@ window reload, and exact route rollback.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import math
 import os
@@ -102,6 +103,7 @@ class HostUpdateMode(str, Enum):
     """Cryptographically distinct production and mutable-source modes."""
 
     PRODUCTION = "production"
+    MICROSOFT_STORE = "microsoft_store"
     DEVELOPMENT_SOURCE = "development_source"
 
 
@@ -1719,9 +1721,13 @@ class UnavailableProductionUpdateRuntime:
         *,
         blocker: str = "production_feed_unavailable",
         release_id: str = "",
+        channel: str = "production",
+        store_uri: str = "",
     ) -> None:
         self._blocker = blocker
         self._release_id = release_id
+        self._channel = channel
+        self._store_uri = store_uri
 
     def start(self) -> None:
         return
@@ -1737,11 +1743,11 @@ class UnavailableProductionUpdateRuntime:
         return
 
     def status(self) -> dict[str, object]:
-        return {
+        status: dict[str, object] = {
             "automatic_apply": True,
             "automatic_on_launch": True,
             "blocking_reason": self._blocker,
-            "channel": "production",
+            "channel": self._channel,
             "check_interval_seconds": PRODUCTION_UPDATE_CHECK_INTERVAL_SECONDS,
             "convergence_phase": "blocked",
             "current_release_id": self._release_id,
@@ -1754,14 +1760,179 @@ class UnavailableProductionUpdateRuntime:
             "target_revision": "",
             "update_available": False,
         }
+        if self._store_uri:
+            status["store_uri"] = self._store_uri
+        return status
+
+
+class MicrosoftStoreUpdateRuntime:
+    """Run the packaged release while Microsoft Store exclusively owns updates."""
+
+    def __init__(
+        self,
+        control: ServiceControl,
+        fence: GenerationFence,
+        boundary: HostReleaseBoundary,
+        *,
+        initial_state: ActiveReleaseState,
+        status_path: Path,
+        store_uri: str,
+        window_replacement: HostWindowReplacement | None = None,
+    ) -> None:
+        self._control = control
+        self._fence = fence
+        self._boundary = boundary
+        self._initial_release = initial_state.current
+        self._status_path = Path(status_path)
+        self._store_uri = store_uri
+        self._window_replacement = window_replacement
+        self._started = False
+        self._closed = False
+
+    def activate_ready(self) -> bool:
+        """Store packages never activate through Stockroom's direct updater."""
+
+        return False
+
+    def start(self) -> None:
+        if self._closed:
+            raise HostReleaseBoundaryError("Microsoft Store runtime is already closed")
+        if self._started:
+            raise HostReleaseBoundaryError("Microsoft Store runtime is already started")
+        self._started = True
+        replacement = self._window_replacement
+        try:
+            if replacement is not None:
+                replacement.start_initial(self._initial_release)
+        except BaseException:
+            self._started = False
+            raise
+        self._write_status()
+
+    @property
+    def owns_native_window(self) -> bool:
+        return self._window_replacement is not None
+
+    def wait_until_window_closed(self) -> int:
+        replacement = self._window_replacement
+        if replacement is None:
+            raise HostReleaseBoundaryError("Microsoft Store native window is unavailable")
+        return replacement.wait_until_closed()
+
+    def provider_browser_surface(
+        self,
+        *,
+        staging_root: str = "",
+        component_id: str = "",
+        manufacturer: str = "",
+        mpn: str = "",
+        provider_id: str = "",
+    ):
+        replacement = self._window_replacement
+        if replacement is None:
+            raise HostReleaseBoundaryError("Microsoft Store provider browser is unavailable")
+        return replacement.provider_browser_surface(
+            staging_root=staging_root,
+            component_id=component_id,
+            manufacturer=manufacturer,
+            mpn=mpn,
+            provider_id=provider_id,
+        )
+
+    @property
+    def native_shell(self) -> object | None:
+        return self._window_replacement
+
+    def show_active_provider_browser(self) -> None:
+        replacement = self._window_replacement
+        if replacement is None:
+            raise HostReleaseBoundaryError("Microsoft Store provider browser is unavailable")
+        replacement.show_active_provider_browser()
+
+    def close_active_provider_browser(self) -> None:
+        replacement = self._window_replacement
+        if replacement is not None:
+            replacement.close_active_provider_browser()
+
+    def status(self) -> dict[str, object]:
+        release_id = self._initial_release.release_id
+        return {
+            "automatic_apply": True,
+            "automatic_on_launch": True,
+            "blocking_reason": None,
+            "channel": "microsoft-store",
+            "check_interval_seconds": 0,
+            "convergence_phase": "store_managed",
+            "current_release_id": release_id,
+            "current_revision": release_id,
+            "detail": "Microsoft Store manages installation and updates.",
+            "generation": self._fence.generation,
+            "next_attempt_at": None,
+            "retry_attempt": 0,
+            "state": "store_managed",
+            "store_uri": self._store_uri,
+            "target_release_id": "",
+            "target_revision": "",
+            "update_available": False,
+        }
+
+    def _write_status(self) -> None:
+        try:
+            self._status_path.parent.mkdir(parents=True, exist_ok=True)
+            descriptor, temporary_name = tempfile.mkstemp(
+                prefix=".Update Status-",
+                suffix=".json",
+                dir=self._status_path.parent,
+            )
+            temporary = Path(temporary_name)
+            try:
+                with os.fdopen(descriptor, "w", encoding="utf-8", newline="\n") as stream:
+                    json.dump(
+                        self.status(),
+                        stream,
+                        ensure_ascii=True,
+                        separators=(",", ":"),
+                        sort_keys=True,
+                    )
+                    stream.flush()
+                    os.fsync(stream.fileno())
+                os.replace(temporary, self._status_path)
+            finally:
+                if temporary.exists():
+                    temporary.unlink()
+        except OSError:
+            return
+
+    def close(self) -> None:
+        if self._closed:
+            return
+        self._closed = True
+        errors: list[BaseException] = []
+        try:
+            self._boundary.close()
+        except BaseException as exc:
+            errors.append(exc)
+        try:
+            self._control.release(self._fence)
+        except BaseException as exc:
+            errors.append(exc)
+        else:
+            try:
+                self._control.close()
+            except BaseException as exc:
+                errors.append(exc)
+        if errors:
+            raise errors[0]
 
 
 def host_update_mode() -> HostUpdateMode:
     """Select production without ever allowing a frozen install to fall back to Git."""
 
+    requested = os.environ.get("STOCKROOM_UPDATE_MODE", "").strip().casefold()
+    if requested == "microsoft_store":
+        return HostUpdateMode.MICROSOFT_STORE
     if bool(getattr(sys, "frozen", False)):
         return HostUpdateMode.PRODUCTION
-    requested = os.environ.get("STOCKROOM_UPDATE_MODE", "").strip().casefold()
     if not requested or requested in {"development", "development_source"}:
         return HostUpdateMode.DEVELOPMENT_SOURCE
     if requested == "production":
@@ -1806,6 +1977,65 @@ def _strict_feed_descriptor(path: Path) -> dict[str, str]:
     return strings
 
 
+def _strict_store_descriptor(path: Path) -> dict[str, str]:
+    def _unique(pairs: list[tuple[str, object]]) -> dict[str, object]:
+        result: dict[str, object] = {}
+        for key, value in pairs:
+            if key in result:
+                raise ValueError("duplicate key")
+            result[key] = value
+        return result
+
+    try:
+        value = json.loads(
+            path.read_text(encoding="utf-8"),
+            object_pairs_hook=_unique,
+            parse_constant=lambda _value: (_ for _ in ()).throw(ValueError()),
+        )
+    except (OSError, UnicodeError, ValueError, json.JSONDecodeError) as exc:
+        raise ProductionUpdateConfigurationError(
+            "Microsoft Store distribution marker is invalid"
+        ) from exc
+    expected = {
+        "channel",
+        "package_name",
+        "publisher",
+        "schema",
+        "store_id",
+        "store_uri",
+        "version",
+    }
+    if type(value) is not dict or set(value) != expected:
+        raise ProductionUpdateConfigurationError(
+            "Microsoft Store distribution marker fields are invalid"
+        )
+    exact = {
+        "channel": "microsoft-store",
+        "package_name": "Sadad.Stockroom",
+        "publisher": "CN=6586C41B-410B-4C94-8631-F025DB362E47",
+        "schema": "stockroom-distribution/1",
+        "store_id": "9NQ6HP17PH4H",
+        "store_uri": "https://apps.microsoft.com/detail/9NQ6HP17PH4H",
+    }
+    if any(value.get(key) != expected_value for key, expected_value in exact.items()):
+        raise ProductionUpdateConfigurationError(
+            "Microsoft Store distribution identity is invalid"
+        )
+    version = value.get("version")
+    if type(version) is not str or re.fullmatch(r"\d+\.\d+\.\d+\.0", version) is None:
+        raise ProductionUpdateConfigurationError(
+            "Microsoft Store package version is invalid"
+        )
+    configured_uri = os.environ.get("STOCKROOM_STORE_URI", "").strip()
+    if configured_uri and configured_uri != exact["store_uri"]:
+        raise ProductionUpdateConfigurationError("Microsoft Store URI is invalid")
+    return {
+        "release_id": f"release-{version}",
+        "store_uri": exact["store_uri"],
+        "version": version,
+    }
+
+
 def _production_bundle_root(bundle_root: Path | None = None) -> Path:
     if bundle_root is not None:
         return Path(bundle_root).resolve()
@@ -1819,6 +2049,40 @@ def _production_bundle_root(bundle_root: Path | None = None) -> Path:
             if (update_root / "Update Feed.json").is_file():
                 return update_root
     raise ProductionUpdateConfigurationError("production update bundle root is unavailable")
+
+
+def _store_package_root(package_root: Path | None = None) -> Path:
+    if package_root is not None:
+        root = Path(package_root).resolve()
+    else:
+        configured = os.environ.get("STOCKROOM_STORE_PACKAGE_ROOT", "")
+        if configured:
+            root = Path(configured).resolve()
+        elif bool(getattr(sys, "frozen", False)):
+            candidate = Path(sys.executable).resolve().parent
+            discovered = next(
+                (
+                    parent
+                    for parent in (candidate, *candidate.parents)
+                    if (parent / "Support" / "Distribution.json").is_file()
+                ),
+                None,
+            )
+            if discovered is None:
+                raise ProductionUpdateConfigurationError(
+                    "Microsoft Store package root is unavailable"
+                )
+            root = discovered
+        else:
+            raise ProductionUpdateConfigurationError(
+                "Microsoft Store package root is unavailable"
+            )
+    _strict_store_descriptor(root / "Support" / "Distribution.json")
+    if (root / "Update" / "Update Feed.json").exists():
+        raise ProductionUpdateConfigurationError(
+            "Microsoft Store package contains a direct update feed"
+        )
+    return root
 
 
 def production_data_root(data_root: Path | None = None) -> Path:
@@ -1853,6 +2117,25 @@ def verified_packaged_release_identity(
         root / "Initial Release" / release_id,
         expected_release_id=release_id,
         expected_manifest_sha256=descriptor["current_manifest_sha256"],
+    )
+    return release_id
+
+
+def verified_store_packaged_release_identity(
+    package_root: Path | None = None,
+) -> str:
+    """Return the exact embedded Store release after validating every member."""
+
+    root = _store_package_root(package_root)
+    descriptor = _strict_store_descriptor(root / "Support" / "Distribution.json")
+    release_id = descriptor["release_id"]
+    manifest_sha256 = hashlib.sha256(
+        (root / "Update" / "Initial Release" / release_id / "Release Manifest.json").read_bytes()
+    ).hexdigest()
+    verify_local_release_set(
+        root / "Update" / "Initial Release" / release_id,
+        expected_release_id=release_id,
+        expected_manifest_sha256=manifest_sha256,
     )
     return release_id
 
@@ -2166,6 +2449,181 @@ def create_production_update_runtime(
         raise
 
 
+def create_store_update_runtime(
+    proxy: SwitchableBackendProxy,
+    *,
+    context: object,
+    public_base_url: str,
+    token: str,
+    reload_window: Callable[[str], None],
+    manage_native_window: bool = True,
+    package_root: Path | None = None,
+    data_root: Path | None = None,
+    authority_scope: str | None = None,
+) -> MicrosoftStoreUpdateRuntime:
+    """Compose managed service authority without constructing a direct update feed."""
+
+    if type(manage_native_window) is not bool:
+        raise TypeError("manage_native_window must be a boolean")
+    package_root = _store_package_root(package_root)
+    descriptor = _strict_store_descriptor(package_root / "Support" / "Distribution.json")
+    release_id = descriptor["release_id"]
+    packaged_source = package_root / "Update" / "Initial Release" / release_id
+    manifest_sha256 = hashlib.sha256(
+        (packaged_source / "Release Manifest.json").read_bytes()
+    ).hexdigest()
+    verified_source = verify_local_release_set(
+        packaged_source,
+        expected_release_id=release_id,
+        expected_manifest_sha256=manifest_sha256,
+    )
+
+    data_root = production_data_root(data_root)
+    releases_directory = data_root / "Releases"
+    state_directory = data_root / "Update State"
+    packaged = _seed_packaged_release(
+        packaged_source,
+        releases_directory / release_id,
+        release_id=release_id,
+        manifest_sha256=verified_source.manifest_sha256,
+    )
+    os.environ.pop("STOCKROOM_CAD_CONVERTER", None)
+    packaged_cad_converter = _cad_converter_path(packaged)
+    if packaged_cad_converter is not None:
+        os.environ["STOCKROOM_CAD_CONVERTER"] = str(packaged_cad_converter)
+
+    from stockroom.planning.production_composition import (
+        build_production_workflow_registry_for_context,
+    )
+
+    service_state_directory = data_root / "Service State"
+    workflow_database = service_state_directory / "Workflow.sqlite"
+    lifecycle = ContextServiceLifecycle(
+        context,
+        workflow_database=workflow_database,
+        workflow_registry_factory=build_production_workflow_registry_for_context,
+        enable_altium=False,
+        require_publication_executor=True,
+    )
+    update_authority_scope = (
+        f"{authority_scope}.StoreRuntime" if authority_scope else "StoreRuntime"
+    )
+    application_authority_scope = authority_scope or DEFAULT_AUTHORITY_SCOPE
+    update_control = ServiceControl(
+        state_directory / "Store Control" / "Control.sqlite",
+        mode=ServiceMode.COORDINATOR,
+        identity=WindowsCurrentIdentity(),
+        mutex_factory=WindowsNamedMutexFactory(purpose=update_authority_scope),
+        authority_scope=update_authority_scope,
+    )
+    update_fence = update_control.acquire()
+    service_authority: ContextServiceAuthority | None = None
+    boundary: HostReleaseBoundary | None = None
+    restore_context = _context_release_identity_restorer(context)
+    try:
+        store = ImmutableReleaseStore(
+            releases_directory=releases_directory,
+            state_directory=state_directory / "Release Store",
+        )
+        accepted_packaged = store.accept_verified(
+            packaged,
+            control=update_control,
+            fence=update_fence,
+        )
+        try:
+            prior = store.verify_startup(update_control)
+        except ReleaseStoreUninitialized:
+            active = store.select_active(
+                accepted_packaged,
+                previous=None,
+                selection_reason="initialize",
+                control=update_control,
+                fence=update_fence,
+            )
+        else:
+            active = (
+                prior
+                if prior.current.release_id == release_id
+                else store.select_active(
+                    accepted_packaged,
+                    previous=prior.current,
+                    selection_reason="activate",
+                    control=update_control,
+                    fence=update_fence,
+                )
+            )
+
+        service_authority = ContextServiceAuthority(
+            context,
+            release_id=release_id,
+            control_database=service_state_directory / "Control.sqlite",
+            lifecycle=lifecycle,
+            start_as_coordinator=True,
+            authority_scope=application_authority_scope,
+        )
+        status_path = state_directory / "Update Status.json"
+        boundary = HostReleaseBoundary(
+            proxy,
+            public_base_url=public_base_url,
+            token=token,
+            local_release_id=release_id,
+            reload_window=reload_window,
+            local_service_authority=service_authority,
+            workflow_database=workflow_database,
+            convergence_status_path=status_path,
+        )
+        boundary.retain({active.current.release_id})
+
+        window_replacement = None
+        if manage_native_window:
+            from stockroom.host.window_runtime import ProductionWindowReplacement
+            from stockroom.store.machine_config import MachineConfig
+
+            config = getattr(context, "config", None)
+            if not isinstance(config, MachineConfig):
+                raise ProductionUpdateConfigurationError(
+                    "Microsoft Store native window configuration is unavailable"
+                )
+            window_replacement = ProductionWindowReplacement(
+                active.current,
+                public_base_url=public_base_url,
+                api_credential=token,
+                config=config,
+            )
+            boundary.attach_window_replacement(window_replacement)
+        return MicrosoftStoreUpdateRuntime(
+            update_control,
+            update_fence,
+            boundary,
+            initial_state=active,
+            status_path=status_path,
+            store_uri=descriptor["store_uri"],
+            window_replacement=window_replacement,
+        )
+    except BaseException:
+        if boundary is not None:
+            try:
+                boundary.close()
+            except BaseException:
+                pass
+        elif service_authority is not None:
+            try:
+                service_authority.close()
+            except BaseException:
+                pass
+        try:
+            update_control.release(update_fence)
+        except BaseException:
+            pass
+        else:
+            try:
+                update_control.close()
+            except BaseException:
+                pass
+        restore_context()
+        raise
+
+
 __all__ = [
     "HostAdoptionReceipt",
     "HostBackendProcess",
@@ -2179,12 +2637,15 @@ __all__ = [
     "HostReleaseRouteError",
     "HostWindowReplacement",
     "HostUpdateMode",
+    "MicrosoftStoreUpdateRuntime",
     "ProductionUpdateConfigurationError",
     "PRODUCTION_UPDATE_CHECK_INTERVAL_SECONDS",
     "ProductionUpdateRuntime",
     "UnavailableProductionUpdateRuntime",
     "create_production_update_runtime",
+    "create_store_update_runtime",
     "host_update_mode",
     "production_data_root",
     "verified_packaged_release_identity",
+    "verified_store_packaged_release_identity",
 ]

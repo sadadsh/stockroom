@@ -11,7 +11,7 @@ from __future__ import annotations
 import json
 import re
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Request, Response
 
 from stockroom.api.updater import AppUpdater, UpdateState
 
@@ -69,9 +69,21 @@ def update_router(require_token) -> APIRouter:
         return _with_frontend_revision(AppUpdater(ctx.app_repo).check())
 
     @r.post("/apply")
-    def apply(request: Request) -> dict:
+    def apply(request: Request, response: Response) -> dict:
         ctx = request.app.state.ctx
         convergence = getattr(ctx, "update_convergence", None)
+        convergence_status = convergence.status() if convergence is not None else None
+        if (
+            isinstance(convergence_status, dict)
+            and convergence_status.get("channel") == "microsoft-store"
+        ):
+            response.status_code = 409
+            return {
+                "detail": "Microsoft Store manages installation and updates.",
+                "state": "store_managed",
+                "store_uri": convergence_status.get("store_uri", ""),
+                "updated": False,
+            }
         activate_ready = getattr(convergence, "activate_ready", None)
         if callable(activate_ready):
             accepted = bool(activate_ready())
