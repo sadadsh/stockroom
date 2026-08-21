@@ -305,12 +305,11 @@ def test_exact_replay_is_idempotent_and_a_stale_claim_never_calls_the_handler(tm
 
 @pytest.mark.serial_only
 def test_a_stage_running_past_its_lease_is_not_reclaimed(tmp_path):
-    # The lease stays sub-second but is deliberately ten heartbeats long: a
-    # single synchronous=FULL commit on Windows can stall a few hundred
-    # milliseconds, and this test must prove renewal, not disk latency.
+    # Keep enough wall-clock margin for a loaded Windows runner. The handler
+    # still outlives the lease, so the test proves renewal rather than latency.
     store = WorkflowStore(tmp_path / "workflow.sqlite3")
     store.submit_batch([IntakeIdentity("ACME", "P-1")])
-    claim = store.claim_ready("worker-a", lease_seconds=0.5, limit=1)[0]
+    claim = store.claim_ready("worker-a", lease_seconds=2.0, limit=1)[0]
     started = threading.Event()
     release = threading.Event()
 
@@ -329,7 +328,7 @@ def test_a_stage_running_past_its_lease_is_not_reclaimed(tmp_path):
 
     def dispatch() -> None:
         try:
-            dispatched.append(runtime.dispatch_claim(claim, "worker-a", lease_seconds=0.5))
+            dispatched.append(runtime.dispatch_claim(claim, "worker-a", lease_seconds=2.0))
         except BaseException as exc:  # noqa: BLE001 - reported to the main thread
             failures.append(exc)
 
@@ -337,7 +336,7 @@ def test_a_stage_running_past_its_lease_is_not_reclaimed(tmp_path):
     worker.start()
     try:
         assert started.wait(2.0)
-        deadline = time.monotonic() + 0.9
+        deadline = time.monotonic() + 2.5
         while time.monotonic() < deadline:
             assert store.claim_ready("worker-b", lease_seconds=30, limit=1) == []
             time.sleep(0.05)
