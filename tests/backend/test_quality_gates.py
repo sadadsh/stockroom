@@ -128,6 +128,14 @@ def test_ci_enforces_backend_types() -> None:
     assert _ci_violations(text) == []
 
 
+def test_ci_initializes_every_native_cad_converter_source() -> None:
+    text = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+
+    assert "shared/OriginalCircuit.Eda.Abstractions" in text
+    assert "shared/OriginalCircuit.Eda.Rendering" in text
+    assert "b24200f06618cecd36f42ff966e9db9ea9491f35" in text
+
+
 def test_release_repository_excludes_personal_editor_tooling() -> None:
     frontend = ROOT / "app" / "frontend"
     assert list(frontend.glob("**/SKILL.md")) == []
