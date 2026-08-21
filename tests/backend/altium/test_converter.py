@@ -9,6 +9,7 @@ from stockroom.altium.converter import (
     CadConversionError,
     _artifact,
     _resolve_converter_executable,
+    render_altium_project_documents,
 )
 
 
@@ -73,3 +74,78 @@ def test_editable_checkout_prefers_its_matching_converter(
     monkeypatch.setattr(converter_module, "_installed_converter", lambda: installed)
 
     assert _resolve_converter_executable(None) == development
+
+
+def test_project_render_boundary_validates_and_reads_svg_artifacts(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    executable = tmp_path / "Stockroom.CadConverter.exe"
+    executable.write_bytes(b"MZ")
+    root = tmp_path / "Project"
+    output = tmp_path / "Output"
+    root.mkdir()
+    source = root / "Main.PcbDoc"
+    source.write_bytes(b"board")
+
+    def invoke(_executable, request_path, _result_path, _timeout, *, result_schema):
+        request = json.loads(request_path.read_text(encoding="utf-8"))
+        assert request == {
+            "schema": "stockroom.cad-converter/project-render-request/1",
+            "projectRoot": str(root.resolve()),
+            "outputDirectory": str(output.resolve()),
+            "documents": ["Main.PcbDoc"],
+            "width": 1600,
+            "height": 1000,
+        }
+        assert result_schema == "stockroom.cad-converter/project-render-result/1"
+        output.mkdir()
+        top = output / "main-top.svg"
+        bottom = output / "main-bottom.svg"
+        top.write_bytes(b"<svg data-view=\"top\"/>")
+        bottom.write_bytes(b"<svg data-view=\"bottom\"/>")
+        return {
+            "schema": result_schema,
+            "status": "ok",
+            "detail": "ready",
+            "artifacts": [
+                {
+                    "sourcePath": "Main.PcbDoc",
+                    "kind": "pcb",
+                    "view": "top",
+                    "path": str(top),
+                    "mediaType": "image/svg+xml",
+                    "width": 1600,
+                    "height": 1000,
+                    "sizeBytes": top.stat().st_size,
+                    "sha256": hashlib.sha256(top.read_bytes()).hexdigest(),
+                    "sourceSha256": hashlib.sha256(source.read_bytes()).hexdigest(),
+                },
+                {
+                    "sourcePath": "Main.PcbDoc",
+                    "kind": "pcb",
+                    "view": "bottom",
+                    "path": str(bottom),
+                    "mediaType": "image/svg+xml",
+                    "width": 1600,
+                    "height": 1000,
+                    "sizeBytes": bottom.stat().st_size,
+                    "sha256": hashlib.sha256(bottom.read_bytes()).hexdigest(),
+                    "sourceSha256": hashlib.sha256(source.read_bytes()).hexdigest(),
+                }
+            ],
+        }
+
+    monkeypatch.setattr(converter_module, "_invoke", invoke)
+
+    result = render_altium_project_documents(
+        root,
+        ("Main.PcbDoc",),
+        output_directory=output,
+        converter_executable=executable,
+    )
+
+    assert result.detail == "ready"
+    assert len(result.artifacts) == 2
+    assert result.artifacts[0].content == b'<svg data-view="top"/>'
+    assert result.artifacts[0].source_path == "Main.PcbDoc"

@@ -180,7 +180,7 @@ def test_altium_artwork_and_geometry_share_one_native_scene_run(monkeypatch, tmp
         ]
     }
 
-    def render(_project, _driver):
+    def render(_project):
         calls.append(_project.id)
         return ProjectVisualBundle(
             {
@@ -224,7 +224,7 @@ def test_altium_artwork_and_geometry_share_one_native_scene_run(monkeypatch, tmp
 def test_altium_render_cache_never_crosses_project_roots(monkeypatch, tmp_path):
     calls = []
 
-    def render(project, _driver):
+    def render(project):
         calls.append(project.id)
         return ProjectVisualBundle(
             {
@@ -256,3 +256,59 @@ def test_altium_render_cache_never_crosses_project_roots(monkeypatch, tmp_path):
     assert adapter.render(first).evidence["detail"] == "first"
     assert adapter.render(second).evidence["detail"] == "second"
     assert calls == ["first", "second"]
+
+
+def test_altium_render_cache_keeps_last_ready_artifacts_after_refresh_failure(
+    monkeypatch,
+    tmp_path,
+):
+    board = tmp_path / "Amp.PcbDoc"
+    board.write_bytes(b"first")
+    project = ProjectRecord(
+        id="amp",
+        name="Amp",
+        root=tmp_path.as_posix(),
+        board_paths=[board.name],
+        eda="altium",
+    )
+    calls = 0
+
+    def render(_project):
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            return ProjectVisualBundle(
+                {
+                    "status": "ready",
+                    "runtime": {"name": "Stockroom CAD Converter", "version": "AltiumSharp"},
+                    "documents": [{"kind": "pcb", "path": board.name, "artifacts": []}],
+                    "detail": "ready",
+                    "digest": "ready",
+                },
+                {"old": object()},
+            )
+        return ProjectVisualBundle(
+            {
+                "status": "blocked",
+                "runtime": {"name": "Stockroom CAD Converter", "version": "AltiumSharp"},
+                "documents": [],
+                "detail": "fresh render failed",
+                "digest": "failed",
+            },
+            {},
+        )
+
+    monkeypatch.setattr("stockroom.projects.adapters.altium.render_altium_project", render)
+    adapter = AltiumProjectAdapter(driver=object())
+
+    first = adapter.render(project)
+    unchanged = adapter.render(project)
+    board.write_bytes(b"changed-size")
+    stale = adapter.render(project)
+
+    assert calls == 2
+    assert unchanged is first
+    assert stale.evidence["status"] == "ready"
+    assert stale.evidence["stale"] is True
+    assert "fresh render failed" in stale.evidence["detail"]
+    assert stale.artifacts == first.artifacts

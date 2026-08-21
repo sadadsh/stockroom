@@ -18,6 +18,7 @@ import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+from xml.etree import ElementTree
 
 from stockroom.altium.native_authoring import read_embedded_model_payloads
 from stockroom.altium.oleread import read_footprint_names, read_symbol_names
@@ -26,6 +27,8 @@ from stockroom.pcad import normalize, parse_file
 from stockroom.pcad.altium_request import build_altium_writer_request
 
 _RESULT_SCHEMA = "stockroom.cad-converter/result/1"
+_PROJECT_REQUEST_SCHEMA = "stockroom.cad-converter/project-render-request/1"
+_PROJECT_RESULT_SCHEMA = "stockroom.cad-converter/project-render-result/1"
 _CONVERTER_ENV = "STOCKROOM_CAD_CONVERTER"
 
 
@@ -83,6 +86,24 @@ class NativeAltiumConversion:
     source_sha256: str
 
 
+@dataclass(frozen=True, slots=True)
+class NativeProjectRenderArtifact:
+    source_path: str
+    kind: str
+    view: str
+    content: bytes
+    media_type: str
+    width: int
+    height: int
+    source_sha256: str
+
+
+@dataclass(frozen=True, slots=True)
+class NativeProjectRender:
+    detail: str
+    artifacts: tuple[NativeProjectRenderArtifact, ...]
+
+
 def _sha256(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as stream:
@@ -121,6 +142,8 @@ def _invoke(
     request_path: Path,
     result_path: Path,
     timeout_seconds: float,
+    *,
+    result_schema: str = _RESULT_SCHEMA,
 ) -> dict[str, Any]:
     executable = executable.resolve(strict=True)
     if executable.suffix.casefold() != ".exe":
@@ -152,7 +175,7 @@ def _invoke(
         result = json.loads(result_path.read_text(encoding="utf-8"))
     except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise CadConversionError("native CAD converter returned unreadable result JSON") from exc
-    if not isinstance(result, dict) or result.get("schema") != _RESULT_SCHEMA:
+    if not isinstance(result, dict) or result.get("schema") != result_schema:
         raise CadConversionError("native CAD converter returned an unsupported result schema")
     if completed.returncode != 0 or result.get("status") != "ok":
         detail = result.get("detail")
@@ -160,6 +183,152 @@ def _invoke(
             detail if isinstance(detail, str) and detail else "native CAD conversion failed"
         )
     return result
+
+
+def _project_artifact(
+    value: object,
+    *,
+    project_root: Path,
+    output_directory: Path,
+    documents: set[str],
+    expected_width: int,
+    expected_height: int,
+) -> NativeProjectRenderArtifact:
+    if not isinstance(value, dict):
+        raise CadConversionError("converter returned an invalid project render artifact")
+    source = value.get("sourcePath")
+    kind = value.get("kind")
+    view = value.get("view")
+    media_type = value.get("mediaType")
+    width = value.get("width")
+    height = value.get("height")
+    source_digest = value.get("sourceSha256")
+    normalized_source = Path(source).as_posix() if isinstance(source, str) else ""
+    expected_kind = (
+        "schematic"
+        if Path(normalized_source).suffix.casefold() == ".schdoc"
+        else "pcb"
+    )
+    expected_views = {"sheet"} if expected_kind == "schematic" else {"top", "bottom"}
+    if (
+        not isinstance(source, str)
+        or normalized_source not in documents
+        or not isinstance(kind, str)
+        or kind != expected_kind
+        or not isinstance(view, str)
+        or view not in expected_views
+        or not isinstance(media_type, str)
+        or media_type != "image/svg+xml"
+        or not isinstance(width, int)
+        or width != expected_width
+        or not isinstance(height, int)
+        or height != expected_height
+        or not isinstance(source_digest, str)
+    ):
+        raise CadConversionError("converter returned invalid project render metadata")
+    source_path = (project_root / source).resolve(strict=True)
+    try:
+        source_path.relative_to(project_root)
+    except ValueError as exc:
+        raise CadConversionError("converter project source escaped its project root") from exc
+    if source_digest != _sha256(source_path):
+        raise CadConversionError("converter project source evidence does not match")
+    artifact = _artifact(value, suffix=".svg", output_directory=output_directory)
+    content = artifact.read_bytes()
+    try:
+        root = ElementTree.fromstring(content)
+    except ElementTree.ParseError as exc:
+        raise CadConversionError("converter project artifact is not valid SVG") from exc
+    if root.tag.rsplit("}", 1)[-1].casefold() != "svg":
+        raise CadConversionError("converter project artifact is not valid SVG")
+    return NativeProjectRenderArtifact(
+        source_path=Path(source).as_posix(),
+        kind=kind,
+        view=view,
+        content=content,
+        media_type=media_type,
+        width=width,
+        height=height,
+        source_sha256=source_digest,
+    )
+
+
+def render_altium_project_documents(
+    project_root: Path,
+    documents: tuple[str, ...],
+    *,
+    output_directory: Path,
+    converter_executable: Path | None = None,
+    timeout_seconds: float = 60,
+    width: int = 1600,
+    height: int = 1000,
+) -> NativeProjectRender:
+    """Render exact Altium project documents as verified SVG without Altium Designer."""
+
+    root = Path(project_root).resolve(strict=True)
+    output = Path(output_directory).resolve()
+    normalized = tuple(Path(document).as_posix() for document in documents)
+    if not normalized or len(set(normalized)) != len(normalized):
+        raise CadConversionError("project render requires distinct documents")
+    executable = _resolve_converter_executable(converter_executable)
+    request = {
+        "schema": _PROJECT_REQUEST_SCHEMA,
+        "projectRoot": str(root),
+        "outputDirectory": str(output),
+        "documents": list(normalized),
+        "width": width,
+        "height": height,
+    }
+    output.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(
+        prefix="Stockroom Project Renderer ", dir=output.parent
+    ) as temporary:
+        boundary = Path(temporary)
+        request_path = boundary / "Request.json"
+        result_path = boundary / "Result.json"
+        request_path.write_text(
+            json.dumps(request, indent=2, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
+        result = _invoke(
+            executable,
+            request_path,
+            result_path,
+            timeout_seconds,
+            result_schema=_PROJECT_RESULT_SCHEMA,
+        )
+
+    values = result.get("artifacts")
+    if not isinstance(values, list):
+        raise CadConversionError("converter result is missing project render artifacts")
+    artifacts = tuple(
+        _project_artifact(
+            value,
+            project_root=root,
+            output_directory=output,
+            documents=set(normalized),
+            expected_width=width,
+            expected_height=height,
+        )
+        for value in values
+    )
+    expected = {
+        (document, view)
+        for document in normalized
+        for view in (
+            ("sheet",)
+            if Path(document).suffix.casefold() == ".schdoc"
+            else ("top", "bottom")
+        )
+    }
+    observed = {(artifact.source_path, artifact.view) for artifact in artifacts}
+    if observed != expected or len(observed) != len(artifacts):
+        raise CadConversionError("converter returned an incomplete project render set")
+    detail = result.get("detail")
+    return NativeProjectRender(
+        detail=detail if isinstance(detail, str) else "Altium project render is ready.",
+        artifacts=artifacts,
+    )
 
 
 def _resolve_converter_executable(value: Path | str | None) -> Path:
@@ -312,4 +481,11 @@ if __name__ == "__main__":
     raise SystemExit(_main())
 
 
-__all__ = ["CadConversionError", "NativeAltiumConversion", "convert_pcad_ascii"]
+__all__ = [
+    "CadConversionError",
+    "NativeAltiumConversion",
+    "NativeProjectRender",
+    "NativeProjectRenderArtifact",
+    "convert_pcad_ascii",
+    "render_altium_project_documents",
+]

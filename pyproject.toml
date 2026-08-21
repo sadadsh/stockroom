@@ -18,7 +18,6 @@ dependencies = [
     # Altium's native documentation pipeline emits PDF. PDFium rasterizes those
     # exact native pages into safe, browser-neutral PNG review artifacts so the
     # Projects reviewer has the same visual workflow as KiCad's SVG exporter.
-    "pypdfium2>=4.30",
     # Native Altium/KiCad project visuals import PIL during ordinary host startup,
     # so Pillow is a production dependency, not only a screenshot-test utility.
     "pillow>=10.0",

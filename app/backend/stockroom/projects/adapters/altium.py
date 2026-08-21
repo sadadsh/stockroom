@@ -6,7 +6,6 @@ import hashlib
 import json
 import re
 import threading
-import time
 from pathlib import Path
 
 from stockroom.altium.driver import AltiumDriver
@@ -48,7 +47,7 @@ class AltiumProjectAdapter:
     def __init__(self, driver: AltiumDriver | None = None) -> None:
         self.driver = driver or AltiumDriver()
         self._render_lock = threading.Lock()
-        self._render_cache: tuple[tuple, float, ProjectVisualBundle] | None = None
+        self._render_cache: dict[str, tuple[tuple, ProjectVisualBundle]] = {}
 
     @staticmethod
     def _root(candidate: Path) -> Path:
@@ -112,7 +111,7 @@ class AltiumProjectAdapter:
                 False,
                 "unavailable",
                 detail=(
-                    "Install Altium Designer to render, validate, edit, and release this project."
+                    "Install Altium Designer to validate, edit, and release this project."
                 ),
             )
         version = self.driver.x2.parent.name if self.driver.x2 else ""
@@ -266,13 +265,26 @@ class AltiumProjectAdapter:
                 if (Path(project.root) / relative).is_file()
             ),
         )
+        cache_id = Path(project.root).resolve().as_posix().casefold()
         with self._render_lock:
-            cached = self._render_cache
-            if cached is not None and cached[0] == key and time.monotonic() - cached[1] < 5:
-                return cached[2]
-            bundle = render_altium_project(project, self.driver)
-            self._render_cache = (key, time.monotonic(), bundle)
-            return bundle
+            cached = self._render_cache.get(cache_id)
+            if cached is not None and cached[0] == key:
+                return cached[1]
+            bundle = render_altium_project(project)
+            if bundle.evidence.get("status") == "ready":
+                self._render_cache[cache_id] = (key, bundle)
+                return bundle
+            if cached is None or cached[1].evidence.get("status") != "ready":
+                return bundle
+            evidence = dict(cached[1].evidence)
+            evidence.pop("digest", None)
+            evidence["stale"] = True
+            evidence["detail"] = (
+                f"{bundle.evidence.get('detail') or 'Fresh render failed'} "
+                "Showing the last valid render."
+            )
+            evidence["digest"] = _digest(evidence)
+            return ProjectVisualBundle(evidence, cached[1].artifacts)
 
 
 def _digest(value: object) -> str:
