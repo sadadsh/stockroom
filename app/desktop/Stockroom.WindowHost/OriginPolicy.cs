@@ -37,6 +37,24 @@ internal static class OriginPolicy
                 StringComparison.Ordinal);
     }
 
+    internal static bool TryExternalNavigation(
+        string? candidate,
+        out Uri parsed)
+    {
+        parsed = null!;
+        if (string.IsNullOrEmpty(candidate)
+            || !Uri.TryCreate(candidate, UriKind.Absolute, out var candidateUri)
+            || !string.IsNullOrEmpty(candidateUri.UserInfo)
+            || (candidateUri.Scheme != Uri.UriSchemeHttps
+                && candidateUri.Scheme != "ms-windows-store"))
+        {
+            return false;
+        }
+
+        parsed = candidateUri;
+        return true;
+    }
+
     private static bool TrySameOrigin(
         string? candidate,
         Uri expectedOrigin,

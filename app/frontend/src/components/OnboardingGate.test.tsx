@@ -122,6 +122,7 @@ describe("OnboardingGate", () => {
   });
 
   it("starts GitHub browser sign-in without showing a token control", async () => {
+    const open = vi.spyOn(window, "open").mockReturnValue(null);
     const unsigned = statusAt("catalog_repository");
     unsigned.guided_setup = guidedSetupAt("catalog_repository", {
       ready: false,
@@ -138,6 +139,11 @@ describe("OnboardingGate", () => {
 
     expect(screen.queryByLabelText(/token/i)).not.toBeInTheDocument();
     await userEvent.setup().click(screen.getByRole("button", { name: "Sign In With GitHub" }));
+    expect(open).toHaveBeenCalledWith(
+      "https://github.com/login/device",
+      "_blank",
+      "noreferrer",
+    );
     await waitFor(() => expect(mockApi.startOnboardingGitHubLogin).toHaveBeenCalledOnce());
     expect(mockApi.openJobStream).toHaveBeenCalledWith("login-1");
   });

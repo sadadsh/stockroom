@@ -246,6 +246,7 @@ class GitHubCli:
             "auth",
             "login",
             "--web",
+            "--clipboard",
             "--hostname",
             "github.com",
             "--git-protocol",

@@ -174,6 +174,7 @@ def test_browser_login_keeps_auth_output_private_and_returns_selected_viewer_fie
         "auth",
         "login",
         "--web",
+        "--clipboard",
         "--hostname",
         "github.com",
         "--git-protocol",

@@ -771,3 +771,19 @@ self-signed Code Signing certificate is trusted once during installation; every
 later `main` build must match that public identity. GitHub-channel installations
 check the TUF feed on launch and in the background without manual redownloads.
 Microsoft Store distribution remains optional and separate.
+
+### Portable Stockroom Uses The Same Signed Native Runtime
+
+The primary GitHub download is a deterministic ZIP derived from the exact signed MSIX. Its root
+`Stockroom.exe` is the signed WPF host; the archive retains the same immutable packaged worker,
+GitHub CLI, CAD converter, update metadata, and rollback boundary. It never revives the retired
+source-cloning Python launcher. App Installer remains an optional installed channel.
+
+### Catalog Sign-In Opens The GitHub Device Page Explicitly
+
+The bundled GitHub CLI still owns OAuth and credential storage. Stockroom opens GitHub's device
+page itself and asks the CLI to copy the one-time code, because a hidden packaged CLI can produce
+the code without successfully launching the Windows browser. The main WebView may send only
+credential-free HTTPS or Microsoft Store destinations to the Windows shell; file, script, HTTP,
+and credential-bearing URLs remain blocked. Provider pages remain inside their dedicated WebView
+and cannot use this route.

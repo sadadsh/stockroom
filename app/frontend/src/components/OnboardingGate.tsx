@@ -12,6 +12,7 @@ import {
 } from "../api/queries";
 import type { GuidedSetupStep, OnboardingStatus } from "../api/types";
 import { useScenarioUiState } from "../design-studio/scenarioState";
+import { openExternalUrl } from "../lib/externalNavigation";
 import { pickHostFolder } from "../lib/hostFolderPicker";
 import { Text, useText } from "../lib/copy";
 import { Button, Card, Eyebrow } from "./primitives";
@@ -252,8 +253,13 @@ function CatalogRepository({ status }: { status: OnboardingStatus }) {
 
   async function signIn() {
     setError("");
-    const terminal = await login.start();
-    if (terminal.status === "error") setError(terminal.error ?? failed);
+    try {
+      openExternalUrl("https://github.com/login/device");
+      const terminal = await login.start();
+      if (terminal.status === "error") setError(terminal.error ?? failed);
+    } catch (cause) {
+      setError(errorText(cause, failed));
+    }
   }
 
   async function submit() {
@@ -306,7 +312,7 @@ function CatalogRepository({ status }: { status: OnboardingStatus }) {
         <div className="mt-5 flex justify-end">
           <Button variant="accent" disabled={login.status === "running" || !github.available} onClick={signIn}>
             {login.status === "running" ? (
-              <Text id="onboarding.catalog.signing-in">Waiting For GitHub...</Text>
+              <Text id="onboarding.catalog.signing-in">Finish In GitHub...</Text>
             ) : (
               <Text id="onboarding.catalog.sign-in">Sign In With GitHub</Text>
             )}

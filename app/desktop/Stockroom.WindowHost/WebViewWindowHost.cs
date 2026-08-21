@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Security.Cryptography;
@@ -2336,6 +2337,27 @@ internal sealed class WebViewWindowHost : IDisposable
         CoreWebView2NewWindowRequestedEventArgs eventArguments)
     {
         eventArguments.Handled = true;
+        if (!OriginPolicy.TryExternalNavigation(
+                eventArguments.Uri,
+                out var destination))
+        {
+            return;
+        }
+
+        try
+        {
+            Process.Start(
+                new ProcessStartInfo
+                {
+                    FileName = destination.AbsoluteUri,
+                    UseShellExecute = true,
+                });
+        }
+        catch (Exception exception)
+            when (exception is InvalidOperationException or Win32Exception)
+        {
+            // The caller remains inside Stockroom when Windows has no handler.
+        }
     }
 
     private static void OnDownloadStarting(
