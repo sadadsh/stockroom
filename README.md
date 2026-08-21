@@ -1,155 +1,144 @@
 # Stockroom
 
-Stockroom is a Windows desktop app for managing a shared KiCad V10 and Altium
-component library and the PCB projects that use it. Open a component and choose
-**CAD Models > Manage Models** to see every known provider, with complete Symbol +
-Footprint + 3D Model sets first. Choose KiCad, Altium, or both, then open any
-provider in Stockroom's movable mini browser. Stockroom never drives the provider
-page; it validates and attaches only files that arrive for the selected EDAs.
-**Choose Downloaded Files** is the manual recovery path. It also audits existing PCB projects, adding
-the parts it does not recognize and relinking the ones it does.
+Stockroom keeps electronic components, CAD files, datasheets, sourcing evidence, and PCB projects in one Windows app. Your component Catalog lives in its own Git repository, so you can use the same parts on another PC or share them with people who have repository access.
 
-The installed app is a native WPF shell with WebView2. It supervises an immutable,
-windowless Python worker (FastAPI) that serves the React single-page app; provider pages use a
-separate native WebView2 surface inside Stockroom's modal. The library itself is a git repository of one JSON file per part,
-with a SQLite index that is derived and never committed. Every write to a
-`.kicad_*` file goes through a byte-preserving s-expression layer inside a single
-git-backed transaction, so an edit either lands as one clean commit or leaves no
-trace.
+[Download Stockroom for Windows](https://sadadsh.github.io/stockroom/) and choose the portable EXE. Unzip it, then open `Stockroom.exe`.
 
-> New here? [`CONTRIBUTING.md`](CONTRIBUTING.md) is the short path to a clean change.
-> [`docs/architecture.md`](docs/architecture.md) is the full module map and the patterns that keep
-> the codebase modular; [`docs/adding-a-feature.md`](docs/adding-a-feature.md) is step-by-step
-> recipes per extension point.
+## Start Here
 
-## Repository layout
+1. Choose KiCad, Altium Designer, or both.
+2. Sign in to GitHub and connect a Catalog repository.
+3. Add a component by exact manufacturer part number or distributor link.
+4. Download missing CAD files through **Manage CAD Assets**.
+5. Open **Projects** to find local KiCad and Altium work and match its BOM to your Catalog.
 
-    app/backend/stockroom/   Backend package (see "Backend layers" below)
-    app/frontend/            React + TypeScript + Tailwind SPA (source)
-    app/frontend-dist/       The built SPA the backend serves (committed)
-    tests/backend/           Backend test suite, mirroring the package tree
-    packaging/               Windows MSIX/App Installer build and release tooling
-    docs/                    Architecture, the add-a-feature guide, and the design contract
-    scripts/                 Local dev and benchmarking harnesses
+Stockroom saves Catalog changes to Git. PCB project repositories stay separate.
 
-### Backend layers
+## Components
 
-The backend is a stack, low level to high:
+The Components screen is the home for your Catalog. Search or filter the list on the left, then open a component to see its CAD, specifications, sourcing, documents, and history.
 
-- `sexp/` is the byte-preserving s-expression editor. It is the only thing that
-  edits `.kicad_*` files, splicing scoped spans and passing everything it doesn't
-  model through untouched.
-- `model/` holds plain dataclasses for a part, a project, a category.
-- `mutation/` is the `Transaction` (the atomic git committer) plus the library and
-  project operations built on it.
-- `kicad/` reads and writes KiCad files: symbols, footprints, schematics, boards,
-  the library tables, and the kicad-cli wrapper.
-- `ingest/` takes provider downloads apart: fingerprinting, staging, and preparing
-  verified KiCad, Altium, and shared 3D assets.
-- `enrich/` and `scrape/` turn a manufacturer part number into specs, datasheets,
-  and assets. `scrape/` is the portable headless-browser engine; `enrich/`
-  orchestrates it.
-- `api/` is the FastAPI app and its routers, plus the per-launch bearer token and
-  the job and SSE plumbing.
-- `host/` owns the source-development WebView bridge and worker lifecycle helpers;
-  `launcher/` is the frozen worker entry point. The visible installed shell lives in
-  `app/desktop/Stockroom.WindowHost/`.
+The first view stays compact. **Show Details** reveals missing fields and source evidence when you need them.
 
-### Frontend
+![An open component with its Catalog list, CAD previews, specifications, and sourcing panel](docs/images/readme/components-dark-1500w.png)
 
-`app/frontend/src` holds the SPA. `pages/` has the top-level screens, `components/`
-the shared UI (the primitive import surface is `components/primitives.ts`), `api/` the
-typed client and the TanStack Query hooks, and `lib/` the router, theme, and
-view-model helpers. Design tokens (color, spacing, type, radius) live in
-`styles/index.css` and `tailwind.config.js`.
+### Add A Part
 
-## Developing
+Select **Add Parts**, paste an exact MPN or a distributor link, and choose **Look Up**. Stockroom checks Mouser first, DigiKey second, and an identity-matched manufacturer datasheet. It keeps sourced fields and reports gaps instead of creating fake values.
 
-You need Python 3.12+, [uv](https://docs.astral.sh/uv/), and Node 20+. KiCad 10 is
-optional; the features that use it (ERC, DRC, previews) degrade honestly when it is
-missing rather than crashing.
+Review the result once, then add it to the Catalog. Parts that still need CAD appear in Assets.
 
-Set up both halves:
+![The Add A Part window with one source field and a short three-step workflow](docs/images/readme/ingest-dark-1500w.png)
 
-    uv sync
-    cd app/frontend && npm ci
+## CAD Assets
 
-For the isolated source-development loop, use
-`scripts\Start-Stockroom-Development.ps1`; its optional Start menu shortcut is
-named **Stockroom Development** and targets one exact checkout. The installed
-product is designed as a separate signed WPF/MSIX application. Building and
-shipping it is covered in `packaging/README.md`.
+Assets separates two jobs:
 
-## Downloading and updating
+- **Needs Assets** lists components missing a required symbol, footprint, or shared 3D model.
+- **Build Now** lists components ready for the selected CAD tool's generated Catalog.
 
-The rapid Windows channel is hosted on
-[Stockroom's download page](https://sadadsh.github.io/stockroom/). Download the
-portable archive, extract it, and open `Stockroom.exe`. Every successful push to
-`main` publishes a signed immutable release and atomically deploys its verified
-update feed. Stockroom checks that feed on launch, so later updates need no manual
-download. App Installer remains available as an optional installed channel.
+![The Assets screen showing components that need CAD files](docs/images/readme/assets-dark-1500w.png)
 
-App Installer owns its Start menu entry, Installed Apps registration, repair, and
-uninstall. The portable archive launches `Stockroom.exe`; both channels supervise the
-immutable packaged backend without invoking a checkout, `uv`, or system Python.
-The Microsoft Store submission remains a separate optional distribution channel;
-it is not part of the rapid GitHub update path. See `packaging/README.md` for the
-exact package and trust boundaries.
+Open **Manage CAD Assets** for a component, choose the EDAs you use, then pick a provider tab. The built-in browser behaves like a normal browser. Stockroom takes you to the part page and leaves sign-in, navigation, and the download button to you.
 
-## Verifying a change
+When a download lands, Stockroom checks it against the exact component. Proven files attach at once, the browser closes, and the component reports **CAD Ready** or names the files that were added. An ambiguous or mismatched package stays available for review. **Import Existing CAD Files** is the manual fallback.
 
-The completion authority is the Windows aggregate gate:
+![Manage CAD Assets with EDA choices, provider tabs, requested files, and download status](docs/images/readme/manage-models-dark-1500w.png)
 
-    powershell -ExecutionPolicy Bypass -File scripts\Gates.ps1
+## Projects
 
-Its individual layers can be run while developing:
+Projects finds KiCad and Altium projects through Windows Search. **Add Location** covers folders Windows has not indexed.
 
-Backend:
+Select a project to inspect its schematic and PCB documents, render either EDA through the same Stockroom canvas, build a BOM, and match exact MPNs to the Catalog. A selector appears when a project contains several boards or schematic documents.
 
-    uv run pytest tests/backend
+Stockroom keeps project Git history in the project repository. It keeps reusable components in the Catalog repository.
 
-Tests that need the `kicad-cli` binary skip themselves when it is absent, so the
-suite is green on a machine without KiCad installed. The write-verification gate is
-described in `docs/backend-testing.md`.
+![The Projects workspace with discovered projects, project files, renderer tabs, and selected document details](docs/images/readme/projects-dark-1500w.png)
 
-Frontend:
+## STM32 Tools
 
-    cd app/frontend
-    npm run test:run
-    npm run typecheck
-    npm run build
+Tools includes an STM32 Explorer and compatibility bench. Search 2,000-plus MCUs, filter by family and package, choose useful columns, inspect pins, and compare target requirements without leaving Stockroom.
 
-`npm run build` regenerates `app/frontend-dist/`, which the backend serves. Commit
-that rebuilt output in the same commit as the source change that produced it.
+![The STM32 Explorer with family filters and a dense specification table](docs/images/readme/stm-dark-1500w.png)
 
-Windows CI runs the aggregate gate's backend, native,
-frontend, type, production-build, and committed-distribution checks, then builds
-the documented unsigned package fixture. The release workflow calls that same CI
-workflow before any signed package can publish.
+## Settings
 
-## Adding a feature
+Settings owns five groups:
 
-The grain of the codebase runs backend to frontend:
+- **General**: updates, theme, applied design, and version details.
+- **Catalog**: GitHub connection, Catalog checkout, sharing, and sync health.
+- **CAD Tools**: KiCad and Altium setup and generated library paths.
+- **Sources**: Mouser and DigiKey API configuration.
+- **Maintenance**: health checks, rebuilds, recovery, and cleanup.
 
-1. Build the backend seam first, with a test. Start at the layer that owns the
-   change (a model field, a mutation, an enrich step) and write the `pytest`
-   before the code.
-2. Expose it through an `api/` router.
-3. Add the typed call to `api/client.ts` and a TanStack hook in `api/queries.ts`.
-4. Build the UI from the shared primitives, following the design contract.
-5. Run both verify gates and commit the rebuilt `frontend-dist/` alongside the
-   source.
+Stockroom checks signed GitHub releases while it runs. A healthy update stages beside the current runtime and activates after restart. The previous generation remains available for rollback.
 
-That order keeps the seams testable and the layers honest.
-[`docs/adding-a-feature.md`](docs/adding-a-feature.md) turns each of those steps into a concrete
-recipe (a new endpoint, an API type, a page, a design token, editable copy, a spec rule).
+![Settings showing update status, machine readiness, appearance, version, and automatic update details](docs/images/readme/settings-dark-1500w.png)
 
-## Conventions
+## Design Studio
 
-- The UI follows `docs/design/design-rules.md`: named tokens over scattered
-  literals, one small set of radii, Title Case on interactive labels, no em
-  dashes. `docs/design/Stockroom Reliability And Design Freedom Decisions.md` is
-  the current design authority; `docs/design/north-star-ui.md` is historical context.
-- Commits are scoped (`git add <path>`, never `-A`) with a plain one-line message.
-- Nothing that touches a `.kicad_*` file bypasses the s-expression layer, and no
-  mutation escapes a `Transaction`.
+Design Studio edits Stockroom itself.
+
+- **Preview** lets you use the app.
+- **Edit** lets you select visible elements, move, resize, rotate, restyle, replace content or icons, change stacking order, and hide elements.
+- **Draft** saves personal work without changing the ordinary app.
+- **Apply To This PC** activates the design outside Design Studio.
+
+Layers exposes hidden items and exact repeated occurrences. Grid snap, free movement, undo, and reset stay available from the editor. Hold `Ctrl+Shift` while launching Stockroom to bypass an applied design for recovery.
+
+![Design Studio with the component screen, Layers, variations, selection handles, and the inspector](docs/images/readme/design-studio-dark-1366w.png)
+
+## Catalog Sharing
+
+A Stockroom Catalog is an ordinary Git repository with one JSON record per component plus its managed documents and CAD files. Derived SQLite indexes and generated EDA outputs stay out of Git.
+
+Give another person access to the Catalog repository, then let them connect it from Stockroom. Git history keeps earlier values, while Stockroom uses the newest accepted field edit. You do not need a Sync button during normal work.
+
+## Download And Updates
+
+The [Stockroom download page](https://sadadsh.github.io/stockroom/) offers two Windows channels:
+
+- **Portable EXE**: unzip and open `Stockroom.exe`. This is the shortest path.
+- **App Installer**: installs Stockroom into Windows and uses the same signed runtime.
+
+Both channels use the same native WPF host, WebView2 interface, immutable packaged worker, CAD converter, and signed update feed. Microsoft Store distribution is optional and separate.
+
+## Development
+
+Stockroom uses a native .NET WPF host, a React and TypeScript interface, and a windowless FastAPI worker. Provider pages run in a separate native WebView2 surface. The Catalog uses Git for recovery and sharing.
+
+Install Python 3.12+, [uv](https://docs.astral.sh/uv/), and Node 20+:
+
+```powershell
+uv sync
+npm.cmd --prefix app/frontend ci
+```
+
+Start the isolated development app:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\Start-Stockroom-Development.ps1
+```
+
+Run the completion gate:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\Gates.ps1
+```
+
+The gate covers Python, TypeScript, React, native host, CAD converter, production build, and committed `frontend-dist` synchronization.
+
+## Repository Map
+
+```text
+app/backend/stockroom/          FastAPI worker and domain code
+app/desktop/                    Native Windows host and CAD converter
+app/frontend/                   React and TypeScript source
+app/frontend-dist/              Committed production interface
+docs/                           Architecture and product decisions
+packaging/                      Windows release and update tooling
+scripts/                        Development and verification commands
+tests/                          Backend and native tests
+```
+
+Read [CONTRIBUTING.md](CONTRIBUTING.md) before changing source. [docs/architecture.md](docs/architecture.md) explains module ownership, and [docs/adding-a-feature.md](docs/adding-a-feature.md) gives the shortest supported path for common changes.
