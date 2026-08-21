@@ -95,6 +95,7 @@ import type {
   SyncResult,
   SyncStatus,
   SystemInfo,
+  SystemProjectDiscovery,
   UpdateApply,
   UpdateCheck,
   StmStatusDTO,
@@ -488,6 +489,10 @@ export const api = {
     return request<{ projects: DiscoveredProject[] }>("POST", "/api/projects/discover", {
       body: { candidate },
     });
+  },
+
+  discoverSystemProjects(): Promise<SystemProjectDiscovery> {
+    return apiGet<SystemProjectDiscovery>("/api/projects/discover-system");
   },
 
   registerProject(root: string, eda: "kicad" | "altium"): Promise<ProjectSummary> {

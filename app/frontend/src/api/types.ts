@@ -838,6 +838,12 @@ export interface DiscoveredProject {
   schematics: string[];
 }
 
+export interface SystemProjectDiscovery {
+  status: "ready" | "unavailable";
+  detail: string;
+  projects: DiscoveredProject[];
+}
+
 export interface ProjectDocument {
   document_id: string;
   path: string;

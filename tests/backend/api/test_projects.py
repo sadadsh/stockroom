@@ -138,6 +138,37 @@ def test_discover_previews_every_project_before_linking(client, tmp_path):
     assert rows[1]["boards"] == ["Amp.PcbDoc"]
 
 
+def test_system_discovery_groups_indexed_descriptors_without_registering(
+    client,
+    tmp_path,
+    monkeypatch,
+):
+    from stockroom.projects.windows_search import IndexedProjectSearch
+
+    kicad = tmp_path / "Amp" / "Amp.kicad_pro"
+    altium = tmp_path / "Power" / "Power.PrjPcb"
+    kicad.parent.mkdir()
+    altium.parent.mkdir()
+    kicad.write_text("{}", encoding="utf-8")
+    altium.write_text("[Design]", encoding="utf-8")
+    monkeypatch.setattr(
+        "stockroom.api.routers.projects.search_project_descriptors",
+        lambda: IndexedProjectSearch(
+            status="ready",
+            detail="Windows Search found 2 project descriptors.",
+            paths=(kicad, altium),
+        ),
+    )
+
+    response = client.get("/api/projects/discover-system")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "ready"
+    assert {project["eda"] for project in body["projects"]} == {"kicad", "altium"}
+    assert client.get("/api/projects").json() == []
+
+
 def test_workspace_has_the_same_tools_and_document_shape_for_both_edas(
     client, tmp_path, monkeypatch
 ):

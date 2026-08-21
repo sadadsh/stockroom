@@ -305,6 +305,14 @@ export function useDiscoverProjects() {
   });
 }
 
+export function useSystemProjectDiscovery() {
+  return useQuery({
+    queryKey: ["system-project-discovery"],
+    queryFn: () => api.discoverSystemProjects(),
+    refetchOnWindowFocus: false,
+  });
+}
+
 export function useRegisterProject() {
   const queryClient = useQueryClient();
   return useMutation({

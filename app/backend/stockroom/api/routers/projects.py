@@ -65,6 +65,7 @@ from stockroom.projects.review_evidence import (
     review_validation_key,
     run_review_native_validation,
 )
+from stockroom.projects.windows_search import search_project_descriptors
 from stockroom.vcs.locks import GitLfsLockService
 from stockroom.vcs.repo import GitRepo
 from stockroom.vcs.sync import SyncEngine
@@ -252,6 +253,35 @@ def projects_router(require_token) -> APIRouter:
     def discover_linkable_projects(body: DiscoverProjectsBody) -> dict:
         projects = discover_projects(Path(body.candidate), requested=body.eda)
         return {"projects": [_description_payload(project) for project in projects]}
+
+    @r.get("/discover-system")
+    def discover_system_projects() -> dict:
+        search = search_project_descriptors()
+        projects = []
+        seen: set[tuple[str, str, str]] = set()
+        for descriptor in search.paths:
+            if not descriptor.is_file():
+                continue
+            try:
+                descriptions = discover_projects(descriptor)
+            except (OSError, ValueError):
+                continue
+            for description in descriptions:
+                key = (
+                    description.root.resolve().as_posix().casefold(),
+                    description.adapter_key,
+                    description.descriptor.casefold(),
+                )
+                if key in seen:
+                    continue
+                seen.add(key)
+                projects.append(_description_payload(description))
+        projects.sort(key=lambda row: (row["name"].casefold(), row["root"].casefold()))
+        return {
+            "status": search.status,
+            "detail": search.detail,
+            "projects": projects,
+        }
 
     @r.get("/{project_id}/workspace")
     def project_workspace(request: Request, project_id: str) -> dict:
