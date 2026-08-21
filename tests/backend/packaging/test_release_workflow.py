@@ -230,8 +230,10 @@ def test_release_materializes_only_the_pinned_tuf_root() -> None:
 def test_only_the_exact_verified_release_asset_set_can_be_published() -> None:
     verify = named_step("build-windows-package", "Verify And Stage Exact Release Assets")["run"]
     upload = named_step("build-windows-package", "Upload Verified Release Assets")
-    publish = named_step("publish-github-release", "Publish Signed Windows Release")["run"]
+    publish_step = named_step("publish-github-release", "Publish Signed Windows Release")
+    publish = publish_step["run"]
 
+    assert publish_step["env"]["GH_REPO"] == "${{ github.repository }}"
     assert upload["with"]["path"] == "${{ runner.temp }}\\Stockroom.Release.Publish"
     assert upload["with"]["if-no-files-found"] == "error"
     assert "Copy-Item -LiteralPath $packagePath -Destination $publishRoot" in verify

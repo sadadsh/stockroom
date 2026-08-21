@@ -775,6 +775,7 @@ jobs:
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
           STOCKROOM_PACKAGE_VERSION: ${{ needs.build-windows-package.outputs.version }}
           STOCKROOM_RELEASE_TAG: ${{ needs.build-windows-package.outputs.release_tag }}
         run: |
