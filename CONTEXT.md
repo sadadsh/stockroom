@@ -12,6 +12,22 @@ _Avoid_: Operator, administrator
 The shared, versioned collection of component records, sourcing evidence, and retained CAD assets.
 _Avoid_: Database, workspace, components folder
 
+**PCB Project**:
+One KiCad or Altium design grouped by its native project descriptor, source documents, and project repository. A PCB Project uses a Component Catalog but never contains or owns that catalog.
+_Avoid_: Catalog project, project catalog
+
+**Project Document**:
+One top-level schematic or PCB source file inside a PCB Project. Stockroom uses the exact filename when more than one document of the same kind exists.
+_Avoid_: Project tab, canvas
+
+**Schematic Sheet**:
+One page within a schematic Project Document. Sheets remain grouped under their document instead of appearing as separate projects.
+_Avoid_: Schematic project, document
+
+**Project Render**:
+The read-only Stockroom view of a Project Document. KiCad and Altium Project Renders use the same canvas, controls, sizing, and presentation grammar.
+_Avoid_: Native editor, project preview image
+
 **Catalog Repository**:
 The GitHub repository and its managed local folder that own one Component Catalog. Its visibility is chosen when the repository is created.
 _Avoid_: Library path, database location

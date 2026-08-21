@@ -743,3 +743,17 @@ they never consume drawing space by default.
 Ordinary specification values remain visible immediately. Missing values and per-row source drawers
 appear only after Show Details in the component header. Selecting a missing or conflicting quality
 summary opens Details automatically, so every existing recovery path remains direct.
+
+### Projects Use One Headless Renderer Contract
+
+PCB Project repositories and Catalog repositories stay separate. Projects discovers native project
+descriptors through the Windows Search index, with Add Location as the fallback for unindexed folders.
+Selecting a project opens one focused workspace and builds its BOM. Exact MPN matches link to the
+current Catalog; every uncertain match stays behind one Review action.
+
+KiCad and Altium documents use one Stockroom canvas and presentation grammar. KiCad keeps its
+read-only CLI SVG export. The bundled CAD Converter reads Altium project documents through the
+vendored AltiumSharp implementation and emits SVG without starting Altium Designer or running an
+OutJob. A document selector appears only for multiple top-level schematics or PCBs, while schematic
+sheets remain grouped under their document. The first proof excludes 3D, native editing, advanced
+layers, and new collaboration infrastructure.
