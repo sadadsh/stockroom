@@ -159,12 +159,13 @@ def test_crlf_fixtures_have_normalized_git_blobs() -> None:
         assert state.startswith("i/lf"), state
 
 
-def test_ci_initializes_every_native_cad_converter_source() -> None:
-    text = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+def test_ci_and_release_initialize_every_native_cad_converter_source() -> None:
+    for workflow in ("ci.yml", "release.yml"):
+        text = (ROOT / ".github" / "workflows" / workflow).read_text(encoding="utf-8")
 
-    assert "shared/OriginalCircuit.Eda.Abstractions" in text
-    assert "shared/OriginalCircuit.Eda.Rendering" in text
-    assert "b24200f06618cecd36f42ff966e9db9ea9491f35" in text
+        assert "shared/OriginalCircuit.Eda.Abstractions" in text
+        assert "shared/OriginalCircuit.Eda.Rendering" in text
+        assert "b24200f06618cecd36f42ff966e9db9ea9491f35" in text
 
 
 def test_release_repository_excludes_personal_editor_tooling() -> None:
