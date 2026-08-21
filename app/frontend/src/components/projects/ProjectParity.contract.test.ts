@@ -41,6 +41,8 @@ describe("Projects cross-EDA frontend contract", () => {
   it("routes every daily view through one selected-project shell", () => {
     const source = Object.values(WORKFLOW_SOURCE).join("\n");
     expect(source).toContain('"overview"');
+    expect(source).toContain('"schematic"');
+    expect(source).toContain('"pcb"');
     expect(source).toContain('"bom"');
     expect(source).toContain('"build"');
     expect(source).toContain('"activity"');
@@ -48,7 +50,7 @@ describe("Projects cross-EDA frontend contract", () => {
     expect(source).toContain('devIdBase="projects"');
   });
 
-  it("uses one placement stage in overview, BOM, and build", () => {
+  it("uses one placement stage in every project visual and build view", () => {
     const users = Object.entries(WORKFLOW_SOURCE)
       .filter(([, source]) => source.includes("<ProjectPlacementStage"))
       .map(([path]) => path.split("/").pop())
@@ -57,6 +59,7 @@ describe("Projects cross-EDA frontend contract", () => {
       "ProjectAssemblyWorkbench.tsx",
       "ProjectBomWorkbench.tsx",
       "ProjectDesignWorkbench.tsx",
+      "ProjectsPage.tsx",
     ]);
   });
 });

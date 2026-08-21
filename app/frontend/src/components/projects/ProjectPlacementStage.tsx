@@ -13,6 +13,7 @@ import type {
   ProjectBoardSceneVia,
   ProjectPlacement,
   ProjectPlacementGeometry,
+  ProjectVisualArtifact,
   ProjectVisualDocument,
 } from "../../api/types";
 import { Text, useCopyFormatter, useText } from "../../lib/copy";
@@ -60,6 +61,8 @@ export function ProjectPlacementStage({
   onRetry,
   unavailable = false,
   className = "",
+  documentKind = "pcb",
+  documentPath = "",
 }: {
   projectId: string;
   geometry: ProjectPlacementGeometry | undefined;
@@ -72,9 +75,13 @@ export function ProjectPlacementStage({
   onRetry?: () => void;
   unavailable?: boolean;
   className?: string;
+  documentKind?: "schematic" | "pcb";
+  documentPath?: string;
 }) {
   const fixturePreview = useScenarioUiState().projects !== undefined;
-  const mapLabel = useText("projects.placement-map.aria", "PCB view");
+  const pcbMapLabel = useText("projects.placement-map.aria", "PCB view");
+  const schematicMapLabel = useText("projects.schematic-map.aria", "Schematic view");
+  const mapLabel = documentKind === "schematic" ? schematicMapLabel : pcbMapLabel;
   // The stage's accessible name states the gestures, which nothing visible does.
   const stageName = useCopyFormatter(
     "projects.placement-stage.aria",
@@ -84,6 +91,7 @@ export function ProjectPlacementStage({
   // board actually shown is derived below, so a document list that changes under the picker cannot
   // leave the stage pointing at a board that is no longer there.
   const [boardChoice, setBoardChoice] = useState("");
+  const [artifactChoice, setArtifactChoice] = useState("");
   const [side, setSide] = useState<"top" | "bottom">("top");
   const [expanded, setExpanded] = useState(false);
   // Each of the three selections below is stored WITH the thing it belongs to, and read back only
@@ -106,10 +114,20 @@ export function ProjectPlacementStage({
     }
     return paths;
   }, [visuals.data?.documents]);
-  const boards = geometry?.boards.length ? geometry.boards : renderedBoards;
+  const reportedBoards = geometry?.boards.length ? geometry.boards : renderedBoards;
+  const boards = documentPath
+    ? reportedBoards.filter((path) => normalizePath(path) === normalizePath(documentPath))
+    : reportedBoards;
   // Derived, not corrected in an effect: the render that first sees a new board list already shows
   // a board that exists in it, and the reader's own pick is kept while it is still offered.
   const board = boards.includes(boardChoice) ? boardChoice : (boards[0] ?? "");
+  const visualDocument = useMemo(() => {
+    const candidates = (visuals.data?.documents ?? []).filter(
+      (document) => document.kind === documentKind && document.status === "ready",
+    );
+    return candidates.find((document) => normalizePath(document.path) === normalizePath(documentPath))
+      ?? (candidates.length === 1 ? candidates[0] : undefined);
+  }, [documentKind, documentPath, visuals.data?.documents]);
   const selected = useMemo(
     () => new Set(selectedReferences.map((reference) => reference.toLocaleUpperCase())),
     [selectedReferences],
@@ -131,7 +149,7 @@ export function ProjectPlacementStage({
     // identity here would refit after every pan.
     reset();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [board, side]);
+  }, [board, side, visualDocument?.path]);
 
   const effectiveReference = activeReference || inspectedReference;
   // A pin belongs to one reference, on one side, of one board; a via additionally belongs to the pin
@@ -163,10 +181,16 @@ export function ProjectPlacementStage({
   const boardArtifact = scene.boardDocument?.artifacts.find(
     (candidate) => candidate.kind === "pcb" && candidate.view === side,
   );
-  const artifact = useProjectVisualArtifact(projectId, boardArtifact?.id ?? "");
+  const schematicArtifacts = visualDocument?.artifacts.filter(
+    (candidate) => candidate.kind === "schematic",
+  ) ?? [];
+  const schematicArtifact = schematicArtifacts.find((candidate) => candidate.id === artifactChoice)
+    ?? schematicArtifacts[0];
+  const selectedArtifact = documentKind === "schematic" ? schematicArtifact : boardArtifact;
+  const artifact = useProjectVisualArtifact(projectId, selectedArtifact?.id ?? "");
   const nativeBoardUrl = useObjectUrl(artifact.data);
   const nativeRenderPending =
-    visuals.isLoading || (!!boardArtifact && artifact.isLoading);
+    visuals.isLoading || (!!selectedArtifact && artifact.isLoading);
   const zoomPercent = Math.round(view.scale * 100);
 
   return (
@@ -178,8 +202,12 @@ export function ProjectPlacementStage({
       aria-label={mapLabel}
     >
       <PlacementStageToolbar
+        kind={documentKind}
         board={board}
         boards={boards}
+        documentPath={documentPath}
+        artifacts={schematicArtifacts}
+        artifactId={schematicArtifact?.id ?? ""}
         side={side}
         placements={scene.boardPlacements}
         nativeBoardUrl={nativeBoardUrl}
@@ -199,6 +227,7 @@ export function ProjectPlacementStage({
           setViaChoice(null);
           onBoardChange?.(nextBoard);
         }}
+        onArtifact={setArtifactChoice}
         onSide={(nextSide) => {
           setSide(nextSide);
           setInspected(null);
@@ -255,38 +284,49 @@ export function ProjectPlacementStage({
           aria-hidden
           className="pointer-events-none absolute inset-x-0 top-1/2 h-px bg-line opacity-35"
         />
-        <PlacementStageScene
-          geometry={geometry}
-          unavailable={unavailable}
-          onRetry={onRetry}
-          nativeBoardUrl={nativeBoardUrl}
-          mapLabel={mapLabel}
-          view={view}
-          side={side}
-          scene={scene}
-          selected={selected}
-          states={states}
-          activeReference={effectiveReference}
-          selectedPinKey={selectedPinKey}
-          selectedViaKey={selectedViaKey}
-          onInspect={(reference) => {
-            setInspected({ board, side, reference });
-            onSelectReference?.(reference, board);
-          }}
-          onPickPin={(key) => setPinChoice({ owner: pinOwner, key })}
-          onPickVia={(key) => setViaChoice({ owner: viaOwner, key })}
-        />
+        {documentKind === "schematic" ? (
+          <SchematicStageScene
+            url={nativeBoardUrl}
+            loading={nativeRenderPending}
+            blocked={!visualDocument || visualDocument.status !== "ready"}
+            view={view}
+          />
+        ) : (
+          <PlacementStageScene
+            geometry={geometry}
+            unavailable={unavailable}
+            onRetry={onRetry}
+            nativeBoardUrl={nativeBoardUrl}
+            mapLabel={mapLabel}
+            view={view}
+            side={side}
+            scene={scene}
+            selected={selected}
+            states={states}
+            activeReference={effectiveReference}
+            selectedPinKey={selectedPinKey}
+            selectedViaKey={selectedViaKey}
+            onInspect={(reference) => {
+              setInspected({ board, side, reference });
+              onSelectReference?.(reference, board);
+            }}
+            onPickPin={(key) => setPinChoice({ owner: pinOwner, key })}
+            onPickVia={(key) => setViaChoice({ owner: viaOwner, key })}
+          />
+        )}
       </div>
 
-      <PlacementStageLegend
-        scene={scene}
-        side={side}
-        activeReference={effectiveReference}
-        selectedReferences={selectedReferences}
-        selectable={!!onSelectReference}
-        states={states}
-        zoomPercent={zoomPercent}
-      />
+      {documentKind === "pcb" ? (
+        <PlacementStageLegend
+          scene={scene}
+          side={side}
+          activeReference={effectiveReference}
+          selectedReferences={selectedReferences}
+          selectable={!!onSelectReference}
+          states={states}
+          zoomPercent={zoomPercent}
+        />
+      ) : null}
     </section>
   );
 }
@@ -447,8 +487,12 @@ function usePlacementScene({
  * happened.
  */
 function PlacementStageToolbar({
+  kind,
   board,
   boards,
+  documentPath,
+  artifacts,
+  artifactId,
   side,
   placements,
   nativeBoardUrl,
@@ -458,6 +502,7 @@ function PlacementStageToolbar({
   rerendering,
   onRerender,
   onBoard,
+  onArtifact,
   onSide,
   zoomPercent,
   onZoomIn,
@@ -466,8 +511,12 @@ function PlacementStageToolbar({
   expanded,
   onExpanded,
 }: {
+  kind: "schematic" | "pcb";
   board: string;
   boards: string[];
+  documentPath: string;
+  artifacts: ProjectVisualArtifact[];
+  artifactId: string;
   side: "top" | "bottom";
   /** Every placement on this board, BOTH sides: the side control counts them. */
   placements: ProjectPlacement[];
@@ -478,6 +527,7 @@ function PlacementStageToolbar({
   rerendering: boolean;
   onRerender: () => void;
   onBoard: (board: string) => void;
+  onArtifact: (artifactId: string) => void;
   onSide: (side: "top" | "bottom") => void;
   zoomPercent: number;
   onZoomIn: () => void;
@@ -487,6 +537,7 @@ function PlacementStageToolbar({
   onExpanded: () => void;
 }) {
   const boardLabel = useText("projects.placement-map.board", "Board");
+  const pageLabel = useText("projects.schematic-map.page", "Page");
   const sideLabel = useText("projects.placement-map.side", "Board side");
   const topLabel = useText("projects.placement-map.top", "Top");
   const bottomLabel = useText("projects.placement-map.bottom", "Bottom");
@@ -502,11 +553,39 @@ function PlacementStageToolbar({
     "projects.placement-map.render-board",
     "Render PCB",
   );
+  const schematicTitle = useText("projects.schematic-map.title", "Schematic");
+  const pcbTitle = useText("projects.placement-map.title", "PCB");
+  const renderingSchematicLabel = useText(
+    "projects.schematic-map.rendering",
+    "Rendering Schematic",
+  );
+  const schematicViewLabel = useText(
+    "projects.schematic-map.view",
+    "Schematic View",
+  );
+  const renderSchematicLabel = useText(
+    "projects.schematic-map.render",
+    "Render Schematic",
+  );
   const zoomInLabel = useText("projects.placement-map.zoom-in", "Zoom In");
   const zoomOutLabel = useText("projects.placement-map.zoom-out", "Zoom Out");
   const fitLabel = useText("projects.placement-map.fit", "Fit Board");
   const expandLabel = useText("projects.placement-map.expand", "Expand Board");
   const collapseLabel = useText("projects.placement-map.collapse", "Close Board View");
+  const fitSchematicLabel = useText("projects.schematic-map.fit", "Fit Schematic");
+  const expandSchematicLabel = useText("projects.schematic-map.expand", "Expand Schematic");
+  const collapseSchematicLabel = useText(
+    "projects.schematic-map.collapse",
+    "Close Schematic View",
+  );
+  const title = kind === "schematic" ? schematicTitle : pcbTitle;
+  const renderingLabel = kind === "schematic" ? renderingSchematicLabel : renderingBoardLabel;
+  const fallbackLabel = kind === "schematic" ? schematicViewLabel : geometryMapLabel;
+  const renderLabel = kind === "schematic" ? renderSchematicLabel : renderBoardLabel;
+  const fitViewLabel = kind === "schematic" ? fitSchematicLabel : fitLabel;
+  const expandViewLabel = kind === "schematic" ? expandSchematicLabel : expandLabel;
+  const collapseViewLabel = kind === "schematic" ? collapseSchematicLabel : collapseLabel;
+  const sourcePath = kind === "schematic" ? documentPath : board;
   const sideOptions = [
     {
       id: "top" as const,
@@ -525,11 +604,11 @@ function PlacementStageToolbar({
     <header className="flex h-[40px] flex-none items-center gap-2 border-b border-line bg-band px-3">
       <div className="flex min-w-0 items-center gap-1.5">
         <h2 className="flex-none text-xs font-semibold text-t1">
-          <Text id="projects.placement-map.title">PCB</Text>
+          {title}
         </h2>
-        {board ? (
-          <span className="max-w-32 truncate font-mono text-2xs text-t3" title={board}>
-            {fileName(board)}
+        {sourcePath ? (
+          <span className="max-w-32 truncate font-mono text-2xs text-t3" title={sourcePath}>
+            {fileName(sourcePath)}
           </span>
         ) : null}
       </div>
@@ -540,7 +619,7 @@ function PlacementStageToolbar({
             tone="neutral"
             title={renderNote}
           >
-            {nativeRenderPending ? renderingBoardLabel : geometryMapLabel}
+            {nativeRenderPending ? renderingLabel : fallbackLabel}
           </Badge>
         ) : null}
         {!nativeRenderPending &&
@@ -551,20 +630,26 @@ function PlacementStageToolbar({
             aria-describedby={fixturePreview ? "projects-native-render-preview-help" : undefined}
             onClick={onRerender}
           >
-            {rerendering ? renderingBoardLabel : renderBoardLabel}
+            {rerendering ? renderingLabel : renderLabel}
           </Button>
         ) : null}
         {fixturePreview ? (
           <span id="projects-native-render-preview-help" className="sr-only">
-            <Text id="projects.preview.native-render-help">
-              Fixture Preview blocks native rendering. Return to Real Data to render the PCB.
-            </Text>
+            {kind === "schematic" ? (
+              <Text id="projects.preview.schematic-render-help">
+                Fixture Preview blocks native rendering. Return to Real Data to render the schematic.
+              </Text>
+            ) : (
+              <Text id="projects.preview.native-render-help">
+                Fixture Preview blocks native rendering. Return to Real Data to render the PCB.
+              </Text>
+            )}
           </span>
         ) : null}
         {/* The board picker's strip is a DIV, not a label. The control inside carries its own
             accessible name, which wins over a wrapping label's text, so the `<label>` it used to
             be named nothing and existed only to draw the bordered strip. */}
-        {boards.length > 1 ? (
+        {kind === "pcb" && boards.length > 1 ? (
           <div className="flex h-8 items-center gap-2 rounded-control border border-line bg-field px-2 text-2xs text-t3">
             <span>{boardLabel}</span>
             <AdaptiveChoice
@@ -577,13 +662,27 @@ function PlacementStageToolbar({
             />
           </div>
         ) : null}
-        <SegmentedControl
-          options={sideOptions}
-          value={side}
-          onChange={onSide}
-          size="small"
-          aria-label={sideLabel}
-        />
+        {kind === "schematic" && artifacts.length > 1 ? (
+          <AdaptiveChoice
+            devId="projects.document-control"
+            label={pageLabel}
+            value={artifactId}
+            onChange={onArtifact}
+            options={artifacts.map((artifact) => ({
+              value: artifact.id,
+              label: artifact.label || `${pageLabel} ${artifact.page}`,
+            }))}
+          />
+        ) : null}
+        {kind === "pcb" ? (
+          <SegmentedControl
+            options={sideOptions}
+            value={side}
+            onChange={onSide}
+            size="small"
+            aria-label={sideLabel}
+          />
+        ) : null}
         <span aria-hidden className="h-4 w-px bg-line2" />
         <div className="flex items-center rounded-control border border-line bg-field p-0.5">
           <StageToolButton
@@ -596,8 +695,8 @@ function PlacementStageToolbar({
           <button
             type="button"
             className="h-6 min-w-[42px] px-1 font-mono text-2xs tabular-nums text-t3 hover:text-t1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-focus"
-            aria-label={fitLabel}
-            title={fitLabel}
+            aria-label={fitViewLabel}
+            title={fitViewLabel}
             onClick={onFit}
           >
             {zoomPercent}%
@@ -611,7 +710,7 @@ function PlacementStageToolbar({
           </StageToolButton>
         </div>
         <StageToolButton
-          label={expanded ? collapseLabel : expandLabel}
+          label={expanded ? collapseViewLabel : expandViewLabel}
           onClick={onExpanded}
           aria-pressed={expanded}
           framed
@@ -633,6 +732,42 @@ function PlacementStageToolbar({
  * `PlacementBoardDiagram` below - the difference between "what state is the stage in" and "what is
  * drawn on it" is the line these two are split on.
  */
+function SchematicStageScene({
+  url,
+  loading,
+  blocked,
+  view,
+}: {
+  url: string | null;
+  loading: boolean;
+  blocked: boolean;
+  view: ReturnType<typeof usePanZoom>["view"];
+}) {
+  if (loading) {
+    return <StageMessage><Text id="projects.schematic-map.loading">Loading schematic...</Text></StageMessage>;
+  }
+  if (!url || blocked) {
+    return (
+      <StageMessage tone="warn">
+        <Text id="projects.schematic-map.blocked">This schematic could not be rendered.</Text>
+      </StageMessage>
+    );
+  }
+  return (
+    <img
+      src={url}
+      alt=""
+      aria-hidden
+      draggable={false}
+      className="h-full min-h-[260px] w-full select-none object-contain"
+      style={{
+        transform: `translate(${view.x}px, ${view.y}px) scale(${view.scale})`,
+        transformOrigin: "center",
+      }}
+    />
+  );
+}
+
 function PlacementStageScene({
   geometry,
   unavailable,

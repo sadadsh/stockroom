@@ -86,6 +86,8 @@ const KNOWN_DERIVED: readonly string[] = [
   // ProjectsPage passes the same TabStrip primitive its shared tool ids.
   "projects.tabs",
   "projects.tab-overview",
+  "projects.tab-schematic",
+  "projects.tab-pcb",
   "projects.tab-bom",
   "projects.tab-build",
   "projects.tab-activity",
@@ -113,7 +115,7 @@ const KNOWN_DERIVED: readonly string[] = [
   "diff.tabs",
   "diff.tab-symbol",
   "diff.tab-footprint",
-]; // 25
+]; // 27
 
 // (2) Passed as a plain string prop and rendered by a child as data-dev-id={devId}. The
 // id string is present in source (verified below), just not on a data-dev-id attribute.

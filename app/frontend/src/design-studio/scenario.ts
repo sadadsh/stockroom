@@ -49,7 +49,7 @@ export interface ScenarioUiState {
   };
   projects?: {
     selectedId?: string | null;
-    activeTab?: "overview" | "bom" | "build" | "activity";
+    activeTab?: "overview" | "schematic" | "pcb" | "bom" | "build" | "activity";
   };
   stm?: {
     tab?: "explorer" | "compatibility";

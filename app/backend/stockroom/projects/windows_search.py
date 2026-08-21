@@ -9,6 +9,8 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
+from stockroom.text import counted
+
 _QUERY = r"""
 $connection = New-Object System.Data.OleDb.OleDbConnection 'Provider=Search.CollatorDSO;Extended Properties="Application=Windows";'
 $connection.Open()
@@ -92,7 +94,7 @@ def search_project_descriptors(
     paths = tuple(sorted(found.values(), key=lambda path: str(path).casefold()))
     return IndexedProjectSearch(
         "ready",
-        f"Windows Search found {len(paths)} project descriptor(s).",
+        f"Windows Search found {counted(len(paths), 'project descriptor')}.",
         paths,
     )
 

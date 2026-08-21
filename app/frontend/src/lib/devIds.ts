@@ -69,6 +69,8 @@ export const DEV_IDS: DevIdEntry[] = [
   { id: "projects.title-strip", label: "Project title strip", area: "projects" },
   { id: "projects.tabs", label: "Project tool tabs", area: "projects" },
   { id: "projects.tab-overview", label: "Overview tab", area: "projects" },
+  { id: "projects.tab-schematic", label: "Schematic tab", area: "projects" },
+  { id: "projects.tab-pcb", label: "PCB tab", area: "projects" },
   { id: "projects.tab-bom", label: "BOM tab", area: "projects" },
   { id: "projects.tab-build", label: "Build tab", area: "projects" },
   { id: "projects.tab-activity", label: "Activity tab", area: "projects" },

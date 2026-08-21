@@ -6,8 +6,12 @@
  */
 import { useEffect, useState } from "react";
 import {
+  useLiveProjectBom,
   useProjectCollaboration,
+  useProjectPlacementGeometry,
   useProjects,
+  useRegisterProject,
+  useSystemProjectDiscovery,
   useProjectWorkspace,
 } from "../api/queries";
 import { ProjectPicker } from "../components/projects/ProjectPicker";
@@ -15,6 +19,8 @@ import { ProjectDesignWorkbench } from "../components/projects/ProjectDesignWork
 import { ProjectBomWorkbench } from "../components/projects/ProjectBomWorkbench";
 import { ProjectAssemblyWorkbench } from "../components/projects/ProjectAssemblyWorkbench";
 import { ProjectChangesWorkbench } from "../components/projects/ProjectChangesWorkbench";
+import { ProjectPlacementStage } from "../components/projects/ProjectPlacementStage";
+import { AdaptiveChoice } from "../components/AdaptiveChoice";
 import {
   Badge,
   Dot,
@@ -28,11 +34,12 @@ import {
 } from "../components/primitives";
 import { Text, useText } from "../lib/copy";
 import { readUiSession, updateUiSession } from "../lib/uiSession";
-import type { ProjectSummary } from "../api/types";
+import type { DiscoveredProject, ProjectSummary, ProjectWorkspace } from "../api/types";
 import { useScenarioUiState } from "../design-studio/scenarioState";
 import type { ScenarioUiState } from "../design-studio/scenario";
+import { useToast } from "../lib/toast";
 
-type ProjectTool = "overview" | "bom" | "build" | "activity";
+type ProjectTool = "overview" | "schematic" | "pcb" | "bom" | "build" | "activity";
 
 // One stable identity for "no projects yet", so `summaries` does not become a brand-new array on
 // every render while the query is still loading - which re-ran the selection effect below on every
@@ -47,10 +54,17 @@ export function ProjectsPage() {
 
 function ProjectsPageContent({ preview }: { preview: ScenarioUiState["projects"] }) {
   const projects = useProjects();
+  const systemProjects = useSystemProjectDiscovery(preview === undefined);
+  const register = useRegisterProject();
+  const { toast } = useToast();
+  const addFailed = useText("projects.picker.toast-link-failed", "Could not add project");
   const [selectedId, setSelectedId] = useState<string | null>(
     () => preview?.selectedId === undefined ? readUiSession().selected_ids.project : preview.selectedId,
   );
   const summaries = projects.data ?? NO_PROJECTS;
+  const foundProjects = (systemProjects.data?.projects ?? []).filter(
+    (found) => !summaries.some((linked) => sameProject(linked, found)),
+  );
 
   // Selecting a project both moves the selection and checkpoints it in the persisted UI session.
   // Both belong to the act of selecting: as a separate effect watching selectedId, the checkpoint
@@ -85,6 +99,11 @@ function ProjectsPageContent({ preview }: { preview: ScenarioUiState["projects"]
         loading={projects.isLoading}
         error={projects.error}
         onSelect={selectProject}
+        foundProjects={foundProjects}
+        onFoundSelect={(found) => register.mutate(found, {
+          onSuccess: (project) => selectProject(project.id),
+          onError: () => toast(addFailed, "err"),
+        })}
         onRetry={() => projects.refetch()}
       />
       <main className="min-h-0 min-w-0 flex-1 overflow-hidden border-l border-line">
@@ -117,9 +136,13 @@ function SelectedProject({
 }) {
   const workspace = useProjectWorkspace(projectId);
   const collaboration = useProjectCollaboration(projectId);
+  useLiveProjectBom(projectId, 1);
+  const geometry = useProjectPlacementGeometry(projectId);
   const [tool, setTool] = useState<ProjectTool>(initialTool);
   const overviewLabel = useText("projects.tab.overview", "Overview");
   const bomLabel = useText("projects.tab.bom", "BOM");
+  const schematicLabel = useText("projects.tab.schematic", "Schematic");
+  const pcbLabel = useText("projects.tab.pcb", "PCB");
   const buildLabel = useText("projects.tab.build", "Build");
   const activityLabel = useText("projects.tab.activity", "Recent Work");
   const toolsLabel = useText("projects.tabs.aria", "Project views");
@@ -149,8 +172,12 @@ function SelectedProject({
   }
 
   const data = workspace.data;
+  const hasSchematic = data.documents.some((document) => document.kind === "schematic" && document.exists);
+  const hasPcb = data.documents.some((document) => document.kind === "pcb" && document.exists);
   const tabs: TabItem<ProjectTool>[] = [
     { id: "overview", label: overviewLabel },
+    ...(hasSchematic ? [{ id: "schematic" as const, label: schematicLabel }] : []),
+    ...(hasPcb ? [{ id: "pcb" as const, label: pcbLabel }] : []),
     { id: "bom", label: bomLabel },
     { id: "build", label: buildLabel },
     { id: "activity", label: activityLabel },
@@ -239,6 +266,21 @@ function SelectedProject({
             <ProjectBomWorkbench projectId={projectId} workspace={data} />
           </TabPanel>
         ) : null}
+        {active === "schematic" ? (
+          <TabPanel idBase="project-workbench" tab="schematic" className="flex min-h-0 flex-1 flex-col">
+            <ProjectVisualWorkbench workspace={data} kind="schematic" geometry={geometry.data} />
+          </TabPanel>
+        ) : null}
+        {active === "pcb" ? (
+          <TabPanel idBase="project-workbench" tab="pcb" className="flex min-h-0 flex-1 flex-col">
+            <ProjectVisualWorkbench
+              workspace={data}
+              kind="pcb"
+              geometry={geometry.data}
+              onRetry={() => geometry.refetch()}
+            />
+          </TabPanel>
+        ) : null}
         {active === "build" ? (
           <TabPanel idBase="project-workbench" tab="build" className="flex min-h-0 flex-1 flex-col">
             <ProjectAssemblyWorkbench projectId={projectId} />
@@ -252,6 +294,63 @@ function SelectedProject({
       </div>
     </div>
   );
+}
+
+function ProjectVisualWorkbench({
+  workspace,
+  kind,
+  geometry,
+  onRetry,
+}: {
+  workspace: ProjectWorkspace;
+  kind: "schematic" | "pcb";
+  geometry: ReturnType<typeof useProjectPlacementGeometry>["data"];
+  onRetry?: () => void;
+}) {
+  const documents = workspace.documents.filter(
+    (document) => document.kind === kind && document.exists,
+  );
+  const [choice, setChoice] = useState(() => documents[0]?.path ?? "");
+  const selected = documents.some((document) => document.path === choice)
+    ? choice
+    : documents[0]?.path ?? "";
+  const schematicFileLabel = useText("projects.schematic-file", "Schematic File");
+  const pcbFileLabel = useText("projects.pcb-file", "PCB File");
+  const label = kind === "schematic" ? schematicFileLabel : pcbFileLabel;
+  return (
+    <div className="flex min-h-0 flex-1 flex-col gap-2 bg-surface p-3">
+      {documents.length > 1 ? (
+        <div className="flex flex-none items-center gap-2">
+          <span className="text-xs font-semibold text-t2">{label}</span>
+          <AdaptiveChoice
+            devId="projects.document-control"
+            label={label}
+            value={selected}
+            onChange={setChoice}
+            options={documents.map((document) => ({
+              value: document.path,
+              label: document.label,
+            }))}
+          />
+        </div>
+      ) : null}
+      <ProjectPlacementStage
+        projectId={workspace.project.id}
+        documentKind={kind}
+        documentPath={selected}
+        geometry={kind === "pcb" ? geometry : undefined}
+        selectedReferences={[]}
+        unavailable={kind === "pcb" && geometry?.status === "blocked"}
+        onRetry={onRetry}
+        className="flex-1"
+      />
+    </div>
+  );
+}
+
+function sameProject(linked: ProjectSummary, found: DiscoveredProject) {
+  const normalize = (value: string) => value.replaceAll("/", "\\").replace(/\\+$/, "").toLocaleLowerCase();
+  return linked.eda === found.eda && normalize(linked.root) === normalize(found.root);
 }
 
 function RuntimeBadge({

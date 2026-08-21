@@ -14,12 +14,27 @@ const INPUT =
   "placeholder:text-t3 focus:border-focus focus-visible:outline focus-visible:outline-2 " +
   "focus-visible:outline-offset-1 focus-visible:outline-focus";
 
+const NO_FOUND_PROJECTS: DiscoveredProject[] = [];
+
+type PickerProject = {
+  key: string;
+  id: string | null;
+  name: string;
+  root: string;
+  eda: "kicad" | "altium";
+  boardCount: number;
+  sheetCount: number;
+  found: DiscoveredProject | null;
+};
+
 export function ProjectPicker({
   projects,
   selectedId,
   loading,
   error,
   onSelect,
+  foundProjects = NO_FOUND_PROJECTS,
+  onFoundSelect,
   onRetry,
 }: {
   projects: ProjectSummary[];
@@ -27,6 +42,8 @@ export function ProjectPicker({
   loading: boolean;
   error: Error | null;
   onSelect: (id: string) => void;
+  foundProjects?: DiscoveredProject[];
+  onFoundSelect?: (project: DiscoveredProject) => void;
   onRetry: () => void;
 }) {
   const [search, setSearch] = useState("");
@@ -38,22 +55,60 @@ export function ProjectPicker({
   const listLabel = useText("projects.picker.list-aria", "Projects");
   const boardLabel = useText("projects.board", "board");
   const boardsLabel = useText("projects.boards", "boards");
-  const gitLabel = useText("projects.git", "Git");
-  const localLabel = useText("projects.local", "Local");
   const kicadLabel = useText("projects.eda.kicad", "KiCad");
   const altiumLabel = useText("projects.eda.altium", "Altium");
+  const foundLabel = useText("projects.found", "Found");
+  const schematicLabel = useText("projects.schematic", "schematic");
+  const schematicsLabel = useText("projects.schematics", "schematics");
+  const entries = useMemo<PickerProject[]>(() => [
+    ...projects.map((project) => ({
+      key: project.id,
+      id: project.id,
+      name: project.name,
+      root: project.root,
+      eda: project.eda,
+      boardCount: project.board_count,
+      sheetCount: project.sheet_count,
+      found: null,
+    })),
+    ...foundProjects.map((project) => ({
+      key: `found:${project.eda}:${project.root.toLocaleLowerCase()}`,
+      id: null,
+      name: project.name,
+      root: project.root,
+      eda: project.eda,
+      boardCount: project.boards.length,
+      sheetCount: project.schematics.length,
+      found: project,
+    })),
+  ], [foundProjects, projects]);
+  const duplicateNames = useMemo(() => {
+    const seen = new Set<string>();
+    const duplicates = new Set<string>();
+    for (const project of entries) {
+      const name = project.name.toLocaleLowerCase();
+      if (seen.has(name)) duplicates.add(name);
+      seen.add(name);
+    }
+    return duplicates;
+  }, [entries]);
   const filtered = useMemo(() => {
     const query = search.trim().toLocaleLowerCase();
-    if (!query) return projects;
-    return projects.filter((project) =>
+    if (!query) return entries;
+    return entries.filter((project) =>
       `${project.name} ${project.root} ${project.eda}`.toLocaleLowerCase().includes(query),
     );
-  }, [projects, search]);
+  }, [entries, search]);
   const selectedVisible = filtered.some((project) => project.id === selectedId);
+
+  function choose(project: PickerProject) {
+    if (project.id) onSelect(project.id);
+    else if (project.found) onFoundSelect?.(project.found);
+  }
 
   function moveSelection(currentId: string, key: string) {
     if (!filtered.length) return;
-    const current = filtered.findIndex((project) => project.id === currentId);
+    const current = filtered.findIndex((project) => project.key === currentId);
     const nextIndex =
       key === "Home"
         ? 0
@@ -63,8 +118,8 @@ export function ProjectPicker({
             ? Math.max(0, current - 1)
             : Math.min(filtered.length - 1, current + 1);
     const next = filtered[nextIndex < 0 ? 0 : nextIndex];
-    onSelect(next.id);
-    projectButtons.current.get(next.id)?.focus();
+    if (next.id) onSelect(next.id);
+    projectButtons.current.get(next.key)?.focus();
   }
 
   return (
@@ -75,7 +130,7 @@ export function ProjectPicker({
     >
       <RouteHeader
         data-dev-id="projects.list-title"
-        right={projects.length ? projects.length.toLocaleString() : undefined}
+        right={entries.length ? entries.length.toLocaleString() : undefined}
       >
         <Text id="projects.picker.title">Projects</Text>
       </RouteHeader>
@@ -86,7 +141,7 @@ export function ProjectPicker({
           className="mb-2.5 h-9 w-full justify-center"
           onClick={() => setLinkOpen(true)}
         >
-          <Text id="projects.picker.link">Link Project</Text>
+          <Text id="projects.picker.link">Add Location</Text>
         </Button>
         <label className="relative block">
           <span className="sr-only">
@@ -126,17 +181,17 @@ export function ProjectPicker({
           <ErrorState className="mt-2" id="projects.picker.failed" devId="projects.picker.failed" onRetry={onRetry}>
             This machine's linked projects could not be listed.
           </ErrorState>
-        ) : projects.length === 0 ? (
+        ) : entries.length === 0 ? (
           <div className="flex flex-col items-center gap-2.5 px-5 py-10 text-center">
             <span className="text-t3">
               <ProjectsIcon />
             </span>
             <p className="text-sm font-medium text-t2">
-              <Text id="projects.picker.empty-title">No Linked Projects</Text>
+              <Text id="projects.picker.empty-title">No Projects Found</Text>
             </p>
             <p className="text-xs leading-5 text-t3">
               <Text id="projects.picker.empty-detail">
-                Link a KiCad or Altium project folder.
+                Add a location containing KiCad or Altium projects.
               </Text>
             </p>
           </div>
@@ -147,7 +202,7 @@ export function ProjectPicker({
         ) : (
           <div className="space-y-1" role="listbox" aria-label={listLabel}>
             {filtered.map((project) => {
-              const active = project.id === selectedId;
+              const active = project.id !== null && project.id === selectedId;
               return (
                 <button
                   type="button"
@@ -155,11 +210,11 @@ export function ProjectPicker({
                   aria-selected={active}
                   tabIndex={active || (!selectedVisible && project === filtered[0]) ? 0 : -1}
                   ref={(node) => {
-                    if (node) projectButtons.current.set(project.id, node);
-                    else projectButtons.current.delete(project.id);
+                    if (node) projectButtons.current.set(project.key, node);
+                    else projectButtons.current.delete(project.key);
                   }}
-                  key={project.id}
-                  onClick={() => onSelect(project.id)}
+                  key={project.key}
+                  onClick={() => choose(project)}
                   onKeyDown={(event) => {
                     if (
                       event.key === "ArrowDown" ||
@@ -168,7 +223,7 @@ export function ProjectPicker({
                       event.key === "End"
                     ) {
                       event.preventDefault();
-                      moveSelection(project.id, event.key);
+                      moveSelection(project.key, event.key);
                     }
                   }}
                   title={project.root}
@@ -199,20 +254,27 @@ export function ProjectPicker({
                       <span className="block truncate text-sm font-semibold text-t1">
                         {project.name}
                       </span>
+                      {duplicateNames.has(project.name.toLocaleLowerCase()) ? (
+                        <span className="block truncate font-mono text-2xs text-t3">
+                          {compactLocation(project.root)}
+                        </span>
+                      ) : null}
                       <span className="mt-1 flex items-center gap-1.5">
                         <Badge size="sm" tone="neutral">
                           {project.eda === "kicad" ? kicadLabel : altiumLabel}
                         </Badge>
                         <span className="text-2xs text-t3">
-                          {project.board_count}{" "}
-                          {project.board_count === 1 ? boardLabel : boardsLabel}
+                          {project.boardCount}{" "}
+                          {project.boardCount === 1 ? boardLabel : boardsLabel}
                         </span>
                         <span aria-hidden className="text-line2">
                           ·
                         </span>
-                        <span className={project.has_git ? "text-2xs text-ok-text" : "text-2xs text-warn"}>
-                          {project.has_git ? gitLabel : localLabel}
+                        <span className="text-2xs text-t3">
+                          {project.sheetCount}{" "}
+                          {project.sheetCount === 1 ? schematicLabel : schematicsLabel}
                         </span>
+                        {project.found ? <Badge size="sm" tone="ok">{foundLabel}</Badge> : null}
                       </span>
                     </span>
                   </span>
@@ -230,6 +292,10 @@ export function ProjectPicker({
       ) : null}
     </aside>
   );
+}
+
+function compactLocation(path: string) {
+  return path.replaceAll("/", "\\").split("\\").filter(Boolean).slice(-2).join("\\");
 }
 
 function LinkProjectDialog({
@@ -338,7 +404,7 @@ function LinkProjectDialog({
       >
         <header className="flex h-[44px] items-center border-b border-line bg-band px-4">
           <h2 id="link-project-title" className="text-sm font-semibold text-t1">
-            <Text id="projects.picker.dialog-title">Link Project</Text>
+            <Text id="projects.picker.dialog-title">Add Location</Text>
           </h2>
           <button
             type="button"
@@ -446,9 +512,9 @@ function LinkProjectDialog({
             disabled={!choice || register.isPending}
           >
             {register.isPending ? (
-              <Text id="projects.picker.linking">Linking...</Text>
+              <Text id="projects.picker.linking">Adding...</Text>
             ) : (
-              <Text id="projects.picker.link">Link Project</Text>
+              <Text id="projects.picker.link">Add Project</Text>
             )}
           </Button>
         </footer>

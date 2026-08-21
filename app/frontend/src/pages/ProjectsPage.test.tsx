@@ -20,6 +20,7 @@ vi.mock("../api/client", async (importActual) => {
     ...actual,
     api: {
       listProjects: vi.fn(),
+      discoverSystemProjects: vi.fn(),
       discoverProjects: vi.fn(),
       registerProject: vi.fn(),
       projectWorkspace: vi.fn(),
@@ -234,6 +235,7 @@ function placementGeometry(
 
 function projectVisuals(eda: "kicad" | "altium"): ProjectVisualBundle {
   const path = eda === "kicad" ? "Power.kicad_pcb" : "Control.PcbDoc";
+  const schematicPath = eda === "kicad" ? "Power.kicad_sch" : "Control.SchDoc";
   return {
     schema_version: 1,
     adapter: eda,
@@ -243,6 +245,27 @@ function projectVisuals(eda: "kicad" | "altium"): ProjectVisualBundle {
       version: "test",
     },
     documents: [
+      {
+        kind: "schematic",
+        path: schematicPath,
+        status: "ready",
+        detail: "Schematic SVG is ready",
+        artifacts: [
+          {
+            id: `${eda}-schematic-sheet`,
+            kind: "schematic",
+            path: schematicPath,
+            view: "sheet",
+            label: "Schematic sheet",
+            page: 1,
+            media_type: "image/svg+xml",
+            width: 1600,
+            height: 1000,
+            bytes: 64,
+            sha256: `${eda}-schematic-digest`,
+          },
+        ],
+      },
       {
         kind: "pcb",
         path,
@@ -379,7 +402,7 @@ function projectVisuals(eda: "kicad" | "altium"): ProjectVisualBundle {
         ],
       },
     ],
-    summary: { documents: 1, artifacts: 1, blocked: 0 },
+    summary: { documents: 2, artifacts: 2, blocked: 0 },
     detail: "Native PCB views are ready",
     digest: `${eda}-visuals`,
   };
@@ -437,6 +460,11 @@ function renderPage() {
 
 beforeEach(() => {
   mockApi.listProjects.mockResolvedValue(PROJECTS);
+  mockApi.discoverSystemProjects.mockResolvedValue({
+    status: "ready",
+    detail: "Windows Search found no new projects.",
+    projects: [],
+  });
   mockApi.discoverProjects.mockResolvedValue({ projects: [] });
   mockApi.registerProject.mockResolvedValue(PROJECTS[0]);
   mockApi.projectWorkspace.mockImplementation(async (id) =>
@@ -522,8 +550,8 @@ describe("ProjectsPage shared workspace", () => {
     renderPage();
     await screen.findByRole("heading", { name: "Power Board" });
 
-    await user.click(screen.getByRole("button", { name: "Link Project" }));
-    const dialog = screen.getByRole("dialog", { name: "Link Project" });
+    await user.click(screen.getByRole("button", { name: "Add Location" }));
+    const dialog = screen.getByRole("dialog", { name: "Add Location" });
     await user.type(
       within(dialog).getByPlaceholderText("Project or Git checkout folder"),
       "C:\\Projects\\Power",
@@ -533,7 +561,7 @@ describe("ProjectsPage shared workspace", () => {
     expect(
       await within(dialog).findByRole("radio", { name: /Power Board/ }),
     ).toHaveAttribute("aria-checked", "true");
-    const link = within(dialog).getByRole("button", { name: "Link Project" });
+    const link = within(dialog).getByRole("button", { name: "Add Project" });
     expect(link).toBeEnabled();
     await user.click(link);
 
@@ -548,15 +576,67 @@ describe("ProjectsPage shared workspace", () => {
     renderPage();
 
     expect(await screen.findByRole("heading", { name: "Power Board" })).toBeInTheDocument();
-    expect(toolNames()).toEqual(["Overview", "BOM", "Build", "Recent Work"]);
+    expect(toolNames()).toEqual(["Overview", "Schematic", "PCB", "BOM", "Build", "Recent Work"]);
     expect(screen.getAllByText("KiCad").length).toBeGreaterThan(0);
     expect(screen.getByRole("region", { name: "PCB view" })).toBeInTheDocument();
 
     await user.click(screen.getByRole("option", { name: /Control Board/ }));
     expect(await screen.findByRole("heading", { name: "Control Board" })).toBeInTheDocument();
-    expect(toolNames()).toEqual(["Overview", "BOM", "Build", "Recent Work"]);
+    expect(toolNames()).toEqual(["Overview", "Schematic", "PCB", "BOM", "Build", "Recent Work"]);
     expect(screen.getAllByText("Altium Designer").length).toBeGreaterThan(0);
     expect(screen.getByRole("region", { name: "PCB view" })).toBeInTheDocument();
+  });
+
+  it("opens an indexed project in one click and warms its BOM", async () => {
+    const user = userEvent.setup();
+    const found = {
+      eda: "kicad" as const,
+      eda_label: "KiCad",
+      name: "Found Board",
+      root: "C:\\Designs\\Found",
+      descriptor: "Found.kicad_pro",
+      boards: ["Found.kicad_pcb"],
+      schematics: ["Found.kicad_sch"],
+    };
+    mockApi.discoverSystemProjects.mockResolvedValue({
+      status: "ready",
+      detail: "Windows Search found 1 project descriptor.",
+      projects: [found],
+    });
+    mockApi.registerProject.mockResolvedValue({
+      id: "found-project",
+      name: found.name,
+      root: found.root,
+      eda: found.eda,
+      board_count: 1,
+      sheet_count: 1,
+      has_git: false,
+      registered_at: "2026-08-21T00:00:00Z",
+    });
+    renderPage();
+
+    await user.click(await screen.findByRole("option", { name: /Found Board/ }));
+
+    expect(mockApi.registerProject).toHaveBeenCalledWith(found.root, found.eda);
+    await waitFor(() => expect(mockApi.liveProjectBom).toHaveBeenCalled());
+  });
+
+  it("shows schematic SVG in the same pan and zoom stage", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findByRole("heading", { name: "Power Board" });
+
+    await user.click(screen.getByRole("tab", { name: "Schematic" }));
+
+    const schematic = await screen.findByRole("region", { name: "Schematic view" });
+    expect(within(schematic).getByRole("heading", { name: "Schematic" })).toBeInTheDocument();
+    expect(within(schematic).getByRole("button", { name: "Fit Schematic" })).toBeInTheDocument();
+    await waitFor(() =>
+      expect(mockApi.projectVisualArtifact).toHaveBeenCalledWith(
+        "kicad-project",
+        "kicad-schematic-sheet",
+      ),
+    );
   });
 
   it("shows the same native PCB canvas for KiCad and Altium projects", async () => {
@@ -743,7 +823,7 @@ describe("ProjectsPage shared workspace", () => {
     };
 
     const multiBoardVisuals = projectVisuals("kicad");
-    const mainBoard = multiBoardVisuals.documents[0]!;
+    const mainBoard = multiBoardVisuals.documents.find((document) => document.kind === "pcb")!;
     multiBoardVisuals.documents.push({
       ...mainBoard,
       path: "Panel.kicad_pcb",
@@ -766,7 +846,7 @@ describe("ProjectsPage shared workspace", () => {
         path: "Panel.kicad_pcb",
       })),
     });
-    multiBoardVisuals.summary.documents = 2;
+    multiBoardVisuals.summary.documents = 3;
 
     mockApi.projectWorkspace.mockResolvedValue(multiBoardWorkspace);
     mockApi.projectPlacementGeometry.mockResolvedValue(multiBoardGeometry);

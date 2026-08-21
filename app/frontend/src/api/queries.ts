@@ -21,6 +21,7 @@ import type {
   GitHubViewer,
   PartDetail,
   ProjectReviewCandidate,
+  ProjectSummary,
   SetLibraryBody,
   SettingsPatch,
 } from "./types";
@@ -305,10 +306,11 @@ export function useDiscoverProjects() {
   });
 }
 
-export function useSystemProjectDiscovery() {
+export function useSystemProjectDiscovery(enabled = true) {
   return useQuery({
     queryKey: ["system-project-discovery"],
     queryFn: () => api.discoverSystemProjects(),
+    enabled,
     refetchOnWindowFocus: false,
   });
 }
@@ -318,7 +320,13 @@ export function useRegisterProject() {
   return useMutation({
     mutationFn: (project: Pick<DiscoveredProject, "root" | "eda">) =>
       api.registerProject(project.root, project.eda),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["projects"] }),
+    onSuccess: (project) => {
+      queryClient.setQueryData<ProjectSummary[]>(["projects"], (current = []) => [
+        ...current.filter((candidate) => candidate.id !== project.id),
+        project,
+      ]);
+      return queryClient.invalidateQueries({ queryKey: ["projects"] });
+    },
   });
 }
 

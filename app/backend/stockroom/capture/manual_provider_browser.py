@@ -251,7 +251,17 @@ class ManualProviderBrowserBroker:
                 self._sessions[session_id] = session
                 self._active_by_part[part_id] = session_id
             thread.start()
-            session.started.wait(timeout=min(5.0, self._stall_timeout))
+            if not session.started.wait(timeout=min(5.0, self._stall_timeout)):
+                with self._lock:
+                    if session.snapshot.state == "starting":
+                        session.snapshot = replace(
+                            session.snapshot,
+                            state="stalled",
+                            error=(
+                                "Provider opening stalled. Retry, choose another provider, or "
+                                "close the browser."
+                            ),
+                        )
             return self.status(session_id)
 
     def cleanup_expired(self) -> int:
