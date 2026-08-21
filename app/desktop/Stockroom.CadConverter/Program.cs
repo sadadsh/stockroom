@@ -18,32 +18,67 @@ public static class CadConverterApplication
         string resultPath,
         CancellationToken cancellationToken = default)
     {
-        CadConverterResult result;
-        var exitCode = 0;
+        var projectRequest = false;
         try
         {
-            await using var input = File.OpenRead(requestPath);
-            var request = await JsonSerializer.DeserializeAsync(
-                input,
-                CadConverterJsonContext.Default.CadConverterRequest,
-                cancellationToken).ConfigureAwait(false);
-            if (request is null)
+            var json = await File.ReadAllTextAsync(requestPath, cancellationToken).ConfigureAwait(false);
+            using var envelope = JsonDocument.Parse(json);
+            projectRequest = envelope.RootElement.TryGetProperty("schema", out var schema)
+                && schema.GetString() == ProjectRenderRequest.CurrentSchema;
+            if (projectRequest)
             {
-                throw new CadConverterException("request JSON is empty");
+                var request = JsonSerializer.Deserialize(
+                    json,
+                    CadConverterJsonContext.Default.ProjectRenderRequest)
+                    ?? throw new CadConverterException("request JSON is empty");
+                var result = await ProjectDocumentRenderer.RenderAsync(request, cancellationToken).ConfigureAwait(false);
+                await WriteResultAsync(resultPath, result, cancellationToken).ConfigureAwait(false);
+                return 0;
             }
-            result = await CadLibraryConverter.ConvertAsync(request, cancellationToken).ConfigureAwait(false);
+
+            var libraryRequest = JsonSerializer.Deserialize(
+                json,
+                CadConverterJsonContext.Default.CadConverterRequest)
+                ?? throw new CadConverterException("request JSON is empty");
+            var libraryResult = await CadLibraryConverter.ConvertAsync(libraryRequest, cancellationToken).ConfigureAwait(false);
+            await WriteResultAsync(resultPath, libraryResult, cancellationToken).ConfigureAwait(false);
+            return 0;
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
-            exitCode = 1;
-            result = new CadConverterResult
+            if (projectRequest)
             {
-                Schema = CadConverterResult.CurrentSchema,
-                Status = "error",
-                Detail = exception.Message,
-            };
+                await WriteResultAsync(
+                    resultPath,
+                    new ProjectRenderResult
+                    {
+                        Schema = ProjectRenderResult.CurrentSchema,
+                        Status = "error",
+                        Detail = exception.Message,
+                    },
+                    cancellationToken).ConfigureAwait(false);
+            }
+            else
+            {
+                await WriteResultAsync(
+                    resultPath,
+                    new CadConverterResult
+                    {
+                        Schema = CadConverterResult.CurrentSchema,
+                        Status = "error",
+                        Detail = exception.Message,
+                    },
+                    cancellationToken).ConfigureAwait(false);
+            }
+            return 1;
         }
+    }
 
+    private static async Task WriteResultAsync(
+        string resultPath,
+        CadConverterResult result,
+        CancellationToken cancellationToken)
+    {
         var resultDirectory = Path.GetDirectoryName(Path.GetFullPath(resultPath));
         if (!string.IsNullOrEmpty(resultDirectory))
         {
@@ -56,7 +91,25 @@ public static class CadConverterApplication
             CadConverterJsonContext.Default.CadConverterResult,
             cancellationToken).ConfigureAwait(false);
         await output.WriteAsync("\n"u8.ToArray(), cancellationToken).ConfigureAwait(false);
-        return exitCode;
+    }
+
+    private static async Task WriteResultAsync(
+        string resultPath,
+        ProjectRenderResult result,
+        CancellationToken cancellationToken)
+    {
+        var resultDirectory = Path.GetDirectoryName(Path.GetFullPath(resultPath));
+        if (!string.IsNullOrEmpty(resultDirectory))
+        {
+            Directory.CreateDirectory(resultDirectory);
+        }
+        await using var output = new FileStream(resultPath, FileMode.Create, FileAccess.Write, FileShare.None, 4096, true);
+        await JsonSerializer.SerializeAsync(
+            output,
+            result,
+            CadConverterJsonContext.Default.ProjectRenderResult,
+            cancellationToken).ConfigureAwait(false);
+        await output.WriteAsync("\n"u8.ToArray(), cancellationToken).ConfigureAwait(false);
     }
 
     private static bool TryParseArguments(

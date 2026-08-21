@@ -25,4 +25,13 @@
       Condition="'$(ALTIUMSHARP_ROOT)' != ''"
       Include="$(ALTIUMSHARP_ROOT)\shared\OriginalCircuit.Eda.Abstractions\src\OriginalCircuit.Eda.Abstractions\OriginalCircuit.Eda.Abstractions.csproj" />
   </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\..\..\vendor\AltiumSharp\TestData\USB Power.SchDoc"
+          Link="Fixtures\USB Power.SchDoc"
+          CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\..\vendor\AltiumSharp\TestData\USB Power Adapter.PcbDoc"
+          Link="Fixtures\USB Power Adapter.PcbDoc"
+          CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>

@@ -244,10 +244,48 @@ public sealed record ModelResult
     public required string Sha256 { get; init; }
 }
 
+public sealed record ProjectRenderRequest
+{
+    public const string CurrentSchema = "stockroom.cad-converter/project-render-request/1";
+
+    public required string Schema { get; init; }
+    public required string ProjectRoot { get; init; }
+    public required string OutputDirectory { get; init; }
+    public required IReadOnlyList<string> Documents { get; init; }
+    public int Width { get; init; } = 1600;
+    public int Height { get; init; } = 1000;
+}
+
+public sealed record ProjectRenderResult
+{
+    public const string CurrentSchema = "stockroom.cad-converter/project-render-result/1";
+
+    public required string Schema { get; init; }
+    public required string Status { get; init; }
+    public required string Detail { get; init; }
+    public IReadOnlyList<ProjectRenderArtifact> Artifacts { get; init; } = [];
+}
+
+public sealed record ProjectRenderArtifact
+{
+    public required string SourcePath { get; init; }
+    public required string Kind { get; init; }
+    public required string View { get; init; }
+    public required string Path { get; init; }
+    public required string MediaType { get; init; }
+    public required int Width { get; init; }
+    public required int Height { get; init; }
+    public required long SizeBytes { get; init; }
+    public required string Sha256 { get; init; }
+    public required string SourceSha256 { get; init; }
+}
+
 [JsonSourceGenerationOptions(
     PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
     WriteIndented = true,
     UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow)]
 [JsonSerializable(typeof(CadConverterRequest))]
 [JsonSerializable(typeof(CadConverterResult))]
+[JsonSerializable(typeof(ProjectRenderRequest))]
+[JsonSerializable(typeof(ProjectRenderResult))]
 public sealed partial class CadConverterJsonContext : JsonSerializerContext;

@@ -13,6 +13,18 @@
           "OpenMcdf": "[3.1.4, )"
         }
       },
+      "originalcircuit.altium.rendering.core": {
+        "type": "Project",
+        "dependencies": {
+          "OriginalCircuit.Altium": "[2.0.0-alpha.1, )"
+        }
+      },
+      "originalcircuit.altium.rendering.svg": {
+        "type": "Project",
+        "dependencies": {
+          "OriginalCircuit.Altium.Rendering.Core": "[2.0.0-alpha.1, )"
+        }
+      },
       "originalcircuit.eda.abstractions": {
         "type": "Project"
       }

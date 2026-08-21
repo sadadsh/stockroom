@@ -24,6 +24,7 @@
 
   <ItemGroup>
     <ProjectReference Include="$(AltiumSharpRoot)\src\OriginalCircuit.Altium\OriginalCircuit.Altium.csproj" />
+    <ProjectReference Include="$(AltiumSharpRoot)\src\OriginalCircuit.Altium.Rendering.Svg\OriginalCircuit.Altium.Rendering.Svg.csproj" />
     <ProjectReference Include="$(AltiumSharpRoot)\shared\OriginalCircuit.Eda.Abstractions\src\OriginalCircuit.Eda.Abstractions\OriginalCircuit.Eda.Abstractions.csproj" />
   </ItemGroup>
 
