@@ -1,10 +1,12 @@
 # Stockroom Windows Packaging
 
-Stockroom's public Windows delivery is an x64 MSIX through Microsoft Store.
-Microsoft signs the package after certification and owns updates. Windows launches
+Stockroom's rapid Windows delivery is a signed x64 MSIX from
+`https://sadadsh.github.io/stockroom/`. The person trusts the pinned public
+certificate once and opens `Stockroom.appinstaller`; later successful `main`
+pushes update through the verified feed without another download. Windows launches
 `WindowHost\Stockroom.WindowHost.exe`, the self-contained .NET 10 WPF host. The
 host starts one immutable PyInstaller onedir backend from the package's verified
-release set.
+release set. Microsoft Store remains an optional, separately signed channel.
 
 Normal startup does not clone application source, run `uv`, execute a source
 Python environment, install WebView2, or provision provider browsers. The Python
@@ -132,8 +134,10 @@ signature boundary. Signing occurs after the unsigned reproducibility proof.
 `.github\workflows\release.yml` first calls the canonical Windows CI workflow;
 only after that gate passes does it invoke the production packager. A successful
 push to `main` publishes one normal immutable GitHub Release as
-`1.0.0.<GitHub run number>`. Manual dispatch builds and verifies the Actions
-artifact without publishing; version tags do not trigger this workflow. Configure:
+`1.0.0.<GitHub run number>`, merges the verified TUF history, and atomically
+deploys the public install site plus `windows/x64` update feed to GitHub Pages. Manual
+dispatch builds and verifies the Actions artifact without publishing; version
+tags do not trigger this workflow. Configure:
 
 - secrets `WINDOWS_CERT_BASE64` and `WINDOWS_CERT_PASSWORD`;
 - secrets `STOCKROOM_TUF_TARGETS_KEY_BASE64`,
@@ -142,6 +146,13 @@ artifact without publishing; version tags do not trigger this workflow. Configur
 - variables `STOCKROOM_WINDOWS_PUBLISHER` and
   `STOCKROOM_WINDOWS_FEED_BASE_URI`; and
 - variable `STOCKROOM_TUF_ROOT_BASE64`.
+
+The repository pins the public half of the GitHub-channel signing identity at
+`packaging\Stockroom GitHub Signing.cer`. The workflow verifies its subject,
+fingerprint, validity, and Code Signing EKU, temporarily trusts it on the isolated
+runner, and requires the secret PFX to match it. The Pages site publishes that
+public certificate at `downloads/Stockroom-GitHub-Signing.cer` for the one-time
+installation trust step; the private key exists only as an environment secret.
 
 The runner decodes signing material under its temporary directory, overwrites and
 removes each secret file before upload, and publishes only:
@@ -175,10 +186,12 @@ open. It stages only verified release sets and uses generation-fenced authority
 handoff for adoption and rollback. A network outage reports `repository_offline`;
 it does not fall back to Git or mutable source.
 
-The TUF ZIP is a deployment payload. An operator or deployment system must merge
-its `metadata/` and `targets/` trees into the configured HTTPS origin without
-replacing bytes at an existing metadata version. Production evidence records this
-external deployment boundary as `staged-not-deployed`.
+The TUF ZIP is a deployment payload. Production evidence records it as
+`staged-not-deployed` until the release job publishes the immutable GitHub Release.
+The following Pages job merges prior feed archives, refuses any immutable-path
+conflict, and atomically deploys the complete public site and `windows/x64` feed.
+Installed GitHub-channel builds check on launch and in the background; no manual
+redownload is required after a successful `main` release.
 
 ## Diagnostics and legacy cleanup
 

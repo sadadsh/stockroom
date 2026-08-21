@@ -30,18 +30,17 @@ def test_store_workflow_builds_private_unsigned_candidate_after_ci() -> None:
     assert "1.0.${{ github.run_number }}.0" in text
 
 
-def test_pages_workflow_deploys_only_public_store_site() -> None:
-    text, workflow = _workflow("pages.yml")
-    assert "path: store-site" in text
-    assert "app/frontend-dist" not in text
-    assert workflow["permissions"] == {"contents": "read"}
-    deploy = workflow["jobs"]["deploy"]
-    assert deploy["permissions"] == {"pages": "write", "id-token": "write"}
+def test_release_workflow_is_the_only_pages_deployer() -> None:
+    assert not (ROOT / ".github" / "workflows" / "pages.yml").exists()
+    _text, workflow = _workflow("release.yml")
+    assert workflow["jobs"]["deploy-update-feed"]["environment"]["name"] == (
+        "github-pages"
+    )
 
 
 def test_store_workflows_pin_every_external_action() -> None:
     references: list[str] = []
-    for name in ("store.yml", "pages.yml"):
+    for name in ("store.yml", "release.yml"):
         text, _workflow_value = _workflow(name)
         references.extend(re.findall(r"uses:\s*([^\s#]+)", text))
     external = [value for value in references if not value.startswith("./")]

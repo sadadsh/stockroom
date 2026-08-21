@@ -315,6 +315,51 @@ jobs:
             $utf8
           )
 
+      - name: Trust Pinned GitHub Signing Certificate
+        shell: pwsh
+        env:
+          STOCKROOM_WINDOWS_PUBLISHER: ${{ vars.STOCKROOM_WINDOWS_PUBLISHER }}
+        run: |
+          Set-StrictMode -Version Latest
+          $ErrorActionPreference = "Stop"
+
+          $certificatePath = "packaging/Stockroom GitHub Signing.cer"
+          $certificate = [Security.Cryptography.X509Certificates.X509Certificate2]::new(
+            $certificatePath
+          )
+          if (
+            $certificate.Subject -cne $env:STOCKROOM_WINDOWS_PUBLISHER -or
+            $certificate.HasPrivateKey
+          ) {
+            throw "The pinned GitHub signing certificate is invalid."
+          }
+          $codeSigningEku = @(
+            $certificate.Extensions |
+              Where-Object {
+                $_ -is [Security.Cryptography.X509Certificates.X509EnhancedKeyUsageExtension]
+              } |
+              ForEach-Object { $_.EnhancedKeyUsages } |
+              Where-Object { $_.Value -ceq "1.3.6.1.5.5.7.3.3" }
+          )
+          if ($codeSigningEku.Count -ne 1) {
+            throw "The pinned GitHub signing certificate lacks the Code Signing EKU."
+          }
+          $storePath = "Cert:\CurrentUser\TrustedPeople\$($certificate.Thumbprint)"
+          if (Test-Path -LiteralPath $storePath) {
+            throw "The GitHub runner already trusts the signing certificate."
+          }
+          $trusted = Import-Certificate `
+            -FilePath $certificatePath `
+            -CertStoreLocation Cert:\CurrentUser\TrustedPeople
+          if ($trusted.Thumbprint -cne $certificate.Thumbprint) {
+            throw "The pinned GitHub signing certificate was not imported exactly."
+          }
+          [IO.File]::AppendAllText(
+            $env:GITHUB_ENV,
+            "STOCKROOM_SIGNING_CERT_THUMBPRINT=$($certificate.Thumbprint)`n",
+            [Text.UTF8Encoding]::new($false)
+          )
+
       - name: Build Canonical Production Package
         shell: pwsh
         env:
@@ -328,6 +373,20 @@ jobs:
             throw "WINDOWS_CERT_PASSWORD is required; unsigned releases are forbidden."
           }
           $pfxPath = Join-Path $env:RUNNER_TEMP "Stockroom.Release.pfx"
+          $flags = [Security.Cryptography.X509Certificates.X509KeyStorageFlags]::EphemeralKeySet
+          $pfx = [Security.Cryptography.X509Certificates.X509Certificate2]::new(
+            $pfxPath,
+            $env:STOCKROOM_SIGNING_CERT_PASSWORD,
+            $flags
+          )
+          try {
+            if ($pfx.Thumbprint -cne $env:STOCKROOM_SIGNING_CERT_THUMBPRINT) {
+              throw "The signing PFX differs from the pinned GitHub signing certificate."
+            }
+          }
+          finally {
+            $pfx.Dispose()
+          }
           $outputRoot = Join-Path $env:RUNNER_TEMP "Stockroom.Release.Output"
           $compatibleReleaseIds = @(
             $env:STOCKROOM_COMPATIBLE_FROM_RELEASE_IDS.Split(
@@ -347,6 +406,7 @@ jobs:
             -Publisher $env:STOCKROOM_WINDOWS_PUBLISHER `
             -FeedBaseUri $env:STOCKROOM_WINDOWS_FEED_BASE_URI `
             -SigningCertificatePath $pfxPath `
+            -SigningCertificateTrustedForVerification `
             -TufRootPath $env:STOCKROOM_TUF_ROOT_PATH `
             -TufMetadataVersion ([int]$env:STOCKROOM_TUF_METADATA_VERSION) `
             -TufTargetsKeyPaths $env:STOCKROOM_TUF_TARGETS_KEY_PATH `
@@ -362,6 +422,18 @@ jobs:
         run: |
           Set-StrictMode -Version Latest
           $ErrorActionPreference = "Stop"
+
+          if (-not [string]::IsNullOrWhiteSpace($env:STOCKROOM_SIGNING_CERT_THUMBPRINT)) {
+            $trustedPath = (
+              "Cert:\CurrentUser\TrustedPeople\$env:STOCKROOM_SIGNING_CERT_THUMBPRINT"
+            )
+            if (Test-Path -LiteralPath $trustedPath) {
+              Remove-Item -LiteralPath $trustedPath -Force
+            }
+            if (Test-Path -LiteralPath $trustedPath) {
+              throw "The pinned GitHub signing certificate remained trusted after cleanup."
+            }
+          }
 
           $paths = @(
             (Join-Path $env:RUNNER_TEMP "Stockroom.Release.pfx"),
@@ -463,7 +535,7 @@ jobs:
             $evidence.signing.executable_signature_status -cne "Valid" -or
             $evidence.signing.msix_signature_status -cne "Valid" -or
             $null -ne $evidence.signing.production_blocker -or
-            $evidence.signing.certificate_was_installed_or_trusted
+            -not $evidence.signing.certificate_was_installed_or_trusted
           ) {
             throw "Production signing evidence is incomplete or invalid."
           }
@@ -713,9 +785,9 @@ jobs:
           records the package contract, exact source revision, SDK validation, signature
           status, deterministic unsigned-payload comparison, and updater round trip.
           ``Stockroom_TUF_Feed_$($env:STOCKROOM_PACKAGE_VERSION).zip`` contains the exact
-          signed ``metadata/`` and consistent-snapshot ``targets/`` trees. Publication as
-          a release asset stages this feed but does not deploy it to the configured HTTPS
-          origin; that external upload remains explicitly required.
+          signed ``metadata/`` and consistent-snapshot ``targets/`` trees. After the
+          release assets are reverified, this workflow deploys the merged update feed to
+          the configured HTTPS origin.
           "@ | Set-Content -LiteralPath $notesPath -Encoding utf8NoBOM
 
           $packageName = "Stockroom_$($env:STOCKROOM_PACKAGE_VERSION)_x64.msix"
@@ -776,3 +848,99 @@ jobs:
           ) {
             throw "Published GitHub release assets differ from the exact release allowlist."
           }
+
+  deploy-update-feed:
+    name: Deploy Public Site And Update Feed
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    needs:
+      - build-windows-package
+      - publish-github-release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    permissions:
+      actions: read
+      contents: read
+      pages: write
+      id-token: write
+    steps:
+      - name: Check Out Exact Revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+
+      - name: Download Verified Release Assets
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: Stockroom-Windows-Release
+          path: release-assets
+
+      - name: Assemble Verified Pages Site
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          STOCKROOM_RELEASE_TAG: ${{ needs.build-windows-package.outputs.release_tag }}
+          STOCKROOM_WINDOWS_FEED_BASE_URI: ${{ vars.STOCKROOM_WINDOWS_FEED_BASE_URI }}
+        run: |
+          Set-StrictMode -Version Latest
+          $ErrorActionPreference = "Stop"
+
+          New-Item -ItemType Directory -Path pages-root | Out-Null
+          Copy-Item -Recurse -Force store-site/* pages-root
+          New-Item -ItemType Directory -Path pages-root/downloads | Out-Null
+          Copy-Item -LiteralPath "packaging/Stockroom GitHub Signing.cer" `
+            -Destination "pages-root/downloads/Stockroom-GitHub-Signing.cer"
+          New-Item -ItemType Directory -Path previous-feeds | Out-Null
+
+          $tags = @(
+            & gh api --paginate "repos/$env:GITHUB_REPOSITORY/releases?per_page=100" `
+              --jq ".[].tag_name"
+          )
+          if ($LASTEXITCODE -ne 0) {
+            throw "Could not list prior Stockroom releases."
+          }
+          foreach ($tag in $tags) {
+            if ($tag -ceq $env:STOCKROOM_RELEASE_TAG) { continue }
+            $feedNames = @(
+              & gh release view $tag --json assets `
+                --jq '.assets[].name | select(startswith("Stockroom_TUF_Feed_"))'
+            )
+            if ($LASTEXITCODE -ne 0) {
+              throw "Could not inspect prior Stockroom release $tag."
+            }
+            foreach ($feedName in $feedNames) {
+              & gh release download $tag --pattern $feedName --dir previous-feeds
+              if ($LASTEXITCODE -ne 0) {
+                throw "Could not download prior Stockroom feed $feedName."
+              }
+            }
+          }
+
+          $previousArgs = @(
+            Get-ChildItem -LiteralPath previous-feeds -File -Filter "*.zip" |
+              Sort-Object Name |
+              ForEach-Object { "--previous-feed"; $_.FullName }
+          )
+          & python3 packaging/deploy_release_feed.py `
+            --publish-root release-assets `
+            --output-root pages-root/windows/x64 `
+            --feed-base-uri $env:STOCKROOM_WINDOWS_FEED_BASE_URI `
+            @previousArgs
+          if ($LASTEXITCODE -ne 0) {
+            throw "Verified Stockroom update-feed staging failed."
+          }
+          New-Item -ItemType File -Path pages-root/.nojekyll -Force | Out-Null
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b
+
+      - name: Upload Public Site And Update Feed
+        uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa
+        with:
+          path: pages-root
+
+      - name: Deploy Public Site And Update Feed
+        id: deployment
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e

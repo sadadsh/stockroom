@@ -512,6 +512,11 @@ def test_windows_build_fails_closed_around_production_signing() -> None:
     script = BUILD_SCRIPT.read_text(encoding="utf-8")
 
     assert "Production mode requires -SigningCertificatePath" in script
+    assert "[switch]$SigningCertificateTrustedForVerification" in script
+    assert (
+        "certificate_was_installed_or_trusted = "
+        "[bool]$SigningCertificateTrustedForVerification" in script
+    )
     assert "EphemeralKeySet" in script
     assert "Publisher must exactly equal the signing certificate subject." in script
     assert "The signing PFX does not contain the Code Signing EKU." in script

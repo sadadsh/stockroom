@@ -82,17 +82,19 @@ shipping it is covered in `packaging/README.md`.
 
 ## Installing and updating
 
-The supported public Windows route is the
-[Microsoft Store](https://apps.microsoft.com/detail/9NQ6HP17PH4H). Microsoft signs
-the submitted MSIX after certification and owns installation and updates. Windows
-owns the Start menu entry, Installed Apps registration, repair, and uninstall.
-Normal startup launches `Stockroom.WindowHost.exe`, which supervises the immutable
-packaged backend without invoking a checkout, `uv`, or a system Python environment.
+The rapid Windows channel is hosted on
+[Stockroom's install page](https://sadadsh.github.io/stockroom/). Trust its pinned
+certificate once, then open `Stockroom.appinstaller`. Every successful push to
+`main` publishes a signed immutable package and atomically deploys its verified
+update feed. Stockroom checks that feed on launch, so later updates need no manual
+download.
 
-`.github/workflows/store.yml` builds a private unsigned Store candidate only after
-canonical CI passes. GitHub continues to host source, release notes, SBOMs,
-checksums, and evidence; it does not publish the unsigned Store MSIX as a normal
-download. See `packaging/README.md` for the exact package and trust boundaries.
+Windows owns the Start menu entry, Installed Apps registration, repair, and
+uninstall. Normal startup launches `Stockroom.WindowHost.exe`, which supervises the
+immutable packaged backend without invoking a checkout, `uv`, or system Python.
+The Microsoft Store submission remains a separate optional distribution channel;
+it is not part of the rapid GitHub update path. See `packaging/README.md` for the
+exact package and trust boundaries.
 
 ## Verifying a change
 

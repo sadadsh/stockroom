@@ -29,3 +29,11 @@ def test_public_policy_truthfully_describes_local_and_provider_data() -> None:
         "no Stockroom-operated advertising, analytics, or telemetry",
     ):
         assert phrase in policy
+
+
+def test_public_site_exposes_the_one_time_github_channel_install_files() -> None:
+    page = (ROOT / "store-site" / "index.html").read_text(encoding="utf-8")
+
+    assert 'href="downloads/Stockroom-GitHub-Signing.cer"' in page
+    assert 'href="windows/x64/Stockroom.appinstaller"' in page
+    assert "one-time certificate" in page

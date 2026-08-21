@@ -10,6 +10,7 @@ param(
     [string]$FeedBaseUri = "",
     [string]$SigningCertificatePath = "",
     [string]$SigningEnvironmentVariableName = "STOCKROOM_SIGNING_CERT_PASSWORD",
+    [switch]$SigningCertificateTrustedForVerification,
     [string]$TufRootPath = "",
     [int]$TufMetadataVersion = 1,
     [string[]]$TufTargetsKeyPaths = @(),
@@ -1183,7 +1184,7 @@ $Evidence = [ordered]@{
         msix_signature_status = $PackageSignatureStatus
         certificate_thumbprint = $CertificateThumbprint
         production_blocker = $SigningBlocker
-        certificate_was_installed_or_trusted = $false
+        certificate_was_installed_or_trusted = [bool]$SigningCertificateTrustedForVerification
     }
     validation = [ordered]@{
         python_contract_validator = $true

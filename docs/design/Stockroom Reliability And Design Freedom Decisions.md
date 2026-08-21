@@ -757,3 +757,17 @@ vendored AltiumSharp implementation and emits SVG without starting Altium Design
 OutJob. A document selector appears only for multiple top-level schematics or PCBs, while schematic
 sheets remain grouped under their document. The first proof excludes 3D, native editing, advanced
 layers, and new collaboration infrastructure.
+
+### Main Pushes Deploy The GitHub Update Feed
+
+The Windows Release workflow is the only GitHub Pages deployment owner. After the
+canonical gate, signed package build, and immutable GitHub Release all succeed, it
+uses the existing verified feed staging boundary to merge prior TUF archives and
+deploy the public install site plus `windows/x64` feed as one Pages artifact. A failed build
+or release never reaches deployment, so the prior live feed remains intact.
+
+The GitHub channel is the primary rapid-update path. Its repository-pinned,
+self-signed Code Signing certificate is trusted once during installation; every
+later `main` build must match that public identity. GitHub-channel installations
+check the TUF feed on launch and in the background without manual redownloads.
+Microsoft Store distribution remains optional and separate.
