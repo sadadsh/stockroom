@@ -511,6 +511,8 @@ def test_windows_build_keeps_sdk_validation_and_round_trip_enabled() -> None:
 def test_windows_build_fails_closed_around_production_signing() -> None:
     script = BUILD_SCRIPT.read_text(encoding="utf-8")
 
+    assert '[string]$TimestampUri = "http://timestamp.digicert.com"' in script
+    assert '"https://timestamp.digicert.com"' not in script
     assert "Production mode requires -SigningCertificatePath" in script
     assert "[switch]$SigningCertificateTrustedForVerification" in script
     assert (

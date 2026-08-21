@@ -18,7 +18,7 @@ param(
     [string[]]$TufTimestampKeyPaths = @(),
     [string]$RollbackReleaseId = "release-bootstrap",
     [string[]]$CompatibleFromReleaseIds = @("release-bootstrap"),
-    [string]$TimestampUri = "https://timestamp.digicert.com",
+    [string]$TimestampUri = "http://timestamp.digicert.com",
     [long]$SourceDateEpoch = 1704067200,
     [string]$OutputRoot = "",
     [switch]$SkipReproducibilityProof
