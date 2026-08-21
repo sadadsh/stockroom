@@ -178,7 +178,10 @@ def stage_release_feed(
     actual_inventory = _extract_feed_archive(archive_path, output_root, current=True)
 
     expected_inventory = feed_evidence.get("repository_inventory")
-    if actual_inventory != expected_inventory:
+    actual_records = sorted(json.dumps(item, sort_keys=True) for item in actual_inventory)
+    if not isinstance(expected_inventory, list) or actual_records != sorted(
+        json.dumps(item, sort_keys=True) for item in expected_inventory
+    ):
         raise ReleaseFeedDeploymentError("extracted feed inventory differs from evidence")
     (output_root / ".nojekyll").write_bytes(b"")
     receipt: dict[str, object] = {

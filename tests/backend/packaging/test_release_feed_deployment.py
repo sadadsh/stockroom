@@ -95,6 +95,22 @@ def test_stage_release_feed_extracts_exact_verified_public_tree(tmp_path: Path) 
     }
 
 
+def test_stage_release_feed_accepts_equivalent_inventory_order(tmp_path: Path) -> None:
+    publish = _publish_root(tmp_path)
+    evidence_path = publish / "Release Feed Evidence.json"
+    evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
+    evidence["repository_inventory"].reverse()
+    evidence_path.write_text(json.dumps(evidence), encoding="utf-8")
+
+    receipt = stage_release_feed(
+        publish_root=publish,
+        output_root=tmp_path / "Pages",
+        expected_feed_base_uri="https://sadadsh.github.io/stockroom/windows/x64/",
+    )
+
+    assert receipt["validation"]["exact_feed_inventory"] is True
+
+
 def test_stage_release_feed_refuses_unsigned_or_uri_mismatch(tmp_path: Path) -> None:
     publish = _publish_root(tmp_path, signed=False)
     with pytest.raises(ReleaseFeedDeploymentError, match="not Authenticode-signed"):
