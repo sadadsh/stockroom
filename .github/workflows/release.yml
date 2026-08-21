@@ -853,9 +853,10 @@ jobs:
           $published = @(
             & gh release view $env:STOCKROOM_RELEASE_TAG --json assets --jq ".assets[].name"
           )
+          $publishedAllowed = @($allowed | ForEach-Object { $_ -replace " ", "." })
           if (
             $LASTEXITCODE -ne 0 -or
-            (Compare-Object -ReferenceObject ($allowed | Sort-Object) -DifferenceObject ($published | Sort-Object))
+            (Compare-Object -ReferenceObject ($publishedAllowed | Sort-Object) -DifferenceObject ($published | Sort-Object))
           ) {
             throw "Published GitHub release assets differ from the exact release allowlist."
           }

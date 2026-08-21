@@ -250,6 +250,8 @@ def test_only_the_exact_verified_release_asset_set_can_be_published() -> None:
     assert "--clobber" not in publish
     assert "Published release assets are immutable" in publish
     assert "asset outside the release allowlist" in publish
+    assert '$publishedAllowed = @($allowed | ForEach-Object { $_ -replace " ", "." })' in publish
+    assert "-ReferenceObject ($publishedAllowed | Sort-Object)" in publish
     assert "Published GitHub release assets differ from the exact release allowlist." in publish
 
 
