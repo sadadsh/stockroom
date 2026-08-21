@@ -1,10 +1,8 @@
 /**
- * The middle column: Specifications. The dominant surface, visible immediately.
+ * The middle column: Specifications. Usable values are visible immediately.
  *
- * Not behind an Overview, not behind a tab, not behind a View All, not in a modal. This is the
- * thing a person opens a component to read, so it is the thing that is on screen when the component
- * opens - every sourced row present, with absent schema expectations kept out of the visible fact
- * list, and a toolbar of FILTERS rather than a set of pages.
+ * Not behind an Overview, tab, or modal. Missing values and per-row source drawers stay quiet until
+ * the header's Details control is used; ordinary sourced rows and their filters stay in place.
  *
  * The search box and the four filters NARROW this list. Neither of them navigates, replaces the
  * column or opens a second surface: the rows that answer stay exactly where they were, in the
@@ -67,6 +65,7 @@ import {
   filterGroups,
   sectionAnchors,
   totalSpecifications,
+  isEmptyState,
   KEY_SECTION_ID,
   SPEC_FILTERS,
   type SpecFilter,
@@ -102,6 +101,7 @@ interface SpecificationsColumnState {
   sourceUrl: (sourceId: string) => string;
   runWrite: (input: SpecificationWrite) => Promise<unknown>;
   writing: boolean;
+  showDetails: boolean;
 }
 
 const SpecificationsColumnContext = createContext<SpecificationsColumnState | null>(null);
@@ -126,18 +126,41 @@ export function SpecificationsColumnChrome({ children }: RegionChromeProps) {
   const dossier = workspace?.dossier;
   const filter = workspace?.specifications.filter ?? "all";
   const scrollRef = workspace?.specifications.scrollRef;
+  const showDetails = workspace?.specifications.showDetails ?? true;
 
   const groups = useMemo(() => dossier?.specificationGroups ?? [], [dossier]);
   const keySpecifications = useMemo(() => dossier?.keySpecifications ?? [], [dossier]);
+  const visibleGroups = useMemo(
+    () =>
+      showDetails
+        ? groups
+        : groups.map((group) => ({
+            ...group,
+            specifications: group.specifications.filter(
+              (record) => !isEmptyState(record.verificationState),
+            ),
+          })),
+    [groups, showDetails],
+  );
+  const visibleKeySpecifications = useMemo(
+    () =>
+      showDetails
+        ? keySpecifications
+        : keySpecifications.filter((record) => !isEmptyState(record.verificationState)),
+    [keySpecifications, showDetails],
+  );
   const total = useMemo(
     () => totalSpecifications(groups, keySpecifications),
     [groups, keySpecifications],
   );
-  const filtered = useMemo(() => filterGroups(groups, filter, query), [groups, filter, query]);
+  const filtered = useMemo(
+    () => filterGroups(visibleGroups, filter, query),
+    [visibleGroups, filter, query],
+  );
   const filteredKey = useMemo(
     () =>
-      filterGroups([keyGroup(keySpecifications, keySectionLabel)], filter, query)[0]?.records ?? [],
-    [keySpecifications, keySectionLabel, filter, query],
+      filterGroups([keyGroup(visibleKeySpecifications, keySectionLabel)], filter, query)[0]?.records ?? [],
+    [visibleKeySpecifications, keySectionLabel, filter, query],
   );
 
   // The headings that are ON SCREEN right now, which is what the strip may offer. A link to a
@@ -208,6 +231,7 @@ export function SpecificationsColumnChrome({ children }: RegionChromeProps) {
       sourceUrl,
       runWrite,
       writing: write.isPending,
+      showDetails,
     }),
     [
       anchors,
@@ -219,6 +243,7 @@ export function SpecificationsColumnChrome({ children }: RegionChromeProps) {
       sourceUrl,
       total,
       write.isPending,
+      showDetails,
     ],
   );
 
@@ -446,6 +471,7 @@ export function SpecificationsKeyBlockPart() {
           busy={column.writing}
           onWrite={column.runWrite}
           sourceUrl={column.sourceUrl}
+          showDetails={column.showDetails}
         />
       ))}
     </SpecSection>
@@ -471,6 +497,7 @@ export function SpecificationsGroupPart({ item }: PiecePartProps) {
           busy={column.writing}
           onWrite={column.runWrite}
           sourceUrl={column.sourceUrl}
+          showDetails={column.showDetails}
         />
       ))}
     </SpecSection>

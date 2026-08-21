@@ -416,11 +416,10 @@ tests protect behavior and identity, but they cannot accept density, hierarchy, 
 calm. Every screenshot review records what still competes with the focal workflow and either corrects it
 or leaves one explicit backlog item with its evidence boundary.
 
-Missing CAD representations keep their named row and exact status, but they no longer receive an equal
-share of the inspection stage. At rest, each absent Symbol, Footprint, or 3D Model uses one compact
-40 px technical-sheet strip; attached previews alone divide the remaining height. Focusing a missing
-row may expand it, and Manage CAD Assets remains the single acquisition route, so the quieter absence
-state changes no data or workflow.
+Missing CAD representations do not consume inspection space at rest. The component-level Details
+control reveals their named rows and exact status as compact 40 px technical-sheet strips. Attached
+previews divide every remaining pixel equally, and Manage CAD Assets remains the single acquisition
+route, so the quieter absence state changes no data or workflow.
 
 ### Intake Never Promises Automatic CAD
 
@@ -733,3 +732,14 @@ Stockroom and the provider remain separate ordinary WebView2 controls, profiles,
 and staging boundaries. They are never visible at the same time: opening a provider selects its native browser
 tab and collapses Stockroom's WebView; the Stockroom tab or Escape reverses that state. This avoids WPF HwndHost
 airspace flashing and avoids the composition-control Direct3D startup failure on supported Windows machines.
+
+### Open Components Lead With Usable Data
+
+The CAD column never scrolls. Attached Symbol, Footprint, and 3D Model divide every available pixel
+equally and never shrink when another drawing opens. Each attached asset carries the same visible Open
+action in the same header position. Missing assets stay hidden until Details reveals compact rows, so
+they never consume drawing space by default.
+
+Ordinary specification values remain visible immediately. Missing values and per-row source drawers
+appear only after Show Details in the component header. Selecting a missing or conflicting quality
+summary opens Details automatically, so every existing recovery path remains direct.

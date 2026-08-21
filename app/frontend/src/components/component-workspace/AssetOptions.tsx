@@ -236,8 +236,16 @@ export function MeasureButton({
   );
 }
 
-/** The one control that opens the full preview: a small maximize glyph, never a text button. */
-export function MaximizeButton({ label, onClick }: { label: string; onClick: () => void }) {
+/** The one full-preview control; module headers may add the visible Open label. */
+export function MaximizeButton({
+  label,
+  onClick,
+  text,
+}: {
+  label: string;
+  onClick: () => void;
+  text?: ReactNode;
+}) {
   return (
     <button
       type="button"
@@ -246,12 +254,14 @@ export function MaximizeButton({ label, onClick }: { label: string; onClick: () 
       title={label}
       onClick={onClick}
       className={
-        "flex h-[20px] w-[20px] items-center justify-center rounded-control text-t3 " +
+        "flex h-[20px] items-center justify-center rounded-control text-t3 " +
+        (text ? "gap-1 px-1.5 " : "w-[20px] ") +
         "hover:bg-control-hover hover:text-t1 focus-visible:outline focus-visible:outline-2 " +
         "focus-visible:outline-offset-1 focus-visible:outline-focus"
       }
     >
       <Icon id="action.maximize" className="h-3.5 w-3.5" />
+      {text}
     </button>
   );
 }

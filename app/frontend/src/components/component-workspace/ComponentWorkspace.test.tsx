@@ -562,6 +562,7 @@ describe("the identity header", () => {
       .getAllByRole("button")
       .map((button) => button.textContent?.trim());
     expect(actions).toEqual([
+      "Show Details",
       "Datasheet",
       "Manufacturer Page",
       "Manage CAD Assets",
@@ -792,14 +793,16 @@ describe("no EDA application is named in ordinary inspection", () => {
     expect(cadAssetStatus(makeRepresentation("model", "failed"))).toBe("Failed");
   });
 
-  it("keeps every asset module on screen when one is expanded", async () => {
+  it("keeps every asset module equal when one full preview opens", async () => {
     const user = userEvent.setup();
     await open();
-    await user.click(screen.getByRole("button", { name: "Footprint", expanded: true }));
+    await user.click(screen.getByRole("button", { name: "Open Footprint" }));
+    expect(await screen.findByRole("dialog", { name: /^Inspect / })).toBeInTheDocument();
     for (const kind of ["symbol", "footprint", "model"] as const) {
-      expect(
-        document.querySelector(devIdSelector(componentRepresentationDevId(ID, kind))),
-      ).not.toBeNull();
+      expect(document.querySelector(devIdSelector(componentRepresentationDevId(ID, kind)))).toHaveClass(
+        "basis-0",
+        "flex-1",
+      );
     }
   });
 });
@@ -869,6 +872,25 @@ const ELECTRICAL: SpecificationGroup = {
 };
 
 describe("the specification column", () => {
+  it("keeps missing values and row disclosures behind one top Details control", async () => {
+    const user = userEvent.setup();
+    await open(makeDossierWith({ groups: [ELECTRICAL] }));
+
+    expect(screen.getByText("Supply Voltage")).toBeVisible();
+    expect(document.querySelector('[data-spec-key="gain_bandwidth"]')).toBeNull();
+    expect(
+      document.querySelector('[data-dev-id="component-browser.spec-evidence-toggle"]'),
+    ).toBeNull();
+
+    await user.click(screen.getByRole("button", { name: "Show Details" }));
+
+    expect(document.querySelector('[data-spec-key="gain_bandwidth"]')).toBeVisible();
+    expect(
+      document.querySelector('[data-dev-id="component-browser.spec-evidence-toggle"]'),
+    ).toBeVisible();
+    expect(screen.getByRole("button", { name: "Hide Details" })).toBeVisible();
+  });
+
   it("shows the specifications immediately, not behind a tab or a View All", async () => {
     await open(makeDossierWith({ groups: [ELECTRICAL] }));
     const column = node("component-browser.column-specifications");
@@ -877,7 +899,9 @@ describe("the specification column", () => {
   });
 
   it("renders an expected field nobody supplied as a real Missing row", async () => {
+    const user = userEvent.setup();
     await open(makeDossierWith({ groups: [ELECTRICAL] }));
+    await user.click(screen.getByRole("button", { name: "Show Details" }));
     const row = document.querySelector<HTMLElement>('[data-spec-key="gain_bandwidth"]')!;
     expect(row).not.toBeNull();
     expect(row.dataset.specState).toBe("missing");
@@ -886,7 +910,9 @@ describe("the specification column", () => {
   });
 
   it("keeps Not Reported apart from Missing, because only one of them is a gap", async () => {
+    const user = userEvent.setup();
     await open(makeDossierWith({ groups: [ELECTRICAL] }));
+    await user.click(screen.getByRole("button", { name: "Show Details" }));
     const notReported = document.querySelector<HTMLElement>('[data-spec-key="slew_rate"]')!;
     // The STATE is what the row is asserted on, and it is unchanged. `Not Reported` is one of the
     // two quiet states, so at rest the value cell shows a dash and carries the exact word as its
@@ -905,6 +931,7 @@ describe("the specification column", () => {
   it("attaches a conflicting value's alternative to the row it disagrees with", async () => {
     const user = userEvent.setup();
     await open(makeDossierWith({ groups: [ELECTRICAL] }));
+    await user.click(screen.getByRole("button", { name: "Show Details" }));
     const row = document.querySelector<HTMLElement>(
       '[data-spec-key="operating_temperature"]',
     )!;

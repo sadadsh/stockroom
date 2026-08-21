@@ -7,11 +7,9 @@
  * is right, not which of two tools can open it; putting `KiCad` and `Altium` in the module header
  * turned every asset into a compatibility report and pushed the actual asset off the line.
  *
- * A collapsed module keeps its header AND a small preview. Collapsing must never remove the third
- * of the CAD set that happens not to be in focus, because "is the symbol consistent with the
- * footprint" is one question and it cannot be answered by flipping between two views.
- * Missing modules also keep their identity, but at rest use a compact absence strip so an empty
- * placeholder cannot take the drawing space away from an asset that can actually be inspected.
+ * Attached modules always share the available column height equally. Opening one uses the full
+ * preview sheet without shrinking the other resting drawings. Missing modules appear only in the
+ * component-level Details view and use a compact absence strip there.
  *
  * The provider is stated here only when it DIFFERS from the column's preferred source. Repeating
  * the same provider sentence under all three assets is what pushed the asset off its own header
@@ -24,7 +22,7 @@ import type {
 } from "../../api/dossierTypes";
 import { useLandPattern, usePreviewGlb, useSymbolGeometry } from "../../api/queries";
 import { componentRepresentationDevId } from "../../lib/componentDevIds";
-import { Text, useText } from "../../lib/copy";
+import { Text, useCopyFormatter, useText } from "../../lib/copy";
 import { runtimeDesignId } from "../../lib/designIdentity";
 import { CubeArt, FootprintArt, SymbolArt } from "../icons";
 import { Icon } from "../Icon";
@@ -106,19 +104,14 @@ function MissingAssetArt({
  * Theme-aware, which is the whole point: this used to be near-white under the symbol and the
  * footprint in dark theme, brighter than anything else in the workspace including the part number.
  *
- * `w-full` because the compact stage is a <button>, which is inline-block and would otherwise
- * shrink to its contents where the expanded <div> fills the column.
+ * `w-full` keeps both attached drawings and revealed missing strips aligned to the column.
  */
-function previewStageClass(expanded: boolean, compactMissing: boolean): string {
+function previewStageClass(compactMissing: boolean): string {
   return (
     "flex w-full items-center justify-center overflow-hidden border-y border-line " +
     "bg-technical focus-visible:outline focus-visible:outline-2 " +
     "focus-visible:-outline-offset-2 focus-visible:outline-focus " +
-    (compactMissing
-      ? "h-[40px] min-h-[40px] flex-none"
-      : expanded
-        ? "min-h-[40px] flex-1"
-        : "h-[56px] min-h-[32px] flex-none")
+    (compactMissing ? "h-[40px] min-h-[40px] flex-none" : "min-h-[40px] flex-1")
   );
 }
 
@@ -129,9 +122,7 @@ export function CadAssetModule({
   preference,
   expectedPins,
   expectedPitch,
-  expanded,
-  focused,
-  onToggle,
+  showDetails,
   onOpenFullPreview,
   focusRef,
 }: {
@@ -142,36 +133,19 @@ export function CadAssetModule({
   /** The component's own pin count, so a terminal count has a second side to be compared to. */
   expectedPins: number | null;
   expectedPitch: number | null;
-  /** Expanded carries the full preview and its controls; collapsed keeps a compact one. */
-  expanded: boolean;
-  /**
-   * This module, and only this module, is the one the column is focused on.
-   *
-   * Distinct from `expanded`, which is true for all three in the resting `all` layout. The measured
-   * evidence footer is gated on THIS rather than on `expanded`, because at rest the column was
-   * carrying three lines of counts nobody had asked for - `2 pins · No duplicates`,
-   * `2 pads · 0.96 mm pitch · Courtyard present · 1.80 x 0.84 mm` - under three drawings, in a
-   * ~300px column. A validation FAILURE is not gated: see `AssetIssue`.
-   */
-  focused: boolean;
-  onToggle: () => void;
+  showDetails: boolean;
   onOpenFullPreview: () => void;
   focusRef?: (node: HTMLElement | null) => void;
 }) {
   const label = REPRESENTATION_LABEL[kind];
   const override = assetOverride(preference, kind);
-  // What the header actually DOES, which is not expand or collapse: at rest all three modules are
-  // expanded, and pressing one focuses it - the other two reduce to compact previews and this one
-  // states the evidence it measured. The two words were describing a state the control does not have.
-  const collapseLabel = useText("component-browser.asset-collapse", "Show All Three");
-  const focusLabel = useText("component-browser.asset-expand", "Focus This Asset");
-  const fullPreview = useText("component-browser.asset-full-preview", "Open Full Preview");
+  const openAsset = useCopyFormatter("component-browser.asset-open", "Open {asset}");
   const attached = view.tools.some((tool) => tool.present);
 
   const preview = usePreviewData(componentId, kind, attached);
   const measured = measurementsFor(kind, preview, expectedPins);
   const status = cadAssetStatus(view, measured);
-  const compactMissing = status === "Missing" && !focused;
+  const compactMissing = status === "Missing";
 
   return (
     <section
@@ -179,29 +153,22 @@ export function CadAssetModule({
       data-dev-id={componentRepresentationDevId(componentId, kind)}
       data-dev-role="component-browser.cad-asset" data-design-cad-kind={kind === "model" ? "model3d" : kind} data-design-cad-target={`cad.${kind === "model" ? "model3d" : kind}`}
       data-asset-kind={kind}
-      data-expanded={expanded ? "true" : "false"}
+      data-expanded="true"
       data-status={status}
       aria-label={label}
       className={
         "flex min-h-0 flex-col border-b border-line last:border-b-0 " +
-        (expanded && !compactMissing ? "flex-1" : "flex-none")
+        (compactMissing ? "flex-none" : "basis-0 flex-1")
       }
     >
       {/* One dense line: name, state, and the source ONLY when it differs from the column's. */}
-      <h3 className="flex items-center gap-2 px-2 py-1">
-        <button
-          type="button"
+      <h3 className="flex min-h-[28px] items-center gap-2 px-2 py-1">
+        <span
           data-dev-id="component-browser.asset-header"
-          aria-expanded={expanded}
-          title={focused ? collapseLabel : focusLabel}
-          onClick={onToggle}
-          className={
-            "ui-section-title flex-none rounded-control focus-visible:outline focus-visible:outline-2 " +
-            "focus-visible:outline-offset-1 focus-visible:outline-focus"
-          }
+          className="ui-section-title flex-none"
         >
           <Text id={REPRESENTATION_COPY_ID[kind]}>{label}</Text>
-        </button>
+        </span>
         {status === "Missing" ? (
           // The centred question mark already says that this asset is absent. Keep the exact state
           // for assistive technology without printing the same word beside every module heading.
@@ -217,69 +184,42 @@ export function CadAssetModule({
             <CadStatusLabel status={status} />
           </StatusText>
         )}
-        {override ? (
-          <span className="ui-component-metadata ml-auto min-w-0 truncate" title={override}>
-            {override}
-          </span>
-        ) : null}
+        <span className="ml-auto flex min-w-0 items-center gap-1">
+          {override ? (
+            <span className="ui-component-metadata min-w-0 truncate" title={override}>
+              {override}
+            </span>
+          ) : null}
+          {attached ? (
+            <MaximizeButton
+              label={openAsset({ asset: label })}
+              onClick={onOpenFullPreview}
+              text={<Text id="component-browser.asset-open">Open</Text>}
+            />
+          ) : null}
+        </span>
       </h3>
 
-      {/* The preview is present in BOTH states, smaller when the module is not in focus, because
-          the three assets are read against each other. Never a text button, which competes with
-          the asset for the line.
+      {/* The stage stays a plain surface. Every attached asset has one predictable Open action in
+          the same header position, without overlapping controls on the drawing. */}
+      <div
+        data-dev-id="component-browser.asset-preview"
+        className={previewStageClass(compactMissing)}
+      >
+        <AssetPreview
+          kind={kind}
+          view={view}
+          preview={preview}
+          missing={status === "Missing"}
+          compactMissing={compactMissing}
+          interactive
+        />
+      </div>
 
-          The STAGE ITSELF is a control only while the module is compact, and that condition is not
-          a style choice. `button` takes presentational children, so a widget role on this container
-          deletes everything under it from the accessibility tree - and while the module is expanded
-          that subtree is the asset's whole control surface: the maximize button, the 3D settings
-          popover, the land pattern's measure target. This container used to carry role="button" in
-          BOTH states, so every one of those controls was invisible to a screen reader, and Enter
-          was the only key that worked because a div gets no keyboard behaviour of its own.
-
-          So the tag follows the content. Compact, the subtree is inert (`interactive={expanded}`
-          switches every child's controls off), nothing is swallowed, and a real <button> gives the
-          stage a name, focus, Enter AND Space for free. Expanded, the stage is a plain surface and
-          the keyboard path is the maximize button that is already inside it. */}
-      {expanded ? (
-        <div
-          data-dev-id="component-browser.asset-preview"
-          className={previewStageClass(true, compactMissing)}
-        >
-          <AssetPreview
-            kind={kind}
-            view={view}
-            preview={preview}
-            missing={status === "Missing"}
-            compactMissing={compactMissing}
-            interactive
-            onOpenFullPreview={onOpenFullPreview}
-          />
-        </div>
-      ) : (
-        <button
-          type="button"
-          data-dev-id="component-browser.asset-preview"
-          aria-label={fullPreview}
-          onClick={onOpenFullPreview}
-          className={previewStageClass(false, compactMissing)}
-        >
-          <AssetPreview
-            kind={kind}
-            view={view}
-            preview={preview}
-            missing={status === "Missing"}
-            compactMissing={compactMissing}
-            interactive={false}
-            onOpenFullPreview={onOpenFullPreview}
-          />
-        </button>
-      )}
-
-      {expanded && attached ? (
+      {attached ? (
         <AssetControls
           kind={kind}
           preview={preview}
-          onOpenFullPreview={onOpenFullPreview}
         />
       ) : null}
 
@@ -287,7 +227,7 @@ export function CadAssetModule({
           can go and ask for; a recorded fault is the one thing the column has to say unprompted. */}
       <AssetIssue status={view.status} issue={view.issue} />
 
-      {focused ? (
+      {showDetails ? (
         <AssetEvidence
           kind={kind}
           view={view}
@@ -408,7 +348,6 @@ function AssetPreview({
   missing,
   compactMissing,
   interactive,
-  onOpenFullPreview,
 }: {
   kind: RepresentationKind;
   view: RepresentationView;
@@ -416,10 +355,7 @@ function AssetPreview({
   missing: boolean;
   compactMissing: boolean;
   interactive: boolean;
-  /** Handed to the 3D viewer, which owns the only control strip a model module has. */
-  onOpenFullPreview: () => void;
 }) {
-  const fullPreview = useText("component-browser.asset-full-preview", "Open Full Preview");
   const unreadable = useText(
     "component-browser.asset-unreadable",
     "This file could not be read on this machine",
@@ -469,13 +405,11 @@ function AssetPreview({
         showViews={interactive}
         showShading={interactive}
         compact
-        // One button, one panel, exactly like the symbol and the land pattern beside it: layers,
-        // motion, camera, appearance and placement all live inside the popover, and the strip is
-        // the settings icon plus the maximize control the module hands down. The previous compact
+        // One settings panel, exactly like the symbol and the land pattern beside it: layers,
+        // motion, camera, appearance and placement live inside the popover. The previous compact
         // bar still carried up to four always-visible layer icons and a spin toggle, which is the
         // same "row of switches above the drawing" the column was being read as.
         controls={interactive ? "panel" : "none"}
-        trailing={interactive ? <MaximizeButton label={fullPreview} onClick={onOpenFullPreview} /> : null}
       />
     </div>
   );
@@ -513,20 +447,16 @@ function PreviewMessage({
  * ~300px column; this puts two or three 20px icons on one 24px line. Not one switch was removed -
  * see `AssetOptions.tsx` for where each went and why measure and fit are not switches.
  *
- * The 3D body's controls are NOT duplicated here. `Glb3DView` owns the scene, so it owns its own
- * one-button panel (`controls="panel"`) and this module hands it the maximize control to place at
- * the end of the same strip - one row for the model too, rather than a bar under a bar.
+ * The 3D body's controls are NOT duplicated here. `Glb3DView` owns the scene and its settings
+ * panel; every asset's Open action already occupies the same module-header position.
  */
 function AssetControls({
   kind,
   preview,
-  onOpenFullPreview,
 }: {
   kind: RepresentationKind;
   preview: PreviewData;
-  onOpenFullPreview: () => void;
 }) {
-  const openFull = useText("component-browser.asset-full-preview", "Open Full Preview");
   const symbolOptions = useText(
     "component-browser.asset-symbol-options",
     "Show Or Hide Drawn Detail",
@@ -558,8 +488,7 @@ function AssetControls({
     "This footprint draws nothing on that layer",
   );
 
-  // The model's strip is Glb3DView's own, so that the settings button and the maximize control sit
-  // on ONE line instead of a module strip stacked under a viewer bar.
+  // The model's settings stay inside Glb3DView instead of adding a second module strip.
   if (kind === "model") return null;
 
   if (kind === "symbol") {
@@ -607,9 +536,6 @@ function AssetControls({
             ),
           ]}
         />
-        <span className="ml-auto flex items-center gap-1">
-          <MaximizeButton label={openFull} onClick={onOpenFullPreview} />
-        </span>
       </AssetControlStrip>
     );
   }
@@ -716,9 +642,6 @@ function AssetControls({
         onToggle={toggleMeasuring}
         disabledReason={base}
       />
-      <span className="ml-auto flex items-center gap-1">
-        <MaximizeButton label={openFull} onClick={onOpenFullPreview} />
-      </span>
     </AssetControlStrip>
   );
 }
@@ -730,11 +653,11 @@ function AssetControls({
 /**
  * What was actually checked, in plain counts, reading `STEP . 5/8 pins matched . No duplicates`.
  *
- * ONLY WHEN THIS MODULE IS THE FOCUSED ONE. At rest the column stacks three drawings, and it used to
+ * ONLY WHEN THE COMPONENT-LEVEL DETAILS CONTROL IS OPEN. The column stacks three drawings, and it used to
  * put a line of counts under each of them - `2 pins · No duplicates`, `2 pads · 0.96 mm pitch ·
  * Courtyard present · 1.80 x 0.84 mm`, `No file is attached` - which is three lines of measurement
- * nobody asked for above the specifications a person opened the component to read. Clicking a module
- * header focuses it (and `Show All Three` comes back), and the focused module states its evidence.
+ * nobody asked for above the specifications a person opened the component to read. The top Details
+ * control reveals this evidence consistently across the component.
  * The data is not gone from anywhere: it is measured from the drawing on demand, the recorded checks
  * are in Manage Models and the evidence surface, and a genuine FAULT is stated in every state by
  * `AssetIssue` above plus the header's own status word.

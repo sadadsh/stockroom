@@ -21,7 +21,7 @@ import type { DatasheetTarget } from "../components/component-workspace/datashee
 import type { ManageMenuItem } from "../components/component-workspace/ManageMenu";
 import type { SpecFilter } from "../components/component-workspace/specificationRows";
 import type { WorkspaceActivity } from "../components/component-workspace/WorkspaceStatusBar";
-import type { CadWorkspaceView, RepresentationLayout } from "../lib/uiSession";
+import type { CadWorkspaceView } from "../lib/uiSession";
 
 export interface WorkspaceHeaderSlice {
   manageItems: ManageMenuItem[];
@@ -32,16 +32,15 @@ export interface WorkspaceHeaderSlice {
   onFindDatasheet: () => void;
   /** Leave Components and open this exact component in the Assets workspace. */
   onManageAssets: () => void;
+  showDetails: boolean;
+  onToggleDetails: () => void;
 }
 
 export interface WorkspaceCadSlice {
   view: CadWorkspaceView;
   onView: (view: CadWorkspaceView) => void;
-  /** `all` expands the three; a kind expands that one and compacts the other two. */
-  layout: RepresentationLayout;
-  onLayout: (layout: RepresentationLayout) => void;
   onOpenFullPreview: (kind: RepresentationKind) => void;
-  /** Where each module's element is kept, so the quality summary can scroll one into view. */
+  /** Where each module's element is kept, so closing a full preview can restore focus. */
   assetRefs: MutableRefObject<Partial<Record<RepresentationKind, HTMLElement | null>>>;
 }
 
@@ -58,6 +57,7 @@ export interface WorkspaceSpecificationsSlice {
   scrollRef: MutableRefObject<HTMLDivElement | null>;
   /** The pinout is genuinely tabular and opens on its own surface. */
   onViewPinout: () => void;
+  showDetails: boolean;
 }
 
 export interface WorkspaceSourcingSlice {

@@ -42,6 +42,7 @@ export interface SpecificationRowProps {
   busy: boolean;
   /** Where a named source can actually be looked at, when such a place exists. */
   sourceUrl: (sourceId: string) => string;
+  showDetails?: boolean;
 }
 
 /**
@@ -63,6 +64,7 @@ export function SpecificationRow({
   onWrite,
   busy,
   sourceUrl,
+  showDetails = true,
 }: SpecificationRowProps) {
   const [open, setOpen] = useState(false);
   const [failure, setFailure] = useState("");
@@ -180,7 +182,7 @@ export function SpecificationRow({
             <SpecStateLabel state={state} />
           </StatusText>
         )}
-        {hasEvidence ? (
+        {showDetails && hasEvidence ? (
           <button
             type="button"
             data-dev-id="component-browser.spec-evidence-toggle"

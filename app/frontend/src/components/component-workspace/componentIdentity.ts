@@ -216,21 +216,6 @@ export function qualitySegments(dossier: ComponentDossier): QualitySegment[] {
 }
 
 /**
- * The one representation a CAD quality segment should focus.
- *
- * The first thing actually wrong, or the FIRST MODULE IN THE COLUMN when nothing is - "focus the
- * asset" has to name an asset even when the set is healthy, or the segment is a dead click. The
- * healthy fallback is read off `CAD_KINDS` rather than named, so it can never disagree with the
- * order the column actually stacks the modules in (it did: the fallback was hardcoded `symbol`,
- * which is now the LAST module).
- */
-export function cadFocusKind(
-  kinds: Record<RepresentationKind, RepresentationView>,
-): RepresentationKind {
-  return cadCondition(kinds).missing[0] ?? CAD_KINDS[0];
-}
-
-/**
  * A lifecycle word's tone. Only the words that MEAN something get a colour.
  *
  * Semantic colour is spent where it encodes a decision - can this part still be designed in - and

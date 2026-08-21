@@ -331,15 +331,9 @@ function module_(kind: string): HTMLElement {
 /* -------------------------------------------------------------- preferred source */
 
 describe("the preferred source is a control, not a caption", () => {
-  it("omits an empty None recorded row but keeps Show All Three when an asset is focused", async () => {
+  it("omits an empty None recorded row without adding a dead reset action", async () => {
     const column = await open(attached(emptyPreference()));
     expect(within(column).queryByRole("combobox", { name: "Preferred Source" })).toBeNull();
-
-    const user = userEvent.setup();
-    await user.click(within(module_("symbol")).getByRole("button", { name: "Symbol" }));
-    const showAll = within(column).getByRole("button", { name: "Show All Three" });
-    expect(showAll).toBeInTheDocument();
-    await user.click(showAll);
     expect(within(column).queryByRole("button", { name: "Show All Three" })).toBeNull();
   });
 
@@ -456,6 +450,20 @@ describe("the preferred source is a control, not a caption", () => {
 /* -------------------------------------------------------------- module behaviour */
 
 describe("the three modules", () => {
+  it("gives every attached CAD model the same frame and an obvious header action", async () => {
+    await open(attached());
+
+    for (const kind of ["symbol", "footprint", "model"]) {
+      const asset = module_(kind);
+      expect(asset).toHaveClass("basis-0", "flex-1");
+      const openButton = within(asset).getByRole("button", {
+        name: `Open ${kind === "model" ? "3D Model" : kind[0]!.toUpperCase() + kind.slice(1)}`,
+      });
+      expect(openButton.closest("h3")).not.toBeNull();
+      expect(openButton).toHaveTextContent("Open");
+    }
+  });
+
   it("divides the available pane height between assets without a CAD scrollbar", async () => {
     const column = await open(attached());
     const body = column.querySelector<HTMLElement>('[data-workspace-scroll="cad"]')!;
@@ -469,7 +477,7 @@ describe("the three modules", () => {
     }
   });
 
-  it("gives attached previews the height missing assets would otherwise consume", async () => {
+  it("hides missing CAD until Details and gives attached CAD all available height", async () => {
     const dossier = attached();
     dossier.cadAssets.kinds.footprint = makeRepresentation("footprint", "missing", []);
     dossier.cadAssets.kinds.model = makeRepresentation("model", "missing", []);
@@ -480,6 +488,11 @@ describe("the three modules", () => {
       module_("symbol").querySelector('[data-dev-id="component-browser.asset-preview"]'),
     ).toHaveClass("flex-1");
     for (const kind of ["footprint", "model"]) {
+      expect(module_(kind)).toBeNull();
+    }
+
+    await userEvent.setup().click(screen.getByRole("button", { name: "Show Details" }));
+    for (const kind of ["footprint", "model"]) {
       expect(module_(kind)).toHaveClass("flex-none");
       expect(
         module_(kind).querySelector('[data-dev-id="component-browser.asset-preview"]'),
@@ -487,13 +500,17 @@ describe("the three modules", () => {
     }
   });
 
-  it("keeps an all-missing CAD set compact without removing its asset workflow", async () => {
+  it("reveals an all-missing CAD set only through Details", async () => {
     const dossier = attached(emptyPreference());
     for (const kind of ["symbol", "footprint", "model"] as const) {
       dossier.cadAssets.kinds[kind] = makeRepresentation(kind, "missing", []);
     }
     await open(dossier);
 
+    for (const kind of ["symbol", "footprint", "model"]) expect(module_(kind)).toBeNull();
+    expect(screen.getByRole("button", { name: "Manage CAD Assets" })).toBeVisible();
+
+    await userEvent.setup().click(screen.getByRole("button", { name: "Show Details" }));
     for (const kind of ["symbol", "footprint", "model"]) {
       expect(module_(kind)).toHaveClass("flex-none");
       expect(
@@ -503,40 +520,27 @@ describe("the three modules", () => {
     expect(screen.getByRole("button", { name: "Manage CAD Assets" })).toBeVisible();
   });
 
-  it("keeps every header AND a preview when one module is focused", async () => {
-    const column = await open(attached());
+  it("keeps every attached module equal while a full preview is open", async () => {
+    await open(attached());
     const user = userEvent.setup();
-    // The header IS the control: its name is the asset it names, and its title says which way
-    // the click goes. A separate Expand text button would compete with the asset for the line.
-    await user.click(within(module_("symbol")).getByRole("button", { name: "Symbol" }));
+    await user.click(within(module_("symbol")).getByRole("button", { name: "Open Symbol" }));
 
-    // Focusing one asset compacts the other two. It never removes them: comparing a symbol
-    // against its footprint is one question, and two views cannot answer it.
+    expect(await screen.findByRole("dialog", { name: /^Inspect / })).toBeInTheDocument();
     for (const kind of ["symbol", "footprint", "model"]) {
-      expect(module_(kind)).toBeInTheDocument();
-      expect(
-        module_(kind).querySelector('[data-dev-id="component-browser.asset-preview"]'),
-      ).toBeInTheDocument();
+      expect(module_(kind)).toHaveClass("basis-0", "flex-1");
+      expect(module_(kind).dataset.expanded).toBe("true");
     }
-    expect(module_("symbol").dataset.expanded).toBe("true");
-    expect(module_("footprint").dataset.expanded).toBe("false");
-    expect(within(column).getByRole("button", { name: "Show All Three" })).toBeInTheDocument();
   });
 
-  it("carries no generic Expand text button, only a maximize control with its full name", async () => {
+  it("carries no generic Expand text button, only one clearly named Open action", async () => {
     const column = await open(attached());
     expect(within(column).queryByRole("button", { name: "Expand" })).toBeNull();
     expect(within(column).queryByRole("button", { name: "Collapse" })).toBeNull();
-    // And the module header's tooltip names what pressing it DOES, rather than a state the control
-    // does not have: at rest all three are expanded, so "Collapse" described nothing.
+    expect(within(column).queryByRole("button", { name: "Show All Three" })).toBeNull();
+    expect(within(module_("symbol")).queryByRole("button", { name: "Symbol" })).toBeNull();
     expect(
-      module_("symbol")
-        .querySelector('[data-dev-id="component-browser.asset-header"]')!
-        .getAttribute("title"),
-    ).toBe("Focus This Asset");
-    expect(
-      within(module_("symbol")).getAllByRole("button", { name: "Open Full Preview" }).length,
-    ).toBeGreaterThan(0);
+      within(module_("symbol")).getAllByRole("button", { name: "Open Symbol" }).length,
+    ).toBe(1);
   });
 
   it("leaves the expanded preview a surface, not a second control with the maximize button's name", async () => {
@@ -556,30 +560,19 @@ describe("the three modules", () => {
     expect(stage.tagName).toBe("DIV");
     expect(stage.getAttribute("role")).toBeNull();
     // One name, one control. The maximize button is the one, and it is not the stage.
-    const named = within(symbol).getAllByRole("button", { name: "Open Full Preview" });
+    const named = within(symbol).getAllByRole("button", { name: "Open Symbol" });
     expect(named).toHaveLength(1);
     expect(named[0]).not.toBe(stage);
   });
 
-  it("makes the COMPACT preview a real button, so Space opens the full preview too", async () => {
-    // Compact, `interactive={false}` switches every child's controls off, so the subtree is inert
-    // and nothing is swallowed - which is what lets the stage be a real control. A native <button>
-    // is what earns Space; the div-with-a-role it replaced answered Enter only, because a div gets
-    // no keyboard behaviour of its own.
+  it("opens CAD from the same header action by keyboard", async () => {
     const user = userEvent.setup();
     await open(attached());
-    await user.click(within(module_("symbol")).getByRole("button", { name: "Symbol" }));
-    expect(module_("footprint").dataset.expanded).toBe("false");
-
-    const stage = module_("footprint").querySelector<HTMLElement>(
-      '[data-dev-id="component-browser.asset-preview"]',
-    )!;
-    expect(stage.tagName).toBe("BUTTON");
-    // The accessible name states the COMPLETE action, not a truncated visible label.
-    expect(stage.getAttribute("aria-label")).toBe("Open Full Preview");
-
-    stage.focus();
-    expect(document.activeElement).toBe(stage);
+    const openButton = within(module_("footprint")).getByRole("button", {
+      name: "Open Footprint",
+    });
+    openButton.focus();
+    expect(document.activeElement).toBe(openButton);
     await user.keyboard(" ");
     await waitFor(() => {
       expect(screen.getByRole("dialog", { name: /^Inspect / })).toBeInTheDocument();
@@ -782,7 +775,7 @@ describe("the previews are drawn from the file", () => {
     }
   });
 
-  it("keeps the measured evidence off the resting column and states it on the focused module", async () => {
+  it("keeps measured evidence behind the top Details control", async () => {
     const user = userEvent.setup();
     await open(attached());
     // AT REST the column stacks three drawings and states no counts under any of them. It used to
@@ -800,13 +793,7 @@ describe("the previews are drawn from the file", () => {
       ).toBeNull();
     }
 
-    // FOCUS the footprint - clicking its header is the same control that already reduced the other
-    // two to compact previews - and the module states what it measured.
-    await user.click(
-      module_("footprint").querySelector<HTMLElement>(
-        '[data-dev-id="component-browser.asset-header"]',
-      )!,
-    );
+    await user.click(screen.getByRole("button", { name: "Show Details" }));
     const line = await waitFor(() => {
       const node = module_("footprint").querySelector(
         '[data-dev-id="component-browser.asset-evidence"]',
@@ -863,6 +850,8 @@ describe("the previews are drawn from the file", () => {
         },
       }),
     );
+    for (const kind of ["model", "footprint", "symbol"]) expect(module_(kind)).toBeNull();
+    await userEvent.setup().click(screen.getByRole("button", { name: "Show Details" }));
     for (const kind of ["model", "footprint", "symbol"]) {
       const node = module_(kind);
       const status = await waitFor(() => within(node).getByText("Missing"));

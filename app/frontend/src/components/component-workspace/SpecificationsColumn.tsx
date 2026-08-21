@@ -58,6 +58,8 @@ export function SpecificationsColumn({
         onOpenDatasheet: noop,
         onFindDatasheet: noop,
         onManageAssets: noop,
+        showDetails: true,
+        onToggleDetails: noop,
       },
       cad: {
         view: "models",
@@ -67,7 +69,7 @@ export function SpecificationsColumn({
         onOpenFullPreview: noop,
         assetRefs: NO_ASSET_REFS,
       },
-      specifications: { filter, onFilter, scrollRef, onViewPinout },
+      specifications: { filter, onFilter, scrollRef, onViewPinout, showDetails: true },
       sourcing: {
         onViewOffers: noop,
         onViewProvenance: noop,

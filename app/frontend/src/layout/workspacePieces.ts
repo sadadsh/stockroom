@@ -208,17 +208,14 @@ export const WORKSPACE_PIECES: readonly PieceManifest[] = [
     home: { regionId: WORKSPACE_REGION.cadColumn, siblingGroup: GROUP.columnChrome },
     source: "components/component-workspace/WorkspaceColumns.tsx",
   },
-  // CadAssetsColumn.tsx `toolbar`: the preferred-source control, plus Show All Three while one
-  // module is focused. One piece - it is one control row, and the second control exists only to
-  // undo the state the first row is in.
+  // CadAssetsColumn.tsx `toolbar`: the preferred-source control.
   {
     id: "workspace.cad-preferred-source",
-    devIds: ["component-browser.preferred-source", "component-browser.show-all-assets"],
+    devIds: ["component-browser.preferred-source"],
     dataNeeds: ["dossier.cadAssets.preference"],
     actions: [
       "component-browser.set-cad-set-source",
       "component-browser.clear-cad-set-source",
-      "component-browser.show-all-cad-assets",
     ],
     scroll: { owns: false },
     home: { regionId: WORKSPACE_REGION.cadColumn, siblingGroup: GROUP.columnChrome },
@@ -245,10 +242,8 @@ export const WORKSPACE_PIECES: readonly PieceManifest[] = [
       "query.symbol-geometry",
       "query.land-pattern",
       "query.preview-glb",
-      "session.representation_layout",
     ],
     actions: [
-      "component-browser.focus-cad-asset",
       "component-browser.open-full-preview",
       "component-browser.toggle-asset-layer",
       "component-browser.measure-footprint",

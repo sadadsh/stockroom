@@ -13,16 +13,14 @@
  * looking at a mixed set nothing to do about it. It now records a decision, and the decision is
  * shown before it is taken.
  *
- * Expansion state persists per component in the ui session. `all` is the reading state: attached
- * drawings divide the available inspection space while missing assets remain compact identity
- * strips. Focusing one asset compacts the other two and never removes them.
+ * Attached drawings divide all available inspection space equally and the column never scrolls.
+ * Missing assets stay out of that space until the component-level Details control reveals them.
  *
  * THE COLUMN IS FIVE PLACEMENTS NOW (plan Phase 1): a title strip, the preferred-source row, and
  * three placements of ONE module piece parameterised by representation kind. The document decides
  * the order and which kinds are drawn; `CadColumnChrome` supplies what all five need and nothing
- * else. The expansion state stays where it was - it is a per-component UI SESSION fact, a data need
- * of the module, not a per-placement setting - because a person focusing the footprint on one part
- * is not redesigning the workspace.
+ * else. Opening one drawing uses the full-preview sheet without changing the resting size of the
+ * three modules.
  */
 import { createContext, useContext, useMemo } from "react";
 import type { ComponentDossier, RepresentationKind } from "../../api/dossierTypes";
@@ -32,7 +30,6 @@ import { useToast } from "../../lib/toast";
 import type { PiecePartProps, RegionChromeProps } from "../../layout/LayoutRenderer";
 import { useWorkspaceRender } from "../../layout/workspaceRenderContext";
 import { BoardIcon } from "../icons";
-import { Button } from "../primitives";
 import { CadAssetModule } from "./CadAssetModule";
 import { REPRESENTATION_KINDS } from "./cadAssetSet";
 import { hasPreferredSourceInformation } from "./cadPreference";
@@ -173,13 +170,11 @@ export function CadPreferredSourcePart() {
   const workspace = useWorkspaceRender();
   const state = useContext(CadColumnContext);
   if (!workspace || !state) return null;
-  const { layout, onLayout } = workspace.cad;
   const preference = workspace.dossier.cadAssets.preference;
   const showPreference = hasPreferredSourceInformation(preference);
-  const showAll = layout !== "all";
   // An empty “Preferred Source: None recorded” row communicates no provider fact and offers no
   // action. Remove only that case; a refused option, mixed set or per-asset provider keeps the row.
-  if (!showPreference && !showAll) {
+  if (!showPreference) {
     // Keep the registered piece addressable to the layout/Design Studio manifest without painting
     // an empty toolbar row in the product.
     return <div data-dev-id="component-browser.preferred-source" hidden aria-hidden />;
@@ -199,26 +194,13 @@ export function CadPreferredSourcePart() {
           />
         </span>
       ) : null}
-      {/* The way back to the reading state. Offered only when one module is focused, because
-          a control that puts the column into the state it is already in is a dead click. */}
-      {showAll ? (
-        <Button
-          small
-          data-dev-id="component-browser.show-all-assets"
-          onClick={() => onLayout("all")}
-          className="ml-auto flex-none"
-        >
-          <Text id="component-browser.show-all-assets">Show All Three</Text>
-        </Button>
-      ) : null}
     </div>
   );
 }
 
 /**
- * The three assets always fit the pane. Attached expanded modules divide the available height;
- * missing modules reserve only a compact strip until focused. Focusing one keeps two compact
- * previews and gives the remaining space to the focused asset.
+ * Attached assets divide every available pixel evenly and the column never scrolls. Missing modules
+ * appear only when Details is open and reserve one compact strip instead of stealing drawing space.
  * `data-workspace-scroll` stays as the stable column-body address, but CAD deliberately owns no
  * scrollbar: a drawing preview scales, while specifications and evidence retain scrolling.
  */
@@ -247,7 +229,8 @@ export function CadAssetModulePart({ placement }: PiecePartProps) {
   if (!kind) return null;
   const view = workspace.dossier.cadAssets.kinds[kind];
   if (!view) return null;
-  const { layout, onLayout, onOpenFullPreview } = workspace.cad;
+  const status = cadAssetStatus(view);
+  if (status === "Missing" && !workspace.header.showDetails) return null;
   return (
     <CadAssetModule
       componentId={workspace.componentId}
@@ -256,10 +239,8 @@ export function CadAssetModulePart({ placement }: PiecePartProps) {
       preference={workspace.dossier.cadAssets.preference}
       expectedPins={state.pins}
       expectedPitch={state.pitch}
-      expanded={layout === "all" || layout === kind}
-      focused={layout === kind}
-      onToggle={() => onLayout(layout === kind ? "all" : kind)}
-      onOpenFullPreview={() => onOpenFullPreview(kind)}
+      showDetails={workspace.header.showDetails}
+      onOpenFullPreview={() => workspace.cad.onOpenFullPreview(kind)}
       focusRef={state.setAssetRef[kind]}
     />
   );

@@ -29,6 +29,7 @@ import { Text, useCopyFormatter, useText } from "../../lib/copy";
 import { openExternalUrl } from "../../lib/externalNavigation";
 import { Button, StatusText } from "../primitives";
 import { BoardIcon, ExternalIcon } from "../icons";
+import { Icon } from "../Icon";
 import { LayoutRuntimeScope, type RegionChromeProps } from "../../layout/LayoutRenderer";
 import { WORKSPACE_CONDITION } from "../../layout/defaultWorkspaceLayout";
 import { useWorkspaceRender } from "../../layout/workspaceRenderContext";
@@ -280,6 +281,8 @@ export function HeaderActionsPart() {
     "component-browser.header-manufacturer-page",
     "Manufacturer Page",
   );
+  const showDetailsLabel = useText("component-browser.header-show-details", "Show Details");
+  const hideDetailsLabel = useText("component-browser.header-hide-details", "Hide Details");
   if (!workspace) return null;
   const { dossier, header } = workspace;
   const page = dossier.identity.manufacturerPage;
@@ -288,6 +291,15 @@ export function HeaderActionsPart() {
       data-dev-id="component-browser.header-actions"
       className="flex flex-none items-center gap-1.5"
     >
+      <Button
+        small
+        data-dev-id="component-browser.header-details"
+        aria-pressed={header.showDetails}
+        icon={<Icon id="status.info" className="h-3.5 w-3.5" />}
+        onClick={header.onToggleDetails}
+      >
+        {header.showDetails ? hideDetailsLabel : showDetailsLabel}
+      </Button>
       <DatasheetButton
         documents={dossier.documents}
         onOpen={header.onOpenDatasheet}

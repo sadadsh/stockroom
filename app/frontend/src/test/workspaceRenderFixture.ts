@@ -16,12 +16,9 @@ import type { ComponentDossier, RepresentationKind } from "../api/dossierTypes";
 import type { SpecFilter } from "../components/component-workspace/specificationRows";
 import type { WorkspaceActivity } from "../components/component-workspace/WorkspaceStatusBar";
 import type { WorkspaceRenderContext } from "../layout/workspaceRenderContext";
-import type { RepresentationLayout } from "../lib/uiSession";
 
 export interface WorkspaceRenderFixtureOptions {
   componentId?: string;
-  /** `all` is the resting state: three expanded CAD modules, which is what ships. */
-  layout?: RepresentationLayout;
   filter?: SpecFilter;
   activity?: WorkspaceActivity;
   refreshing?: boolean;
@@ -46,12 +43,12 @@ export function workspaceRenderFixture(
       onOpenDatasheet: noop,
       onFindDatasheet: noop,
       onManageAssets: noop,
+      showDetails: true,
+      onToggleDetails: noop,
     },
     cad: {
       view: "models",
       onView: noop,
-      layout: over.layout ?? "all",
-      onLayout: noop,
       onOpenFullPreview: noop,
       assetRefs: { current: {} } as MutableRefObject<
         Partial<Record<RepresentationKind, HTMLElement | null>>
@@ -62,6 +59,7 @@ export function workspaceRenderFixture(
       onFilter: noop,
       scrollRef: emptyRef<HTMLDivElement>(),
       onViewPinout: noop,
+      showDetails: true,
     },
     sourcing: {
       onViewOffers: noop,

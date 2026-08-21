@@ -50,7 +50,6 @@ import {
   setComponentViewInSession,
   updateUiSession,
   useUiSession,
-  type RepresentationLayout,
 } from "../../lib/uiSession";
 import { EnrichPanel } from "../EnrichPanel";
 import type { PreviewKind } from "../PreviewModal";
@@ -59,7 +58,7 @@ import { WorkspaceShellDialogs, type ShellDialog } from "./ShellActions";
 import { WorkspaceSurfaces, type WorkspaceSurface } from "./WorkspaceSurfaces";
 import { previewKindFor } from "./cadAssetSet";
 import { manageMenuItems, shellManageItems } from "./manageActions";
-import { cadFocusKind, type QualitySegmentKind } from "./componentIdentity";
+import type { QualitySegmentKind } from "./componentIdentity";
 import { openKindFor, type DatasheetTarget } from "./datasheetWorkflow";
 import type { SpecFilter } from "./specificationRows";
 
@@ -102,6 +101,7 @@ export function ComponentWorkspace({
   const [surface, setSurface] = useState<WorkspaceSurface | null>(initialSurface ?? null);
   const [datasheet, setDatasheet] = useState<DatasheetTarget | null>(null);
   const [specFilter, setSpecFilter] = useState<SpecFilter>("all");
+  const [showDetails, setShowDetails] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(initialConfirmDelete);
   const [shellDialog, setShellDialog] = useState<ShellDialog>(null);
   const specScrollRef = useRef<HTMLDivElement | null>(null);
@@ -160,15 +160,14 @@ export function ComponentWorkspace({
   const onQualitySegment = useCallback(
     (kind: QualitySegmentKind) => {
       if (kind === "cad") {
-        const focus = cadFocusKind(query.data!.cadAssets.kinds);
-        patchView({ representation_layout: focus });
-        assetRefs.current[focus]?.scrollIntoView({ block: "nearest" });
+        setShowDetails(true);
         return;
       }
+      setShowDetails(true);
       setSpecFilter(kind === "missing" ? "missing" : "conflicts");
       scrollColumnToTop(specScrollRef.current);
     },
-    [patchView, query.data],
+    [],
   );
 
   const busy = editField.isPending || moveCategory.isPending;
@@ -203,6 +202,7 @@ export function ComponentWorkspace({
         onEditIdentity: () => setSurface("identity"),
         onEditClassification: () => setSurface("classification"),
         onReviewMissing: () => {
+          setShowDetails(true);
           setSpecFilter("missing");
           scrollColumnToTop(specScrollRef.current);
         },
@@ -252,12 +252,17 @@ export function ComponentWorkspace({
       onOpenDatasheet: setDatasheet,
       onFindDatasheet: () => setSurface("provenance"),
       onManageAssets: manageAssets,
+      showDetails,
+      onToggleDetails: () => {
+        setShowDetails((current) => {
+          if (current) setSpecFilter("all");
+          return !current;
+        });
+      },
     },
     cad: {
       view: activeCadView,
       onView: setCadView,
-      layout: view.representation_layout,
-      onLayout: (layout: RepresentationLayout) => patchView({ representation_layout: layout }),
       onOpenFullPreview: (kind) => setPreview(previewKindFor(kind)),
       assetRefs,
     },
@@ -266,6 +271,7 @@ export function ComponentWorkspace({
       onFilter: setSpecFilter,
       scrollRef: specScrollRef,
       onViewPinout: () => setSurface("pinout"),
+      showDetails,
     },
     sourcing: {
       onViewOffers: () => setSurface("offers"),

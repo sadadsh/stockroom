@@ -699,26 +699,6 @@ describe("opening a component", () => {
     expect(readUiSession().open_components).toEqual(["p0", "p1"]);
   });
 
-  it("remembers which CAD asset each component was left expanded on", async () => {
-    wrap(<ComponentsPage />);
-    const user = userEvent.setup();
-    await screen.findByText("Description p0");
-
-    // Expanding one asset compacts the other two; the choice belongs to THIS component.
-    await user.click(screen.getByRole("button", { name: "Footprint", expanded: true }));
-    await waitFor(() =>
-      expect(readUiSession().component_views.p0).toMatchObject({
-        representation_layout: "footprint",
-      }),
-    );
-
-    await openRow(user, 1);
-    await screen.findByText("Description p1");
-    // A second component starts at its own default rather than inheriting the first's view.
-    expect(screen.getByRole("button", { name: "Symbol", expanded: true })).toBeInTheDocument();
-    expect(readUiSession().component_views.p1?.representation_layout).toBe("all");
-  });
-
   it("scrolls only evidence columns while CAD resizes to fit", async () => {
     wrap(<ComponentsPage />);
     await screen.findByText("Description p0");

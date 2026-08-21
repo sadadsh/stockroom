@@ -17,7 +17,7 @@
  * against the contract.
  */
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { ApiError, api } from "../../api/client";
@@ -186,6 +186,8 @@ async function open(dossier: ComponentDossier) {
   await waitFor(() =>
     expect(document.querySelector(devIdSelector("component-browser.header-mpn"))).not.toBeNull(),
   );
+  fireEvent.click(screen.getByRole("button", { name: "Show Details" }));
+  await screen.findByRole("button", { name: "Hide Details" });
   return view;
 }
 
