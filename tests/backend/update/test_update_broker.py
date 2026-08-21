@@ -226,7 +226,7 @@ def test_coordinator_stages_and_shadow_observes_without_repository_authority(
     fence = control.acquire()
     release = _release(tmp_path)
     repository = _ScriptedRepository([release])
-    broker = _broker(control, fence, repository)
+    broker = _broker(control, fence, repository, refresh_interval_seconds=10.0)
 
     handle = broker.start()
     _wait_until(lambda: broker.status().phase is UpdateBrokerPhase.STAGED)
