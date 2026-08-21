@@ -1,5 +1,6 @@
 """The repository-wide type boundary is a required gate, not an advisory command."""
 
+import subprocess
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -143,6 +144,19 @@ def test_scale_wall_clock_acceptance_is_workstation_only() -> None:
     )
 
     assert "@pytest.mark.performance_budget\n@pytest.mark.parametrize" in text
+
+
+def test_crlf_fixtures_have_normalized_git_blobs() -> None:
+    fixtures = (
+        "tests/backend/fixtures/kicad/fp-lib-table.sample",
+        "tests/backend/fixtures/kicad/sym-lib-table.sample",
+    )
+
+    for fixture in fixtures:
+        state = subprocess.check_output(
+            ["git", "ls-files", "--eol", fixture], cwd=ROOT, text=True
+        )
+        assert state.startswith("i/lf"), state
 
 
 def test_ci_initializes_every_native_cad_converter_source() -> None:
