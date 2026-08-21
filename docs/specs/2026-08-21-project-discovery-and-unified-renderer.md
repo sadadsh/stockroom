@@ -57,6 +57,18 @@ If a fresh render fails, Stockroom keeps the last valid render and shows **Retry
 - New collaboration, locking, review, or release systems.
 - New background sync infrastructure.
 
+## Agreed Follow-Up Direction
+
+These decisions remain approved but do not expand the first proof:
+
+- Component Catalog repositories and PCB Project repositories remain separate.
+- Stockroom calls the shared component source **Catalog** and hides routine Git terms.
+- **Share Catalog** handles member access. Accessible shared Catalogs appear after sign-in.
+- Catalog exchange runs automatically. The newest field edit becomes active, while Git history retains the displaced value.
+- Windows Search results stay current without repeated whole-drive crawling.
+- Projects keeps the focused Stockroom layout: one project list, one large workspace, four tabs, and details only when useful.
+- Later renderer work may add 3D and advanced layers only after the common 2D proof passes native use.
+
 ## Acceptance
 
 The proof is accepted when:
