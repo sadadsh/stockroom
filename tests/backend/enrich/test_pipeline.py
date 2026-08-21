@@ -89,6 +89,27 @@ def test_enrich_candidate_fills_only_empty_fields(tmp_path):
     assert c.mpn == "TPS62130RGTR"       # was empty, filled
 
 
+def test_enrich_candidate_carries_official_payload_evidence_to_bulk_add(tmp_path, monkeypatch):
+    pipe = EnrichmentPipeline(cache_dir=tmp_path / "cache")
+    result = EnrichmentResult()
+    result.official_payloads = {"mouser": {"SearchResults": {"Parts": []}}}
+    result.official_evidence = {
+        "mouser": {
+            "provider": "mouser",
+            "queried_mpn": "TPS62130RGTR",
+            "canonical_mpn": "TPS62130RGTR",
+            "selected_values": {"mpn": "TPS62130RGTR"},
+        }
+    }
+    monkeypatch.setattr(pipe, "enrich", lambda *_args, **_kwargs: result)
+
+    candidate = _candidate(mpn="TPS62130RGTR")
+    pipe.enrich_candidate(candidate)
+
+    assert candidate.official_payloads == result.official_payloads
+    assert candidate.official_evidence == result.official_evidence
+
+
 def test_enrich_candidate_does_not_promote_discovery_identity_even_when_overwrite_is_opted_in(
     tmp_path,
 ):

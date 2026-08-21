@@ -118,6 +118,10 @@ def _copy_specs(candidate, result, overwrite: set[str]) -> None:
         candidate.alternates.setdefault(key, [
             {"value": s.value, "source": s.source, "confidence": s.confidence} for s in entries
         ])
+    for provider, payload in result.official_payloads.items():
+        candidate.official_payloads.setdefault(provider, dict(payload))
+    for provider, evidence in result.official_evidence.items():
+        candidate.official_evidence.setdefault(provider, dict(evidence))
 
 
 def fill_category(result: EnrichmentResult) -> None:
