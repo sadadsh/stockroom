@@ -15,18 +15,12 @@ from stockroom.planning import (
 from stockroom.workflow import StageName, WorkflowStore
 
 
+@pytest.mark.performance_budget
 @pytest.mark.parametrize(
     ("identity_count", "batch_size", "claim_limit", "worker_count"),
     (
         (100, 50, 24, 4),
-        pytest.param(
-            1_000,
-            100,
-            256,
-            8,
-            marks=pytest.mark.performance_budget,
-            id="controlled-workstation-budget",
-        ),
+        pytest.param(1_000, 100, 256, 8, id="controlled-workstation-budget"),
     ),
 )
 def test_synthetic_scale_reopens_and_settles_exactly_once(

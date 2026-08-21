@@ -128,6 +128,23 @@ def test_ci_enforces_backend_types() -> None:
     assert _ci_violations(text) == []
 
 
+def test_main_push_runs_the_canonical_gate_only_through_release() -> None:
+    text = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    trigger = text.split("permissions:", 1)[0]
+
+    assert "  pull_request:" in trigger
+    assert "  workflow_call:" in trigger
+    assert "  push:" not in trigger
+
+
+def test_scale_wall_clock_acceptance_is_workstation_only() -> None:
+    text = (ROOT / "tests/backend/planning/test_scale_simulation.py").read_text(
+        encoding="utf-8"
+    )
+
+    assert "@pytest.mark.performance_budget\n@pytest.mark.parametrize" in text
+
+
 def test_ci_initializes_every_native_cad_converter_source() -> None:
     text = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
 
