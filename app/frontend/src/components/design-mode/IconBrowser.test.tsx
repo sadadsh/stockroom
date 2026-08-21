@@ -64,7 +64,7 @@ describe("IconBrowser", () => {
     expect(within(results).getAllByRole("button", { name: /^Select Icon/ })).toHaveLength(501);
     expect(screen.getByText(/501 offline icons/)).toHaveTextContent("501 of 501 icons shown");
     expect(screen.queryByRole("button", { name: "Show More Icons" })).not.toBeInTheDocument();
-  }, 15_000);
+  });
 
   it("starts in one catalogue and loads only that default family", async () => {
     render(<IconBrowser targetViewBox="0 0 24 24" onSelect={vi.fn()} />);

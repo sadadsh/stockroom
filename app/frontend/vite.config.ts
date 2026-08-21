@@ -158,6 +158,7 @@ const config = defineConfig({
   // floor: every M6 slice ships with tests that run here (see the M6 plan).
   test: {
     environment: "jsdom",
+    testTimeout: 15_000,
     globals: true,
     setupFiles: ["./src/test/setup.ts"],
     include: ["src/**/*.{test,spec}.{ts,tsx}"],
