@@ -347,13 +347,13 @@ jobs:
           if ($codeSigningEku.Count -ne 1) {
             throw "The pinned GitHub signing certificate lacks the Code Signing EKU."
           }
-          $storePath = "Cert:\CurrentUser\TrustedPeople\$($certificate.Thumbprint)"
+          $storePath = "Cert:\LocalMachine\TrustedPeople\$($certificate.Thumbprint)"
           if (Test-Path -LiteralPath $storePath) {
             throw "The GitHub runner already trusts the signing certificate."
           }
           $trusted = Import-Certificate `
             -FilePath $certificatePath `
-            -CertStoreLocation Cert:\CurrentUser\TrustedPeople
+            -CertStoreLocation Cert:\LocalMachine\TrustedPeople
           if ($trusted.Thumbprint -cne $certificate.Thumbprint) {
             throw "The pinned GitHub signing certificate was not imported exactly."
           }
@@ -428,7 +428,7 @@ jobs:
 
           if (-not [string]::IsNullOrWhiteSpace($env:STOCKROOM_SIGNING_CERT_THUMBPRINT)) {
             $trustedPath = (
-              "Cert:\CurrentUser\TrustedPeople\$env:STOCKROOM_SIGNING_CERT_THUMBPRINT"
+              "Cert:\LocalMachine\TrustedPeople\$env:STOCKROOM_SIGNING_CERT_THUMBPRINT"
             )
             if (Test-Path -LiteralPath $trustedPath) {
               Remove-Item -LiteralPath $trustedPath -Force

@@ -175,12 +175,13 @@ def test_signing_secrets_are_step_scoped_and_always_destroyed() -> None:
         "${{ secrets.WINDOWS_CERT_PASSWORD }}"
     )
     assert trust["run"].count("packaging/Stockroom GitHub Signing.cer") == 1
-    assert "Cert:\\CurrentUser\\TrustedPeople" in trust["run"]
+    assert "Cert:\\LocalMachine\\TrustedPeople" in trust["run"]
+    assert "Cert:\\CurrentUser\\TrustedPeople" not in trust["run"]
     assert "STOCKROOM_SIGNING_CERT_THUMBPRINT" in trust["run"]
     assert "-SigningCertificateTrustedForVerification" in build["run"]
     assert cleanup["if"] == "${{ always() }}"
     assert "STOCKROOM_SIGNING_CERT_THUMBPRINT" in cleanup["run"]
-    assert "Cert:\\CurrentUser\\TrustedPeople" in cleanup["run"]
+    assert "Cert:\\LocalMachine\\TrustedPeople" in cleanup["run"]
     assert "[IO.FileAccess]::Write" in cleanup["run"]
     assert "$stream.Write($buffer, 0, $count)" in cleanup["run"]
     assert "Remove-Item -LiteralPath $path -Force" in cleanup["run"]
