@@ -181,32 +181,32 @@ public sealed class PackagedWorkerRuntimeTests
 
     private static Process StartControlledWorker(string ready, string exit)
     {
-        var powershell = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.System),
-            "WindowsPowerShell",
-            "v1.0",
-            "powershell.exe");
-        var script = string.Join(
-            "; ",
-            "$ErrorActionPreference = 'Stop'",
-            $"[IO.File]::WriteAllText('{Ps(ready)}', 'ready')",
-            $"while (-not [IO.File]::Exists('{Ps(exit)}')) {{ Start-Sleep -Milliseconds 10 }}",
-            "1..200 | ForEach-Object { [Console]::Out.WriteLine(\"worker-out-$_\") }",
-            "[Console]::Out.WriteLine('worker-final-output')",
-            "[Console]::Error.WriteLine('worker-final-error')",
-            "exit 23");
+        var script = Path.Combine(Path.GetDirectoryName(ready)!, "worker.cmd");
+        File.WriteAllLines(
+            script,
+            [
+                "@echo off",
+                $"> \"{ready}\" echo ready",
+                ":wait",
+                $"if not exist \"{exit}\" goto wait",
+                "for /L %%i in (1,1,200) do echo worker-out-%%i",
+                "echo worker-final-output",
+                ">&2 echo worker-final-error",
+                "exit /b 23",
+            ]);
         var start = new ProcessStartInfo
         {
-            FileName = powershell,
+            FileName = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.System),
+                "cmd.exe"),
             UseShellExecute = false,
             CreateNoWindow = true,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
         };
-        start.ArgumentList.Add("-NoLogo");
-        start.ArgumentList.Add("-NoProfile");
-        start.ArgumentList.Add("-NonInteractive");
-        start.ArgumentList.Add("-Command");
+        start.ArgumentList.Add("/D");
+        start.ArgumentList.Add("/Q");
+        start.ArgumentList.Add("/C");
         start.ArgumentList.Add(script);
         return Process.Start(start)
             ?? throw new InvalidOperationException("controlled worker did not start");
@@ -236,6 +236,4 @@ public sealed class PackagedWorkerRuntimeTests
             // The process exited between the liveness check and cleanup.
         }
     }
-
-    private static string Ps(string value) => value.Replace("'", "''", StringComparison.Ordinal);
 }
