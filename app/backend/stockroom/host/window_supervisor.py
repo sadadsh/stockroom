@@ -24,6 +24,7 @@ import secrets
 import subprocess
 import threading
 import time
+import uuid
 from collections.abc import Callable, Collection, Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -42,6 +43,7 @@ from stockroom.host.windows_handoff_pipe import (
     HandoffMessage,
     HandoffPipeError,
     HandoffProtocolError,
+    connect_windows_named_pipe,
     create_windows_named_pipe_server,
     new_pipe_name,
     validate_handoff_id,
@@ -867,6 +869,25 @@ class _OwnedWindowProcess:
         return exit_code
 
 
+class _AttachedWindowProcess:
+    """Non-owning process boundary for the already-running standalone WPF host."""
+
+    def terminate_and_reap(self, *, timeout: float) -> None:
+        del timeout
+
+    def reap_after_shutdown(self, *, timeout: float) -> None:
+        del timeout
+
+    def wait_for_exit(
+        self,
+        *,
+        timeout: float | None,
+        cleanup_timeout: float,
+    ) -> int | None:
+        del timeout, cleanup_timeout
+        return None
+
+
 def _bounded_call(
     operation: Callable[[], _T],
     *,
@@ -960,7 +981,7 @@ class WindowHostClient:
         *,
         base_url: str,
         channel: ChannelPort,
-        owned_process: _OwnedWindowProcess,
+        owned_process: _OwnedWindowProcess | _AttachedWindowProcess,
         command_timeout: float,
         forbidden_values: Sequence[str],
         stop_timeout: float,
@@ -2009,6 +2030,114 @@ class WindowHostSupervisor:
         return identity
 
 
+def connect_attached_window_host(
+    pipe_name: str,
+    *,
+    expected_host_process_id: int,
+    release_id: str,
+    base_url: str,
+    api_credential: str,
+    command_timeout_seconds: float = 10.0,
+) -> WindowHostClient:
+    """Bind the packaged worker to the standalone WPF process that launched it.
+
+    The WPF process owns the first-instance current-SID pipe.  This worker verifies that exact
+    process before sending either credential, then reuses the normal bounded window-host command
+    protocol.  Closing this client closes only the channel; the worker never owns or terminates
+    its parent process.
+    """
+
+    validated_pipe = validate_pipe_name(pipe_name)
+    host_process_id = validate_process_id(
+        expected_host_process_id,
+        label="expected host process ID",
+    )
+    worker_process_id = validate_process_id(os.getpid(), label="worker process ID")
+    validated_release_id = _validate_release_id(release_id)
+    validated_api_credential = _canonical_credential(
+        api_credential,
+        label="API credential",
+    )
+    command_timeout = _positive_timeout(
+        command_timeout_seconds,
+        label="command_timeout_seconds",
+    )
+    handoff_id = str(uuid.uuid4())
+    handoff_credential = ""
+    for _attempt in range(8):
+        candidate = _canonical_credential(
+            secrets.token_urlsafe(32),
+            label="handoff credential",
+        )
+        if not secrets.compare_digest(candidate, validated_api_credential):
+            handoff_credential = candidate
+            break
+    if not handoff_credential:
+        raise WindowSupervisorError("independent handoff credential could not be generated")
+
+    # The packaged worker can connect before its 120-second startup health check completes;
+    # the standalone WPF host reads this bootstrap immediately after that same check.
+    deadline = _now_unix_ms() + 120_000
+    bootstrap_message = HandoffMessage(
+        handoff_id=handoff_id,
+        sequence=1,
+        deadline_unix_ms=deadline,
+        name="bootstrap",
+        payload={
+            "release_id": validated_release_id,
+            "base_url": base_url,
+            "api_credential": validated_api_credential,
+            "handoff_credential": handoff_credential,
+        },
+    )
+    bootstrap = parse_bootstrap(bootstrap_message)
+    connection = connect_windows_named_pipe(
+        validated_pipe,
+        expected_server_pid=host_process_id,
+    )
+    channel: HandoffChannel | None = None
+    try:
+        channel = HandoffChannel(
+            connection,
+            expected_handoff_id=handoff_id,
+        )
+        sent = channel.send(
+            "bootstrap",
+            bootstrap_message.payload,
+            deadline_unix_ms=deadline,
+        )
+        if sent.sequence != 1 or channel.peer_process_id != host_process_id:
+            raise WindowSupervisorProtocolError("attached window bootstrap identity changed")
+        hello = channel.receive(expected_names={"hello-hidden"})
+        identity = WindowHostSupervisor._verify_hello(
+            hello,
+            bootstrap=bootstrap,
+            parent_process_id=worker_process_id,
+            child_process_id=host_process_id,
+        )
+        client = WindowHostClient(
+            identity,
+            base_url=bootstrap.base_url,
+            channel=channel,
+            owned_process=_AttachedWindowProcess(),
+            command_timeout=command_timeout,
+            forbidden_values=(validated_api_credential, handoff_credential),
+            stop_timeout=5.0,
+            wall_clock=_now_unix_ms,
+        )
+        # The standalone WPF process prepared and shows this window directly. Mirror both
+        # facts into the reverse session so provider commands use the normal state machine.
+        client.prepare_hidden()
+        client.show()
+        return client
+    except BaseException:
+        try:
+            (channel or connection).close()
+        except BaseException:
+            pass
+        raise
+
+
 __all__ = [
     "ChannelFactory",
     "ChannelPort",
@@ -2027,5 +2156,6 @@ __all__ = [
     "WindowSupervisorProcessError",
     "WindowSupervisorProtocolError",
     "WindowSupervisorTimeout",
+    "connect_attached_window_host",
     "sanitized_window_host_environment",
 ]

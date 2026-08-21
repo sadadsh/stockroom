@@ -118,26 +118,50 @@ describe("ManageModelsWorkspace", () => {
       />,
     );
 
-    const providerButtons = within(screen.getByRole("radiogroup", { name: "CAD model providers" }))
-      .getAllByRole("radio");
+    const providerButtons = within(screen.getByRole("tablist", { name: "CAD model providers" }))
+      .getAllByRole("tab");
     expect(providerButtons).toHaveLength(2);
     expect(providerButtons[0]).toHaveTextContent(partial.label);
     expect(providerButtons[1]).toHaveTextContent(complete.label);
     expect(providerButtons[0].querySelector("svg")).toBeNull();
     expect(providerButtons[1].querySelector("svg")).toBeNull();
-    const completeProvider = providerButtons[1];
-    expect(within(completeProvider).getByText("All 3")).toBeVisible();
-    expect(within(providerButtons[0]).queryByText("All 3")).toBeNull();
-    expect(screen.getAllByText("All 3")).toHaveLength(1);
+    expect(screen.queryByText("All 3")).toBeNull();
     expect(screen.queryByText("3D Model")).toBeNull();
     expect(screen.queryByRole("button", { name: "Open Provider" })).toBeNull();
     expect(onOpenProvider).not.toHaveBeenCalled();
     await user.click(providerButtons[1]);
-    await waitFor(() => expect(onOpenProvider).toHaveBeenCalledWith(complete.id, [
-      "kicad_symbol",
-      "kicad_footprint",
-      "kicad_model",
-    ]));
+    await waitFor(() => expect(api.startManualProviderBrowser).toHaveBeenCalledWith(
+      expect.objectContaining({ partId: "part-1", providerId: complete.id }),
+    ));
+    expect(onOpenProvider).not.toHaveBeenCalled();
+  });
+
+  it("uses free provider tabs and observes downloads without provider automation", async () => {
+    const user = userEvent.setup();
+    const dossier = makeDossier();
+    dossier.cadSourceCoverage.rows = [
+      { ...providerRow("mouser", true), label: "Mouser" },
+      { ...providerRow("digikey", true), label: "DigiKey" },
+    ];
+    const onOpenProvider = vi.fn();
+
+    render(
+      <ManageModelsWorkspace
+        componentId="part-1"
+        dossier={dossier}
+        onOpenProvider={onOpenProvider}
+      />,
+    );
+
+    const tabs = within(screen.getByRole("tablist", { name: "CAD model providers" }))
+      .getAllByRole("tab");
+    expect(tabs.map((tab) => tab.textContent)).toEqual(["Mouser", "DigiKey"]);
+    await user.click(tabs[1]);
+
+    await waitFor(() => expect(api.startManualProviderBrowser).toHaveBeenCalledWith(
+      expect.objectContaining({ partId: "part-1", providerId: "digikey" }),
+    ));
+    expect(onOpenProvider).not.toHaveBeenCalled();
   });
 
   it("uses the idle surface as a compact acquisition dashboard", () => {
@@ -151,14 +175,14 @@ describe("ManageModelsWorkspace", () => {
     expect(within(summary).getByText("KiCad Symbol + Footprint")).toBeVisible();
     expect(within(summary).getByText("Shared 3D Model")).toBeVisible();
     expect(within(summary).getByText("No Files Staged")).toBeVisible();
-    expect(screen.getByText("Open A Provider")).toBeVisible();
+    expect(screen.getByText("Providers")).toBeVisible();
     expect(
       screen.getByText(
         "Choose a provider above to download CAD, or import files on this PC.",
       ),
     ).toBeVisible();
-    for (const provider of screen.getAllByRole("radio")) {
-      expect(provider).toHaveAttribute("title", `Open ${provider.textContent?.replace("All 3", "").trim()}`);
+    for (const provider of screen.getAllByRole("tab")) {
+      expect(provider).toHaveAttribute("title", `Open ${provider.textContent?.trim()}`);
       expect(provider.className).toContain("bg-control-top");
     }
     expect(screen.getByRole("button", { name: "Import Existing CAD Files" })).toBeVisible();
@@ -179,8 +203,8 @@ describe("ManageModelsWorkspace", () => {
       />,
     );
 
-    for (const provider of screen.getAllByRole("radio")) {
-      expect(provider).toHaveAttribute("aria-checked", "false");
+    for (const provider of screen.getAllByRole("tab")) {
+      expect(provider).toHaveAttribute("aria-selected", "false");
     }
     expect(screen.getByRole("region", { name: "CAD acquisition overview" })).toBeVisible();
     expect(screen.queryByRole("dialog")).toBeNull();
@@ -205,16 +229,15 @@ describe("ManageModelsWorkspace", () => {
     );
 
     expect(onOpenProvider).not.toHaveBeenCalled();
-    const providers = screen.getAllByRole("radio");
+    const providers = screen.getAllByRole("tab");
     const lastProvider = providers[providers.length - 1]!;
     await user.click(lastProvider);
-    expect(lastProvider).toHaveAttribute("aria-checked", "true");
+    expect(lastProvider).toHaveAttribute("aria-selected", "true");
     expect(screen.queryByRole("button", { name: "Open Provider" })).toBeNull();
-    expect(onOpenProvider).toHaveBeenCalledWith("partial-b", [
-      "kicad_symbol",
-      "kicad_footprint",
-      "kicad_model",
-    ]);
+    expect(api.startManualProviderBrowser).toHaveBeenCalledWith(
+      expect.objectContaining({ partId: "part-1", providerId: "partial-b" }),
+    );
+    expect(onOpenProvider).not.toHaveBeenCalled();
     expect(providers[0]).not.toHaveTextContent("Missing");
   });
 
@@ -247,7 +270,7 @@ describe("ManageModelsWorkspace", () => {
       />,
     );
 
-    const trigger = screen.getByRole("radio", { name: label });
+    const trigger = screen.getByRole("tab", { name: label });
     trigger.focus();
     await user.click(trigger);
     const dialog = screen.getByRole("dialog", { name: `${label} Browser` });
@@ -312,7 +335,7 @@ describe("ManageModelsWorkspace", () => {
     }];
 
     render(<ManageModelsWorkspace componentId="part-1" dossier={dossier} />);
-    await user.click(screen.getByRole("radio", { name: "Mouser" }));
+    await user.click(screen.getByRole("tab", { name: "Mouser" }));
 
     const dialog = screen.getByRole("dialog", { name: "Mouser Browser" });
     expect(dialog).toHaveStyle({
@@ -365,7 +388,7 @@ describe("ManageModelsWorkspace", () => {
       url: "https://www.mouser.com/c/?q=LM358DR",
     }];
     render(<ManageModelsWorkspace componentId="part-1" dossier={dossier} />);
-    const trigger = screen.getByRole("radio", { name: "Mouser" });
+    const trigger = screen.getByRole("tab", { name: "Mouser" });
     trigger.focus();
     await user.click(trigger);
     await screen.findByRole("dialog", { name: "Mouser Browser" });
@@ -390,7 +413,7 @@ describe("ManageModelsWorkspace", () => {
     expect(document.activeElement).toBe(trigger);
   });
 
-  it("shows exact broker-landed files and requires explicit Apply", async () => {
+  it("shows exact broker-landed files as added without another Apply", async () => {
     const user = userEvent.setup();
     vi.mocked(api.startManualProviderBrowser).mockImplementation(async (input) => ({
       session_id: input.sessionId,
@@ -401,20 +424,14 @@ describe("ManageModelsWorkspace", () => {
       state: "active",
       error: "",
       browser_state: null,
-      proposal: {
-        proposal_token: "proposal-1",
-        part_id: "part-1",
-        provider: "manual",
-        primary_tool: "kicad",
-        attachments: [{
-          role: "KiCad Symbol",
-          file_name: "LM358DR.kicad_sym",
-          target: "Active KiCad Symbol",
-        }],
-        inactive_evidence: [],
+      proposal: null,
+      cad_ready: {
+        attached: ["kicad_symbol"],
+        edas: ["kicad"],
         landed_files: ["Mouser-LM358DR.zip", "LM358DR.kicad_sym"],
+        part_complete: false,
+        provider_id: "mouser",
         remaining_roles: ["KiCad Footprint", "3D Model"],
-        automatic_apply_ready: false,
       },
     }));
     const apply = vi.spyOn(api, "applyPartFiles").mockResolvedValue({
@@ -433,13 +450,13 @@ describe("ManageModelsWorkspace", () => {
     }];
     render(<ManageModelsWorkspace componentId="part-1" dossier={dossier} />);
 
-    await user.click(screen.getByRole("radio", { name: "Mouser" }));
+    await user.click(screen.getByRole("tab", { name: "Mouser" }));
     expect(await screen.findByText("Mouser-LM358DR.zip")).toBeVisible();
-    expect(screen.getAllByText("LM358DR.kicad_sym")).toHaveLength(2);
+    expect(screen.getByText("LM358DR.kicad_sym")).toBeVisible();
     expect(screen.getByText("Still needed: KiCad Footprint and 3D Model")).toBeVisible();
+    expect(screen.queryByRole("dialog")).toBeNull();
     expect(apply).not.toHaveBeenCalled();
-    await user.click(screen.getByRole("button", { name: "Apply Attachments" }));
-    expect(apply).toHaveBeenCalledWith({ partId: "part-1", proposalToken: "proposal-1" });
+    expect(screen.queryByRole("button", { name: "Apply Attachments" })).toBeNull();
   });
 
   it("shows durable CAD Ready without another Apply for a complete exact provider package", async () => {
@@ -487,7 +504,7 @@ describe("ManageModelsWorkspace", () => {
       <ManageModelsWorkspace componentId="part-1" dossier={dossier} onAttached={onAttached} />,
     );
 
-    await user.click(screen.getByRole("radio", { name: "Mouser" }));
+    await user.click(screen.getByRole("tab", { name: "Mouser" }));
 
     expect(await screen.findByText("CAD Ready")).toBeVisible();
     expect(screen.getByText("Mouser-LM358DR.zip")).toBeVisible();
@@ -536,7 +553,7 @@ describe("ManageModelsWorkspace", () => {
     }];
     render(<ManageModelsWorkspace componentId="part-1" dossier={dossier} />);
 
-    await user.click(screen.getByRole("radio", { name: "Mouser" }));
+    await user.click(screen.getByRole("tab", { name: "Mouser" }));
 
     expect(await screen.findByRole("progressbar", { name: "Download progress" })).toHaveValue(40);
     expect(screen.getByRole("button", { name: "Retry" })).toBeVisible();
@@ -559,7 +576,7 @@ describe("ManageModelsWorkspace", () => {
     }];
     render(<ManageModelsWorkspace componentId="part-1" dossier={dossier} />);
 
-    fireEvent.click(screen.getByRole("radio", { name: "Mouser" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Mouser" }));
     expect(screen.getByText("Opening Provider...")).toBeVisible();
     await act(async () => {
       await vi.advanceTimersByTimeAsync(8_001);
@@ -607,9 +624,9 @@ describe("ManageModelsWorkspace", () => {
     ];
     render(<ManageModelsWorkspace componentId="part-1" dossier={dossier} />);
 
-    await user.click(screen.getByRole("radio", { name: "Mouser" }));
+    await user.click(screen.getByRole("tab", { name: "Mouser" }));
     await waitFor(() => expect(screen.getByRole("button", { name: "Back" })).toBeEnabled());
-    await user.click(screen.getByRole("radio", { name: "LCSC" }));
+    await user.click(screen.getByRole("tab", { name: "LCSC" }));
 
     expect(screen.getByRole("dialog", { name: "LCSC Browser" })).toBeVisible();
     expect(screen.getByRole("button", { name: "Back" })).toBeDisabled();
@@ -653,7 +670,7 @@ describe("ManageModelsWorkspace", () => {
     ];
 
     render(<ManageModelsWorkspace componentId="part-1" dossier={dossier} />);
-    await user.click(screen.getByRole("radio", { name: "Mouser" }));
+    await user.click(screen.getByRole("tab", { name: "Mouser" }));
 
     expect(skipProvider).toHaveBeenCalledTimes(1);
     expect(api.startManualProviderBrowser).not.toHaveBeenCalled();
@@ -665,6 +682,7 @@ describe("ManageModelsWorkspace", () => {
     const dossier = makeDossier();
     dossier.cadSourceCoverage.rows = [providerRow("complete", true)];
     const onOpenProvider = vi.fn().mockImplementation(() => new Promise(() => undefined));
+    vi.mocked(api.startManualProviderBrowser).mockImplementation(() => new Promise(() => undefined));
 
     render(
       <ManageModelsWorkspace
@@ -676,7 +694,7 @@ describe("ManageModelsWorkspace", () => {
     );
 
     expect(screen.queryByRole("region", { name: "SnapEDA Browser" })).toBeNull();
-    await user.click(screen.getByRole("radio", { name: /SnapEDA/ }));
+    await user.click(screen.getByRole("tab", { name: /SnapEDA/ }));
 
     expect(screen.getByRole("dialog", { name: "SnapEDA Browser" })).toBeVisible();
     expect(screen.getByRole("region", { name: "SnapEDA Browser Page" })).toBeVisible();
@@ -685,7 +703,7 @@ describe("ManageModelsWorkspace", () => {
     );
     expect(screen.getByText("Loading")).toBeVisible();
     expect(screen.getByRole("button", { name: "Reload" })).toBeDisabled();
-    expect(onOpenProvider).toHaveBeenCalledTimes(1);
+    expect(onOpenProvider).not.toHaveBeenCalled();
   });
 
   it("closes browser chrome while the native provider route is still preparing", async () => {
@@ -702,7 +720,7 @@ describe("ManageModelsWorkspace", () => {
       />,
     );
 
-    await user.click(screen.getByRole("radio", { name: /SnapEDA/ }));
+    await user.click(screen.getByRole("tab", { name: /SnapEDA/ }));
     expect(screen.getByRole("dialog", { name: "SnapEDA Browser" })).toBeVisible();
 
     await user.click(screen.getByRole("button", { name: "Close" }));
@@ -754,7 +772,7 @@ describe("ManageModelsWorkspace", () => {
     await user.click(screen.getByRole("button", { name: "Close" }));
     expect(closeProvider).not.toHaveBeenCalled();
     expect(screen.queryByRole("dialog", { name: "SnapEDA Browser" })).toBeNull();
-    expect(screen.getByRole("radio", { name: /Ultra Librarian/ })).toBeEnabled();
+    expect(screen.getByRole("tab", { name: /Ultra Librarian/ })).toBeEnabled();
 
     await user.click(screen.getByRole("button", { name: "Show Provider" }));
     expect(showProvider).toHaveBeenCalledTimes(1);
@@ -895,7 +913,7 @@ describe("ManageModelsWorkspace", () => {
     await user.click(screen.getByRole("button", { name: "Show Provider" }));
     expect(showProvider).toHaveBeenCalledTimes(1);
 
-    await user.click(screen.getByRole("radio", { name: /Ultra Librarian/ }));
+    await user.click(screen.getByRole("tab", { name: /Ultra Librarian/ }));
     expect(skipProvider).toHaveBeenCalledTimes(1);
 
     expect(screen.queryByRole("button", { name: "Skip This Part" })).toBeNull();
@@ -983,7 +1001,7 @@ describe("ManageModelsWorkspace", () => {
     );
 
     expect(screen.queryByRole("button", { name: "Open Provider" })).toBeNull();
-    expect(screen.getByRole("radio", { name: /SnapEDA/ })).toBeDisabled();
+    expect(screen.getByRole("tab", { name: /SnapEDA/ })).toBeDisabled();
     expect(screen.getByRole("status")).toHaveTextContent(
       "Finish the active Provider Visit for Other Part first.",
     );
@@ -1009,15 +1027,16 @@ describe("ManageModelsWorkspace", () => {
     expect(screen.getByRole("checkbox", { name: "KiCad" })).not.toBeChecked();
     await user.click(screen.getByRole("checkbox", { name: "KiCad" }));
 
-    await user.click(screen.getByRole("radio", { name: /SnapEDA/ }));
+    await user.click(screen.getByRole("tab", { name: /SnapEDA/ }));
 
-    expect(onOpenProvider).toHaveBeenCalledWith("complete", [
-      "kicad_symbol",
-      "kicad_footprint",
-      "kicad_model",
-      "altium_symbol",
-      "altium_footprint",
-    ]);
+    expect(api.startManualProviderBrowser).toHaveBeenCalledWith(
+      expect.objectContaining({
+        partId: "part-1",
+        providerId: "complete",
+        edas: ["altium", "kicad"],
+      }),
+    );
+    expect(onOpenProvider).not.toHaveBeenCalled();
   });
 
   it.each([

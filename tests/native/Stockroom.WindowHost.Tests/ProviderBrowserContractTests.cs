@@ -112,6 +112,76 @@ public sealed class ProviderBrowserContractTests
     }
 
     [Fact]
+    public void LazyProviderControlIsLoadedBeforeWebView2Initialization()
+    {
+        var source = File.ReadAllText(
+            Path.Combine(
+                FindProjectDirectory(),
+                "WebViewWindowHost.cs")).Replace("\r\n", "\n", StringComparison.Ordinal);
+        var start = source.IndexOf(
+            "private async Task InitializeProviderBrowserAttemptAsync()",
+            StringComparison.Ordinal);
+        var end = source.IndexOf(
+            "private void SyncProviderTab()",
+            start,
+            StringComparison.Ordinal);
+        var method = source[start..end];
+
+        var load = method.IndexOf(
+            "_providerSurface.Visibility = Visibility.Hidden;",
+            StringComparison.Ordinal);
+        var initialize = method.IndexOf(
+            "await providerWebView.EnsureCoreWebView2Async(environment)",
+            StringComparison.Ordinal);
+        var restore = method.IndexOf(
+            "_providerSurface.Visibility = priorVisibility;",
+            StringComparison.Ordinal);
+        Assert.True(load >= 0 && initialize > load && restore > initialize);
+    }
+
+    [Fact]
+    public void ProviderTabsNeverOverlapTwoWebViewSurfaces()
+    {
+        var source = File.ReadAllText(
+            Path.Combine(
+                FindProjectDirectory(),
+                "WebViewWindowHost.cs"));
+
+        Assert.Contains(
+            "private readonly WebView2 _webView;",
+            source,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "WebView2CompositionControl",
+            source,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "var providerWebView = new WebView2",
+            source,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "_webView.Visibility = Visibility.Collapsed;\n        _providerSurface.Visibility = Visibility.Visible;\n        _tabStrip.Root.Visibility = Visibility.Visible;",
+            source.Replace("\r\n", "\n", StringComparison.Ordinal),
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "_webView.Visibility = Visibility.Visible;\n                _providerSurface.Visibility = Visibility.Visible;",
+            source.Replace("\r\n", "\n", StringComparison.Ordinal),
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "_tabStrip.Root.IsHitTestVisible = false;",
+            source,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "_tabStrip.StockroomTab.Checked += (_, _) => HideProviderBrowser();",
+            source,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "_tabStrip.ProviderTab.Checked += (_, _) => ShowActiveProviderBrowser();",
+            source,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void FirstValidRendererViewportRestoresAProviderHiddenByEarlyShow()
     {
         var source = File.ReadAllText(
@@ -123,10 +193,7 @@ public sealed class ProviderBrowserContractTests
             "else\n                {\n                    // A provider-show can arrive before React has committed measurable bounds.",
             source,
             StringComparison.Ordinal);
-        Assert.Contains(
-            "_webView.Visibility = Visibility.Visible;\n                    _providerSurface.Visibility = Visibility.Visible;\n                    _tabStrip.SelectProvider();\n                    UpdateProviderChrome();",
-            source,
-            StringComparison.Ordinal);
+        Assert.Contains("ShowActiveProviderBrowser();", source, StringComparison.Ordinal);
     }
 
     [Fact]

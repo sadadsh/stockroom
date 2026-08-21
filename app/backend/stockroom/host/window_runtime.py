@@ -1149,7 +1149,113 @@ class ProductionWindowReplacement:
         self._ports.close()
 
 
+class AttachedProviderBrowserSurface:
+    """Provider and shell capabilities of the standalone WPF process that owns this worker."""
+
+    def __init__(
+        self,
+        client: WindowClientPort,
+        *,
+        id_factory: Callable[[], str] = lambda: str(uuid.uuid4()),
+    ) -> None:
+        if not client.active:
+            raise ReleaseWindowRuntimeError("attached native window is unavailable")
+        self._client = client
+        self._id_factory = id_factory
+        self._provider_lock = threading.RLock()
+        self._active_provider_lease: ProviderLeaseHandshake | None = None
+
+    @contextmanager
+    def provider_browser_surface(
+        self,
+        *,
+        staging_root: str = "",
+        component_id: str = "",
+        manufacturer: str = "",
+        mpn: str = "",
+        provider_id: str = "",
+    ):
+        with self._provider_lock:
+            previous = self._active_provider_lease
+            if previous is not None:
+                self._client.release_provider_lease(
+                    previous.lease_id,
+                    previous.generation,
+                )
+                self._active_provider_lease = None
+            handshake = self._client.begin_provider_lease(
+                self._id_factory(),
+                staging_root=staging_root,
+                component_id=component_id,
+                manufacturer=manufacturer,
+                mpn=mpn,
+                provider_id=provider_id,
+            )
+            self._active_provider_lease = handshake
+            lease = ProviderBrowserLease(
+                lease_id=handshake.lease_id,
+                generation=handshake.generation,
+                staging_root=handshake.staging_root,
+                component_id=handshake.component_id,
+                manufacturer=handshake.manufacturer,
+                mpn=handshake.mpn,
+                provider_id=handshake.provider_id,
+                _show=self._client.show_provider,
+                _hide=self._client.hide_provider,
+                _current_url=self._client.provider_current_url,
+                _navigate=self._client.navigate_provider,
+                _refresh=self._client.refresh_provider,
+                _state=self._client.provider_state,
+                _cancel_downloads=self._client.cancel_provider_downloads,
+                _document_state=self._client.provider_document_state,
+                _download_events=self._client.provider_download_events,
+            )
+            try:
+                yield lease
+            finally:
+                if not lease._retained:
+                    try:
+                        self._client.release_provider_lease(
+                            lease.lease_id,
+                            lease.generation,
+                        )
+                    finally:
+                        if self._active_provider_lease == handshake:
+                            self._active_provider_lease = None
+
+    def show_active_provider_browser(self) -> None:
+        lease = self._active_provider_lease
+        if lease is None:
+            raise ReleaseWindowRuntimeError("provider browser has no active lease")
+        self._client.show_provider(lease.lease_id, lease.generation)
+
+    def close_active_provider_browser(self) -> None:
+        with self._provider_lock:
+            lease = self._active_provider_lease
+            if lease is None:
+                return
+            try:
+                self._client.release_provider_lease(lease.lease_id, lease.generation)
+            finally:
+                if self._active_provider_lease == lease:
+                    self._active_provider_lease = None
+
+    def detected_eda_applications(self) -> tuple[dict[str, str], ...]:
+        return self._client.detected_eda_applications()
+
+    def reveal_component_directory(self, root: str, path: str) -> None:
+        self._client.reveal_directory(root, path)
+
+    def open_component_file(self, application_id: str, root: str, path: str) -> None:
+        self._client.open_file_with_eda_application(application_id, root, path)
+
+    def close(self) -> None:
+        self.close_active_provider_browser()
+        self._client.close()
+
+
 __all__ = [
+    "AttachedProviderBrowserSurface",
     "NativeWindowExport",
     "NativeWindowObservation",
     "ProductionWindowReplacement",

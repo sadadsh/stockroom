@@ -42,6 +42,7 @@ internal sealed class PackagedWorkerRuntime : IDisposable
     internal Uri BaseUri { get; }
     internal string ReleaseId { get; }
     internal SensitiveCredential ApiCredential { get; }
+    internal int ProcessId => _process.Id;
 
     internal Task<int> WaitForExitAsync(CancellationToken cancellationToken = default)
     {
@@ -54,6 +55,8 @@ internal sealed class PackagedWorkerRuntime : IDisposable
     internal static async Task<PackagedWorkerRuntime> StartAsync(
         string packageRoot,
         string? packageProbeScope = null,
+        string? attachedWindowPipe = null,
+        uint attachedWindowProcessId = 0,
         CancellationToken cancellationToken = default)
     {
         var release = PackagedRelease.Resolve(packageRoot);
@@ -77,6 +80,16 @@ internal sealed class PackagedWorkerRuntime : IDisposable
         start.Environment["STOCKROOM_RELEASE_ID"] = release.ReleaseId;
         start.Environment["STOCKROOM_SERVICE_MODE"] = "coordinator";
         start.Environment["STOCKROOM_SERVICE_CONTROL_TOKEN"] = string.Empty;
+        if (string.IsNullOrWhiteSpace(attachedWindowPipe) != (attachedWindowProcessId == 0))
+        {
+            throw new WindowHostException("attached native window identity is incomplete");
+        }
+        if (!string.IsNullOrWhiteSpace(attachedWindowPipe))
+        {
+            start.Environment["STOCKROOM_ATTACHED_WINDOW_PIPE"] = attachedWindowPipe;
+            start.Environment["STOCKROOM_ATTACHED_WINDOW_PID"] =
+                attachedWindowProcessId.ToString(CultureInfo.InvariantCulture);
+        }
         ConfigureUpdateEnvironment(start, release);
         if (!string.IsNullOrWhiteSpace(packageProbeScope))
         {

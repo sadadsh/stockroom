@@ -27,10 +27,10 @@ export function ProviderList({
       className="flex flex-none items-center gap-2 border-b border-line bg-band px-3 py-2"
     >
       <span className="ui-eyebrow flex-none">
-        <Text id="component-browser.manage-models-providers">Open A Provider</Text>
+        <Text id="component-browser.manage-models-providers">Providers</Text>
       </span>
       <div
-        role="radiogroup"
+        role="tablist"
         aria-label={providerListLabel}
         className="flex min-w-0 flex-1 items-stretch gap-1 overflow-x-auto"
       >
@@ -38,9 +38,9 @@ export function ProviderList({
           <button
             key={provider.row.id}
             type="button"
-            role="radio"
+            role="tab"
             data-dev-role="component-browser.provider-row"
-            aria-checked={provider.row.id === selectedId}
+            aria-selected={provider.row.id === selectedId}
             title={openProviderTitle({ provider: provider.row.label })}
             disabled={disabled || !provider.reachable}
             tabIndex={
@@ -76,17 +76,12 @@ export function ProviderList({
                     % enabledProviders.length;
               onSelect(enabledProviders[targetIndex].row.id);
               const buttons = event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>(
-                'button[role="radio"]:not(:disabled)',
+                'button[role="tab"]:not(:disabled)',
               );
               buttons?.[targetIndex]?.focus();
             }}
           >
             <span className="whitespace-nowrap text-xs font-medium text-t1">{provider.row.label}</span>
-            {provider.complete ? (
-              <span className="whitespace-nowrap rounded-full bg-ok/10 px-1.5 py-0.5 text-[10px] font-semibold text-ok-text">
-                <Text id="component-browser.manage-models-all-three">All 3</Text>
-              </span>
-            ) : null}
           </button>
         ))}
       </div>

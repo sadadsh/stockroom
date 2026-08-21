@@ -2,8 +2,8 @@
 
 The provider page remains entirely person-operated.  This broker leases Stockroom's dedicated
 provider WebView, observes its native download journal, and inspects completed files.  One exact,
-complete package for the selected EDA set is applied automatically; partial or ambiguous packages
-remain the same inactive proposal used by the manual picker.
+unambiguous attachment is applied automatically even when other requested roles remain. Ambiguous
+or identity-free packages remain the same inactive proposal used by the manual picker.
 """
 
 from __future__ import annotations
@@ -626,52 +626,6 @@ class ManualProviderBrowserBroker:
                                     # durable library-owned assets.
                                     session.proposal_token = ""
                                 selected_remaining = _selected_remaining_roles(session.edas, result)
-                                if selected_remaining:
-                                    try:
-                                        refreshed_proposal = self._proposal_factory(
-                                            self._ctx,
-                                            session.snapshot.part_id,
-                                            tuple(landed),
-                                            edas=session.edas,
-                                        )
-                                    except Exception as exc:  # noqa: BLE001 - never claim ready
-                                        with self._lock:
-                                            session.snapshot = replace(
-                                                session.snapshot,
-                                                state="active",
-                                                proposal=None,
-                                                error=(
-                                                    "The package is partial and could not be "
-                                                    f"re-inspected: {exc}"
-                                                ),
-                                            )
-                                    else:
-                                        refreshed_token = refreshed_proposal.get("proposal_token")
-                                        if type(refreshed_token) is not str or not refreshed_token:
-                                            with self._lock:
-                                                session.snapshot = replace(
-                                                    session.snapshot,
-                                                    state="active",
-                                                    proposal=None,
-                                                    error=(
-                                                        "The package is partial and produced no "
-                                                        "reviewable proposal."
-                                                    ),
-                                                )
-                                            continue
-                                        self._replace_proposal_token(session, refreshed_token)
-                                        with self._lock:
-                                            session.snapshot = replace(
-                                                session.snapshot,
-                                                state="active",
-                                                proposal=refreshed_proposal,
-                                                error=(
-                                                    "The package still needs "
-                                                    + ", ".join(selected_remaining)
-                                                    + ". Review the staged proposal."
-                                                ),
-                                            )
-                                    continue
                                 warning = str(result.get("warning", "") or "")
                                 cad_ready = {
                                     "attached": _string_list(result.get("attached", [])),
@@ -681,17 +635,26 @@ class ManualProviderBrowserBroker:
                                     ),
                                     "part_complete": bool(result.get("complete")),
                                     "provider_id": session.snapshot.provider_id,
-                                    "remaining_roles": [],
+                                    "remaining_roles": selected_remaining,
                                 }
                                 if warning:
                                     cad_ready["warning"] = warning
+                                message = warning
+                                if selected_remaining:
+                                    message = (
+                                        "Downloaded files added. Still needed: "
+                                        + ", ".join(selected_remaining)
+                                        + "."
+                                    )
+                                    if warning:
+                                        message += " " + warning
                                 with self._lock:
                                     session.snapshot = replace(
                                         session.snapshot,
                                         state="ready",
                                         proposal=None,
                                         cad_ready=cad_ready,
-                                        error=warning,
+                                        error=message,
                                     )
                                 break
                         else:

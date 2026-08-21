@@ -103,12 +103,11 @@ internal sealed class WebViewWindowHost : IDisposable
         // for the life of the window, and shows a single Stockroom tab until a provider page
         // is actually open.
         _tabStrip = new WindowTabStrip();
-        // Provider navigation now lives inside CAD Models > Manage Models. Keep the proven
-        // navigation controller during rolling compatibility, but remove its window-level UI.
+        // Provider pages replace Stockroom's WebView while open, so the native strip is the
+        // permanently reachable way back to Stockroom and between provider pages.
         _tabStrip.Root.Visibility = Visibility.Collapsed;
-        _tabStrip.Root.IsHitTestVisible = false;
-        _tabStrip.StockroomTab.Click += (_, _) => HideProviderBrowser();
-        _tabStrip.ProviderTab.Click += (_, _) => ShowActiveProviderBrowser();
+        _tabStrip.StockroomTab.Checked += (_, _) => HideProviderBrowser();
+        _tabStrip.ProviderTab.Checked += (_, _) => ShowActiveProviderBrowser();
         _tabStrip.BackButton.Click += (_, _) => NavigateProviderHistory(back: true);
         _tabStrip.ForwardButton.Click += (_, _) => NavigateProviderHistory(back: false);
         _tabStrip.RefreshButton.Click += (_, _) => RefreshActiveProvider();
@@ -452,15 +451,10 @@ internal sealed class WebViewWindowHost : IDisposable
                 SyncProviderTab();
                 if (!TryApplyProviderViewport())
                 {
-                    _providerSurface.Visibility = Visibility.Collapsed;
-                    _webView.Visibility = Visibility.Visible;
+                    ShowStockroomTab();
                     return true;
                 }
-                _webView.Visibility = Visibility.Visible;
-                _providerSurface.Visibility = Visibility.Visible;
-                _tabStrip.SelectProvider();
-                UpdateProviderChrome();
-                _providerWebView?.Focus();
+                ShowActiveProviderBrowser();
                 return true;
             });
     }
@@ -496,6 +490,7 @@ internal sealed class WebViewWindowHost : IDisposable
     {
         _providerSurface.Visibility = Visibility.Collapsed;
         _webView.Visibility = Visibility.Visible;
+        _tabStrip.Root.Visibility = Visibility.Collapsed;
         _tabStrip.SelectStockroom();
         _webView.Focus();
     }
@@ -516,6 +511,7 @@ internal sealed class WebViewWindowHost : IDisposable
 
         _webView.Visibility = Visibility.Collapsed;
         _providerSurface.Visibility = Visibility.Visible;
+        _tabStrip.Root.Visibility = Visibility.Visible;
         _tabStrip.SelectProvider();
         UpdateProviderChrome();
         ActiveProviderWebView()?.Focus();
@@ -855,33 +851,46 @@ internal sealed class WebViewWindowHost : IDisposable
 
     private async Task InitializeProviderBrowserAttemptAsync()
     {
+        // WPF WebView2 waits for Loaded; a control under a Collapsed parent never reaches it.
+        // Hidden keeps Stockroom visible while connecting this lazy provider control to the window.
+        var priorVisibility = _providerSurface.Visibility;
+        _providerSurface.Visibility = Visibility.Hidden;
         var providerWebView = new WebView2
         {
             AllowDrop = false,
             CreationProperties = new CoreWebView2CreationProperties(),
         };
-        _providerWebView = providerWebView;
-        _providerContent.Children.Add(providerWebView);
-        var options = new CoreWebView2EnvironmentOptions
+        try
         {
-            // Capture is leased across release activation, so only the active host initializes
-            // this browser. Exclusive access keeps a second host out of the profile while the
-            // stable user-data folder preserves provider sign-in state between launches. No
-            // remote-debugging port is opened: nothing outside this process may drive this
-            // browser, and the person operating it is the only source of input.
-            ExclusiveUserDataFolderAccess = true,
-        };
-        var environment = await CoreWebView2Environment.CreateAsync(
-                browserExecutableFolder: null,
-                userDataFolder: _machineConfig.ProviderProfileDirectory(),
-                options)
-            .ConfigureAwait(true);
-        _providerEnvironment = environment;
-        environment.BrowserProcessExited += OnProviderBrowserProcessExited;
-        await providerWebView.EnsureCoreWebView2Async(environment)
-            .ConfigureAwait(true);
-        ConfigureProviderCoreWebView(providerWebView.CoreWebView2);
-        _providerSurface.Visibility = Visibility.Collapsed;
+            _providerWebView = providerWebView;
+            _providerContent.Children.Add(providerWebView);
+            var options = new CoreWebView2EnvironmentOptions
+            {
+                // Capture is leased across release activation, so only the active host initializes
+                // this browser. Exclusive access keeps a second host out of the profile while the
+                // stable user-data folder preserves provider sign-in state between launches. No
+                // remote-debugging port is opened: nothing outside this process may drive this
+                // browser, and the person operating it is the only source of input.
+                ExclusiveUserDataFolderAccess = true,
+            };
+            var environment = await CoreWebView2Environment.CreateAsync(
+                    browserExecutableFolder: null,
+                    userDataFolder: _machineConfig.ProviderProfileDirectory(),
+                    options)
+                .ConfigureAwait(true);
+            _providerEnvironment = environment;
+            environment.BrowserProcessExited += OnProviderBrowserProcessExited;
+            await providerWebView.EnsureCoreWebView2Async(environment)
+                .ConfigureAwait(true);
+            ConfigureProviderCoreWebView(providerWebView.CoreWebView2);
+        }
+        finally
+        {
+            if (_providerSurface.Visibility == Visibility.Hidden)
+            {
+                _providerSurface.Visibility = priorVisibility;
+            }
+        }
     }
 
     /// <summary>
@@ -1050,8 +1059,8 @@ internal sealed class WebViewWindowHost : IDisposable
     {
         var surface = new Grid
         {
-            HorizontalAlignment = HorizontalAlignment.Left,
-            VerticalAlignment = VerticalAlignment.Top,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            VerticalAlignment = VerticalAlignment.Stretch,
             Background = new SolidColorBrush(Color.FromRgb(17, 21, 29)),
             Visibility = Visibility.Collapsed,
         };
@@ -1083,9 +1092,9 @@ internal sealed class WebViewWindowHost : IDisposable
             return false;
         }
 
-        _providerSurface.Margin = new Thickness(layout.X, layout.Y, 0, 0);
-        _providerSurface.Width = layout.Width;
-        _providerSurface.Height = layout.Height;
+        // The renderer's measured modal body is the visibility and identity handshake. Once it
+        // is valid, the native provider page owns the window's provider tab instead of competing
+        // with Stockroom's WebView in the same pixels.
         return true;
     }
 
@@ -1603,6 +1612,7 @@ internal sealed class WebViewWindowHost : IDisposable
         _tabStrip.RemoveProviderTab();
         _providerSurface.Visibility = Visibility.Collapsed;
         _webView.Visibility = Visibility.Visible;
+        _tabStrip.Root.Visibility = Visibility.Collapsed;
         foreach (var popup in _providerPopups.Keys.ToArray())
         {
             RemoveProviderPopup(popup);
@@ -2140,25 +2150,20 @@ internal sealed class WebViewWindowHost : IDisposable
                 {
                     // Commit the provider switch by hiding the old compositor before accepting
                     // any geometry or history state for the replacement session.
-                    _providerSurface.Visibility = Visibility.Collapsed;
-                    _webView.Visibility = Visibility.Visible;
+                    ShowStockroomTab();
                     _tabStrip.SetNavigationState(false, false);
                 }
                 _providerViewportRequest = request;
                 if (!request.Visible || !TryApplyProviderViewport())
                 {
-                    _providerSurface.Visibility = Visibility.Collapsed;
-                    _webView.Visibility = Visibility.Visible;
+                    ShowStockroomTab();
                 }
                 else
                 {
                     // A provider-show can arrive before React has committed measurable bounds.
                     // Publishing the first valid visible viewport is therefore the visibility
                     // commit, not merely a geometry update for an already-visible surface.
-                    _webView.Visibility = Visibility.Visible;
-                    _providerSurface.Visibility = Visibility.Visible;
-                    _tabStrip.SelectProvider();
-                    UpdateProviderChrome();
+                    ShowActiveProviderBrowser();
                 }
                 return;
             }

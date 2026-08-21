@@ -1329,14 +1329,7 @@ def test_failed_production_bootstrap_restores_exact_context_identity(
         "TrustedReleaseRepository",
         reject_repository,
     )
-    real_authority = release_runtime.ContextServiceAuthority
     authority_scope = _authority_scope(tmp_path)
-
-    def scoped_authority(*args, **kwargs):
-        kwargs.setdefault("authority_scope", authority_scope)
-        return real_authority(*args, **kwargs)
-
-    monkeypatch.setattr(release_runtime, "ContextServiceAuthority", scoped_authority)
     proxy = SwitchableBackendProxy(_local_app(release.release_id, 1))
 
     with pytest.raises(RuntimeError, match="repository setup failed"):
@@ -1348,6 +1341,7 @@ def test_failed_production_bootstrap_restores_exact_context_identity(
             reload_window=lambda _url: None,
             bundle_root=bundle_root,
             data_root=tmp_path / "Data",
+            authority_scope=authority_scope,
         )
 
     assert context.service_mode == "prior-mode"
@@ -1413,6 +1407,22 @@ def test_managed_worker_uses_store_runtime_for_store_packages(monkeypatch) -> No
     monkeypatch.setenv("STOCKROOM_UPDATE_MODE", "microsoft_store")
 
     assert worker._managed_update_runtime_factory() is create_store_update_runtime
+
+
+@pytest.mark.parametrize(
+    ("probe_scope", "expected"),
+    [
+        ("", "Coordinator"),
+        ("Probe123", "Probe123"),
+    ],
+)
+def test_managed_worker_reuses_one_application_authority_scope(
+    probe_scope: str,
+    expected: str,
+) -> None:
+    from stockroom.host import worker
+
+    assert worker._application_authority_scope(probe_scope) == expected
 
 
 def test_store_runtime_never_constructs_or_activates_a_direct_update_feed(

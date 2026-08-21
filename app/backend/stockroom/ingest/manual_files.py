@@ -455,13 +455,18 @@ def propose_manual_cad_files(
         )
         if tuple(_file_digest(path) for path in snapshots) != digests:
             raise ValueError("a proposal-owned CAD snapshot changed during inspection")
-        remaining_roles, roles_ready = _proposal_readiness(
+        remaining_roles, _roles_ready = _proposal_readiness(
             ctx,
             part_id,
             edas,
             attachments,
         )
-        automatic_apply_ready = roles_ready and not identity_gaps
+        attachment_roles = [str(item.get("role", "")) for item in attachments]
+        automatic_apply_ready = (
+            bool(attachments)
+            and len(set(attachment_roles)) == len(attachment_roles)
+            and not identity_gaps
+        )
         remaining_status = list(dict.fromkeys([*remaining_roles, *identity_gaps]))
         now = time.monotonic()
         entry: _ManualCadProposalEntry = {

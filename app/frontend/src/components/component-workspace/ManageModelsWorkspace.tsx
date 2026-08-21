@@ -9,7 +9,6 @@ import type {
 import { useOptionalCapture } from "../../lib/capture";
 import {
   captureInFlight,
-  captureRequirementsForEdas,
   CAPTURE_EDAS,
   type CaptureEda,
 } from "../../lib/captureRequirements";
@@ -57,7 +56,6 @@ export function ManageModelsWorkspace({
   onView: _onView,
   primaryEda = "kicad",
   onBack,
-  onOpenProvider,
   onRecoverFiles,
   onAttached,
 }: {
@@ -66,7 +64,7 @@ export function ManageModelsWorkspace({
   onView?: (view: CadWorkspaceView) => void;
   primaryEda?: CaptureEda;
   onBack?: () => void;
-  onOpenProvider?: (providerId: string, needs: ReturnType<typeof captureRequirementsForEdas>) => void | Promise<void>;
+  onOpenProvider?: (providerId: string, needs: readonly string[]) => void | Promise<void>;
   onRecoverFiles?: () => Promise<CaptureRecoveryResult>;
   onAttached?: () => void;
 }) {
@@ -126,14 +124,15 @@ export function ManageModelsWorkspace({
   }, [manualBrowser]);
 
   const acceptManualSnapshot = useCallback((next: ManualProviderBrowserSession) => {
-    manualBrowserRef.current = next;
-    setManualBrowser(next);
-    if (next.proposal) setManualAttachmentProposal(next.proposal);
-    if (next.cad_ready) {
+    const accepted = next.cad_ready ? { ...next, state: "ready" as const } : next;
+    manualBrowserRef.current = accepted;
+    setManualBrowser(accepted);
+    if (accepted.proposal) setManualAttachmentProposal(accepted.proposal);
+    if (accepted.cad_ready) {
       setManualAttachmentProposal(null);
-      setCadReady(next.cad_ready);
-      if (!reportedReadySessionsRef.current.has(next.session_id)) {
-        reportedReadySessionsRef.current.add(next.session_id);
+      setCadReady(accepted.cad_ready);
+      if (!reportedReadySessionsRef.current.has(accepted.session_id)) {
+        reportedReadySessionsRef.current.add(accepted.session_id);
         onAttached?.();
       }
     }
@@ -170,59 +169,8 @@ export function ManageModelsWorkspace({
       if (openingProviderRef.current) return;
       const provider = providers.find((candidate) => candidate.row.id === providerId);
       setHiddenOpeningProviderId(null);
-      if (!provider?.row.captureAvailable) {
-        if (!provider?.row.url) {
-          setActivityMessage("This provider has no verified page for this component.");
-          return;
-        }
-        const sessionId = crypto.randomUUID();
-        const routeId = `manual:${providerId}`;
-        const browserOwnerId = `${componentId}:${providerId}:${routeId}:${sessionId}`;
-        const starting: ManualProviderBrowserSession = {
-          session_id: sessionId,
-          part_id: componentId,
-          provider_id: providerId,
-          url: provider.row.url,
-          browser_owner_id: browserOwnerId,
-          state: "starting",
-          proposal: null,
-          error: "",
-          browser_state: null,
-        };
-        manualBrowserRef.current = starting;
-        setManualBrowser(starting);
-        setManualAttachmentProposal(null);
-        setHiddenManualSessionId(null);
-        setActivityMessage(`Opening ${provider.row.label}...`);
-        try {
-          const opened = await withinManualBrowserDeadline(
-            api.startManualProviderBrowser({
-              partId: componentId,
-              sessionId,
-              providerId,
-              url: provider.row.url,
-              edas: selectedEdas,
-              browserOwnerId,
-            }),
-            "Provider opening stalled. Retry, choose another provider, or close the browser.",
-          );
-          if (manualBrowserRef.current?.session_id !== sessionId) return;
-          acceptManualSnapshot(opened);
-          setActivityMessage(opened.error || (opened.state === "ready" ? "CAD Ready" : "Provider ready"));
-        } catch (error) {
-          if (manualBrowserRef.current?.session_id !== sessionId) return;
-          const failed = {
-            ...starting,
-            state: (
-              error instanceof Error && error.message.includes("stalled")
-                ? "stalled"
-                : "failed"
-            ) as "stalled" | "failed",
-            error: error instanceof Error ? error.message : "Could not open provider",
-          };
-          acceptManualSnapshot(failed);
-          setActivityMessage(failed.error);
-        }
+      if (!provider?.row.url) {
+        setActivityMessage("This provider has no verified page for this component.");
         return;
       }
       const priorManual = manualBrowserRef.current;
@@ -239,24 +187,55 @@ export function ManageModelsWorkspace({
         manualBrowserRef.current = null;
         setManualBrowser(null);
       }
-      const needs = captureRequirementsForEdas(selectedEdas);
+      const sessionId = crypto.randomUUID();
+      const routeId = `manual:${providerId}`;
+      const browserOwnerId = `${componentId}:${providerId}:${routeId}:${sessionId}`;
+      const starting: ManualProviderBrowserSession = {
+        session_id: sessionId,
+        part_id: componentId,
+        provider_id: providerId,
+        url: provider.row.url,
+        browser_owner_id: browserOwnerId,
+        state: "starting",
+        proposal: null,
+        error: "",
+        browser_state: null,
+      };
       openingProviderRef.current = providerId;
       setOpeningProviderId(providerId);
+      manualBrowserRef.current = starting;
+      setManualBrowser(starting);
+      setManualAttachmentProposal(null);
+      setHiddenManualSessionId(null);
       setActivityMessage(`Opening ${provider.row.label}...`);
       try {
-        if (onOpenProvider) {
-          await onOpenProvider(providerId, needs);
-        } else {
-          if (!capture) return;
-          await capture.start(
-            componentId,
-            dossier.identity.displayName,
-            needs,
+        const opened = await withinManualBrowserDeadline(
+          api.startManualProviderBrowser({
+            partId: componentId,
+            sessionId,
             providerId,
-          );
-        }
+            url: provider.row.url,
+            edas: selectedEdas,
+            browserOwnerId,
+          }),
+          "Provider opening stalled. Retry, choose another provider, or close the browser.",
+        );
+        if (manualBrowserRef.current?.session_id !== sessionId) return;
+        acceptManualSnapshot(opened);
+        setActivityMessage(opened.error || (opened.state === "ready" ? "CAD Ready" : "Provider ready"));
       } catch (error) {
-        setActivityMessage(error instanceof Error ? error.message : "Could not open provider");
+        if (manualBrowserRef.current?.session_id !== sessionId) return;
+        const failed = {
+          ...starting,
+          state: (
+            error instanceof Error && error.message.includes("stalled")
+              ? "stalled"
+              : "failed"
+          ) as "stalled" | "failed",
+          error: error instanceof Error ? error.message : "Could not open provider",
+        };
+        acceptManualSnapshot(failed);
+        setActivityMessage(failed.error);
       } finally {
         openingProviderRef.current = null;
         setOpeningProviderId(null);
@@ -264,10 +243,7 @@ export function ManageModelsWorkspace({
     },
     [
       acceptManualSnapshot,
-      capture,
       componentId,
-      dossier.identity.displayName,
-      onOpenProvider,
       providers,
       selectedEdas,
     ],
@@ -292,6 +268,7 @@ export function ManageModelsWorkspace({
         if (disposed || manualBrowserRef.current?.session_id !== session.session_id) return;
         acceptManualSnapshot(next);
         if (next.error) setActivityMessage(next.error);
+        else if (next.cad_ready?.remaining_roles.length) setActivityMessage("Downloaded files added");
         else if (next.state === "ready") setActivityMessage("CAD Ready");
         if (["starting", "active", "stalled"].includes(next.state)) {
           timer = setTimeout(() => void poll(), 250);
@@ -376,7 +353,7 @@ export function ManageModelsWorkspace({
       && !activeNativeRoute
       && hiddenOpeningProviderId !== selectedProvider?.row.id
       && (
-        (openingProviderId === selectedProvider?.row.id && selectedProvider?.row.captureAvailable)
+        openingProviderId === selectedProvider?.row.id
         || (activeManualBrowser && manualBrowser?.state === "starting")
       ),
   );
@@ -451,7 +428,7 @@ export function ManageModelsWorkspace({
     : null;
   function hideActiveProvider() {
     setScenarioBrowserDismissed(true);
-    if (browserPreparing && selectedProvider?.row.captureAvailable) {
+    if (browserPreparing && selectedProvider) {
       setHiddenOpeningProviderId(selectedProvider.row.id);
     }
     if (activeManualBrowser && manualBrowser) {
@@ -569,11 +546,11 @@ export function ManageModelsWorkspace({
     ?? previewStatus
     ?? (anotherCaptureBusy
       ? `Finish the active Provider Visit for ${capture?.active.partName || "the other component"} first.`
-      : selectedProvider && !selectedProvider.row.captureAvailable
-        ? "Complete exact packages attach automatically. Partial downloads wait for review."
+      : selectedProvider
+        ? "Download CAD here. Stockroom checks it and attaches a complete exact package automatically."
         : null);
   const showActionBar = Boolean(
-    (selectedProvider && !selectedProvider.row.captureAvailable && selectedProvider.row.url)
+    (selectedProvider && selectedProvider.row.url)
       || ((activeNativeRoute || activeManualBrowser) && !browserOpen)
       || attachmentProposal
       || cadReady
@@ -669,16 +646,6 @@ export function ManageModelsWorkspace({
             });
             return;
           }
-          if (!provider?.row.captureAvailable) {
-            if (provider?.row.url) {
-              setManualBrowser(null);
-              setHiddenManualSessionId(null);
-              void openProvider(providerId);
-            } else {
-              setActivityMessage("This provider has no verified page for this component.");
-            }
-            return;
-          }
           setManualBrowser(null);
           setHiddenManualSessionId(null);
           setActivityMessage(null);
@@ -761,12 +728,22 @@ export function ManageModelsWorkspace({
                 <Text id="component-browser.manage-models-provider-download">Provider Download</Text>
               </p>
               <h3 className="text-base font-semibold text-t1">
-                <Text id="component-browser.manage-models-cad-ready">CAD Ready</Text>
+                {cadReady.remaining_roles.length ? (
+                  <Text id="component-browser.manage-models-files-added">CAD Files Added</Text>
+                ) : (
+                  <Text id="component-browser.manage-models-cad-ready">CAD Ready</Text>
+                )}
               </h3>
               <p className="mt-1 text-xs text-t2">
-                The validated {cadReady.edas.join(" and ")} package is attached to this exact part.
-                {cadReady.part_complete ? " This part is complete." : " Other EDA providers are optional."}
+                <Text id="component-browser.manage-models-files-added-help">
+                  Downloaded files were validated and added to this exact part.
+                </Text>
               </p>
+              {cadReady.remaining_roles.length ? (
+                <p className="mt-2 text-xs font-semibold text-warn-text">
+                  Still needed: {joinRoles(cadReady.remaining_roles)}
+                </p>
+              ) : null}
               <ul aria-label={attachedFilesLabel} className="mt-3 space-y-1 text-xs text-t2">
                 {cadReady.landed_files.map((fileName) => (
                   <li key={fileName} className="truncate font-mono">{fileName}</li>

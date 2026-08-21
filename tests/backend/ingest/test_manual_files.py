@@ -220,7 +220,7 @@ def test_manual_proposal_defers_mutation_and_carries_the_selected_eda_into_apply
 
     assert applied == []
     assert proposal["remaining_roles"] == ["3D Model", "Altium Footprint"]
-    assert proposal["automatic_apply_ready"] is False
+    assert proposal["automatic_apply_ready"] is True
     result = apply_manual_cad_proposal(ctx, "part-1", proposal["proposal_token"])
     assert result == {"attached": ["altium_symbol"]}
     assert len(applied) == 1

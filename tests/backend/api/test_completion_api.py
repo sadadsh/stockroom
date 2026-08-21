@@ -1522,6 +1522,57 @@ def test_direct_provider_browser_route_starts_a_task_bound_proposal_session(
     assert status.json()["proposal"]["landed_files"] == ["TPS62130.zip"]
 
 
+def test_direct_provider_browser_uses_the_managed_window_runtime_surface(
+    client,
+    app_ctx,
+    monkeypatch,
+):
+    from types import SimpleNamespace
+
+    from stockroom.capture import manual_provider_browser
+    from stockroom.capture.manual_provider_browser import ManualProviderBrowserSnapshot
+
+    surface = lambda **_kwargs: None
+    observed = {}
+
+    class Broker:
+        def __init__(self, _ctx, selected_surface, **_kwargs):
+            observed["surface"] = selected_surface
+
+        def start(self, **fields):
+            return ManualProviderBrowserSnapshot(
+                session_id=fields["session_id"],
+                part_id=fields["part_id"],
+                provider_id=fields["provider_id"],
+                url=fields["url"],
+                browser_owner_id=fields["browser_owner_id"],
+                state="active",
+            )
+
+    monkeypatch.delattr(app_ctx, "provider_browser_surface", raising=False)
+    monkeypatch.setattr(
+        app_ctx,
+        "update_convergence",
+        SimpleNamespace(provider_browser_surface=surface),
+        raising=False,
+    )
+    monkeypatch.setattr(manual_provider_browser, "ManualProviderBrowserBroker", Broker)
+
+    response = client.post(
+        "/api/library/parts/tps62130/provider-browser",
+        json={
+            "session_id": "7ed4d06c-66b0-4dbe-88ef-35edce7a373f",
+            "provider_id": "mouser",
+            "url": "https://www.mouser.com/c/?q=TPS62130",
+            "edas": ["kicad"],
+            "browser_owner_id": "tps62130:mouser:mouser:7ed4d06c",
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    assert observed["surface"] is surface
+
+
 def test_api_shutdown_releases_the_manual_provider_browser_broker(app_ctx, monkeypatch):
     from fastapi.testclient import TestClient
 

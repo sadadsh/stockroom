@@ -4,7 +4,44 @@ from __future__ import annotations
 
 import argparse
 import os
+import threading
 from pathlib import Path
+
+
+class _DeferredAttachedProviderSurface:
+    """Make the parent-owned provider surface callable before its pipe handshake finishes."""
+
+    def __init__(self) -> None:
+        self._ready = threading.Event()
+        self._surface = None
+        self._error: BaseException | None = None
+
+    def bind(self, surface) -> None:
+        self._surface = surface
+        self._ready.set()
+
+    def fail(self, error: BaseException) -> None:
+        self._error = error
+        self._ready.set()
+
+    def _require_surface(self):
+        if not self._ready.wait(15.0) or self._surface is None:
+            raise RuntimeError("the packaged provider browser did not connect") from self._error
+        return self._surface
+
+    def provider_browser_surface(self, **kwargs):
+        return self._require_surface().provider_browser_surface(**kwargs)
+
+    def show_active_provider_browser(self) -> None:
+        self._require_surface().show_active_provider_browser()
+
+    def close_active_provider_browser(self) -> None:
+        if self._ready.is_set() and self._surface is not None:
+            self._surface.close_active_provider_browser()
+
+    def close(self) -> None:
+        if self._ready.is_set() and self._surface is not None:
+            self._surface.close()
 
 
 def _managed_update_runtime_factory():
@@ -20,6 +57,12 @@ def _managed_update_runtime_factory():
         if host_update_mode() is HostUpdateMode.MICROSOFT_STORE
         else create_production_update_runtime
     )
+
+
+def _application_authority_scope(package_probe_scope: str) -> str:
+    from stockroom.service import DEFAULT_AUTHORITY_SCOPE
+
+    return package_probe_scope or DEFAULT_AUTHORITY_SCOPE
 
 
 def main() -> None:
@@ -74,11 +117,12 @@ def main() -> None:
     )
 
     package_probe_scope = os.environ.pop("STOCKROOM_PACKAGE_PROBE_SCOPE", "")
+    application_authority_scope = _application_authority_scope(package_probe_scope)
     if coordinator:
         prepared_library = _prepare_managed_library(
             None,
             service_state_root=Path(control_database).resolve().parent,
-            authority_scope=package_probe_scope or "ApplicationService",
+            authority_scope=application_authority_scope,
         )
         ctx = build_context(prepared_library, cold=True)
     else:
@@ -126,6 +170,12 @@ def main() -> None:
     checkout_inventory = os.environ.pop("STOCKROOM_CHECKOUT_INVENTORY", "")
     if checkout_inventory:
         setattr(ctx, "checkout_inventory_path", Path(checkout_inventory))
+    attached_pipe = os.environ.pop("STOCKROOM_ATTACHED_WINDOW_PIPE", "")
+    attached_host_pid = os.environ.pop("STOCKROOM_ATTACHED_WINDOW_PID", "")
+    if bool(attached_pipe) != bool(attached_host_pid):
+        ctx.close()
+        raise SystemExit("attached window identity is incomplete")
+
     if authority is None:
         app = create_app(ctx)
     else:
@@ -141,6 +191,37 @@ def main() -> None:
         "STOCKROOM_PUBLIC_BASE_URL",
         f"http://127.0.0.1:{args.port}",
     )
+    attached_surface = None
+    if attached_pipe:
+        try:
+            expected_host_process_id = int(attached_host_pid)
+        except ValueError as exc:
+            ctx.close()
+            raise SystemExit("attached window process identity is invalid") from exc
+        attached_surface = _DeferredAttachedProviderSurface()
+        setattr(ctx, "provider_browser_surface", attached_surface.provider_browser_surface)
+
+        def connect_attached_window() -> None:
+            try:
+                from stockroom.host.window_runtime import AttachedProviderBrowserSurface
+                from stockroom.host.window_supervisor import connect_attached_window_host
+
+                client = connect_attached_window_host(
+                    attached_pipe,
+                    expected_host_process_id=expected_host_process_id,
+                    release_id=release_id,
+                    base_url=public_base_url,
+                    api_credential=token,
+                )
+                attached_surface.bind(AttachedProviderBrowserSurface(client))
+            except BaseException as exc:
+                attached_surface.fail(exc)
+
+        threading.Thread(
+            target=connect_attached_window,
+            name="Stockroom Attached Window",
+            daemon=True,
+        ).start()
     _install_injected_index(
         app,
         public_base_url,
@@ -159,7 +240,7 @@ def main() -> None:
             token=token,
             reload_window=lambda _url: None,
             manage_native_window=False,
-            authority_scope=(package_probe_scope or None),
+            authority_scope=application_authority_scope,
         )
         setattr(ctx, "update_convergence", production_update_runtime)
         production_update_runtime.start()
@@ -168,6 +249,8 @@ def main() -> None:
         uvicorn.run(served_app, host="127.0.0.1", port=args.port, log_level="warning")
     finally:
         try:
+            if attached_surface is not None:
+                attached_surface.close()
             if production_update_runtime is not None:
                 production_update_runtime.close()
             elif authority is not None:

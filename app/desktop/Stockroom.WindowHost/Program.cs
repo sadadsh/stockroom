@@ -92,9 +92,14 @@ internal static class Program
         LauncherDiagnostics.Write(
             "native-host-starting",
             $"package={packageRoot};version={LauncherDiagnostics.ProductVersion()}");
-        using var worker = PackagedWorkerRuntime.StartAsync(packageRoot)
+        using var windowHandoff = StandaloneWindowHandoff.Create();
+        using var worker = PackagedWorkerRuntime.StartAsync(
+                packageRoot,
+                attachedWindowPipe: windowHandoff.PipeName,
+                attachedWindowProcessId: checked((uint)Environment.ProcessId))
             .GetAwaiter()
             .GetResult();
+        windowHandoff.BindWorker(worker);
         using var bootstrap = HandoffBootstrap.CreateDirect(
             worker.ReleaseId,
             worker.BaseUri,
@@ -117,6 +122,7 @@ internal static class Program
                     () => application.Shutdown(1));
                 await host.InitializeAsync().ConfigureAwait(true);
                 host.PrepareHidden(DateTimeOffset.UtcNow.AddSeconds(30).ToUnixTimeMilliseconds());
+                windowHandoff.StartSession(host, bootstrap.ProfileId);
                 host.Show();
                 _ = await host.FocusAsync(CancellationToken.None).ConfigureAwait(true);
                 readyHost.TrySetResult(host);

@@ -232,7 +232,7 @@ describe("AssetsPage", () => {
       parts: mockApi.listParts.mock.calls.length,
       catalog: mockApi.catalogBuildStatus.mock.calls.length,
     };
-    await user.click(await screen.findByRole("radio", { name: "Mouser" }));
+    await user.click(await screen.findByRole("tab", { name: "Mouser" }));
     expect((await screen.findAllByText("CAD Ready")).length).toBeGreaterThan(0);
 
     await screen.findByText("ADG714BRUZ-REEL.zip");
@@ -288,7 +288,7 @@ describe("AssetsPage", () => {
 
     await user.click(await screen.findByRole("button", { name: /Needs Assets/ }));
     await user.click(await screen.findByRole("button", { name: "Manage CAD Assets" }));
-    await user.click(await screen.findByRole("radio", { name: "Mouser" }));
+    await user.click(await screen.findByRole("tab", { name: "Mouser" }));
     expect(await screen.findByText("ADG714BRUZ-REEL.zip")).toBeVisible();
     const before = {
       dossier: mockApi.partDossier.mock.calls.length,

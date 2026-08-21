@@ -25,6 +25,7 @@ from stockroom.host.window_supervisor import (
     WindowSupervisorProcessError,
     WindowSupervisorProtocolError,
     WindowSupervisorTimeout,
+    connect_attached_window_host,
     sanitized_window_host_environment,
 )
 from stockroom.host.windows_handoff_pipe import (
@@ -270,6 +271,7 @@ class _Channel:
         self.sent.append(message)
         return message
 
+
     def _hello(self, request: HandoffMessage) -> HandoffMessage:
         bootstrap = parse_bootstrap(request)
         result: dict[str, object] = {
@@ -482,6 +484,50 @@ class _Channel:
         self._closed_event.set()
         if self.close_error is not None:
             raise self.close_error
+
+
+def test_attached_window_bootstrap_survives_packaged_worker_startup(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    connection = _Transport(peer_process_id=_CHILD_PID)
+    channel = _Channel(handoff_id=_HANDOFF_ID, peer_process_id=_CHILD_PID)
+
+    def connect(pipe_name: str, *, expected_server_pid: int) -> _Transport:
+        assert pipe_name == _PIPE_NAME
+        assert expected_server_pid == _CHILD_PID
+        return connection
+
+    def channel_factory(
+        transport: _Transport,
+        *,
+        expected_handoff_id: str,
+    ) -> _Channel:
+        assert transport is connection
+        assert expected_handoff_id == _HANDOFF_ID
+        return channel
+
+    monkeypatch.setattr(supervisor_module, "connect_windows_named_pipe", connect)
+    monkeypatch.setattr(supervisor_module, "HandoffChannel", channel_factory)
+    monkeypatch.setattr(supervisor_module.uuid, "uuid4", lambda: _HANDOFF_ID)
+    monkeypatch.setattr(supervisor_module.os, "getpid", lambda: _PARENT_PID)
+    monkeypatch.setattr(supervisor_module, "_now_unix_ms", lambda: _NOW)
+
+    client = connect_attached_window_host(
+        _PIPE_NAME,
+        expected_host_process_id=_CHILD_PID,
+        release_id="release-1.0.0.0",
+        base_url=_BASE_URL,
+        api_credential=_API_CREDENTIAL,
+    )
+
+    assert channel.sent[0].name == "bootstrap"
+    assert channel.sent[0].deadline_unix_ms == _NOW + 120_000
+    assert [message.name for message in channel.sent] == [
+        "bootstrap",
+        "prepare-hidden",
+        "show",
+    ]
+    client.close()
 
 
 @dataclass

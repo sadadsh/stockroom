@@ -300,6 +300,12 @@ internal static partial class NativeMethods
         SafePipeHandle pipe,
         out uint serverProcessId);
 
+    [LibraryImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool GetNamedPipeClientProcessId(
+        SafePipeHandle pipe,
+        out uint clientProcessId);
+
     [LibraryImport("advapi32.dll")]
     internal static partial uint GetSecurityInfo(
         IntPtr handle,

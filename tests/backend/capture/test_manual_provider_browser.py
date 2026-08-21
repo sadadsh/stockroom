@@ -236,7 +236,7 @@ def test_complete_unambiguous_download_auto_applies_and_publishes_durable_cad_re
     _wait_for(lambda: surface.released == 1)
 
 
-def test_auto_apply_that_still_lacks_a_selected_role_never_reports_cad_ready(tmp_path):
+def test_auto_apply_partial_files_reports_the_attachment_and_remaining_roles(tmp_path):
     surface = _Surface()
     proposal_calls = 0
 
@@ -256,8 +256,8 @@ def test_auto_apply_that_still_lacks_a_selected_role_never_reports_cad_ready(tmp
             "inactive_evidence": [],
             "ignored": [],
             "landed_files": [path.name for path in paths],
-            "remaining_roles": [] if proposal_calls == 1 else ["KiCad Footprint"],
-            "automatic_apply_ready": proposal_calls == 1,
+            "remaining_roles": ["KiCad Footprint"],
+            "automatic_apply_ready": True,
         }
 
     broker = ManualProviderBrowserBroker(
@@ -300,13 +300,21 @@ def test_auto_apply_that_still_lacks_a_selected_role_never_reports_cad_ready(tmp
     )
 
     snapshot = _wait_for(
-        lambda: value if (value := broker.status(session.session_id)).proposal is not None else None
+        lambda: value if (value := broker.status(session.session_id)).cad_ready is not None else None
     )
-    assert snapshot.state == "active"
-    assert snapshot.cad_ready is None
-    assert snapshot.proposal["remaining_roles"] == ["KiCad Footprint"]
-    assert "still needs KiCad Footprint" in snapshot.error
-    broker.stop(session.session_id)
+    assert snapshot.state == "ready"
+    assert snapshot.proposal is None
+    assert snapshot.cad_ready == {
+        "attached": ["kicad_symbol", "kicad_model"],
+        "edas": ["kicad"],
+        "landed_files": ["partial.zip"],
+        "part_complete": False,
+        "provider_id": "mouser",
+        "remaining_roles": ["KiCad Footprint"],
+    }
+    assert snapshot.error == "Downloaded files added. Still needed: KiCad Footprint."
+    assert proposal_calls == 1
+    _wait_for(lambda: surface.released == 1)
 
 
 def test_durable_apply_survives_a_followup_index_refresh_failure(monkeypatch):

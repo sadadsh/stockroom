@@ -438,13 +438,13 @@ surface steps instead of borders that imply additional controls.
 
 Provider browsing remains person-driven, but Stockroom owns the download outcome. Navigation and download
 progress must have bounded stall detection and an explicit recovery action; a spinner may never run forever.
-When a landed archive validates and maps unambiguously to every asset required by the selected EDA set plus
-the shared 3D model, Stockroom stages and attaches it to the exact part automatically and shows a durable
-`CAD Ready` result. A second Apply click would add no useful decision in that happy path.
+When a landed archive validates and maps unambiguously to the exact part, Stockroom stages and attaches every
+proven asset automatically, closes the provider browser as soon as processing finishes, and shows a durable
+`CAD Ready` or `CAD Files Added` result. A second Apply click would add no useful decision in that path.
 
-Ambiguous or partial archives keep the proposal and manual-mapping fallback. They state the exact roles still
-needed and never mark the part complete. Other providers remain available later, but they are optional after
-one complete validated package. Adding staged part assets to the machine's KiCad or Altium catalog remains a
+Ambiguous archives keep the proposal and manual-mapping fallback. Proven partial archives attach what landed,
+close the browser, and state the exact roles still needed without marking the part complete. Other providers
+remain available later. Adding part assets to the machine's KiCad or Altium catalog remains a
 separate, explicit Assets build so downloading a part never changes an EDA installation unexpectedly.
 
 ### One Inspector, Four Groups, And Explicit Apply
@@ -716,3 +716,20 @@ Close is always a recoverable Stockroom action. It dismisses the React modal imm
 while the native route is still preparing or when a stale identity-bound native close command is
 refused. The exact task remains active in the background, and Show Provider restores the same page
 without restarting the download workflow.
+
+### Provider Tabs Stay Person-Operated And Downloads Attach Automatically
+
+Manage CAD Assets is a small browser workspace. Every available provider is an ordinary tab, the
+person may switch tabs at any time, and Stockroom only opens the exact part or search page. Stockroom
+does not automate provider controls, force a provider order, or label tabs as complete.
+
+Every downloaded CAD file is captured into task-owned staging and inspected against the exact part
+identity. Any unambiguous attachment proven to belong to that part is applied immediately, even when
+other requested roles are still missing. The workspace reports which files were added and which roles
+remain; it never asks for a redundant Apply step. Ambiguous, mismatched, or identity-free files remain
+inactive for explicit review and can never mutate the catalog automatically.
+
+Stockroom and the provider remain separate ordinary WebView2 controls, profiles, leases, download journals,
+and staging boundaries. They are never visible at the same time: opening a provider selects its native browser
+tab and collapses Stockroom's WebView; the Stockroom tab or Escape reverses that state. This avoids WPF HwndHost
+airspace flashing and avoids the composition-control Direct3D startup failure on supported Windows machines.

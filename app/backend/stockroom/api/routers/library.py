@@ -2038,6 +2038,9 @@ def library_router(require_token) -> APIRouter:
         ctx = request.app.state.ctx
         surface = getattr(ctx, "provider_browser_surface", None)
         if not callable(surface):
+            runtime = getattr(ctx, "update_convergence", None)
+            surface = getattr(runtime, "provider_browser_surface", None)
+        if not callable(surface):
             raise ApiError(503, "The embedded provider browser is unavailable in this host.")
         broker = ManualProviderBrowserBroker(
             ctx,
