@@ -426,18 +426,6 @@ jobs:
           Set-StrictMode -Version Latest
           $ErrorActionPreference = "Stop"
 
-          if (-not [string]::IsNullOrWhiteSpace($env:STOCKROOM_SIGNING_CERT_THUMBPRINT)) {
-            $trustedPath = (
-              "Cert:\LocalMachine\TrustedPeople\$env:STOCKROOM_SIGNING_CERT_THUMBPRINT"
-            )
-            if (Test-Path -LiteralPath $trustedPath) {
-              Remove-Item -LiteralPath $trustedPath -Force
-            }
-            if (Test-Path -LiteralPath $trustedPath) {
-              throw "The pinned GitHub signing certificate remained trusted after cleanup."
-            }
-          }
-
           $paths = @(
             (Join-Path $env:RUNNER_TEMP "Stockroom.Release.pfx"),
             (Join-Path $env:RUNNER_TEMP "Stockroom.TUF.Targets.pem"),
@@ -700,6 +688,25 @@ jobs:
           )
           if (Compare-Object -ReferenceObject ($allowed | Sort-Object) -DifferenceObject $actual) {
             throw "Release staging contains a file outside the exact publication allowlist."
+          }
+
+      - name: Remove Ephemeral Verification Trust
+        if: ${{ always() }}
+        shell: pwsh
+        run: |
+          Set-StrictMode -Version Latest
+          $ErrorActionPreference = "Stop"
+
+          if (-not [string]::IsNullOrWhiteSpace($env:STOCKROOM_SIGNING_CERT_THUMBPRINT)) {
+            $trustedPath = (
+              "Cert:\LocalMachine\TrustedPeople\$env:STOCKROOM_SIGNING_CERT_THUMBPRINT"
+            )
+            if (Test-Path -LiteralPath $trustedPath) {
+              Remove-Item -LiteralPath $trustedPath -Force
+            }
+            if (Test-Path -LiteralPath $trustedPath) {
+              throw "The pinned GitHub signing certificate remained trusted after cleanup."
+            }
           }
 
       - name: Upload Verified Release Assets

@@ -158,6 +158,10 @@ def test_signing_secrets_are_step_scoped_and_always_destroyed() -> None:
     trust = named_step("build-windows-package", "Trust Pinned GitHub Signing Certificate")
     build = named_step("build-windows-package", "Build Canonical Production Package")
     cleanup = named_step("build-windows-package", "Destroy Ephemeral Signing Material")
+    trust_cleanup = named_step(
+        "build-windows-package", "Remove Ephemeral Verification Trust"
+    )
+    verify = named_step("build-windows-package", "Verify And Stage Exact Release Assets")
     build_steps = steps("build-windows-package")
 
     assert WORKFLOW_TEXT.count("${{ secrets.WINDOWS_CERT_BASE64 }}") == 1
@@ -180,13 +184,17 @@ def test_signing_secrets_are_step_scoped_and_always_destroyed() -> None:
     assert "STOCKROOM_SIGNING_CERT_THUMBPRINT" in trust["run"]
     assert "-SigningCertificateTrustedForVerification" in build["run"]
     assert cleanup["if"] == "${{ always() }}"
-    assert "STOCKROOM_SIGNING_CERT_THUMBPRINT" in cleanup["run"]
-    assert "Cert:\\LocalMachine\\TrustedPeople" in cleanup["run"]
     assert "[IO.FileAccess]::Write" in cleanup["run"]
     assert "$stream.Write($buffer, 0, $count)" in cleanup["run"]
     assert "Remove-Item -LiteralPath $path -Force" in cleanup["run"]
+    assert "Cert:\\LocalMachine\\TrustedPeople" not in cleanup["run"]
+    assert trust_cleanup["if"] == "${{ always() }}"
+    assert "STOCKROOM_SIGNING_CERT_THUMBPRINT" in trust_cleanup["run"]
+    assert "Cert:\\LocalMachine\\TrustedPeople" in trust_cleanup["run"]
     assert build_steps.index(trust) < build_steps.index(build) < build_steps.index(cleanup)
-    assert build_steps.index(cleanup) < build_steps.index(
+    assert build_steps.index(cleanup) < build_steps.index(verify)
+    assert build_steps.index(verify) < build_steps.index(trust_cleanup)
+    assert build_steps.index(trust_cleanup) < build_steps.index(
         named_step("build-windows-package", "Upload Verified Release Assets")
     )
 
