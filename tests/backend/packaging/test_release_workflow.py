@@ -150,7 +150,8 @@ def test_release_can_only_invoke_the_canonical_production_packager() -> None:
     assert "exit 0" not in WORKFLOW_TEXT.casefold()
     assert "dist/stockroom.exe" not in WORKFLOW_TEXT.casefold()
     assert "stockroom.exe.sha256" not in WORKFLOW_TEXT.casefold()
-    assert "Stockroom.exe" not in WORKFLOW_TEXT
+    assert "packaging/portable_release.py" in WORKFLOW_TEXT
+    assert "packaging/build_exe.ps1" not in WORKFLOW_TEXT
 
 
 def test_signing_secrets_are_step_scoped_and_always_destroyed() -> None:
@@ -237,14 +238,15 @@ def test_only_the_exact_verified_release_asset_set_can_be_published() -> None:
     assert upload["with"]["path"] == "${{ runner.temp }}\\Stockroom.Release.Publish"
     assert upload["with"]["if-no-files-found"] == "error"
     assert "Copy-Item -LiteralPath $packagePath -Destination $publishRoot" in verify
+    assert "Copy-Item -LiteralPath $portablePath -Destination $publishRoot" in verify
     assert "Copy-Item -LiteralPath $appInstallerPath -Destination $publishRoot" in verify
     assert "Copy-Item -LiteralPath $evidencePath -Destination $publishRoot" in verify
     assert "Copy-Item -LiteralPath $feedPath -Destination $publishRoot" in verify
     assert "Copy-Item -LiteralPath $feedEvidencePath -Destination $publishRoot" in verify
     assert "Stockroom_TUF_Feed_$($env:STOCKROOM_PACKAGE_VERSION).zip" in publish
-    assert "Copy-Item" not in "\n".join(
-        line for line in verify.splitlines() if "Stockroom.exe" in line
-    )
+    assert "--native-host-probe" in verify
+    assert '$portableLaunch.schema -cne "stockroom-native-host-launch/1"' in verify
+    assert "release-assets/$portableName" in publish
     assert "Release staging contains a file outside the exact publication allowlist." in verify
     assert "gh release upload $env:STOCKROOM_RELEASE_TAG @assets" in publish
     assert "--clobber" not in publish
@@ -265,6 +267,7 @@ def test_main_release_atomically_deploys_the_verified_update_feed() -> None:
     assert "Copy-Item -Recurse -Force store-site/* pages-root" in stage
     assert "Stockroom GitHub Signing.cer" in stage
     assert "pages-root/downloads/Stockroom-GitHub-Signing.cer" in stage
+    assert "pages-root/downloads/Stockroom-Windows-Portable.zip" in stage
     assert "packaging/deploy_release_feed.py" in stage
     assert "--previous-feed" in stage
     assert "pages-root/windows/x64" in stage

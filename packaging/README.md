@@ -1,17 +1,18 @@
 # Stockroom Windows Packaging
 
-Stockroom's rapid Windows delivery is a signed x64 MSIX from
-`https://sadadsh.github.io/stockroom/`. The person trusts the pinned public
-certificate once and opens `Stockroom.appinstaller`; later successful `main`
-pushes update through the verified feed without another download. Windows launches
-`WindowHost\Stockroom.WindowHost.exe`, the self-contained .NET 10 WPF host. The
+Stockroom's rapid Windows delivery provides a portable native EXE archive and a
+signed x64 MSIX from `https://sadadsh.github.io/stockroom/`. The portable path needs
+only extraction and `Stockroom.exe`; App Installer remains optional. Later successful
+`main` pushes update either channel through the verified feed without another
+download. Windows launches the self-contained .NET 10 WPF host. The
 host starts one immutable PyInstaller onedir backend from the package's verified
 release set. Microsoft Store remains an optional, separately signed channel.
 
 Normal startup does not clone application source, run `uv`, execute a source
 Python environment, install WebView2, or provision provider browsers. The Python
-worker has no interactive entry point. `packaging\build_exe.ps1` fails closed
-because the former standalone bootstrap is no longer a supported product.
+worker has no interactive entry point. `packaging\portable_release.py` derives the
+portable archive from the exact signed package. The former source-cloning
+`packaging\build_exe.ps1` bootstrap remains retired.
 
 The Store package contains:
 
@@ -157,6 +158,7 @@ installation trust step; the private key exists only as an environment secret.
 The runner decodes signing material under its temporary directory, overwrites and
 removes each secret file before upload, and publishes only:
 
+- the portable native EXE archive;
 - the signed MSIX;
 - `Stockroom.appinstaller`;
 - the TUF feed archive;
