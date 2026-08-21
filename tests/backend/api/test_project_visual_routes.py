@@ -220,7 +220,22 @@ def test_overlapping_visual_refreshes_share_one_native_render(
     record = _register(client, root)
     started = threading.Event()
     release = threading.Event()
+    second_entered = threading.Event()
+    continue_second = threading.Event()
     calls: list[str] = []
+    project_ops = client.app.state.ctx.project_ops
+    original_get = project_ops.get
+    get_count = 0
+
+    def tracked_get(project_id):
+        nonlocal get_count
+        get_count += 1
+        if get_count == 2:
+            second_entered.set()
+            assert continue_second.wait(5), "test did not continue the second refresh"
+        return original_get(project_id)
+
+    monkeypatch.setattr(project_ops, "get", tracked_get)
 
     class Adapter:
         def render(self, project):
@@ -241,9 +256,11 @@ def test_overlapping_visual_refreshes_share_one_native_render(
         first = pool.submit(client.get, url)
         assert started.wait(5), "first native render did not start"
         second = pool.submit(client.get, url)
-        time.sleep(0.05)
+        assert second_entered.wait(5), "second refresh did not overlap the native render"
         release.set()
-        responses = [first.result(timeout=5), second.result(timeout=5)]
+        first_response = first.result(timeout=5)
+        continue_second.set()
+        responses = [first_response, second.result(timeout=5)]
 
     assert [response.status_code for response in responses] == [200, 200]
     assert calls == [record["id"]]

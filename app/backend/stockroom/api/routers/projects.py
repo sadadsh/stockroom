@@ -194,11 +194,11 @@ def projects_router(require_token) -> APIRouter:
         return rec.eda or "kicad", tuple(rows)
 
     def project_visual_bundle(ctx, project_id: str, *, refresh: bool = False):
+        observed_generation = visual_generations.get(project_id, 0)
         rec = ctx.project_ops.get(project_id)
         if rec is None:
             raise FileNotFoundError(f"no such project: {project_id}")
         source_key = visual_source_key(rec)
-        observed_generation = visual_generations.get(project_id, 0)
         with visual_lock(project_id):
             cached = visual_cache.get(project_id)
             if not refresh and cached is not None and cached[0] == source_key:
