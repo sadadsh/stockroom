@@ -278,6 +278,29 @@ class ImmutableReleaseStore:
             selection_reason=pointer.selection_reason,
         )
 
+    def recover_packaged(
+        self,
+        packaged: AcceptedRelease,
+        *,
+        control: ServiceControl,
+        fence: GenerationFence,
+    ) -> ActiveReleaseState:
+        """Replace an unreadable active release only when the package supports it."""
+
+        _require_active_fence(control, fence)
+        pointer = self._latest_pointer(control)
+        if pointer.current.release_id not in packaged.manifest.compatible_from_release_ids:
+            raise AcceptedReleaseCorruption(
+                "packaged release is not compatible with the unreadable active release"
+            )
+        return self.select_active(
+            packaged,
+            previous=None,
+            selection_reason="initialize",
+            control=control,
+            fence=fence,
+        )
+
     def _verify_verified_release(
         self, release: VerifiedReleaseSet
     ) -> AcceptedRelease:

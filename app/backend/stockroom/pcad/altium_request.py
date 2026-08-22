@@ -153,11 +153,16 @@ def _symbol_graphics(graphics: tuple[Graphic, ...]) -> dict[str, list[dict[str, 
                     "y2mm": _mm(end.y_nm),
                     "widthMm": _mm(graphic.width_nm),
                     "color": 0xFF0000,
+                    "ownerPartId": 1,
                 }
             )
         elif graphic.kind == "polygon":
             result["polylines"].append(
-                {"points": [_point(item) for item in graphic.points], "lineWidth": 0}
+                {
+                    "points": [_point(item) for item in graphic.points],
+                    "lineWidth": 0,
+                    "ownerPartId": 1,
+                }
             )
         elif graphic.kind == "arc":
             if graphic.radius_nm <= 0:
@@ -172,6 +177,7 @@ def _symbol_graphics(graphics: tuple[Graphic, ...]) -> dict[str, list[dict[str, 
                     "startAngle": start,
                     "endAngle": 360 if abs(sweep) >= 360 else (start + sweep) % 360,
                     "lineWidth": 0,
+                    "ownerPartId": 1,
                 }
             )
         elif graphic.kind == "text":
@@ -180,6 +186,7 @@ def _symbol_graphics(graphics: tuple[Graphic, ...]) -> dict[str, list[dict[str, 
                     "text": graphic.text or "",
                     "xmm": _mm(graphic.points[0].x_nm),
                     "ymm": _mm(graphic.points[0].y_nm),
+                    "ownerPartId": 1,
                 }
             )
         else:
@@ -385,6 +392,7 @@ def build_altium_writer_request(
         "name": library.mpn,
         "description": f"{library.manufacturer} {library.mpn}",
         "designatorPrefix": library.reference_prefix,
+        "partCount": 1,
         "pins": [
             {
                 "designator": item.number,
@@ -396,6 +404,7 @@ def build_altium_writer_request(
                 "electricalType": _electrical_type(item.electrical_type),
                 "showName": item.show_name,
                 "showDesignator": item.show_number,
+                "ownerPartId": 1,
             }
             for item in library.symbol.pins
         ],

@@ -639,6 +639,71 @@ def test_exact_native_altium_symbol_can_supply_its_own_identity_binding(
     assert discard_manual_cad_proposal(record.id, proposal["proposal_token"]) is True
 
 
+def test_exact_native_source_mpn_binds_sanitized_symbol_and_referenced_footprint(
+    tmp_path: Path, monkeypatch
+) -> None:
+    selected = tmp_path / "selected.zip"
+    selected.write_bytes(b"selected")
+    symbol = tmp_path / "USB2512B-I_M2.SchLib"
+    footprint = tmp_path / "TQFN.PcbLib"
+    symbol.write_bytes(b"symbol")
+    footprint.write_bytes(b"footprint")
+    record = PartRecord(
+        id="part-1",
+        display_name="USB hub",
+        category="ICs",
+        mpn="USB2512B-I/M2",
+        manufacturer="Microchip Technology",
+    )
+    record.assets_for("kicad").model = AssetRef(file="models/existing.step")
+
+    class Pipeline:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def inspect(self, *, inputs):
+            return []
+
+    monkeypatch.setattr("stockroom.ingest.manual_files.IngestPipeline", Pipeline)
+    monkeypatch.setattr(
+        "stockroom.ingest.manual_files._discover_native_altium",
+        lambda *_args: [symbol, footprint],
+    )
+    monkeypatch.setattr(
+        "stockroom.ingest.manual_files.read_altium_symbol",
+        lambda *_args, **_kwargs: SimpleNamespace(
+            mpn=record.mpn,
+            footprint_entries=("TQFN",),
+        ),
+    )
+    monkeypatch.setattr(
+        "stockroom.ingest.manual_files.read_footprint_names",
+        lambda _path: ["TQFN"],
+    )
+    ctx = SimpleNamespace(
+        ops=SimpleNamespace(load_record=lambda _part_id: record),
+        profile=object(),
+        repo=object(),
+        cli=object(),
+    )
+
+    proposal = propose_manual_cad_files(ctx, record.id, (selected,), edas=("altium",))
+
+    assert [item["role"] for item in proposal["attachments"]] == [
+        "Altium Symbol",
+        "Altium Footprint",
+    ]
+    assert proposal["remaining_roles"] == []
+    assert proposal["review_required_reason"] == ""
+    assert proposal["automatic_apply_ready"] is True
+
+
 def test_two_exact_native_libraries_with_the_same_name_remain_ambiguous(
     tmp_path: Path, monkeypatch
 ) -> None:

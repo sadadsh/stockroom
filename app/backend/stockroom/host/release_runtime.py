@@ -57,6 +57,7 @@ from stockroom.service import (
 )
 from stockroom.update import (
     AcceptedRelease,
+    AcceptedReleaseCorruption,
     ActiveReleaseState,
     ImmutableReleaseStore,
     ReleaseActivationPhase,
@@ -410,6 +411,31 @@ def _prefer_newer_packaged_release(
         control=control,
         fence=fence,
     )
+
+
+def _verify_or_initialize_packaged_release(
+    store: ImmutableReleaseStore,
+    packaged: AcceptedRelease,
+    *,
+    control: ServiceControl,
+    fence: GenerationFence,
+) -> ActiveReleaseState:
+    try:
+        return store.verify_startup(control)
+    except ReleaseStoreUninitialized:
+        return store.select_active(
+            packaged,
+            previous=None,
+            selection_reason="initialize",
+            control=control,
+            fence=fence,
+        )
+    except (AcceptedReleaseCorruption, OSError):
+        return store.recover_packaged(
+            packaged,
+            control=control,
+            fence=fence,
+        )
 
 
 class HostReleaseBoundary:
@@ -2306,24 +2332,19 @@ def create_production_update_runtime(
             control=update_control,
             fence=update_fence,
         )
-        try:
-            active = store.verify_startup(update_control)
-        except ReleaseStoreUninitialized:
-            active = store.select_active(
-                accepted_packaged,
-                previous=None,
-                selection_reason="initialize",
-                control=update_control,
-                fence=update_fence,
-            )
-        else:
-            active = _prefer_newer_packaged_release(
-                store,
-                active,
-                accepted_packaged,
-                control=update_control,
-                fence=update_fence,
-            )
+        active = _verify_or_initialize_packaged_release(
+            store,
+            accepted_packaged,
+            control=update_control,
+            fence=update_fence,
+        )
+        active = _prefer_newer_packaged_release(
+            store,
+            active,
+            accepted_packaged,
+            control=update_control,
+            fence=update_fence,
+        )
 
         service_authority = ContextServiceAuthority(
             context,
@@ -2539,28 +2560,23 @@ def create_store_update_runtime(
             control=update_control,
             fence=update_fence,
         )
-        try:
-            prior = store.verify_startup(update_control)
-        except ReleaseStoreUninitialized:
-            active = store.select_active(
+        prior = _verify_or_initialize_packaged_release(
+            store,
+            accepted_packaged,
+            control=update_control,
+            fence=update_fence,
+        )
+        active = (
+            prior
+            if prior.current.release_id == release_id
+            else store.select_active(
                 accepted_packaged,
-                previous=None,
-                selection_reason="initialize",
+                previous=prior.current,
+                selection_reason="activate",
                 control=update_control,
                 fence=update_fence,
             )
-        else:
-            active = (
-                prior
-                if prior.current.release_id == release_id
-                else store.select_active(
-                    accepted_packaged,
-                    previous=prior.current,
-                    selection_reason="activate",
-                    control=update_control,
-                    fence=update_fence,
-                )
-            )
+        )
 
         service_authority = ContextServiceAuthority(
             context,

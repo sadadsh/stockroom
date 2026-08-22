@@ -110,12 +110,21 @@ class StagingCandidate:
         )
 
 
-def _symbol_metadata(sym_lib: SymbolLib, name: str) -> tuple[str, list[str]]:
+def _symbol_metadata(sym_lib: SymbolLib, name: str) -> tuple[str, list[str], str]:
     sym = sym_lib.get_symbol(name)
     description = sym.get_property("Description") or ""
     keywords = sym.get_property("ki_keywords") or ""
     tags = [t for t in keywords.split() if t]
-    return description, tags
+    mpns = [
+        value.strip()
+        for value in (
+            sym.get_property("MPN"),
+            sym.get_property("Manufacturer Part Number"),
+        )
+        if value and value.strip()
+    ]
+    mpn = mpns[0] if mpns and len({value.casefold() for value in mpns}) == 1 else ""
+    return description, tags, mpn
 
 
 def _preferred_footprint_index(
@@ -184,7 +193,7 @@ def build_candidates(
 
     candidates: list[StagingCandidate] = []
     for name in names:
-        description, tags = _symbol_metadata(sym_lib, name)
+        description, tags, mpn = _symbol_metadata(sym_lib, name)
         gaps: list[str] = []
         if not variants:
             gaps.append("no footprint in this package")
@@ -204,6 +213,7 @@ def build_candidates(
                 display_name=propose_display_name(name),
                 entry_name=propose_entry_name(name),
                 category=propose_category(f"{name} {description} {' '.join(tags)}"),
+                mpn=mpn,
                 description=description,
                 tags=tags,
                 gaps=gaps,

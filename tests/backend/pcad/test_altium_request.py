@@ -16,6 +16,13 @@ def test_request_preserves_identity_variants_pins_and_semantic_layers(tmp_path: 
     assert request["mpn"] == "EXACT-LONG-MPN"
     assert request["outputStem"] == "exact-long-mpn-5c56"
     assert request["symbol"]["name"] == "EXACT-LONG-MPN"
+    assert request["symbol"]["partCount"] == 1
+    assert all(pin["ownerPartId"] == 1 for pin in request["symbol"]["pins"])
+    for primitive_kind in ("lines", "rectangles", "polylines", "arcs", "ellipses", "labels"):
+        assert all(
+            primitive["ownerPartId"] == 1
+            for primitive in request["symbol"][primitive_kind]
+        )
     assert request["defaultFootprint"] == "DEFAULT"
     assert request["padPinMap"] == [{"pad": "1", "pin": "1"}]
     assert request["symbol"]["pins"][0]["orientation"] == "left"

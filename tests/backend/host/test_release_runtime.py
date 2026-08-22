@@ -45,6 +45,7 @@ from stockroom.service import (
 )
 from stockroom.update import (
     AcceptedRelease,
+    AcceptedReleaseCorruption,
     ImmutableReleaseStore,
     ReleaseActivationFailed,
     ReleaseActivationRole,
@@ -1613,6 +1614,89 @@ def test_frozen_v1_host_accepts_v2_candidate_supported_by_v1_broker(
 def test_numeric_host_versions_pad_missing_windows_components() -> None:
     assert _numeric_version("0.1.0") == _numeric_version("0.1.0.0")
     assert _numeric_version("1.2") < _numeric_version("1.2.0.1")
+
+
+@pytest.mark.parametrize(
+    ("previous_release_id", "previous_version", "should_recover"),
+    [
+        ("release-1.0.0.53", "1.0.0.53", True),
+        ("release-1.0.0.70", "1.0.0.70", False),
+    ],
+)
+def test_packaged_release_recovers_only_a_compatible_unreadable_release(
+    tmp_path: Path,
+    monkeypatch,
+    previous_release_id: str,
+    previous_version: str,
+    should_recover: bool,
+) -> None:
+    import stockroom.host.release_runtime as release_runtime
+    import stockroom.update.immutable_store as immutable_store
+
+    releases = tmp_path / "Releases"
+    previous = _release(
+        releases,
+        previous_release_id,
+        rollback_release_id="release-bootstrap",
+        mode="ok",
+        package_version=previous_version,
+    )
+    packaged = _release(
+        releases,
+        "release-1.0.0.60",
+        rollback_release_id="release-1.0.0.53",
+        compatible_from_release_ids=("release-1.0.0.53",),
+        mode="ok",
+        package_version="1.0.0.60",
+    )
+    control, fence = _control(tmp_path / "Control")
+    store = ImmutableReleaseStore(
+        releases_directory=releases,
+        state_directory=tmp_path / "State",
+    )
+    try:
+        accepted_previous = store.accept_verified(previous, control=control, fence=fence)
+        store.select_active(
+            accepted_previous,
+            previous=None,
+            selection_reason="initialize",
+            control=control,
+            fence=fence,
+        )
+        accepted_packaged = store.accept_verified(
+            packaged,
+            control=control,
+            fence=fence,
+        )
+        verify = immutable_store._verify_release_directory
+
+        def deny_previous(directory: Path, **kwargs):
+            if directory.name == previous.release_id:
+                raise PermissionError(5, "Access is denied", directory / "Release Manifest.json")
+            return verify(directory, **kwargs)
+
+        monkeypatch.setattr(immutable_store, "_verify_release_directory", deny_previous)
+
+        if should_recover:
+            recovered = release_runtime._verify_or_initialize_packaged_release(
+                store,
+                accepted_packaged,
+                control=control,
+                fence=fence,
+            )
+            assert recovered.current.release_id == packaged.release_id
+            assert recovered.previous is None
+        else:
+            with pytest.raises(AcceptedReleaseCorruption, match="compatible"):
+                release_runtime._verify_or_initialize_packaged_release(
+                    store,
+                    accepted_packaged,
+                    control=control,
+                    fence=fence,
+                )
+    finally:
+        control.release(fence)
+        control.close()
 
 
 def test_newer_packaged_release_supersedes_stale_pointer_but_not_newer_download(

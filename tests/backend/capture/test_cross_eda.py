@@ -4,6 +4,7 @@ import shutil
 import struct
 from pathlib import Path
 
+import olefile
 import pytest
 
 from stockroom.capture.cross_eda import (
@@ -100,6 +101,23 @@ def test_native_altium_readback_observes_identity_pins_and_pad_geometry() -> Non
     ]
     assert all(round(pad.width_mm, 2) == 2.33 for pad in footprint.pads)
     assert all(round(pad.height_mm, 2) == 1.56 for pad in footprint.pads)
+
+
+def test_native_altium_readback_separates_exact_source_mpn_from_sanitized_entry() -> None:
+    path = ALTIUM_FIXTURES / "sample.SchLib"
+    with olefile.OleFileIO(str(path)) as container:
+        raw = container.openstream(["S1M", "Data"]).read()
+    raw = raw.replace(b"S1M", b"S/1")
+
+    symbol = _read_altium_symbol_stream(
+        raw,
+        "S_1",
+        source_identity="S/1",
+    )
+
+    assert symbol.entry == "S_1"
+    assert symbol.mpn == "S/1"
+    assert symbol.footprint_entries == ("DIOM5227X270N",)
 
 
 def test_kicad_readback_ignores_unnumbered_paste_apertures(tmp_path: Path) -> None:

@@ -27,6 +27,7 @@ from stockroom.altium.ul_import import (
     UltraLibrarianImportError,
     convert_ul_altium_package,
 )
+from stockroom.capture.cross_eda import read_altium_symbol
 from stockroom.capture.requirements import Requirement, capture_needs
 from stockroom.ingest.errors import IngestError
 from stockroom.ingest.naming import propose_entry_name
@@ -259,26 +260,56 @@ def _file_digest(path: Path) -> str:
     return digest.hexdigest()
 
 
-def _native_altium_exact_mpn(path: Path, expected_mpn: str) -> bool:
-    """Prove one native library's authoritative entry name preserves the exact target MPN."""
-
+def _native_altium_identity_bindings(
+    paths: list[Path],
+    expected_mpn: str,
+) -> set[Path]:
+    """Native files bound by an exact source MPN and its referenced footprint."""
     requested = _exact_mpn_key(expected_mpn)
     if not requested:
-        return False
-    try:
-        suffix = path.suffix.casefold()
-        if suffix == ".schlib":
-            names = read_symbol_names(path)
-        elif suffix == ".pcblib":
-            names = read_footprint_names(path)
-        else:
-            return False
-    except Exception:  # noqa: BLE001 - unreadable identity remains review-only
-        return False
-    return any(
-        _exact_mpn_key(name.replace("&plus_", "+")) == requested
-        for name in names
-    )
+        return set()
+    bound: set[Path] = set()
+    referenced_footprints: set[str] = set()
+    for path in paths:
+        if path.suffix.casefold() != ".schlib":
+            continue
+        try:
+            symbol = read_altium_symbol(
+                path,
+                expected_mpn,
+                source_identity=expected_mpn,
+            )
+            if _exact_mpn_key(symbol.mpn) == requested:
+                bound.add(path)
+                referenced_footprints.update(
+                    _exact_mpn_key(name.replace("&plus_", "+"))
+                    for name in symbol.footprint_entries
+                )
+                continue
+        except Exception:  # noqa: BLE001 - unreadable identity remains review-only
+            pass
+        try:
+            if any(
+                _exact_mpn_key(name.replace("&plus_", "+")) == requested
+                for name in read_symbol_names(path)
+            ):
+                bound.add(path)
+        except Exception:  # noqa: BLE001 - unreadable identity remains review-only
+            pass
+
+    for path in paths:
+        if path.suffix.casefold() not in {".pcblib", ".intlib"}:
+            continue
+        try:
+            names = {
+                _exact_mpn_key(name.replace("&plus_", "+"))
+                for name in read_footprint_names(path)
+            }
+        except Exception:  # noqa: BLE001 - unreadable identity remains review-only
+            continue
+        if requested in names or names & referenced_footprints:
+            bound.add(path)
+    return bound
 
 
 def _proposal_target(requirement: Requirement) -> tuple[str, str]:
@@ -410,6 +441,7 @@ def _manual_attachment_preview(
         except Exception as exc:  # noqa: BLE001 - other proposal roles remain useful
             native = []
             ignored.append(f"native Altium discovery skipped: {exc}")
+        identity_bound_native = _native_altium_identity_bindings(native, record.mpn)
         unbound_native: list[str] = []
         for path in native:
             suffix = path.suffix.casefold()
@@ -419,7 +451,7 @@ def _manual_attachment_preview(
                 contributed = add(Requirement.ALTIUM_FOOTPRINT, path)
             else:
                 contributed = False
-            if contributed and not _native_altium_exact_mpn(path, record.mpn):
+            if contributed and path not in identity_bound_native:
                 unbound_native.append(path.name)
         if unbound_native:
             names = ", ".join(sorted(set(unbound_native), key=str.casefold))

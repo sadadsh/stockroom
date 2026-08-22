@@ -117,6 +117,34 @@ def test_build_candidates_from_snapeda(tmp_path, fixtures_dir):
 
 
 @requires_kicad_cli
+def test_build_candidates_preserves_exact_mpn_property_before_sanitizing_entries(
+    tmp_path, fixtures_dir
+):
+    sym = tmp_path / "USB2512B-I_M2.kicad_sym"
+    source = (fixtures_dir / "one_symbol.kicad_sym").read_text(encoding="utf-8")
+    source = source.replace("TESTPART", "USB2512B-I_M2").replace(
+        '\t\t(property "Footprint"',
+        '\t\t(property "MPN" "USB2512B-I/M2" (at 0 0 0))\n'
+        '\t\t(property "Footprint"',
+    )
+    sym.write_text(source, encoding="utf-8")
+    fp = tmp_path / "USB2512B-I_M2.kicad_mod"
+    shutil.copyfile(fixtures_dir / "one_footprint.kicad_mod", fp)
+    model = tmp_path / "USB2512B-I_M2.step"
+    model.write_bytes(b"ISO-10303-21;\n")
+
+    [candidate] = build_candidates(
+        _cli(),
+        DetectedSource("snapeda", sym, None, [fp], model, None),
+        tmp_path / "work",
+    )
+
+    assert candidate.mpn == "USB2512B-I/M2"
+    assert candidate.symbol_name == "USB2512B-I_M2"
+    assert candidate.entry_name == "USB2512B-I_M2"
+
+
+@requires_kicad_cli
 def test_build_candidates_flags_missing_model(tmp_path, fixtures_dir):
     sym = tmp_path / "MyPart.kicad_sym"
     fp = tmp_path / "MyPart.kicad_mod"

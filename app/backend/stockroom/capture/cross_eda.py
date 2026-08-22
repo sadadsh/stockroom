@@ -83,6 +83,7 @@ class _SymbolReadback:
     mpn: str
     pins: tuple[_Pin, ...]
     mpn_from_entry: bool = False
+    footprint_entries: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -275,7 +276,12 @@ def _pascal_string(payload: bytes, offset: int, label: str) -> tuple[str, int]:
     return raw.decode("latin-1"), end
 
 
-def _read_altium_symbol_stream(raw: bytes, entry: str) -> _SymbolReadback:
+def _read_altium_symbol_stream(
+    raw: bytes,
+    entry: str,
+    *,
+    source_identity: str = "",
+) -> _SymbolReadback:
     records: list[dict[str, str]] = []
     pins: list[_Pin] = []
     offset = 0
@@ -306,9 +312,10 @@ def _read_altium_symbol_stream(raw: bytes, entry: str) -> _SymbolReadback:
     if component.get("RECORD") != "1":
         raise CrossEdaVerificationError("Altium SchLib has no component header")
     library_reference = component.get("LIBREFERENCE", "")
-    if library_reference != entry:
+    expected_identity = source_identity or entry
+    if library_reference != expected_identity:
         raise CrossEdaVerificationError(
-            f"Altium component stream is {library_reference!r}, not {entry!r}"
+            f"Altium component stream is {library_reference!r}, not {expected_identity!r}"
         )
     try:
         declared_count = int(component.get("ALLPINCOUNT", ""))
@@ -325,6 +332,15 @@ def _read_altium_symbol_stream(raw: bytes, entry: str) -> _SymbolReadback:
         for record in records
         if record.get("RECORD") == "41" and record.get("NAME")
     }
+    footprint_entries = tuple(
+        dict.fromkeys(
+            record.get("MODELNAME", "")
+            for record in records
+            if record.get("RECORD") == "45"
+            and record.get("MODELTYPE", "").casefold() == "pcblib"
+            and record.get("MODELNAME", "")
+        )
+    )
     mpn = _field(properties, _MPN_FIELDS)
     return _SymbolReadback(
         entry=entry,
@@ -332,10 +348,16 @@ def _read_altium_symbol_stream(raw: bytes, entry: str) -> _SymbolReadback:
         mpn=mpn or (entry if _mpn_key(entry) else ""),
         pins=observed_pins,
         mpn_from_entry=not bool(mpn),
+        footprint_entries=footprint_entries,
     )
 
 
-def read_altium_symbol(path: Path, preferred_entry: str) -> _SymbolReadback:
+def read_altium_symbol(
+    path: Path,
+    preferred_entry: str,
+    *,
+    source_identity: str = "",
+) -> _SymbolReadback:
     entry = pick_entry(read_symbol_names(path), "Altium symbol", preferred_entry)
     with olefile.OleFileIO(str(path)) as container:
         stream = [entry, "Data"]
@@ -343,7 +365,11 @@ def read_altium_symbol(path: Path, preferred_entry: str) -> _SymbolReadback:
             raise CrossEdaVerificationError(
                 f"Altium SchLib entry {entry!r} has no component Data stream"
             )
-        return _read_altium_symbol_stream(container.openstream(stream).read(), entry)
+        return _read_altium_symbol_stream(
+            container.openstream(stream).read(),
+            entry,
+            source_identity=source_identity,
+        )
 
 
 def _read_altium_pad_stream(raw: bytes, entry: str) -> tuple[_PadGeometry, ...]:
