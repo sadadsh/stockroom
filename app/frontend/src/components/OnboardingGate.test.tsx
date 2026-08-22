@@ -145,6 +145,9 @@ describe("OnboardingGate", () => {
       "noreferrer",
     );
     await waitFor(() => expect(mockApi.startOnboardingGitHubLogin).toHaveBeenCalledOnce());
+    expect(mockApi.startOnboardingGitHubLogin.mock.invocationCallOrder[0]).toBeLessThan(
+      open.mock.invocationCallOrder[0],
+    );
     expect(mockApi.openJobStream).toHaveBeenCalledWith("login-1");
   });
 

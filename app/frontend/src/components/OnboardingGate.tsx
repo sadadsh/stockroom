@@ -254,8 +254,9 @@ function CatalogRepository({ status }: { status: OnboardingStatus }) {
   async function signIn() {
     setError("");
     try {
+      const terminalPromise = login.start();
       openExternalUrl("https://github.com/login/device");
-      const terminal = await login.start();
+      const terminal = await terminalPromise;
       if (terminal.status === "error") setError(terminal.error ?? failed);
     } catch (cause) {
       setError(errorText(cause, failed));
@@ -312,7 +313,7 @@ function CatalogRepository({ status }: { status: OnboardingStatus }) {
         <div className="mt-5 flex justify-end">
           <Button variant="accent" disabled={login.status === "running" || !github.available} onClick={signIn}>
             {login.status === "running" ? (
-              <Text id="onboarding.catalog.signing-in">Finish In GitHub...</Text>
+              <Text id="onboarding.catalog.signing-in">Paste The Copied Code In GitHub...</Text>
             ) : (
               <Text id="onboarding.catalog.sign-in">Sign In With GitHub</Text>
             )}
