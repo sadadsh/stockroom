@@ -234,6 +234,7 @@ def read_kicad_footprint(path: Path, step_model: Path) -> _FootprintReadback:
             height_mm=pad.size[1],
         )
         for pad in footprint.pads
+        if any(layer.endswith(".Cu") or layer == "*.Cu" for layer in pad.layers)
     )
     _validate_pads(pads, "KiCad")
     model_path = footprint.model_path

@@ -121,7 +121,6 @@ internal static partial class ConversionValidation
         RequireText(footprint.Name, "footprint.name", 255);
         RequireText(footprint.Description, "footprint.description", 1024);
         Require(footprint.Pads.Count > 0, $"footprint {footprint.Name} requires at least one pad");
-        RequireUnique(footprint.Pads.Select(item => item.Designator), $"{footprint.Name} pad designators");
         foreach (var pad in footprint.Pads)
         {
             RequireText(pad.Designator, "pad designator", 64);

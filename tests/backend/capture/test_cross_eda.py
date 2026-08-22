@@ -18,6 +18,7 @@ from stockroom.capture.cross_eda import (
     _verify_identity,
     read_altium_footprint,
     read_altium_symbol,
+    read_kicad_footprint,
     read_kicad_symbol,
     verify_cross_eda_component,
     verify_kicad_component,
@@ -99,6 +100,22 @@ def test_native_altium_readback_observes_identity_pins_and_pad_geometry() -> Non
     ]
     assert all(round(pad.width_mm, 2) == 2.33 for pad in footprint.pads)
     assert all(round(pad.height_mm, 2) == 1.56 for pad in footprint.pads)
+
+
+def test_kicad_readback_ignores_unnumbered_paste_apertures(tmp_path: Path) -> None:
+    _symbol, footprint = _write_kicad_pair(tmp_path)
+    footprint.write_text(
+        footprint.read_text(encoding="utf-8").replace(
+            '  (pad "2" smd rect',
+            '  (pad "" smd rect (at 0 0) (size 1 1) (layers "F.Paste"))\n'
+            '  (pad "2" smd rect',
+        ),
+        encoding="utf-8",
+    )
+
+    observed = read_kicad_footprint(footprint, _system_step())
+
+    assert [pad.number for pad in observed.pads] == ["1", "2"]
 
 
 def test_native_altium_readback_accepts_an_unnamed_numbered_pin() -> None:

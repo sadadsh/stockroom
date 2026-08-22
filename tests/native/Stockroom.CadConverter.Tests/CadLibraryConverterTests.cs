@@ -108,7 +108,7 @@ public sealed class CadLibraryConverterTests
     }
 
     [Fact]
-    public async Task InvalidPadIdentityFailsBeforeWritingAnyOutput()
+    public async Task RepeatedPadDesignatorsWriteReadableNativePads()
     {
         using var scope = new TestScope();
         var request = scope.Request();
@@ -124,11 +124,13 @@ public sealed class CadLibraryConverterTests
             ],
         };
 
-        var error = await Assert.ThrowsAsync<CadConverterException>(
-            () => CadLibraryConverter.ConvertAsync(request));
+        var result = await CadLibraryConverter.ConvertAsync(request);
 
-        Assert.Contains("pad designators", error.Message, StringComparison.OrdinalIgnoreCase);
-        Assert.False(Directory.Exists(request.OutputDirectory));
+        var pcblib = await new PcbLibReader().ReadAsync(result.Pcblib!.Path);
+        var footprint = Assert.IsType<PcbComponent>(pcblib[request.DefaultFootprint]);
+        var repeated = footprint.Pads.Where(pad => pad.Designator == "1").ToArray();
+        Assert.Equal(2, repeated.Length);
+        Assert.Equal(2, repeated.Select(pad => pad.Location.X).Distinct().Count());
     }
 
     [Fact]
