@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import shutil
+import struct
 from pathlib import Path
 
 import pytest
@@ -10,6 +11,7 @@ from stockroom.capture.cross_eda import (
     _geometry_tolerance_ratio,
     _PadGeometry,
     _Pin,
+    _read_altium_symbol_stream,
     _SymbolReadback,
     _terminal_map,
     _verify_geometry,
@@ -97,6 +99,21 @@ def test_native_altium_readback_observes_identity_pins_and_pad_geometry() -> Non
     ]
     assert all(round(pad.width_mm, 2) == 2.33 for pad in footprint.pads)
     assert all(round(pad.height_mm, 2) == 1.56 for pad in footprint.pads)
+
+
+def test_native_altium_readback_accepts_an_unnamed_numbered_pin() -> None:
+    header = b"|RECORD=1|LIBREFERENCE=TEST|ALLPINCOUNT=1|"
+    pin = b"\0" * 26 + b"\0" + b"\x011"
+    stream = (
+        struct.pack("<I", len(header))
+        + header
+        + struct.pack("<I", (1 << 24) | len(pin))
+        + pin
+    )
+
+    symbol = _read_altium_symbol_stream(stream, "TEST")
+
+    assert [(item.number, item.name) for item in symbol.pins] == [("1", "")]
 
 
 def test_metadata_light_altium_identity_requires_exact_external_attestation() -> None:

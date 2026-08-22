@@ -266,7 +266,7 @@ def _pascal_string(payload: bytes, offset: int, label: str) -> tuple[str, int]:
         raise CrossEdaVerificationError(f"Altium {label} is truncated")
     length = payload[offset]
     end = offset + 1 + length
-    if not length or end > len(payload):
+    if end > len(payload):
         raise CrossEdaVerificationError(f"Altium {label} length is invalid")
     raw = payload[offset + 1 : end]
     if any(byte < 0x20 for byte in raw):
