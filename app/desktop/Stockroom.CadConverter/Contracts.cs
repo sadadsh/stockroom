@@ -28,6 +28,7 @@ public sealed record SymbolDefinition
     public required string Name { get; init; }
     public required string Description { get; init; }
     public required string DesignatorPrefix { get; init; }
+    public int PartCount { get; init; } = 1;
     public required IReadOnlyList<SymbolPinDefinition> Pins { get; init; }
     public IReadOnlyList<SymbolLineDefinition> Lines { get; init; } = [];
     public IReadOnlyList<SymbolRectangleDefinition> Rectangles { get; init; } = [];
@@ -49,6 +50,7 @@ public sealed record SymbolPinDefinition
     public required string ElectricalType { get; init; }
     public bool ShowName { get; init; } = true;
     public bool ShowDesignator { get; init; } = true;
+    public int OwnerPartId { get; init; } = 1;
 }
 
 public sealed record SymbolLineDefinition
@@ -59,6 +61,7 @@ public sealed record SymbolLineDefinition
     public required double Y2mm { get; init; }
     public required double WidthMm { get; init; }
     public int Color { get; init; } = 0xFF0000;
+    public int OwnerPartId { get; init; } = 1;
 }
 
 public sealed record SymbolRectangleDefinition
@@ -71,6 +74,7 @@ public sealed record SymbolRectangleDefinition
     public bool Filled { get; init; }
     public int Color { get; init; } = 0xFF0000;
     public int FillColor { get; init; } = 0xFFFFFF;
+    public int OwnerPartId { get; init; } = 1;
 }
 
 public sealed record SymbolPolylineDefinition
@@ -78,6 +82,7 @@ public sealed record SymbolPolylineDefinition
     public required IReadOnlyList<PointDefinition> Points { get; init; }
     public int LineWidth { get; init; }
     public int Color { get; init; } = 0xFF0000;
+    public int OwnerPartId { get; init; } = 1;
 }
 
 public sealed record SymbolArcDefinition
@@ -89,6 +94,7 @@ public sealed record SymbolArcDefinition
     public required double EndAngle { get; init; }
     public int LineWidth { get; init; }
     public int Color { get; init; } = 0xFF0000;
+    public int OwnerPartId { get; init; } = 1;
 }
 
 public sealed record SymbolEllipseDefinition
@@ -101,6 +107,7 @@ public sealed record SymbolEllipseDefinition
     public bool Filled { get; init; }
     public int Color { get; init; } = 0xFF0000;
     public int FillColor { get; init; } = 0xFFFFFF;
+    public int OwnerPartId { get; init; } = 1;
 }
 
 public sealed record SymbolLabelDefinition
@@ -110,6 +117,7 @@ public sealed record SymbolLabelDefinition
     public required double Ymm { get; init; }
     public int Orientation { get; init; }
     public int Color { get; init; } = 0x800000;
+    public int OwnerPartId { get; init; } = 1;
 }
 
 public sealed record SymbolParameterDefinition

@@ -83,7 +83,7 @@ public static class CadLibraryConverter
             LibReference = definition.Name,
             Description = definition.Description,
             DesignatorPrefix = definition.DesignatorPrefix,
-            PartCount = 1,
+            PartCount = definition.PartCount,
             AllPinCount = definition.Pins.Count,
             Color = StandardComponentColor,
             AreaColor = StandardComponentAreaColor,
@@ -104,7 +104,7 @@ public static class CadLibraryConverter
                 ShowDesignator = pin.ShowDesignator,
                 Color = StandardComponentColor,
                 AreaColor = StandardComponentAreaColor,
-                OwnerPartId = 1,
+                OwnerPartId = pin.OwnerPartId,
             });
         }
         foreach (var line in definition.Lines)
@@ -115,7 +115,7 @@ public static class CadLibraryConverter
                 End = Point(line.X2mm, line.Y2mm),
                 Width = Mm(line.WidthMm),
                 Color = line.Color,
-                OwnerPartId = 1,
+                OwnerPartId = line.OwnerPartId,
             });
         }
         foreach (var rectangle in definition.Rectangles)
@@ -128,7 +128,7 @@ public static class CadLibraryConverter
                 IsFilled = rectangle.Filled,
                 Color = rectangle.Color,
                 FillColor = rectangle.FillColor,
-                OwnerPartId = 1,
+                OwnerPartId = rectangle.OwnerPartId,
             });
         }
         foreach (var polyline in definition.Polylines)
@@ -141,7 +141,7 @@ public static class CadLibraryConverter
                 builder.AddVertex(Mm(point.Xmm), Mm(point.Ymm));
             }
             var builtPolyline = builder.Build();
-            builtPolyline.OwnerPartId = 1;
+            builtPolyline.OwnerPartId = polyline.OwnerPartId;
             component.AddPolyline(builtPolyline);
         }
         foreach (var arc in definition.Arcs)
@@ -154,7 +154,7 @@ public static class CadLibraryConverter
                 EndAngle = arc.EndAngle,
                 LineWidth = arc.LineWidth,
                 Color = arc.Color,
-                OwnerPartId = 1,
+                OwnerPartId = arc.OwnerPartId,
             });
         }
         foreach (var ellipse in definition.Ellipses)
@@ -168,7 +168,7 @@ public static class CadLibraryConverter
                 IsFilled = ellipse.Filled,
                 Color = ellipse.Color,
                 FillColor = ellipse.FillColor,
-                OwnerPartId = 1,
+                OwnerPartId = ellipse.OwnerPartId,
             });
         }
         foreach (var label in definition.Labels)
@@ -179,7 +179,7 @@ public static class CadLibraryConverter
                 Location = Point(label.Xmm, label.Ymm),
                 Rotation = label.Orientation * 90d,
                 Color = label.Color,
-                OwnerPartId = 1,
+                OwnerPartId = label.OwnerPartId,
             });
         }
 

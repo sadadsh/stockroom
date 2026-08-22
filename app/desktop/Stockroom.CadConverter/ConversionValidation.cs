@@ -53,10 +53,12 @@ internal static partial class ConversionValidation
         RequireText(symbol.Name, "symbol.name", 255);
         RequireText(symbol.Description, "symbol.description", 1024);
         RequireText(symbol.DesignatorPrefix, "symbol.designatorPrefix", 32);
+        Require(symbol.PartCount is >= 1 and <= 255, "symbol partCount must be 1 through 255");
         Require(symbol.Pins.Count > 0, "symbol requires at least one pin");
         RequireUnique(symbol.Pins.Select(item => item.Designator), "symbol pin designators");
         foreach (var pin in symbol.Pins)
         {
+            RequireOwnerPart(pin.OwnerPartId, symbol.PartCount, "symbol pin");
             RequireText(pin.Designator, "symbol pin designator", 64);
             RequireText(pin.Name, "symbol pin name", 255, allowEmpty: true);
             RequireCoordinate(pin.Xmm, "symbol pin x");
@@ -68,22 +70,26 @@ internal static partial class ConversionValidation
 
         foreach (var line in symbol.Lines)
         {
+            RequireOwnerPart(line.OwnerPartId, symbol.PartCount, "symbol line");
             RequireCoordinates(line.X1mm, line.Y1mm, line.X2mm, line.Y2mm, "symbol line");
             RequireNonNegative(line.WidthMm, "symbol line width");
         }
         foreach (var rectangle in symbol.Rectangles)
         {
+            RequireOwnerPart(rectangle.OwnerPartId, symbol.PartCount, "symbol rectangle");
             RequireCoordinates(rectangle.X1mm, rectangle.Y1mm, rectangle.X2mm, rectangle.Y2mm, "symbol rectangle");
             RequirePositive(rectangle.WidthMm, "symbol rectangle width");
         }
         foreach (var polyline in symbol.Polylines)
         {
+            RequireOwnerPart(polyline.OwnerPartId, symbol.PartCount, "symbol polyline");
             Require(polyline.Points.Count >= 2, "symbol polyline requires at least two points");
             Require(polyline.LineWidth is >= 0 and <= 2, "symbol polyline lineWidth must be 0, 1, or 2");
             ValidatePoints(polyline.Points, "symbol polyline");
         }
         foreach (var arc in symbol.Arcs)
         {
+            RequireOwnerPart(arc.OwnerPartId, symbol.PartCount, "symbol arc");
             RequireCoordinate(arc.Xmm, "symbol arc x");
             RequireCoordinate(arc.Ymm, "symbol arc y");
             RequirePositive(arc.RadiusMm, "symbol arc radius");
@@ -93,6 +99,7 @@ internal static partial class ConversionValidation
         }
         foreach (var ellipse in symbol.Ellipses)
         {
+            RequireOwnerPart(ellipse.OwnerPartId, symbol.PartCount, "symbol ellipse");
             RequireCoordinate(ellipse.Xmm, "symbol ellipse x");
             RequireCoordinate(ellipse.Ymm, "symbol ellipse y");
             RequirePositive(ellipse.RadiusXmm, "symbol ellipse x radius");
@@ -101,6 +108,7 @@ internal static partial class ConversionValidation
         }
         foreach (var label in symbol.Labels)
         {
+            RequireOwnerPart(label.OwnerPartId, symbol.PartCount, "symbol label");
             RequireText(label.Text, "symbol label", 1024, allowEmpty: true);
             RequireCoordinate(label.Xmm, "symbol label x");
             RequireCoordinate(label.Ymm, "symbol label y");
@@ -177,6 +185,9 @@ internal static partial class ConversionValidation
             ValidateModel(footprint.Model);
         }
     }
+
+    private static void RequireOwnerPart(int ownerPartId, int partCount, string label) =>
+        Require(ownerPartId >= 1 && ownerPartId <= partCount, $"{label} ownerPartId must name an existing part");
 
     private static void ValidateModel(StepModelDefinition model)
     {

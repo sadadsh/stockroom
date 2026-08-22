@@ -75,6 +75,80 @@ public sealed class CadLibraryConverterTests
     }
 
     [Fact]
+    public async Task MultipartSymbolPreservesPartAndPrimitiveOwnership()
+    {
+        using var scope = new TestScope();
+        var request = scope.Request();
+        request = request with
+        {
+            Symbol = request.Symbol with
+            {
+                PartCount = 3,
+                Pins =
+                [
+                    request.Symbol.Pins[0] with { OwnerPartId = 1 },
+                    request.Symbol.Pins[1] with { OwnerPartId = 1 },
+                    request.Symbol.Pins[2] with { OwnerPartId = 2 },
+                    request.Symbol.Pins[3] with { OwnerPartId = 3 },
+                ],
+                Lines = request.Symbol.Lines.Select(item => item with { OwnerPartId = 1 }).ToArray(),
+                Rectangles = request.Symbol.Rectangles.Select(item => item with { OwnerPartId = 3 }).ToArray(),
+                Polylines = request.Symbol.Polylines.Select(item => item with { OwnerPartId = 2 }).ToArray(),
+                Arcs = request.Symbol.Arcs.Select(item => item with { OwnerPartId = 1 }).ToArray(),
+                Ellipses = request.Symbol.Ellipses.Select(item => item with { OwnerPartId = 2 }).ToArray(),
+                Labels = request.Symbol.Labels.Select(item => item with { OwnerPartId = 3 }).ToArray(),
+            },
+        };
+
+        var result = await CadLibraryConverter.ConvertAsync(request);
+
+        var schlib = await new SchLibReader().ReadAsync(result.Schlib!.Path);
+        var symbol = Assert.IsType<SchComponent>(Assert.Single(schlib.Components));
+        Assert.Equal(3, symbol.PartCount);
+        Assert.Equal([1, 1, 2, 3], symbol.Pins.Cast<SchPin>().Select(pin => pin.OwnerPartId).ToArray());
+        Assert.Equal(1, Assert.IsType<SchLine>(Assert.Single(symbol.Lines)).OwnerPartId);
+        Assert.Equal(3, Assert.IsType<SchRectangle>(Assert.Single(symbol.Rectangles)).OwnerPartId);
+        Assert.Equal(2, Assert.IsType<SchPolyline>(Assert.Single(symbol.Polylines)).OwnerPartId);
+        Assert.Equal(1, Assert.IsType<SchArc>(Assert.Single(symbol.Arcs)).OwnerPartId);
+        Assert.Equal(2, Assert.IsType<SchEllipse>(Assert.Single(symbol.Ellipses)).OwnerPartId);
+        Assert.Equal(3, Assert.IsType<SchLabel>(Assert.Single(symbol.Labels)).OwnerPartId);
+    }
+
+    [Fact]
+    public async Task JsonBoundaryRejectsSymbolOwnerOutsidePartCount()
+    {
+        using var scope = new TestScope();
+        var request = scope.Request();
+        request = request with
+        {
+            Symbol = request.Symbol with
+            {
+                PartCount = 2,
+                Pins =
+                [
+                    request.Symbol.Pins[0] with { OwnerPartId = 3 },
+                    .. request.Symbol.Pins.Skip(1),
+                ],
+            },
+        };
+        var requestPath = Path.Combine(scope.Root, "InvalidOwner.json");
+        var resultPath = Path.Combine(scope.Root, "InvalidOwnerResult.json");
+        await File.WriteAllTextAsync(
+            requestPath,
+            JsonSerializer.Serialize(request, CadConverterJsonContext.Default.CadConverterRequest));
+
+        var exitCode = await CadConverterApplication.ConvertFileAsync(requestPath, resultPath);
+
+        Assert.Equal(1, exitCode);
+        var result = JsonSerializer.Deserialize(
+            await File.ReadAllTextAsync(resultPath),
+            CadConverterJsonContext.Default.CadConverterResult);
+        Assert.NotNull(result);
+        Assert.Equal("error", result.Status);
+        Assert.Contains("ownerPartId", result.Detail, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task JsonBoundaryWritesAResultDocumentAndRejectsUnknownFields()
     {
         using var scope = new TestScope();
