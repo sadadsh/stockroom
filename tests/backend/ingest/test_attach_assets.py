@@ -1,8 +1,10 @@
 import shutil
 import zipfile
+from types import SimpleNamespace
 
 import pytest
 
+from stockroom.ingest.manual_files import import_manual_cad_files
 from stockroom.ingest.pipeline import IngestPipeline
 from stockroom.kicad.footprint import Footprint
 from stockroom.kicad.symbol_lib import SymbolLib
@@ -40,16 +42,16 @@ def _snapeda_zip(tmp_path, fixtures_dir, name="part.zip", with_datasheet=False):
     return z
 
 
-def _add_bare_part(pipe, category="ICs") -> PartRecord:
+def _add_bare_part(pipe, category="ICs", mpn="TESTPART") -> PartRecord:
     """Land an existing part with NO symbol/footprint/model, the way a whole-BOM
     import (add_reference_part) lands identity + sourcing only, so its CAD assets
     can be attached afterward (spec section 5, owner 2026-07-16 optional-assets gate)."""
     record = PartRecord(
         id="",
-        display_name="TESTPART",
+        display_name=mpn,
         category=category,
         description="a test part",
-        mpn="TESTPART",
+        mpn=mpn,
         manufacturer="Acme",
         datasheet=Datasheet(source_url="https://example.com/testpart.pdf"),
         purchase=[Purchase(vendor="Mouser", url="https://mouser.com/p/1")],
@@ -58,6 +60,25 @@ def _add_bare_part(pipe, category="ICs") -> PartRecord:
     k = landed.assets_for("kicad")
     assert k.symbol is None and k.footprint is None and k.model is None
     return landed
+
+
+def test_manual_import_sanitizes_slash_in_mpn_before_kicad_placement(tmp_path, fixtures_dir):
+    pipe = _pipeline(tmp_path)
+    bare = _add_bare_part(pipe, mpn="USB2512B-I/M2")
+    package = _snapeda_zip(tmp_path, fixtures_dir, name="USB2512B-I_M2.zip")
+    ctx = SimpleNamespace(ops=pipe.ops, profile=pipe.profile, repo=pipe.repo, cli=pipe.cli)
+
+    result = import_manual_cad_files(ctx, bare.id, (package,))
+
+    assert result["attached"] == ["kicad_footprint", "kicad_model", "kicad_symbol"]
+    current = pipe.ops.load_record(bare.id)
+    assert current.mpn == "USB2512B-I/M2"
+    assert current.assets_for("kicad").symbol.name == "USB2512B-I_M2"
+    assert current.assets_for("kicad").footprint.name == "USB2512B-I_M2"
+    assert (
+        pipe.profile.library.footprint_lib_path("ICs") / "USB2512B-I_M2.kicad_mod"
+    ).is_file()
+    assert not (pipe.profile.library.footprint_lib_path("ICs") / "USB2512B-I").exists()
 
 
 def test_attach_assets_lands_symbol_footprint_and_model_on_a_bare_part(tmp_path, fixtures_dir):

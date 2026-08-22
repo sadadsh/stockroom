@@ -42,7 +42,7 @@ _CATEGORY_KEYWORDS: tuple[tuple[str, str], ...] = (
     ("ic", "ICs"),
 )
 
-_FORBIDDEN = re.compile(r"[{}\s]+")
+_FORBIDDEN = re.compile(r'[<>:"/\\|?*{}\s]+')
 
 
 def _sanitize(name: str) -> str:

@@ -19,6 +19,10 @@ def test_entry_name_sanitizes_forbidden_chars():
     assert "{" not in out and "}" not in out and " " not in out
 
 
+def test_entry_name_sanitizes_windows_filename_chars_in_mpn():
+    assert propose_entry_name("", "USB2512B-I/M2") == "USB2512B-I_M2"
+
+
 def test_entry_name_never_empty():
     assert propose_entry_name("", "") == "Part"
 

@@ -29,6 +29,7 @@ from stockroom.altium.ul_import import (
 )
 from stockroom.capture.requirements import Requirement, capture_needs
 from stockroom.ingest.errors import IngestError
+from stockroom.ingest.naming import propose_entry_name
 from stockroom.ingest.pipeline import IngestPipeline
 from stockroom.ingest.sandbox import unpack_inputs
 from stockroom.ingest.staging import StagingCandidate
@@ -210,7 +211,10 @@ def _only_missing_kicad(
             and Requirement.KICAD_MODEL.value in missing
             else None
         ),
-        entry_name=record.mpn or candidate.entry_name or candidate.symbol_name,
+        entry_name=propose_entry_name(
+            candidate.entry_name or candidate.symbol_name,
+            record.mpn,
+        ),
         category=record.category,
     )
 
