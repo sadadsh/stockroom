@@ -58,6 +58,14 @@ def merge_symbol_into_lib(
     )
     if renamed == node_text and source_name != new_name:
         raise PlacementError(f"could not rename symbol {source_name!r}")
+    renamed_doc = SexpDocument.parse(renamed)
+    for unit in renamed_doc.root.find_all("symbol"):
+        unit_name = unit.children[1]
+        suffix = re.search(r"(_\d+_\d+)$", unit_name.value)
+        if suffix is None:
+            raise PlacementError(f"invalid nested symbol name {unit_name.value!r}")
+        unit_name.set_value(new_name + suffix.group(1), quote=True)
+    renamed = renamed_doc.serialize()
     before = lib.serialize()
     lib.insert_symbol(renamed)  # append the symbol node (byte-preserving)
     after = lib.serialize()

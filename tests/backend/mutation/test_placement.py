@@ -2,6 +2,8 @@ import shutil
 
 import pytest
 
+from stockroom.kicad.category_lib import create_empty_symbol_lib
+from stockroom.kicad.cli import KiCadCli
 from stockroom.kicad.footprint import Footprint
 from stockroom.kicad.symbol_lib import SymbolLib
 from stockroom.model.part import Datasheet, PartRecord
@@ -12,6 +14,7 @@ from stockroom.mutation.placement import (
     mirror_fields_to_symbol,
     place_footprint,
 )
+from tests.backend.conftest import requires_kicad_cli
 
 
 def test_assert_only_added_passes_for_pure_addition():
@@ -41,6 +44,21 @@ def test_merge_symbol_appends_renamed_symbol(tmp_path, fixtures_dir):
     lib = SymbolLib.load(lib_path)
     assert lib.symbol_names == ["TPS62130RGTR"]
     assert lib.version == "20251024"  # untouched
+
+
+@requires_kicad_cli
+def test_merge_symbol_renames_nested_units_and_remains_kicad_parseable(tmp_path, fixtures_dir):
+    lib_path = tmp_path / "SR-ICs.kicad_sym"
+    create_empty_symbol_lib(KiCadCli(), lib_path)
+    source = tmp_path / "source.kicad_sym"
+    KiCadCli().sym_upgrade(fixtures_dir / "legacy.lib", source)
+
+    merge_symbol_into_lib(lib_path, source, "TEST_R", "TARGET PART")
+
+    text = lib_path.read_text(encoding="utf-8")
+    assert '(symbol "TARGET PART_0_1"' in text
+    assert "TEST_R_0_1" not in text
+    KiCadCli().sym_upgrade(lib_path, tmp_path / "upgraded.kicad_sym")
 
 
 def test_merge_symbol_rejects_duplicate_name(tmp_path, fixtures_dir):

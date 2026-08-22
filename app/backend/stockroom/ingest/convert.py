@@ -18,11 +18,14 @@ def normalize_symbol(cli: KiCadCli, src: Path, dcm: Path | None, workdir: Path) 
     workdir.mkdir(parents=True, exist_ok=True)
     src = Path(src)
     if src.suffix == ".kicad_sym":
-        # already a native symbol library: copy into the sandbox and use as-is
-        # (the reference importer loads .kicad_sym directly, upgrading only .lib).
-        dst = workdir / src.name
-        shutil.copyfile(src, dst)
-        return dst
+        # Native provider libraries can still use an older KiCad schema.
+        in_dir = workdir / "in"
+        in_dir.mkdir(parents=True, exist_ok=True)
+        staged_src = in_dir / src.name
+        shutil.copyfile(src, staged_src)
+        out = workdir / "normalized.kicad_sym"
+        cli.sym_upgrade(staged_src, out)
+        return out if out.exists() else staged_src
     # legacy .lib or foreign format: upgrade via kicad-cli. Keep the source and
     # the output on distinct paths (never src == dst). A sibling .dcm named like
     # the library is copied next to the source so kicad-cli merges descriptions.
