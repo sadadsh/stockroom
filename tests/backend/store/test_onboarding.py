@@ -170,6 +170,16 @@ def test_guided_clone_preflight_resumes_only_the_exact_origin(tmp_path):
         )
 
 
+def test_guided_clone_preflight_accepts_ssh_origin_for_selected_github_repository(tmp_path):
+    destination = _library(tmp_path / "catalog")
+    GitRepo(destination).add_remote("origin", "git@github.com:engineer/catalog.git")
+
+    assert onboarding.guided_clone_destination(
+        destination,
+        expected_url="https://github.com/engineer/catalog.git",
+    ) == (destination.resolve(), True)
+
+
 def test_clone_requires_a_url():
     with pytest.raises(ValueError):
         onboarding.set_library(MachineConfig(), "clone", url="")

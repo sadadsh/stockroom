@@ -147,6 +147,10 @@ public sealed class PackagingAndSecurityContractTests
             allSource,
             StringComparison.Ordinal);
         Assert.Contains(
+            "kicad-cli",
+            allSource,
+            StringComparison.Ordinal);
+        Assert.Contains(
             "stockroom.host.provider-viewport",
             allSource,
             StringComparison.Ordinal);

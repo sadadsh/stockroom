@@ -20,6 +20,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+from stockroom.projects.library_pin import normalize_remote
 from stockroom.store.library_location import library_is_initialized, resolve_libraries_root
 from stockroom.store.machine_config import MachineConfig, config_dir
 from stockroom.store.profile import ProfileStore
@@ -196,9 +197,8 @@ def guided_clone_destination(
     repo = GitRepo(root)
     if not (root / ".git").exists():
         raise ValueError(f"clone destination is not empty: {root}")
-    actual = repo.remote_url("origin").strip().rstrip("/")
-    expected = expected_url.strip().rstrip("/")
-    if actual.casefold().removesuffix(".git") != expected.casefold().removesuffix(".git"):
+    actual = repo.remote_url("origin")
+    if normalize_remote(actual) != normalize_remote(expected_url):
         raise ValueError("existing clone origin does not match the selected Catalog Repository")
     return root, True
 

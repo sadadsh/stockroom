@@ -1,6 +1,6 @@
 import { guardPreviewEffect } from "../design-studio/previewEffects";
 
-export type HostFilePurpose = "cad-recovery";
+export type HostFilePurpose = "cad-recovery" | "kicad-cli";
 
 type LegacyHostApi = {
   pick_files?: (purpose: HostFilePurpose) => Promise<string[]>;
@@ -18,10 +18,11 @@ export class HostFilePickerUnavailableError extends Error {
 }
 
 export async function pickHostFiles(purpose: HostFilePurpose): Promise<string[]> {
+  const label = purpose === "kicad-cli" ? "KiCad CLI executable" : "CAD recovery files";
   guardPreviewEffect({
     kind: "host-file-picker",
-    action: "choosing CAD recovery files",
-    instruction: "choose CAD recovery files",
+    action: `choosing ${label}`,
+    instruction: `choose ${label}`,
   });
   const bridges = window as unknown as {
     __STOCKROOM_HOST__?: ManagedHostApi;

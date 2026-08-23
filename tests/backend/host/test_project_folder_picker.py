@@ -10,10 +10,15 @@ from unittest.mock import MagicMock
 import pytest
 
 
-def _webview_module(*, folder_kind: object | None = None, legacy_kind: object | None = None):
+def _webview_module(
+    *,
+    folder_kind: object | None = None,
+    open_kind: object | None = None,
+    legacy_kind: object | None = None,
+):
     module = types.ModuleType("webview")
-    if folder_kind is not None:
-        module.FileDialog = types.SimpleNamespace(FOLDER=folder_kind)
+    if folder_kind is not None or open_kind is not None:
+        module.FileDialog = types.SimpleNamespace(FOLDER=folder_kind, OPEN=open_kind)
     if legacy_kind is not None:
         module.FOLDER_DIALOG = legacy_kind
     return module
@@ -124,6 +129,25 @@ def test_folder_picker_refuses_unknown_workflow_before_opening_a_dialog(monkeypa
         lambda: (_ for _ in ()).throw(AssertionError("dialog must stay closed")),
     )
     assert host_window._HostApi().pick_folder("arbitrary") == []
+
+
+def test_kicad_cli_picker_uses_a_single_executable_file_dialog(monkeypatch, tmp_path):
+    from stockroom.host import window as host_window
+
+    open_kind = object()
+    webview = _webview_module(open_kind=open_kind)
+    monkeypatch.setitem(sys.modules, "webview", webview)
+    executable = tmp_path / "kicad-cli.exe"
+    win = MagicMock()
+    win.create_file_dialog.return_value = (str(executable),)
+    monkeypatch.setattr(host_window, "active_window", lambda: win)
+
+    assert host_window._HostApi().pick_files("kicad-cli") == [str(executable)]
+    win.create_file_dialog.assert_called_once_with(
+        open_kind,
+        allow_multiple=False,
+        file_types=("KiCad CLI (kicad-cli.exe)", "Executable Files (*.exe)", "All Files (*.*)"),
+    )
 
 
 def test_legacy_project_picker_delegates_to_the_allowlisted_bridge(monkeypatch, tmp_path):

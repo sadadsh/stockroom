@@ -20,6 +20,19 @@ describe("host file picker", () => {
     expect(pickFiles).toHaveBeenCalledWith("cad-recovery");
   });
 
+  it("uses the managed native picker for the KiCad CLI", async () => {
+    const pickFiles = vi.fn().mockResolvedValue(["C:\\KiCad\\bin\\kicad-cli.exe"]);
+    Object.defineProperty(window, "__STOCKROOM_HOST__", {
+      configurable: true,
+      value: { pickFiles },
+    });
+
+    await expect(pickHostFiles("kicad-cli")).resolves.toEqual([
+      "C:\\KiCad\\bin\\kicad-cli.exe",
+    ]);
+    expect(pickFiles).toHaveBeenCalledWith("kicad-cli");
+  });
+
   it("fails honestly when no native host owns file selection", async () => {
     await expect(pickHostFiles("cad-recovery")).rejects.toBeInstanceOf(
       HostFilePickerUnavailableError,

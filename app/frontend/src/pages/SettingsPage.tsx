@@ -64,6 +64,7 @@ import {
 } from "../lib/updateStanding";
 import { useUpdateStanding } from "../lib/useUpdateStanding";
 import { pickHostFolder } from "../lib/hostFolderPicker";
+import { pickHostFiles } from "../lib/hostFilePicker";
 import { useScenarioUiState } from "../design-studio/scenarioState";
 import { useOptionalDesignStudio } from "../design-studio/DesignStudioProvider";
 
@@ -564,6 +565,15 @@ function LibraryRepositoriesSection() {
     });
   }
 
+  async function chooseCatalogFolder() {
+    try {
+      const folder = await pickHostFolder("catalog");
+      if (folder) setPath(folder);
+    } catch (error) {
+      toast(errMsg(error), "err");
+    }
+  }
+
   return (
     <>
       {libraries.isLoading ? (
@@ -652,15 +662,20 @@ function LibraryRepositoriesSection() {
             width="100%"
           />
         ) : null}
-        <AstryxTextInput
-          label={mode === "open" ? openFolderLabel : newFolderLabel}
-          isLabelHidden
-          value={path}
-          onChange={setPath}
-          placeholder={mode === "open" ? openFolderLabel : newFolderLabel}
-          size="sm"
-          width="100%"
-        />
+        <div className="flex items-center gap-2">
+          <AstryxTextInput
+            label={mode === "open" ? openFolderLabel : newFolderLabel}
+            isLabelHidden
+            value={path}
+            onChange={setPath}
+            placeholder={mode === "open" ? openFolderLabel : newFolderLabel}
+            size="sm"
+            width="100%"
+          />
+          <Button onClick={chooseCatalogFolder}>
+            <Text id="settings.library.choose-folder">Choose Catalog Folder</Text>
+          </Button>
+        </div>
         <Button
           onClick={() =>
             apply(
@@ -997,6 +1012,15 @@ function KiCadSection() {
     }
   }
 
+  async function chooseCliFile() {
+    try {
+      const [file = ""] = await pickHostFiles("kicad-cli");
+      if (file) setCliDraft(file);
+    } catch (error) {
+      toast(errMsg(error), "err");
+    }
+  }
+
   function onSave() {
     if (!dirty || save.isPending) return;
     save.mutate(
@@ -1150,6 +1174,9 @@ function KiCadSection() {
             placeholder={cliPlaceholder}
             className={INPUT_CLS}
           />
+          <Button onClick={chooseCliFile}>
+            <Text id="settings.kicad.choose-cli">Choose KiCad CLI</Text>
+          </Button>
         </div>
         <div>
           <Button onClick={onSave} disabled={!dirty || save.isPending}>

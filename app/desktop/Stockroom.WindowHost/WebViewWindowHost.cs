@@ -1734,7 +1734,7 @@ internal sealed class WebViewWindowHost : IDisposable
                       });
                     },
                     pickFiles(purpose) {
-                      if (purpose !== "cad-recovery") {
+                      if (!["cad-recovery", "kicad-cli"].includes(purpose)) {
                         return Promise.reject(new Error("Unknown Stockroom file purpose."));
                       }
                       const id = crypto.randomUUID();
@@ -2186,7 +2186,7 @@ internal sealed class WebViewWindowHost : IDisposable
             purpose = HandoffCodec.GetRequiredString(root, "purpose");
             if (!Guid.TryParseExact(id, "D", out _)
                 || (fileRequest
-                    ? purpose != "cad-recovery"
+                    ? purpose is not ("cad-recovery" or "kicad-cli")
                     : purpose is not ("project" or "catalog" or "stm-cubemx" or "kicad-config")))
             {
                 return;
@@ -2204,11 +2204,14 @@ internal sealed class WebViewWindowHost : IDisposable
         {
             if (fileRequest)
             {
+                var cadRecovery = purpose == "cad-recovery";
                 var dialog = new OpenFileDialog
                 {
-                    Multiselect = true,
-                    Title = "Choose Downloaded CAD Files",
-                    Filter = "CAD files|*.zip;*.kicad_sym;*.kicad_mod;*.step;*.stp;*.SchLib;*.PcbLib|All files|*.*",
+                    Multiselect = cadRecovery,
+                    Title = cadRecovery ? "Choose Downloaded CAD Files" : "Choose KiCad CLI",
+                    Filter = cadRecovery
+                        ? "CAD files|*.zip;*.kicad_sym;*.kicad_mod;*.step;*.stp;*.SchLib;*.PcbLib|All files|*.*"
+                        : "KiCad CLI|kicad-cli.exe|Executable files|*.exe|All files|*.*",
                 };
                 if (dialog.ShowDialog(_window) == true)
                 {

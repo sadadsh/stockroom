@@ -166,6 +166,7 @@ beforeEach(() => {
   resetUpdateClocksForTests();
   localStorage.clear();
   delete document.documentElement.dataset.theme;
+  Reflect.deleteProperty(window, "__STOCKROOM_HOST__");
   mockApi.getSettings.mockResolvedValue({ ...BASE_SETTINGS });
   mockApi.listProfiles.mockResolvedValue({
     profiles: ["Main", "Archive"],
@@ -320,16 +321,37 @@ describe("SettingsPage - library repositories", () => {
     });
   });
 
-  it("creates a fresh Git repository at the requested path", async () => {
+  it("creates a fresh Git repository from the native folder picker", async () => {
+    const pickFolder = vi.fn().mockResolvedValue(["D:\\Libraries\\Scratch"]);
+    Object.defineProperty(window, "__STOCKROOM_HOST__", {
+      configurable: true,
+      value: { pickFolder },
+    });
     renderPage();
     await openSettings("settings.profiles");
     await screen.findByText("Archive");
-    await userEvent.type(screen.getByLabelText("New Catalog Folder"), "D:\\Libraries\\Scratch");
+    await userEvent.click(screen.getByRole("button", { name: /choose catalog folder/i }));
     await userEvent.click(screen.getByRole("button", { name: /set up catalog git remote/i }));
+    expect(pickFolder).toHaveBeenCalledWith("catalog");
     expect(mockApi.setLibrary).toHaveBeenCalledWith({
       mode: "create",
       path: "D:\\Libraries\\Scratch",
     });
+  });
+
+  it("selects the KiCad CLI executable with a native file picker", async () => {
+    const pickFiles = vi.fn().mockResolvedValue(["C:\\Program Files\\KiCad\\10.0\\bin\\kicad-cli.exe"]);
+    Object.defineProperty(window, "__STOCKROOM_HOST__", {
+      configurable: true,
+      value: { pickFiles },
+    });
+    renderPage();
+    await openSettings("settings.kicad");
+    await userEvent.click(screen.getByRole("button", { name: /choose kicad cli/i }));
+    expect(pickFiles).toHaveBeenCalledWith("kicad-cli");
+    expect(screen.getByLabelText(/kicad cli override/i)).toHaveValue(
+      "C:\\Program Files\\KiCad\\10.0\\bin\\kicad-cli.exe",
+    );
   });
 });
 

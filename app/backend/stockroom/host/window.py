@@ -947,7 +947,7 @@ class _HostApi:
     def pick_files(self, purpose: str) -> list[str]:
         """Pick recovery CAD files without granting the renderer arbitrary filesystem access."""
 
-        if purpose != "cad-recovery":
+        if purpose not in {"cad-recovery", "kicad-cli"}:
             return []
         import webview
 
@@ -958,12 +958,17 @@ class _HostApi:
         open_dialog = getattr(dialog_types, "OPEN", None)
         if open_dialog is None:
             open_dialog = webview.OPEN_DIALOG
+        cad_recovery = purpose == "cad-recovery"
         result = window.create_file_dialog(
             open_dialog,
-            allow_multiple=True,
+            allow_multiple=cad_recovery,
             file_types=(
-                "CAD Files (*.zip;*.kicad_sym;*.kicad_mod;*.step;*.stp;*.SchLib;*.PcbLib)",
-                "All Files (*.*)",
+                (
+                    "CAD Files (*.zip;*.kicad_sym;*.kicad_mod;*.step;*.stp;*.SchLib;*.PcbLib)",
+                    "All Files (*.*)",
+                )
+                if cad_recovery
+                else ("KiCad CLI (kicad-cli.exe)", "Executable Files (*.exe)", "All Files (*.*)")
             ),
         )
         return list(result) if result else []
