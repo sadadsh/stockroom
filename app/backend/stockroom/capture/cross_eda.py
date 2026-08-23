@@ -360,7 +360,7 @@ def read_altium_symbol(
 ) -> _SymbolReadback:
     entry = pick_entry(read_symbol_names(path), "Altium symbol", preferred_entry)
     with olefile.OleFileIO(str(path)) as container:
-        stream = [entry, "Data"]
+        stream = _resolve_component_data_stream(container, entry)
         if not container.exists(stream):
             raise CrossEdaVerificationError(
                 f"Altium SchLib entry {entry!r} has no component Data stream"
@@ -370,6 +370,21 @@ def read_altium_symbol(
             entry,
             source_identity=source_identity,
         )
+
+
+def _resolve_component_data_stream(container, entry: str) -> list[str]:
+    direct = [entry, "Data"]
+    if container.exists(direct):
+        return direct
+    matches = [
+        path
+        for path in container.listdir(streams=True, storages=False)
+        if len(path) == 2
+        and path[1] == "Data"
+        and len(path[0]) == 31
+        and entry.startswith(path[0])
+    ]
+    return matches[0] if len(matches) == 1 else direct
 
 
 def _read_altium_pad_stream(raw: bytes, entry: str) -> tuple[_PadGeometry, ...]:
@@ -432,7 +447,7 @@ def _read_altium_pad_stream(raw: bytes, entry: str) -> tuple[_PadGeometry, ...]:
 def read_altium_footprint(path: Path, preferred_entry: str) -> _FootprintReadback:
     entry = pick_entry(read_footprint_names(path), "Altium footprint", preferred_entry)
     with olefile.OleFileIO(str(path)) as container:
-        stream = [entry, "Data"]
+        stream = _resolve_component_data_stream(container, entry)
         if not container.exists(stream):
             raise CrossEdaVerificationError(
                 f"Altium PcbLib entry {entry!r} has no component Data stream"

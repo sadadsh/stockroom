@@ -13,6 +13,7 @@ from stockroom.capture.cross_eda import (
     _PadGeometry,
     _Pin,
     _read_altium_symbol_stream,
+    _resolve_component_data_stream,
     _SymbolReadback,
     _terminal_map,
     _verify_geometry,
@@ -28,6 +29,18 @@ from stockroom.kicad.stock import find_kicad_share_dir
 from stockroom.planning import ExactPartIdentity
 
 ALTIUM_FIXTURES = Path(__file__).parents[1] / "altium" / "fixtures"
+
+
+class _OleDirectory:
+    def __init__(self, streams: list[list[str]]) -> None:
+        self._streams = streams
+
+    def exists(self, path: list[str]) -> bool:
+        return path in self._streams
+
+    def listdir(self, *, streams: bool, storages: bool) -> list[list[str]]:
+        assert streams and not storages
+        return self._streams
 
 
 def _write_kicad_pair(
@@ -101,6 +114,14 @@ def test_native_altium_readback_observes_identity_pins_and_pad_geometry() -> Non
     ]
     assert all(round(pad.width_mm, 2) == 2.33 for pad in footprint.pads)
     assert all(round(pad.height_mm, 2) == 1.56 for pad in footprint.pads)
+
+
+def test_altium_readback_resolves_ole_truncated_component_storage() -> None:
+    entry = "SOT-23-3_L2.9-W1.3-P1.90-LS2.4-BR"
+    truncated = entry[:31]
+    container = _OleDirectory([["Library", "Data"], [truncated, "Data"]])
+
+    assert _resolve_component_data_stream(container, entry) == [truncated, "Data"]
 
 
 def test_native_altium_readback_separates_exact_source_mpn_from_sanitized_entry() -> None:
