@@ -67,7 +67,7 @@ def _wire(ctx) -> None:
     )
 
 
-def test_step_order_is_server_owned_and_resumes_from_persisted_source_decision(tmp_path):
+def test_step_order_has_only_the_three_required_setup_decisions(tmp_path):
     ctx = _ctx(tmp_path, primary="", remote="")
     assert guided_setup.status(ctx, _github())["step"] == "choose_cad_tool"
 
@@ -78,14 +78,15 @@ def test_step_order_is_server_owned_and_resumes_from_persisted_source_decision(t
     assert guided_setup.status(ctx, _github())["step"] == "connect_the_tool"
 
     _wire(ctx)
-    assert guided_setup.status(ctx, _github())["step"] == "improve_source_data"
-
-    guided_setup.record_source_decision(ctx.config, skipped=True)
     document = guided_setup.status(ctx, _github())
     assert document["step"] == "ready"
     assert document["ready"] is True
-    assert document["source_data"]["skipped"] is True
-    assert ctx.config.saves == 1
+    assert document["steps"] == [
+        "choose_cad_tool",
+        "catalog_repository",
+        "connect_the_tool",
+    ]
+    assert document["source_data"]["decided"] is False
 
 
 def test_current_github_auth_and_connectivity_are_required_even_after_progress(tmp_path):

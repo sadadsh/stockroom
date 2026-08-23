@@ -200,9 +200,12 @@ import { DEV_IDS, DEV_ID_AREAS, DEV_ID_BY_ID } from "./devIds";
 // deleted Altium bulk-embed control.
 // 515 makes the truthful About current-version status directly editable.
 // 517 adds the opened-component Details control.
-const EXPECTED_ENTRIES = 518;
+const EXPECTED_ENTRIES = 510;
 
 describe("devIds catalogue", () => {
+  it("contains no retired About targets", () => {
+    expect(DEV_IDS.some((entry) => entry.area === "about" || entry.id === "settings.about" || entry.id === "rail.about")).toBe(false);
+  });
   // The count is asserted from a single constant so bumping it is one edit, and so the test NAME can
   // never drift out of step with the number it checks (it used to say 199 while asserting 219).
   it(`has exactly ${EXPECTED_ENTRIES} entries carrying only id/label/area`, () => {
@@ -227,10 +230,9 @@ describe("devIds catalogue", () => {
     expect(seen.size).toBe(EXPECTED_ENTRIES);
   });
 
-  it("enumerates the 22 areas in first-appearance order, and every entry is a member", () => {
+  it("enumerates the 21 areas in first-appearance order, and every entry is a member", () => {
     expect(DEV_ID_AREAS).toEqual([
       "rail",
-      "about",
       "onboarding",
       "toast",
       "capture",
@@ -254,7 +256,7 @@ describe("devIds catalogue", () => {
       // first-appearance order rather than a taxonomy.
       "design",
     ]);
-    expect(DEV_ID_AREAS).toHaveLength(22);
+    expect(DEV_ID_AREAS).toHaveLength(21);
 
     // Every catalogued area is declared in DEV_ID_AREAS...
     const declared = new Set(DEV_ID_AREAS);

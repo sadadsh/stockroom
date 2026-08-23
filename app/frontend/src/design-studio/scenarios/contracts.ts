@@ -16,10 +16,6 @@ const globalContractIds = [
   "global.source-promotion.blocked", "global.source-promotion.success", "global.source-promotion.failure",
 ] as const;
 
-const globalAboutContractIds = [
-  "global.about.open", "global.about.current", "global.about.update-available", "global.about.stale",
-] as const;
-
 const assetsContractIds = ["assets.landing"] as const;
 
 const componentContractIds = [
@@ -82,7 +78,6 @@ const settingsContractIds = [
 ] as const;
 
 export const globalStateContracts = defineScenarioStateContracts("global", "components", globalContractIds);
-export const globalAboutStateContracts = defineScenarioStateContracts("global", "settings", globalAboutContractIds);
 export const assetsStateContracts = defineScenarioStateContracts("assets", "assets", assetsContractIds);
 export const componentStateContracts = defineScenarioStateContracts("components", "components", componentContractIds);
 export const componentAssetStateContracts = defineScenarioStateContracts("assets", "assets", componentAssetContractIds);
@@ -93,7 +88,6 @@ export const settingsStateContracts = defineScenarioStateContracts("settings", "
 
 export const bootstrapStateContracts = [
   ...globalStateContracts,
-  ...globalAboutStateContracts,
   ...assetsStateContracts,
   ...componentStateContracts,
   ...componentAssetStateContracts,

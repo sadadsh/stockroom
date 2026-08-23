@@ -48,7 +48,7 @@ vi.mock("../../api/client", async (importActual) => {
         guided_setup: {
           schema: 1,
           step: "ready",
-          steps: ["choose_cad_tool", "catalog_repository", "connect_the_tool", "improve_source_data", "ready"],
+          steps: ["choose_cad_tool", "catalog_repository", "connect_the_tool"],
           ready: true,
           repository_ready: true,
           repository: { owner: "engineer", name: "stockroom-catalog", url: "https://github.com/engineer/stockroom-catalog.git" },
@@ -169,10 +169,10 @@ function DuplicateLayersProduct() {
     <main data-dev-id="shell.root">
       <button type="button" data-design-studio-entry onClick={studio.open}>Open Duplicate Studio</button>
       <section data-dev-id="rail.root">
-        <button type="button" data-dev-id="rail.about" data-testid="duplicate-first">First About</button>
+        <button type="button" data-dev-id="rail.nav-settings" data-testid="duplicate-first">First Settings</button>
       </section>
       <section data-dev-id="settings.root">
-        <button type="button" data-dev-id="rail.about" data-testid="duplicate-second">Second About</button>
+        <button type="button" data-dev-id="rail.nav-settings" data-testid="duplicate-second">Second Settings</button>
       </section>
       <output data-testid="duplicate-selection">
         {dev.selectedTarget?.element.getAttribute("data-testid") ?? "none"}
@@ -332,7 +332,7 @@ describe("DesignStudioShell", () => {
     await user.click(screen.getByRole("button", { name: "Open Duplicate Studio" }));
     const sidebar = await openDrawer("Layers");
     const duplicateRows = within(sidebar).getAllByRole("button", {
-      name: /Legacy About target · \d of 2/,
+      name: /Settings nav item · \d of 2/,
     });
 
     await user.click(duplicateRows[1]!);
@@ -342,7 +342,7 @@ describe("DesignStudioShell", () => {
     expect(screen.getByTestId("duplicate-first")).not.toHaveStyle({ visibility: "hidden" });
     expect(screen.getByTestId("duplicate-second")).toHaveStyle({ visibility: "hidden" });
     expect(within(sidebar).getByRole("button", {
-      name: /Legacy About target · 2 of 2 · Hidden/,
+      name: /Settings nav item · 2 of 2 · Hidden/,
     })).toBeVisible();
   });
 
@@ -746,14 +746,6 @@ describe("DesignStudioShell", () => {
     fireEvent.keyDown(window, { key: "Escape" });
     await waitFor(() => expect(screen.queryByRole("region", { name: "Stockroom Preview" })).toBeNull());
     expect(entry).toHaveFocus();
-  });
-
-  it("keeps About inside Settings instead of opening a production modal", async () => {
-    await renderStudio();
-    expect(screen.queryByRole("button", { name: "About" })).toBeNull();
-    await chooseScenario("About Open");
-    expect(await screen.findByRole("heading", { name: "About Stockroom" })).toBeVisible();
-    expect(screen.queryByRole("dialog", { name: "About Stockroom" })).toBeNull();
   });
 
   it("lets the real SpecMatrix Columns popover own Escape before Design Studio", async () => {

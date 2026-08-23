@@ -34,6 +34,19 @@ class ScriptedRunner:
         return self.results.pop(0)
 
 
+class ScriptedLoginRunner:
+    def __init__(self, *lines: str, returncode: int = 0) -> None:
+        self.lines = lines
+        self.returncode = returncode
+        self.calls: list[tuple[list[str], float]] = []
+
+    def __call__(self, argv, *, on_output, timeout: float):
+        self.calls.append((list(argv), timeout))
+        for line in self.lines:
+            on_output(line)
+        return self.returncode
+
+
 def _result(stdout: str = "", *, returncode: int = 0, stderr: str = ""):
     return subprocess.CompletedProcess([], returncode, stdout=stdout, stderr=stderr)
 
@@ -161,15 +174,24 @@ def test_authentication_status_distinguishes_signed_out_from_operational_failure
         offline.authenticated()
 
 
-def test_browser_login_keeps_auth_output_private_and_returns_selected_viewer_fields() -> None:
+def test_browser_login_reports_only_the_device_code_and_returns_selected_viewer_fields() -> None:
     runner = ScriptedRunner(
-        _result("one-time-browser-output-that-must-not-return"),
         _result('{"login":"sadadsh","name":"Sadad","token":"secret"}'),
     )
-    cli = GitHubCli(executable=Path("gh.exe"), runner=runner)
+    login_runner = ScriptedLoginRunner(
+        "! First copy your one-time code: ABCD-EFGH\n",
+        "Never expose this diagnostic or oauth token\n",
+    )
+    cli = GitHubCli(
+        executable=Path("gh.exe"),
+        runner=runner,
+        login_runner=login_runner,
+    )
+    codes: list[str] = []
 
-    assert cli.login_browser() == GitHubViewer(login="sadadsh", name="Sadad")
-    assert runner.calls[0][0] == [
+    assert cli.login_browser(on_code=codes.append) == GitHubViewer(login="sadadsh", name="Sadad")
+    assert codes == ["ABCD-EFGH"]
+    assert login_runner.calls[0][0] == [
         "gh.exe",
         "auth",
         "login",
@@ -181,7 +203,7 @@ def test_browser_login_keeps_auth_output_private_and_returns_selected_viewer_fie
         "https",
         "--skip-ssh-key",
     ]
-    assert runner.calls[1][0] == ["gh.exe", "api", "--method", "GET", "user"]
+    assert runner.calls[0][0] == ["gh.exe", "api", "--method", "GET", "user"]
 
 
 def test_viewer_and_owners_return_personal_then_sorted_organizations() -> None:

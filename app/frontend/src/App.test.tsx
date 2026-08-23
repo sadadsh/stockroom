@@ -24,6 +24,7 @@ vi.mock("./api/client", async (importActual) => {
     api: {
       ...actual.api,
       getOnboarding: vi.fn(),
+      completeOnboarding: vi.fn(),
       listParts: vi.fn(),
       facets: vi.fn(),
       partDetail: vi.fn(),
@@ -167,7 +168,7 @@ describe("App shell", () => {
     }
   });
 
-  it("shows the Ready proof until the person completes Guided Setup", async () => {
+  it("automatically completes a legacy Ready state", async () => {
     vi.spyOn(api, "getOnboarding").mockResolvedValue({
       ...ONBOARDING_READY,
       onboarded: false,
@@ -175,6 +176,7 @@ describe("App shell", () => {
     });
     mockApi.listParts.mockResolvedValue({ parts: [], count: 0 });
     mockApi.facets.mockResolvedValue({ by_category: {}, by_manufacturer: {}, complete: 0, incomplete: 0 });
+    mockApi.completeOnboarding.mockResolvedValue({ ...ONBOARDING_READY, onboarded: true, first_run: false });
     try {
       const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
       render(
@@ -191,8 +193,8 @@ describe("App shell", () => {
         </QueryClientProvider>,
       );
       expect(await screen.findByRole("heading", { name: "Ready" })).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "Open Components" })).toBeInTheDocument();
-      expect(screen.queryByText("Stockroom", { selector: "span" })).not.toBeInTheDocument();
+      await waitFor(() => expect(mockApi.completeOnboarding).toHaveBeenCalledOnce());
+      expect(screen.queryByRole("button", { name: "Open Components" })).not.toBeInTheDocument();
     } finally {
       mockApi.getOnboarding.mockResolvedValue(ONBOARDING_READY);
     }
@@ -412,14 +414,10 @@ describe("App shell", () => {
 
     await activate("global.onboarding.open");
     expect(await screen.findByRole("heading", { name: "Catalog Repository" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Connect Existing" })).toHaveAttribute("aria-pressed", "true");
+    expect(await screen.findByRole("combobox", { name: "Catalog Repository" })).toBeInTheDocument();
     expect(screen.queryByLabelText(/path|url|token/i)).not.toBeInTheDocument();
     expect(document.querySelector('[data-dev-id="onboarding.gate"]')).toBeInTheDocument();
     expect(fetchMock).not.toHaveBeenCalled();
-
-    await activate("global.about.open");
-    expect(await screen.findByRole("heading", { name: "About Stockroom" })).toBeInTheDocument();
-    expect(document.querySelector('[data-dev-id="settings.about"]')).toBeInTheDocument();
 
     await activate("global.update.available");
     expect((await screen.findAllByText("Update Available")).length).toBeGreaterThan(0);

@@ -6,14 +6,12 @@ import {
   useConnectGuidedTool,
   useOnboardingGitHubLogin,
   useOnboardingGitHubRepositories,
-  useSaveGuidedSourceData,
   useSetGuidedRepository,
   useUpdateSettings,
 } from "../api/queries";
 import type { GuidedSetupStep, OnboardingStatus } from "../api/types";
 import { useScenarioUiState } from "../design-studio/scenarioState";
 import { openExternalUrl } from "../lib/externalNavigation";
-import { pickHostFolder } from "../lib/hostFolderPicker";
 import { Text, useText } from "../lib/copy";
 import { Button, Card, Eyebrow } from "./primitives";
 
@@ -35,8 +33,6 @@ function StepName({ step }: { step: GuidedSetupStep }) {
       return <Text id="onboarding.step.catalog">Catalog Repository</Text>;
     case "connect_the_tool":
       return <Text id="onboarding.step.connect">Connect The Tool</Text>;
-    case "improve_source_data":
-      return <Text id="onboarding.step.sources">Improve Source Data</Text>;
     case "ready":
       return <Text id="onboarding.step.prepared">Ready</Text>;
   }
@@ -46,7 +42,11 @@ function SetupProgress({ status }: { status: OnboardingStatus }) {
   const activeIndex = status.guided_setup.steps.indexOf(status.guided_setup.step);
   const label = useText("onboarding.progress", "Setup Progress");
   return (
-    <ol aria-label={label} className="grid grid-cols-5 gap-1 border-b border-line pb-4">
+    <ol
+      aria-label={label}
+      className="grid gap-1 border-b border-line pb-4"
+      style={{ gridTemplateColumns: `repeat(${status.guided_setup.steps.length}, minmax(0, 1fr))` }}
+    >
       {status.guided_setup.steps.map((step, index) => (
         <li
           key={step}
@@ -88,8 +88,6 @@ function SetupStep({ status }: { status: OnboardingStatus }) {
       return <CatalogRepository status={status} />;
     case "connect_the_tool":
       return <ConnectTool status={status} />;
-    case "improve_source_data":
-      return <ImproveSourceData />;
     case "ready":
       return <Prepared status={status} />;
   }
@@ -196,8 +194,8 @@ function CatalogRepository({ status }: { status: OnboardingStatus }) {
   const [owner, setOwner] = useState(status.guided_setup.github.viewer?.login ?? "");
   const [name, setName] = useState("stockroom-catalog");
   const [visibility, setVisibility] = useState<"public" | "private">("private");
-  const [folder, setFolder] = useState(status.default_dir);
   const [error, setError] = useState(scenario?.setupError ?? "");
+  const openedCode = useRef<string | null>(null);
   const login = useOnboardingGitHubLogin();
   const repository = useSetGuidedRepository();
   const repositories = useOnboardingGitHubRepositories(
@@ -207,8 +205,8 @@ function CatalogRepository({ status }: { status: OnboardingStatus }) {
   const ownerLabel = useText("onboarding.catalog.owner", "GitHub Owner");
   const nameLabel = useText("onboarding.catalog.name", "Git Checkout Name");
   const modeLabel = useText("onboarding.catalog.mode", "Catalog Setup Mode");
+  const catalogLabel = useText("onboarding.catalog.title", "Catalog Repository");
   const failed = useText("onboarding.catalog.failed", "Stockroom could not prepare the Catalog Git checkout. Rerun this step.");
-  const pickerFailed = useText("onboarding.catalog.picker-failed", "Stockroom could not open the folder picker. Rerun the folder choice.");
 
   useEffect(() => {
     setError(scenario?.setupError ?? "");
@@ -235,28 +233,23 @@ function CatalogRepository({ status }: { status: OnboardingStatus }) {
     [repositories.data],
   );
 
-  useEffect(() => {
-    if (mode === "connect" && writableRepositories.length > 0 && !writableRepositories.some((item) => item.name === name)) {
-      setName(writableRepositories[0].name);
-    }
-  }, [mode, name, writableRepositories]);
+  const selectedName = mode === "connect" && !writableRepositories.some((item) => item.name === name)
+    ? writableRepositories.find((item) => /catalog|components|library/i.test(item.name))?.name
+      ?? writableRepositories[0]?.name
+      ?? ""
+    : name;
 
-  async function chooseFolder() {
-    setError("");
-    try {
-      const selected = await pickHostFolder("catalog");
-      if (selected) setFolder(selected);
-    } catch (cause) {
-      setError(errorText(cause, pickerFailed));
-    }
-  }
+  useEffect(() => {
+    const code = login.progress?.user_code;
+    if (!code || openedCode.current === code) return;
+    openedCode.current = code;
+    openExternalUrl(login.progress?.verification_uri ?? "https://github.com/login/device");
+  }, [login.progress?.user_code, login.progress?.verification_uri]);
 
   async function signIn() {
     setError("");
     try {
-      const terminalPromise = login.start();
-      openExternalUrl("https://github.com/login/device");
-      const terminal = await terminalPromise;
+      const terminal = await login.start();
       if (terminal.status === "error") setError(terminal.error ?? failed);
     } catch (cause) {
       setError(errorText(cause, failed));
@@ -264,15 +257,15 @@ function CatalogRepository({ status }: { status: OnboardingStatus }) {
   }
 
   async function submit() {
-    if (!owner || !name.trim() || !folder) return;
+    if (!owner || !selectedName.trim()) return;
     setError("");
     try {
       await repository.mutateAsync({
         mode,
         owner,
-        name: name.trim(),
+        name: selectedName.trim(),
         visibility: mode === "create" ? visibility : undefined,
-        path: folder,
+        path: status.default_dir,
       });
     } catch (cause) {
       setError(errorText(cause, failed));
@@ -310,10 +303,17 @@ function CatalogRepository({ status }: { status: OnboardingStatus }) {
           </Text>
         </StepIntro>
         {error || login.error || github.error ? <InlineError>{error || login.error || github.error || failed}</InlineError> : null}
+        {login.progress?.user_code ? (
+          <section className="mt-5 rounded-control border border-acc bg-field p-4 text-center">
+            <p className="text-xs text-t3"><Text id="onboarding.catalog.device-code-label">GitHub Device Code</Text></p>
+            <p className="mt-2 font-mono text-2xl font-semibold tracking-[0.18em] text-t1">{login.progress.user_code}</p>
+            <p className="mt-2 text-xs text-t2"><Text id="onboarding.catalog.device-code-help">Paste this code into the GitHub page that just opened.</Text></p>
+          </section>
+        ) : null}
         <div className="mt-5 flex justify-end">
           <Button variant="accent" disabled={login.status === "running" || !github.available} onClick={signIn}>
             {login.status === "running" ? (
-              <Text id="onboarding.catalog.signing-in">Paste The Copied Code In GitHub...</Text>
+              <Text id="onboarding.catalog.signing-in">Getting Code...</Text>
             ) : (
               <Text id="onboarding.catalog.sign-in">Sign In With GitHub</Text>
             )}
@@ -323,7 +323,7 @@ function CatalogRepository({ status }: { status: OnboardingStatus }) {
     );
   }
 
-  const canSubmit = Boolean(owner && name.trim() && folder) && !repository.isPending;
+  const canSubmit = Boolean(owner && selectedName.trim()) && !repository.isPending;
   return (
     <>
       <StepIntro
@@ -365,32 +365,28 @@ function CatalogRepository({ status }: { status: OnboardingStatus }) {
               <Text id="onboarding.catalog.suggested">Suggested Name: Stockroom Catalog</Text>
             </span>
           </label>
+        ) : repositories.isLoading ? (
+          <p className="self-end pb-2 text-xs text-t3"><Text id="onboarding.catalog.loading">Loading Catalogs...</Text></p>
+        ) : writableRepositories.length === 0 ? (
+          <p className="self-end pb-2 text-xs text-t3"><Text id="onboarding.catalog.none">No Writable Catalogs Found</Text></p>
         ) : (
-          <div>
+          <label className="block">
             <span className="mb-1 block text-xs text-t3">
               <Text id="onboarding.catalog.available">Available Catalogs</Text>
             </span>
-            <div className="max-h-36 space-y-1 overflow-auto rounded-control border border-line bg-field p-1">
-              {repositories.isLoading ? (
-                <p className="px-2 py-2 text-xs text-t3"><Text id="onboarding.catalog.loading">Loading Catalogs...</Text></p>
-              ) : writableRepositories.length === 0 ? (
-                <p className="px-2 py-2 text-xs text-t3"><Text id="onboarding.catalog.none">No Writable Catalogs Found</Text></p>
-              ) : writableRepositories.map((item) => (
-                <button
-                  key={`${item.owner}/${item.name}`}
-                  type="button"
-                  aria-pressed={name === item.name}
-                  onClick={() => setName(item.name)}
-                  className={
-                    "block w-full rounded-control px-2 py-1.5 text-left text-sm " +
-                    (name === item.name ? "bg-acc text-acc-on" : "text-t2 hover:bg-raise2 hover:text-t1")
-                  }
-                >
+            <select
+              className={INPUT}
+              aria-label={catalogLabel}
+              value={selectedName}
+              onChange={(event) => setName(event.target.value)}
+            >
+              {writableRepositories.map((item) => (
+                <option key={`${item.owner}/${item.name}`} value={item.name}>
                   {item.owner}/{item.name} · {item.visibility}
-                </button>
+                </option>
               ))}
-            </div>
-          </div>
+            </select>
+          </label>
         )}
       </div>
       {mode === "create" ? (
@@ -406,27 +402,16 @@ function CatalogRepository({ status }: { status: OnboardingStatus }) {
           </div>
         </fieldset>
       ) : null}
-      <section className="mt-4 rounded-control border border-line bg-field px-3 py-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="min-w-0">
-            <p className="text-xs text-t3"><Text id="onboarding.catalog.local-folder">Managed Local Folder</Text></p>
-            <p data-testid="catalog-folder" className="mt-1 truncate text-sm text-t1">{folder || status.default_dir}</p>
-          </div>
-          <Button onClick={chooseFolder} disabled={repository.isPending}>
-            <Text id="onboarding.catalog.choose-folder">Change Folder</Text>
-          </Button>
-        </div>
-      </section>
       {repositories.error && !error ? <InlineError>{errorText(repositories.error, failed)}</InlineError> : null}
       {error ? <InlineError>{error}</InlineError> : null}
       <div className="mt-5 flex justify-end">
         <Button variant="accent" disabled={!canSubmit} onClick={submit}>
           {repository.isPending ? (
-            <Text id="onboarding.catalog.preparing">Preparing...</Text>
+            <Text id="onboarding.catalog.preparing" values={{ catalog: selectedName }}>{"Downloading {catalog}..."}</Text>
           ) : mode === "create" ? (
             <Text id="onboarding.catalog.create-action">Create Catalog</Text>
           ) : (
-            <Text id="onboarding.catalog.connect-action">Connect Catalog</Text>
+            <Text id="onboarding.catalog.connect-action" values={{ catalog: selectedName }}>{"Connect {catalog}"}</Text>
           )}
         </Button>
       </div>
@@ -484,94 +469,24 @@ function ConnectTool({ status }: { status: OnboardingStatus }) {
   );
 }
 
-function ImproveSourceData() {
-  const save = useSaveGuidedSourceData();
-  const [mouser, setMouser] = useState("");
-  const [digikeyId, setDigikeyId] = useState("");
-  const [digikeySecret, setDigikeySecret] = useState("");
-  const [error, setError] = useState("");
-  const mouserLabel = useText("onboarding.sources.mouser", "Mouser Credential");
-  const digikeyIdLabel = useText("onboarding.sources.digikey-id", "DigiKey Client ID");
-  const digikeySecretLabel = useText("onboarding.sources.digikey-secret", "DigiKey Client Secret");
-  const failed = useText("onboarding.sources.failed", "Stockroom could not validate the source credentials. Correct them or skip this optional step.");
-
-  async function submit(skipped: boolean) {
-    setError("");
-    try {
-      await save.mutateAsync(
-        skipped
-          ? { skipped: true }
-          : {
-              mouser_api_key: mouser || undefined,
-              digikey_client_id: digikeyId || undefined,
-              digikey_client_secret: digikeySecret || undefined,
-            },
-      );
-    } catch (cause) {
-      setError(errorText(cause, failed));
-    }
-  }
-
-  const hasCredential = Boolean(mouser.trim() || digikeyId.trim() || digikeySecret.trim());
-  return (
-    <>
-      <StepIntro
-        eyebrow={<Text id="onboarding.sources.eyebrow">Step Four · Optional</Text>}
-        title={<Text id="onboarding.sources.title">Improve Source Data</Text>}
-      >
-        <Text id="onboarding.sources.lede">
-          Official Mouser and DigiKey credentials add exact specifications, price, stock, product status, and datasheet facts. This step is optional.
-        </Text>
-      </StepIntro>
-      <div className="mt-5 grid gap-3">
-        <label>
-          <span className="mb-1 block text-xs text-t3">{mouserLabel}</span>
-          <input className={INPUT} aria-label={mouserLabel} type="password" value={mouser} onChange={(event) => setMouser(event.target.value)} autoComplete="off" />
-        </label>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <label>
-            <span className="mb-1 block text-xs text-t3">{digikeyIdLabel}</span>
-            <input className={INPUT} aria-label={digikeyIdLabel} value={digikeyId} onChange={(event) => setDigikeyId(event.target.value)} autoComplete="off" />
-          </label>
-          <label>
-            <span className="mb-1 block text-xs text-t3">{digikeySecretLabel}</span>
-            <input className={INPUT} aria-label={digikeySecretLabel} type="password" value={digikeySecret} onChange={(event) => setDigikeySecret(event.target.value)} autoComplete="off" />
-          </label>
-        </div>
-      </div>
-      {error ? <InlineError>{error}</InlineError> : null}
-      <div className="mt-5 flex items-center justify-end gap-3">
-        <Button disabled={save.isPending} onClick={() => void submit(true)}>
-          <Text id="onboarding.sources.skip">Skip</Text>
-        </Button>
-        <Button variant="accent" disabled={save.isPending || !hasCredential} onClick={() => void submit(false)}>
-          {save.isPending ? <Text id="onboarding.sources.validating">Validating...</Text> : <Text id="onboarding.sources.connect">Connect Source Data</Text>}
-        </Button>
-      </div>
-    </>
-  );
-}
-
 function Prepared({ status }: { status: OnboardingStatus }) {
   const complete = useCompleteOnboarding();
   const [error, setError] = useState("");
+  const attempted = useRef(false);
   const failed = useText("onboarding.prepared.failed", "Stockroom could not finish setup. Rerun this step.");
   const repository = status.guided_setup.repository;
   const primary = status.eda_tools.find((tool) => tool.key === status.primary_eda);
 
-  async function finish() {
-    setError("");
-    try {
-      await complete.mutateAsync();
-    } catch (cause) {
-      setError(errorText(cause, failed));
-    }
-  }
+  useEffect(() => {
+    if (attempted.current) return;
+    attempted.current = true;
+    void complete.mutateAsync().catch((cause) => setError(errorText(cause, failed)));
+  }, [complete, failed]); // Legacy ready state: finish once without another confirmation screen.
 
   return (
     <>
       <StepIntro
-        eyebrow={<Text id="onboarding.prepared.eyebrow">Step Five</Text>}
+        eyebrow={<Text id="onboarding.prepared.eyebrow">Finishing Setup</Text>}
         title={<Text id="onboarding.prepared.title">Ready</Text>}
       >
         <Text id="onboarding.prepared.lede">
@@ -603,11 +518,7 @@ function Prepared({ status }: { status: OnboardingStatus }) {
         <dd className="text-t1"><Text id="onboarding.prepared.add">Add A Component</Text></dd>
       </dl>
       {error ? <InlineError>{error}</InlineError> : null}
-      <div className="mt-5 flex justify-end">
-        <Button variant="accent" disabled={complete.isPending} onClick={finish}>
-          {complete.isPending ? <Text id="onboarding.prepared.opening">Opening...</Text> : <Text id="onboarding.prepared.open">Open Components</Text>}
-        </Button>
-      </div>
+      <p role="status" className="mt-5 text-sm text-t2"><Text id="onboarding.prepared.opening">Opening...</Text></p>
     </>
   );
 }

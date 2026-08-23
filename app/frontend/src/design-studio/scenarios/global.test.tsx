@@ -11,10 +11,6 @@ const GLOBAL_SCENARIO_INVENTORY = [
   "global.onboarding.error",
   "global.onboarding.create-error",
   "global.onboarding.clone-error",
-  "global.about.open",
-  "global.about.current",
-  "global.about.update-available",
-  "global.about.stale",
   "global.rail.expanded",
   "global.rail.collapsed",
   "global.theme.dark",
@@ -67,27 +63,8 @@ describe("global Design Studio scenarios", () => {
     },
   );
 
-  it("keeps the stale About scenario internally coherent", async () => {
-    await mountScenario("global.about.stale");
-    const about = document.querySelector('[data-dev-id="about.root"]');
-    const updates = document.querySelector('[data-dev-id="settings.update"]');
-    expect(about).toHaveTextContent("Version Disagreement");
-    expect(about).toHaveTextContent("Restart Stockroom to apply the prepared release");
-    expect(updates).toHaveTextContent("Restart Required");
-  });
-
-  it("shows the current About state instead of duplicating the open state", async () => {
-    await mountScenario("global.about.current");
-
-    const current = document.querySelector('[data-dev-id="about.current"]');
-    expect(current).toBeVisible();
-    expect(current).toHaveTextContent("Current");
-    expect(document.querySelector('[data-dev-id="about.stale"]')).toBeNull();
-  });
-
   it.each([
     ["global.onboarding.open", "onboarding.gate"],
-    ["global.about.open", "about.root"],
     ["global.add-parts.empty", "addpart.root"],
     ["global.search.initial", "search.root"],
     ["global.toast.success", "toast.status"],

@@ -850,7 +850,7 @@ describe("SettingsPage - flat IA + Machine Setup band", () => {
     await screen.findByTestId("settings.appearance.header");
     expect(screen.queryByRole("navigation", { name: /settings sections/i })).toBeNull();
     for (const id of [
-      "settings.appearance", "settings.about", "settings.update", "settings.profiles", "settings.sync",
+      "settings.appearance", "settings.update", "settings.profiles", "settings.sync",
       "settings.github", "settings.kicad", "settings.altium", "settings.cubemx",
       "settings.distributor", "settings.rescan", "settings.completion", "settings.derivation",
       "settings.health", "settings.librarysync", "settings.cad-clear",
@@ -859,21 +859,13 @@ describe("SettingsPage - flat IA + Machine Setup band", () => {
     }
   });
 
-  it("places About, the installed version, and project links inside Settings", async () => {
+  it("contains no personal About section or personal project links", async () => {
     renderPage();
-    const about = await screen.findByTestId("settings.about.header");
-    expect(about).toHaveTextContent("About Stockroom");
-    expect(document.querySelector('[data-dev-id="about.root"]')).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /LinkedIn.*opens in new tab/i })).toHaveAttribute(
-      "href",
-      "https://www.linkedin.com/in/sadadhaidari",
-    );
-    expect(screen.getByRole("link", { name: /GitHub.*opens in new tab/i })).toHaveAttribute(
-      "href",
-      "https://github.com/sadadsh",
-    );
-    expect(screen.getAllByText(__APP_VERSION__).length).toBeGreaterThan(0);
-    expect(screen.queryByRole("dialog", { name: "About Stockroom" })).toBeNull();
+    await screen.findByTestId("settings.appearance.header");
+    expect(screen.queryByTestId("settings.about.header")).toBeNull();
+    expect(document.querySelector('[data-dev-id="about.root"]')).toBeNull();
+    expect(screen.queryByText("Sadad Haidari")).toBeNull();
+    expect(screen.queryByRole("link", { name: /LinkedIn/i })).toBeNull();
   });
 
   it("owns one page scroller containing readiness and every capability card", async () => {

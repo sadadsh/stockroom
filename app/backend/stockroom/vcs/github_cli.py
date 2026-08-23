@@ -12,6 +12,7 @@ import re
 import shutil
 import subprocess
 import sys
+import threading
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -25,6 +26,7 @@ _MAX_REPOSITORIES = 100
 _OWNER_PATTERN = re.compile(r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?")
 _REPOSITORY_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,99}")
 _VERSION_PATTERN = re.compile(r"gh version ([0-9]+(?:\.[0-9]+){1,3})(?=\s|$)")
+_DEVICE_CODE_PATTERN = re.compile(r"\b[A-Z0-9]{4}-[A-Z0-9]{4}\b")
 
 Visibility = Literal["public", "private", "internal"]
 OwnerKind = Literal["personal", "organization"]
@@ -45,6 +47,16 @@ class GitHubCliRunner(Protocol):
         input_text: str | None = None,
         timeout: float,
     ) -> subprocess.CompletedProcess[str]: ...
+
+
+class GitHubCliLoginRunner(Protocol):
+    def __call__(
+        self,
+        argv: Sequence[str],
+        *,
+        on_output: Callable[[str], None],
+        timeout: float,
+    ) -> int: ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -98,6 +110,47 @@ def _default_runner(
     )
 
 
+def _default_login_runner(
+    argv: Sequence[str],
+    *,
+    on_output: Callable[[str], None],
+    timeout: float,
+) -> int:
+    process = subprocess.Popen(
+        list(argv),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        shell=False,
+        creationflags=_NO_WINDOW,
+    )
+    output = process.stdout
+    if output is None:
+        process.kill()
+        raise OSError("GitHub CLI output pipe is unavailable")
+
+    def read_output() -> None:
+        for line in output:
+            on_output(line)
+
+    reader = threading.Thread(
+        target=read_output,
+        daemon=True,
+    )
+    reader.start()
+    try:
+        return process.wait(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.wait()
+        raise
+    finally:
+        reader.join(timeout=1.0)
+        output.close()
+
+
 def resolve_github_cli(
     *,
     frozen: bool | None = None,
@@ -146,9 +199,11 @@ class GitHubCli:
         *,
         executable: Path | None = None,
         runner: GitHubCliRunner = _default_runner,
+        login_runner: GitHubCliLoginRunner = _default_login_runner,
     ) -> None:
         self._executable = Path(executable) if executable is not None else resolve_github_cli()
         self._runner = runner
+        self._login_runner = login_runner
 
     def _argv(self, *args: str) -> list[str]:
         if self._executable is None:
@@ -241,20 +296,36 @@ class GitHubCli:
             return False
         raise GitHubCliError("GitHub sign-in status check failed.")
 
-    def login_browser(self) -> GitHubViewer:
-        self._run(
-            "auth",
-            "login",
-            "--web",
-            "--clipboard",
-            "--hostname",
-            "github.com",
-            "--git-protocol",
-            "https",
-            "--skip-ssh-key",
-            timeout=_LOGIN_TIMEOUT_SECONDS,
-            error="GitHub browser sign-in did not complete.",
-        )
+    def login_browser(self, *, on_code: Callable[[str], None] | None = None) -> GitHubViewer:
+        reported: set[str] = set()
+
+        def inspect(line: str) -> None:
+            match = _DEVICE_CODE_PATTERN.search(line)
+            if match is not None and match.group(0) not in reported:
+                reported.add(match.group(0))
+                if on_code is not None:
+                    on_code(match.group(0))
+
+        try:
+            returncode = self._login_runner(
+                self._argv(
+                    "auth",
+                    "login",
+                    "--web",
+                    "--clipboard",
+                    "--hostname",
+                    "github.com",
+                    "--git-protocol",
+                    "https",
+                    "--skip-ssh-key",
+                ),
+                on_output=inspect,
+                timeout=_LOGIN_TIMEOUT_SECONDS,
+            )
+        except (OSError, subprocess.SubprocessError):
+            raise GitHubCliError("GitHub browser sign-in did not complete.") from None
+        if returncode != 0:
+            raise GitHubCliError("GitHub browser sign-in did not complete.")
         return self.viewer()
 
     def viewer(self) -> GitHubViewer:

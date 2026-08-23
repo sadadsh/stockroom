@@ -26,22 +26,14 @@ export const DEV_IDS: DevIdEntry[] = [
   { id: "rail.nav-stm", label: "STM Viewer nav item", area: "rail" },
   { id: "rail.footer", label: "Rail footer", area: "rail" },
   { id: "rail.nav-settings", label: "Settings nav item", area: "rail" },
-  // Compatibility target for existing personal Design Studio documents. No rail control renders it.
-  { id: "rail.about", label: "Legacy About target", area: "rail" },
   { id: "rail.collapse", label: "Collapse rail toggle", area: "rail" },
   { id: "rail.utility", label: "Update + theme utility row", area: "rail" },
   { id: "rail.update", label: "Update / up-to-date control", area: "rail" },
   { id: "rail.theme-toggle", label: "Theme toggle", area: "rail" },
-  { id: "about.root", label: "About settings content", area: "about" },
   { id: "onboarding.gate", label: "Onboarding gate", area: "onboarding" },
   { id: "onboarding.setup-error", label: "Setup connection error", area: "onboarding" },
   { id: "toast.status", label: "Toast status", area: "toast" },
   { id: "capture.status", label: "Guided capture status", area: "capture" },
-  { id: "about.icon", label: "About logo tile", area: "about" },
-  { id: "about.credit", label: "About credit line", area: "about" },
-  { id: "about.current", label: "About current-version status", area: "about" },
-  { id: "about.stale", label: "About stale-frontend note", area: "about" },
-  { id: "about.links", label: "About social links", area: "about" },
   { id: "assets.root", label: "Assets workspace", area: "assets" },
   { id: "assets.title", label: "Assets title", area: "assets" },
   { id: "assets.add-parts", label: "Assets Add Parts action", area: "assets" },
@@ -455,7 +447,6 @@ export const DEV_IDS: DevIdEntry[] = [
   { id: "settings.title", label: "Settings heading", area: "settings" },
   { id: "settings.machine-band", label: "Application delivery and machine readiness", area: "settings" },
   { id: "settings.content", label: "Complete settings scroll area", area: "settings" },
-  { id: "settings.about", label: "About Stockroom section", area: "settings" },
   { id: "settings.altium", label: "Altium Database Library section", area: "settings" },
   { id: "settings.cubemx", label: "STM32CubeMX Data section", area: "settings" },
   { id: "settings.appearance", label: "Appearance section", area: "settings" },
@@ -595,7 +586,7 @@ export const DEV_IDS: DevIdEntry[] = [
 ];
 
 // The areas in first-appearance order, for grouping the catalogue.
-export const DEV_ID_AREAS: readonly string[] = ["rail", "about", "onboarding", "toast", "capture", "assets", "components", "stm", "projects", "component-browser", "detail", "search", "addpart", "ingest", "settings", "altiumdb", "complete", "preview", "diff", "confirm", "shell", "design"];
+export const DEV_ID_AREAS: readonly string[] = ["rail", "onboarding", "toast", "capture", "assets", "components", "stm", "projects", "component-browser", "detail", "search", "addpart", "ingest", "settings", "altiumdb", "complete", "preview", "diff", "confirm", "shell", "design"];
 
 // A by-id lookup so consumers resolve an entry in one call instead of re-scanning the list.
 export const DEV_ID_BY_ID: ReadonlyMap<string, DevIdEntry> = new Map(

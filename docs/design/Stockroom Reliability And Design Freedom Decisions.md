@@ -779,11 +779,21 @@ The primary GitHub download is a deterministic ZIP derived from the exact signed
 GitHub CLI, CAD converter, update metadata, and rollback boundary. It never revives the retired
 source-cloning Python launcher. App Installer remains an optional installed channel.
 
-### Catalog Sign-In Opens The GitHub Device Page Explicitly
+### Catalog Setup Is Three Automatic Steps
 
 The bundled GitHub CLI still owns OAuth and credential storage. Stockroom opens GitHub's device
-page itself and asks the CLI to copy the one-time code, because a hidden packaged CLI can produce
-the code without successfully launching the Windows browser. The main WebView may send only
+page only after the CLI produces the one-time code, and shows that code prominently inside the app.
+The main WebView may send only
 credential-free HTTPS or Microsoft Store destinations to the Windows shell; file, script, HTTP,
 and credential-bearing URLs remain blocked. Provider pages remain inside their dedicated WebView
 and cannot use this route.
+
+First-run setup has three required actions: choose the CAD tool, choose or create a writable Catalog
+Repository, and connect the tool. Source credentials remain optional Settings controls. Repository
+selection uses one native selector and an app-managed local checkout; no path typing is required.
+When that checkout location already contains another repository or person-owned files, Stockroom
+preserves it and chooses a repository-named sibling automatically. Successful tool connection
+finishes onboarding without a separate Ready confirmation.
+
+Settings contains product and machine controls only. The personal About section and its author and
+profile links are not product configuration and are not shown.

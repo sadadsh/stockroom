@@ -740,11 +740,10 @@ export interface ActivateResponse {
 }
 
 export type GuidedSetupStep =
-  | "choose_cad_tool"
-  | "catalog_repository"
-  | "connect_the_tool"
-  | "improve_source_data"
-  | "ready";
+    | "choose_cad_tool"
+    | "catalog_repository"
+    | "connect_the_tool"
+    | "ready";
 
 export interface GitHubViewer {
   login: string;

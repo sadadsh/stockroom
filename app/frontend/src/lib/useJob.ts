@@ -14,6 +14,8 @@ export type JobStatus = "idle" | "running" | "done" | "error";
 export interface JobProgress {
   pct?: number;
   message?: string;
+  user_code?: string;
+  verification_uri?: string;
   // The real pipeline phase (queued/fetching/rendering/extracting/validating), so the UI can
   // show honest per-stage loading instead of a bare spinner (spec section 8). Absent on jobs
   // that only report pct/message (e.g. bulk).

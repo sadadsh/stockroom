@@ -77,14 +77,15 @@ function isGitHubRepository(value: unknown): boolean {
 
 function isGuidedSetup(value: unknown): boolean {
   if (!isRecord(value)) return false;
-  const steps = ["choose_cad_tool", "catalog_repository", "connect_the_tool", "improve_source_data", "ready"];
+  const steps = ["choose_cad_tool", "catalog_repository", "connect_the_tool"];
+  const states = [...steps, "ready"];
   const repository = value.repository;
   const github = value.github;
   const tool = value.tool_connection;
   const source = value.source_data;
   return (
     value.schema === 1 &&
-    typeof value.step === "string" && steps.includes(value.step) &&
+    typeof value.step === "string" && states.includes(value.step) &&
     Array.isArray(value.steps) && value.steps.length === steps.length && value.steps.every((step, index) => step === steps[index]) &&
     typeof value.ready === "boolean" &&
     typeof value.repository_ready === "boolean" &&

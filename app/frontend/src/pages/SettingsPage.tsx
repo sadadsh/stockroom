@@ -7,9 +7,7 @@
  * key is only ever shown as a last-4 hint.
  */
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
-import { Banner as AstryxBanner } from "@astryxdesign/core/Banner";
 import { Card as AstryxCard } from "@astryxdesign/core/Card";
-import { Link as AstryxLink } from "@astryxdesign/core/Link";
 import { TextInput as AstryxTextInput } from "@astryxdesign/core/TextInput";
 import { ApiError, api } from "../api/client";
 import type { SetLibraryBody, SettingsPatch, WiringReport } from "../api/types";
@@ -57,7 +55,6 @@ import {
 import { Text, useCopyFormatter, useText } from "../lib/copy";
 import { Icon } from "../components/Icon";
 import {
-  aboutVersion,
   shortRevision,
   updateTargetRevision,
   type UpdateStanding,
@@ -1779,86 +1776,12 @@ function UpdateSection() {
   );
 }
 
-function AboutSettingsSection({ version, note = "" }: { version: string; note?: string }) {
-  const versionIsCurrent = /\bcurrent\b/i.test(note);
-  return (
-    <div
-      data-dev-id="about.root"
-      className="grid grid-cols-[44px_minmax(0,1fr)_auto] items-start gap-4 max-[900px]:grid-cols-[44px_minmax(0,1fr)]"
-    >
-      {/* Keep the former rail target addressable so existing personal Design Studio documents can
-          follow About into Settings instead of becoming invalid. It owns no product navigation. */}
-      <div data-dev-id="rail.about" className="contents">
-      <div
-        data-dev-id="about.icon"
-        className="grid h-11 w-11 flex-none place-items-center rounded-control bg-raise2 shadow-card"
-      >
-        <Icon id="brand.wordmark" className="ico h-6 w-6 text-t1" />
-      </div>
-      <div className="min-w-[14rem] flex-1">
-        <p data-dev-id="about.credit" className="text-sm text-t2">
-          <Text id="modal.about.credit">Made with love, from </Text>
-          <span className="font-medium text-t1">
-            <Text id="modal.about.author">Sadad Haidari</Text>
-          </span>
-          .
-        </p>
-        <p className="mt-1 text-xs text-t3">
-          <span className="font-medium"><Text id="modal.about.version">Version</Text></span>{" "}
-          <span className="tnum font-mono">{version}</span>
-        </p>
-        {versionIsCurrent ? (
-          <div data-dev-id="about.current" className="mt-2">
-            <Badge tone="ok">
-              <Text id="settings.about.current-status">Current</Text>
-            </Badge>
-          </div>
-        ) : note ? (
-          <AstryxBanner
-            data-dev-id="about.stale"
-            status="warning"
-            title={<Text id="settings.about.version-disagreement">Version Disagreement</Text>}
-            description={note}
-            container="section"
-            className="mt-2"
-          />
-        ) : null}
-      </div>
-      <div
-        data-dev-id="about.links"
-        className="flex flex-none flex-wrap items-center gap-3 max-[900px]:col-start-2"
-      >
-        <AstryxLink
-          href="https://www.linkedin.com/in/sadadhaidari"
-          isExternalLink
-          isStandalone
-          className="gap-1.5 text-xs"
-        >
-          <Text id="modal.about.linkedin">LinkedIn</Text>
-        </AstryxLink>
-        <AstryxLink
-          href="https://github.com/sadadsh"
-          isExternalLink
-          isStandalone
-          className="gap-1.5 text-xs"
-        >
-          <Text id="modal.about.github">GitHub</Text>
-        </AstryxLink>
-      </div>
-      </div>
-    </div>
-  );
-}
-
 // The General group's disclosures. Each group panel resolves its own cached queries (the same keys
 // the page header already reads, so no extra request) and computes its own collapsed-row summaries,
 // which keeps SettingsPage itself the page frame rather than the sum of all five panels.
 function GeneralGroup() {
   const { theme } = useTheme();
-  const { query: update, view: updateStanding } = useUpdateStanding();
-  const scenarioRail = useScenarioUiState().rail;
-  const aboutNote = scenarioRail?.aboutNote
-    ?? (updateStanding.standing === "restart_required" ? updateStanding.detail : "");
+  const { view: updateStanding } = useUpdateStanding();
   return (
     <>
         <SettingsDisclosure
@@ -1876,19 +1799,6 @@ function GeneralGroup() {
           data-dev-id="settings.appearance"
         >
           <AppearanceSection />
-        </SettingsDisclosure>
-        <SettingsDisclosure
-          title="About Stockroom"
-          titleId="settings.about.title"
-          hint="Application version, installed build, and project links."
-          hintId="settings.about.hint"
-          summary={<span className="tnum font-mono">{aboutVersion(update.data, __APP_VERSION__)}</span>}
-          data-dev-id="settings.about"
-        >
-          <AboutSettingsSection
-            version={aboutVersion(update.data, __APP_VERSION__)}
-            note={aboutNote}
-          />
         </SettingsDisclosure>
         <SettingsDisclosure
           title="Automatic Updates"

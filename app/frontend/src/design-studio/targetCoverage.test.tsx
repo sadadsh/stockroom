@@ -18,7 +18,7 @@ describe("target coverage", () => {
 
   it("requires generated identities on a control's internal text and icon nodes", () => {
     const root = fixture(`
-      <button data-dev-id="rail.about"><span data-design-id="auto.fixture.0abc123">About</span><svg data-design-id="auto.fixture.0def456" viewBox="0 0 24 24"></svg></button>
+      <button data-dev-id="rail.nav-settings"><span data-design-id="auto.fixture.0abc123">Settings</span><svg data-design-id="auto.fixture.0def456" viewBox="0 0 24 24"></svg></button>
     `);
     expect(coverageIssuesFor(root, DEV_IDS)).toEqual([]);
   });
@@ -44,7 +44,7 @@ describe("target coverage", () => {
 
   it("derives text, icon, layout, and interactive boundaries without opt-in markers", () => {
     const root = fixture(`
-      <button data-dev-id="rail.about">About</button>
+      <button data-dev-id="rail.nav-settings">Settings</button>
       <h2 data-copy-id="design-studio.title">Design Studio</h2>
       <svg data-icon-id="action.add"></svg>
       <section data-layout-piece="workspace.header-identity"></section>
@@ -85,7 +85,7 @@ describe("target coverage", () => {
   it("accepts registered dev, copy, icon, layout-piece, and approved dynamic identities", () => {
     const dynamic = componentDevId("STM32 H7[owner]");
     const root = fixture(`
-      <button data-design-meaningful data-dev-id="rail.about">About</button>
+      <button data-design-meaningful data-dev-id="rail.nav-settings">Settings</button>
       <h2 data-design-meaningful data-copy-id="design-studio.title">Design Studio</h2>
       <svg data-design-meaningful data-icon-id="action.add"></svg>
       <section data-design-meaningful data-layout-piece="workspace.header-identity"></section>
@@ -111,8 +111,8 @@ describe("target coverage", () => {
     const root = fixture(`
       <main data-dev-id="shell.root">
         <section data-dev-id="shell.content">
-          <button data-dev-id="rail.about"><span data-copy-id="about.title">About</span></button>
-          <button data-dev-id="rail.about">About Again</button>
+          <button data-dev-id="rail.nav-settings"><span data-copy-id="design-studio.title">Design Studio</span></button>
+          <button data-dev-id="rail.nav-settings">Settings Again</button>
         </section>
       </main>
     `);
@@ -121,12 +121,12 @@ describe("target coverage", () => {
       expect.objectContaining({ key: "dev:shell.root", depth: 0, occurrences: 1 }),
       expect.objectContaining({ key: "dev:shell.content", parentKey: "dev:shell.root", depth: 1 }),
       expect.objectContaining({
-        key: "dev:rail.about@ambiguous",
+        key: "dev:rail.nav-settings@ambiguous",
         parentKey: "dev:shell.content",
         occurrences: 2,
         overrideId: null,
       }),
-      expect.objectContaining({ key: "copy:about.title" }),
+      expect.objectContaining({ key: "copy:design-studio.title" }),
     ]));
     expect(layers.map((target) => target.key).join(" ")).not.toMatch(/index|:0|:1/);
   });
@@ -134,17 +134,17 @@ describe("target coverage", () => {
   it("emits one exact selectable layer row for each durable duplicate occurrence", () => {
     const root = fixture(`
       <main data-dev-id="shell.root">
-        <section data-dev-id="rail.root"><button data-dev-id="rail.about">Rail About</button></section>
-        <section data-dev-id="settings.root"><button data-dev-id="rail.about">Settings About</button></section>
+        <section data-dev-id="rail.root"><button data-dev-id="rail.nav-settings">Rail Settings</button></section>
+        <section data-dev-id="settings.root"><button data-dev-id="rail.nav-settings">Settings Button</button></section>
       </main>
     `);
 
-    const duplicateRows = targetLayersFor(root, DEV_IDS).filter((target) => target.id === "rail.about");
+    const duplicateRows = targetLayersFor(root, DEV_IDS).filter((target) => target.id === "rail.nav-settings");
 
     expect(duplicateRows).toHaveLength(2);
     expect(new Set(duplicateRows.map((target) => target.key)).size).toBe(2);
     expect(duplicateRows.every((target) => target.overrideId?.startsWith("auto.occurrence."))).toBe(true);
-    expect(duplicateRows.map((target) => target.element.textContent)).toEqual(["Rail About", "Settings About"]);
+    expect(duplicateRows.map((target) => target.element.textContent)).toEqual(["Rail Settings", "Settings Button"]);
   });
 
   it("includes generated identities in the complete layer tree", () => {

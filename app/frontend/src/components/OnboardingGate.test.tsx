@@ -65,6 +65,16 @@ function streamOf(...events: string[]): ReadableStream<Uint8Array> {
   });
 }
 
+function controlledStream() {
+  const encoder = new TextEncoder();
+  let controller!: ReadableStreamDefaultController<Uint8Array>;
+  return {
+    stream: new ReadableStream<Uint8Array>({ start(value) { controller = value; } }),
+    send(event: string) { controller.enqueue(encoder.encode(event)); },
+    close() { controller.close(); },
+  };
+}
+
 function renderGate(status: OnboardingStatus, scenario = {}) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   client.setQueryData(["onboarding"], status);
@@ -89,7 +99,7 @@ beforeEach(() => {
 });
 
 describe("OnboardingGate", () => {
-  it("renders the server-owned five-step order and resumes the named step", () => {
+  it("renders only the three required setup steps", () => {
     renderGate(statusAt("connect_the_tool"));
 
     const progress = screen.getByRole("list", { name: "Setup Progress" });
@@ -97,8 +107,6 @@ describe("OnboardingGate", () => {
       "1.Choose CAD Tool",
       "2.Catalog Repository",
       "3.Connect The Tool",
-      "4.Improve Source Data",
-      "5.Ready",
     ]);
     expect(screen.getByRole("heading", { name: "Connect The Tool" })).toBeInTheDocument();
   });
@@ -121,8 +129,9 @@ describe("OnboardingGate", () => {
     await waitFor(() => expect(mockApi.updateSettings).toHaveBeenCalledWith({ primary_eda: "altium" }));
   });
 
-  it("starts GitHub browser sign-in without showing a token control", async () => {
+  it("shows the GitHub device code before opening the authorization page", async () => {
     const open = vi.spyOn(window, "open").mockReturnValue(null);
+    const events = controlledStream();
     const unsigned = statusAt("catalog_repository");
     unsigned.guided_setup = guidedSetupAt("catalog_repository", {
       ready: false,
@@ -131,24 +140,24 @@ describe("OnboardingGate", () => {
       github: { available: true, version: "2.80.0", authenticated: false, online: true, viewer: null, owners: [] },
     });
     mockApi.startOnboardingGitHubLogin.mockResolvedValue({ job_id: "login-1" });
-    mockApi.openJobStream.mockResolvedValue(streamOf(
-      'event: result\ndata: {"result":{"viewer":{"login":"engineer","name":null},"owners":[]}}\n\n',
-      "event: done\ndata: {}\n\n",
-    ));
+    mockApi.openJobStream.mockResolvedValue(events.stream);
     renderGate(unsigned);
 
     expect(screen.queryByLabelText(/token/i)).not.toBeInTheDocument();
     await userEvent.setup().click(screen.getByRole("button", { name: "Sign In With GitHub" }));
+    await waitFor(() => expect(mockApi.openJobStream).toHaveBeenCalledWith("login-1"));
+    expect(open).not.toHaveBeenCalled();
+
+    events.send('event: progress\ndata: {"stage":"device_code","pct":0.3,"message":"Enter this code in GitHub","user_code":"ABCD-EFGH","verification_uri":"https://github.com/login/device"}\n\n');
+    expect(await screen.findByText("ABCD-EFGH")).toBeVisible();
     expect(open).toHaveBeenCalledWith(
       "https://github.com/login/device",
       "_blank",
       "noreferrer",
     );
-    await waitFor(() => expect(mockApi.startOnboardingGitHubLogin).toHaveBeenCalledOnce());
-    expect(mockApi.startOnboardingGitHubLogin.mock.invocationCallOrder[0]).toBeLessThan(
-      open.mock.invocationCallOrder[0],
-    );
-    expect(mockApi.openJobStream).toHaveBeenCalledWith("login-1");
+    events.send('event: result\ndata: {"result":{"viewer":{"login":"engineer","name":null},"owners":[]}}\n\n');
+    events.send("event: done\ndata: {}\n\n");
+    events.close();
   });
 
   it("creates for a personal or organization owner with an editable slug, access, and native folder picker", async () => {
@@ -179,25 +188,27 @@ describe("OnboardingGate", () => {
     }));
   });
 
-  it("lists writable GitHub catalogs and connects the selected one without typed URL or path controls", async () => {
+  it("makes the likely catalog an obvious selection and connects it without a path choice", async () => {
     mockApi.getOnboardingGitHubRepositories.mockResolvedValue({ repositories: [
-      { owner: "engineer", name: "catalog-a", url: "https://github.com/engineer/catalog-a.git", visibility: "private", permission: "admin", writable: true },
+      { owner: "engineer", name: "unrelated-app", url: "https://github.com/engineer/unrelated-app.git", visibility: "private", permission: "admin", writable: true },
+      { owner: "engineer", name: "Mainline-Components", url: "https://github.com/engineer/Mainline-Components.git", visibility: "private", permission: "admin", writable: true },
       { owner: "engineer", name: "read-only", url: "https://github.com/engineer/read-only.git", visibility: "public", permission: "read", writable: false },
     ] });
     mockApi.setGuidedRepository.mockResolvedValue(statusAt("connect_the_tool"));
     renderGate(statusAt("catalog_repository"));
 
-    expect(await screen.findByRole("button", { name: /engineer\/catalog-a/ })).toBeInTheDocument();
+    const selector = await screen.findByRole("combobox", { name: "Catalog Repository" });
+    expect(selector).toHaveValue("Mainline-Components");
     expect(screen.queryByText(/read-only/)).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/path|url|token/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Change Folder" })).not.toBeInTheDocument();
     const user = userEvent.setup();
-    await user.click(screen.getByRole("button", { name: /engineer\/catalog-a/ }));
-    await user.click(screen.getByRole("button", { name: "Connect Catalog" }));
+    await user.click(screen.getByRole("button", { name: "Connect Mainline-Components" }));
 
     await waitFor(() => expect(mockApi.setGuidedRepository).toHaveBeenCalledWith({
       mode: "connect",
       owner: "engineer",
-      name: "catalog-a",
+      name: "Mainline-Components",
       visibility: undefined,
       path: "C:/Users/Engineer/Stockroom Catalog",
     }));
@@ -221,28 +232,12 @@ describe("OnboardingGate", () => {
     await waitFor(() => expect(mockApi.connectGuidedTool).toHaveBeenCalledOnce());
   });
 
-  it("submits optional source credentials, keeps backend validation inline, and permits Skip", async () => {
-    mockApi.saveGuidedSourceData.mockRejectedValueOnce(new Error("DigiKey needs both Client ID and Client Secret"));
-    mockApi.saveGuidedSourceData.mockResolvedValueOnce(statusAt("ready"));
-    renderGate(statusAt("improve_source_data"));
-    const user = userEvent.setup();
-
-    await user.type(screen.getByLabelText("DigiKey Client ID"), "client-only");
-    await user.click(screen.getByRole("button", { name: "Connect Source Data" }));
-    expect(await screen.findByRole("alert")).toHaveTextContent("DigiKey needs both Client ID and Client Secret");
-    await user.click(screen.getByRole("button", { name: "Skip" }));
-    await waitFor(() => expect(mockApi.saveGuidedSourceData).toHaveBeenLastCalledWith({ skipped: true }));
-  });
-
-  it("shows the exact prepared proof and completes through the sole primary action", async () => {
+  it("completes an already-ready setup without another confirmation screen", async () => {
     const status = statusAt("ready", { guided_setup: GUIDED_SETUP_READY });
     mockApi.completeOnboarding.mockResolvedValue({ ...status, onboarded: true, first_run: false });
     renderGate(status);
 
-    expect(screen.getByText("engineer/stockroom-catalog")).toBeInTheDocument();
-    expect(screen.getByText("KiCad is connected.")).toBeInTheDocument();
-    expect(screen.getByText("Add A Component")).toBeInTheDocument();
-    await userEvent.setup().click(screen.getByRole("button", { name: "Open Components" }));
     await waitFor(() => expect(mockApi.completeOnboarding).toHaveBeenCalledOnce());
+    expect(screen.queryByRole("button", { name: "Open Components" })).not.toBeInTheDocument();
   });
 });

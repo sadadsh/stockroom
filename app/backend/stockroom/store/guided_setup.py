@@ -19,8 +19,6 @@ SETUP_STEPS = (
     "choose_cad_tool",
     "catalog_repository",
     "connect_the_tool",
-    "improve_source_data",
-    "ready",
 )
 
 
@@ -220,8 +218,6 @@ def status(ctx, github: dict[str, object]) -> dict[str, object]:
         step = "catalog_repository"
     elif not bool(tool["connected"]):
         step = "connect_the_tool"
-    elif not source_decided:
-        step = "improve_source_data"
     else:
         step = "ready"
 

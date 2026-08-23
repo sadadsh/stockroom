@@ -7,8 +7,6 @@ export const GUIDED_SETUP_READY: GuidedSetupStatus = {
     "choose_cad_tool",
     "catalog_repository",
     "connect_the_tool",
-    "improve_source_data",
-    "ready",
   ],
   ready: true,
   repository_ready: true,

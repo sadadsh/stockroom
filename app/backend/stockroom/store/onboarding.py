@@ -182,9 +182,9 @@ def guided_clone_destination(
 ) -> tuple[Path, bool]:
     """Preflight a guided clone and identify an exact resumable checkout.
 
-    Returns ``(path, False)`` for an absent/empty destination and ``(path, True)`` only when the
-    destination is already a Git checkout whose credential-free origin exactly matches GitHub's
-    expected repository. Every other non-empty folder is refused before remote creation.
+    Returns ``(path, False)`` for an absent/empty destination and ``(path, True)`` when an exact
+    checkout already exists. An occupied destination is preserved and a repository-named sibling
+    is selected automatically.
     """
 
     root = _require_library_root_boundary(Path(destination))
@@ -195,12 +195,27 @@ def guided_clone_destination(
     if not any(root.iterdir()):
         return root, False
     repo = GitRepo(root)
-    if not (root / ".git").exists():
-        raise ValueError(f"clone destination is not empty: {root}")
-    actual = repo.remote_url("origin")
-    if normalize_remote(actual) != normalize_remote(expected_url):
-        raise ValueError("existing clone origin does not match the selected Catalog Repository")
-    return root, True
+    if (root / ".git").exists() and normalize_remote(repo.remote_url("origin")) == normalize_remote(
+        expected_url
+    ):
+        return root, True
+
+    repository_name = expected_url.rstrip("/").rsplit("/", 1)[-1].removesuffix(".git")
+    if not repository_name:
+        raise ValueError("the selected Catalog Repository has no usable name")
+    index = 1
+    while True:
+        name = repository_name if index == 1 else f"{repository_name}-{index}"
+        candidate = _require_library_root_boundary(root.with_name(name))
+        index += 1
+        if candidate == root:
+            continue
+        if not candidate.exists() or (candidate.is_dir() and not any(candidate.iterdir())):
+            return candidate, False
+        if (candidate / ".git").exists() and normalize_remote(
+            GitRepo(candidate).remote_url("origin")
+        ) == normalize_remote(expected_url):
+            return candidate, True
 
 
 def set_library(

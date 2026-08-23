@@ -72,46 +72,6 @@
       ]
     },
     {
-      "id": "global.about.open",
-      "title": "About Open",
-      "area": "global",
-      "group": "Global",
-      "route": "settings",
-      "expectedTargets": [
-        "about.root"
-      ]
-    },
-    {
-      "id": "global.about.current",
-      "title": "About Current",
-      "area": "global",
-      "group": "Global",
-      "route": "settings",
-      "expectedTargets": [
-        "about.root"
-      ]
-    },
-    {
-      "id": "global.about.update-available",
-      "title": "About Update-Available",
-      "area": "global",
-      "group": "Global",
-      "route": "settings",
-      "expectedTargets": [
-        "about.root"
-      ]
-    },
-    {
-      "id": "global.about.stale",
-      "title": "About Stale",
-      "area": "global",
-      "group": "Global",
-      "route": "settings",
-      "expectedTargets": [
-        "about.root"
-      ]
-    },
-    {
       "id": "global.rail.expanded",
       "title": "Rail Expanded",
       "area": "global",

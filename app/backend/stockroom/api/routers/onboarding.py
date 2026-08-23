@@ -212,7 +212,17 @@ def onboarding_router(require_token) -> APIRouter:
         def work(progress):
             progress({"stage": "waiting", "pct": 0.2, "message": "waiting for GitHub sign-in"})
             cli = GitHubCli()
-            viewer = cli.login_browser()
+            viewer = cli.login_browser(
+                on_code=lambda code: progress(
+                    {
+                        "stage": "device_code",
+                        "pct": 0.3,
+                        "message": "Enter this code in GitHub",
+                        "user_code": code,
+                        "verification_uri": "https://github.com/login/device",
+                    }
+                )
+            )
             return {
                 "viewer": {"login": viewer.login, "name": viewer.name},
                 "owners": [
@@ -370,6 +380,8 @@ def onboarding_router(require_token) -> APIRouter:
                 tool=selected_tool,
                 receipt=receipt,
             )
+            onb.complete_onboarding(ctx.config)
+            guided_setup.record_completion(ctx.config)
             final = PrimaryEdaPolicy(ctx.config).primary_tool
             if (
                 final is None

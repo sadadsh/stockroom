@@ -5,7 +5,6 @@ import { guidedSetupAt } from "../fixtures/onboardingFixtures";
 export const globalScenarioIds = [
   "global.real-data", "global.onboarding.open", "global.onboarding.create", "global.onboarding.clone",
   "global.onboarding.error", "global.onboarding.create-error", "global.onboarding.clone-error",
-  "global.about.open", "global.about.current", "global.about.update-available", "global.about.stale",
   "global.rail.expanded", "global.rail.collapsed", "global.theme.dark", "global.theme.light",
   "global.update.current", "global.update.available", "global.update.updating", "global.update.error",
   "global.add-parts.empty", "global.add-parts.validating", "global.add-parts.exact", "global.add-parts.mismatch", "global.add-parts.duplicate", "global.add-parts.failure",
@@ -31,6 +30,22 @@ const firstRun = {
     repository: null,
   }),
 };
+const firstRunSignedOut = {
+  ...firstRun,
+  guided_setup: guidedSetupAt("catalog_repository", {
+    ready: false,
+    repository_ready: false,
+    repository: null,
+    github: {
+      available: true,
+      version: "2.80.0",
+      authenticated: false,
+      online: true,
+      viewer: null,
+      owners: [],
+    },
+  }),
+};
 const searchRows = [{ id: "fixture-part", display_name: "LM358", category: "Integrated Circuits", mpn: "LM358DR", manufacturer: "Texas Instruments", is_complete: true, missing: [], specs: { channels: 2 }, stock: 1200, unit_price: 0.42, currency: "USD" }];
 
 function fixture(method: string, path: string, response: unknown, behavior?: ScenarioFixture["behavior"]): ScenarioFixture {
@@ -40,31 +55,29 @@ function fixture(method: string, path: string, response: unknown, behavior?: Sce
 function globalFixtures(id: GlobalScenarioId): ScenarioFixture[] {
   if (id === "global.real-data") return [];
   const isOnboarding = id.startsWith("global.onboarding.");
-  const updateState = id.endsWith("update.available") || id.endsWith("about.update-available") ? "update_available"
+  const updateState = id.endsWith("update.available") ? "update_available"
     : id.endsWith("update.updating") ? "updating" : id === "global.offline" ? "offline"
-      : id === "global.stale" || id.endsWith("about.stale") ? "restart_required" : "up_to_date";
+      : id === "global.stale" ? "restart_required" : "up_to_date";
   const reads: ScenarioFixture[] = [];
   for (const item of settingsReadFixtures({ updateState })) {
     if (isOnboarding && item.path === "/api/onboarding") continue;
-    const staleUpdate = id.endsWith("about.stale") && item.path === "/api/update/check"
-      ? {
-          ...item,
-          response: {
-            ...(item.response as Record<string, unknown>),
-            state: "up_to_date",
-            update_available: false,
-            frontend_revision: "1111111111111111111111111111111111111111",
-            current_revision: "1111111111111111111111111111111111111111",
-            target_revision: "1111111111111111111111111111111111111111",
-            detail: "The backend is current, but this window is still running the previous interface.",
-          },
-        }
-      : item;
     reads.push(id === "global.update.error" && item.path === "/api/update/check"
-      ? { ...staleUpdate, behavior: { state: "error" as const, status: 503, message: "Update check unavailable." } }
-      : staleUpdate);
+      ? { ...item, behavior: { state: "error" as const, status: 503, message: "Update check unavailable." } }
+      : item);
   }
-  if (isOnboarding) reads.unshift(fixture("GET", "/api/onboarding", firstRun));
+  if (isOnboarding) reads.unshift(
+    fixture("GET", "/api/onboarding", id === "global.onboarding.open" ? firstRunSignedOut : firstRun),
+    fixture("GET", "/api/onboarding/github/repositories/engineer", {
+      repositories: [{
+        owner: "engineer",
+        name: "stockroom-catalog",
+        url: "https://github.com/engineer/stockroom-catalog",
+        visibility: "private",
+        permission: "admin",
+        writable: true,
+      }],
+    }),
+  );
   if (id.startsWith("global.search.")) {
     const query = id.endsWith(".initial") ? "" : id.endsWith(".filtered") ? "LM358" : id.endsWith(".empty") ? "missing-part" : "LM358";
     const error = id.endsWith(".error") ? { state: "error" as const, status: 503, message: "Search unavailable." } : undefined;
@@ -90,16 +103,6 @@ function uiFor(id: GlobalScenarioId): Readonly<ScenarioUiState> {
           : "Could not prepare the catalog.";
     return { onboarding: { mode, setupError } };
   }
-  if (id.startsWith("global.about.")) return {
-    settings: { section: "settings.about" },
-    rail: {
-      aboutNote: id.endsWith(".current")
-        ? "Stockroom is current."
-        : id.endsWith(".stale")
-          ? "The running frontend and backend versions disagree. Restart Stockroom to apply the prepared release."
-          : undefined,
-    },
-  };
   if (id === "global.rail.collapsed" || id === "global.rail.expanded") return { railState: id.endsWith("collapsed") ? "collapsed" : "expanded" };
   if (id === "global.theme.dark" || id === "global.theme.light") return { theme: id.endsWith("light") ? "light" : "dark" };
   if (id.startsWith("global.add-parts.")) return { addParts: { state: id.split(".").slice(-1)[0] as NonNullable<ScenarioUiState["addParts"]>["state"] } };
@@ -114,7 +117,6 @@ function uiFor(id: GlobalScenarioId): Readonly<ScenarioUiState> {
 
 function targetFor(id: GlobalScenarioId): string {
   if (id.startsWith("global.onboarding.")) return "onboarding.gate";
-  if (id.startsWith("global.about.")) return "about.root";
   if (id.startsWith("global.add-parts.")) return "addpart.root";
   if (id.startsWith("global.search.")) return "search.root";
   if (id.startsWith("global.confirmation.")) return "confirm.root";
@@ -129,7 +131,7 @@ function targetFor(id: GlobalScenarioId): string {
 
 function scenario(id: GlobalScenarioId): DesignScenario {
   return {
-    id, title: id === "global.real-data" ? "Real Data" : id.split(".").slice(1).join(" ").replace(/(^|[ -])\w/g, (letter) => letter.toUpperCase()), area: "global", group: "Global", route: id.startsWith("global.about.") ? "settings" : "components",
+    id, title: id === "global.real-data" ? "Real Data" : id.split(".").slice(1).join(" ").replace(/(^|[ -])\w/g, (letter) => letter.toUpperCase()), area: "global", group: "Global", route: "components",
     fixtures: globalFixtures(id), initialUi: uiFor(id), expectedTargets: [targetFor(id)],
   };
 }

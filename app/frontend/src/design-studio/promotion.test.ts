@@ -34,7 +34,7 @@ function personalDocument(): DesignDocument {
     tokens: { root: { "--r-card": "18px" }, light: { "--c-t1": "#111111" } },
     copy: { "rail.components": "My Components" },
     icons: { "nav.components": { swapToId: "nav.stm" } },
-    elements: { "rail.about": { width: "240px" } },
+    elements: { "rail.nav-settings": { width: "240px" } },
     behaviors: { "projects.board-control": { preset: "segmented" } },
     layout: null,
   };
@@ -67,7 +67,7 @@ describe("personal design source promotion", () => {
       tokens: { root: { "--r-card": "18px" }, light: { "--c-t1": "#111111" } },
       copy: { "rail.components": "My Components" },
       icons: { "nav.components": { swapToId: "nav.stm" } },
-      elements: { "rail.about": { width: "240px" } },
+      elements: { "rail.nav-settings": { width: "240px" } },
       behaviors: { "projects.board-control": { preset: "segmented" } },
       copyPlaceholders: {},
       layout: { workspace: null },
@@ -111,7 +111,7 @@ describe("personal design source promotion", () => {
     shell.innerHTML = `
       <button>Make App Default</button>
       <div data-design-product-root>
-        <button data-dev-id="rail.about">About</button>
+        <button data-dev-id="rail.nav-settings">Settings</button>
       </div>
     `;
 

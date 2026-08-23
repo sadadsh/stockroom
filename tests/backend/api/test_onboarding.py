@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 
 from stockroom.store.profile import ProfileStore
-from stockroom.vcs.github_cli import GitHubRepository
+from stockroom.vcs.github_cli import GitHubOwner, GitHubRepository, GitHubViewer
 from stockroom.vcs.repo import GitRepo
 
 pytestmark = pytest.mark.skipif(shutil.which("git") is None, reason="git not installed")
@@ -60,6 +60,30 @@ def test_github_status_distinguishes_sign_in_from_an_outage():
     assert auth_probe_offline["authenticated"] is False
     assert auth_probe_offline["online"] is False
     assert "retry automatically" in auth_probe_offline["error"]
+
+
+def test_github_login_streams_the_device_code_without_a_token(client, monkeypatch):
+    class Authority:
+        def login_browser(self, *, on_code):
+            on_code("ABCD-EFGH")
+            return GitHubViewer(login="engineer", name=None)
+
+        def owners(self):
+            return (GitHubOwner(login="engineer", kind="personal"),)
+
+    monkeypatch.setattr("stockroom.api.routers.onboarding.GitHubCli", Authority)
+
+    started = client.post("/api/onboarding/github/login")
+    assert started.status_code == 200
+    with client.stream(
+        "GET",
+        f"/api/jobs/{started.json()['job_id']}/events",
+    ) as stream:
+        events = "".join(stream.iter_text())
+
+    assert '"user_code": "ABCD-EFGH"' in events
+    assert '"verification_uri": "https://github.com/login/device"' in events
+    assert "token" not in events.casefold()
 
 
 def test_status_reports_current_library(client):
@@ -291,16 +315,39 @@ def test_guided_mutations_refuse_to_overlap_tool_setup(client, app_ctx, tmp_path
     assert app_ctx.config.primary_eda == "kicad"
 
 
-def test_guided_repository_preflights_destination_before_remote_creation(
+def test_guided_repository_preserves_an_occupied_folder_and_uses_a_safe_sibling(
     client, app_ctx, tmp_path, monkeypatch
 ):
     app_ctx.config.primary_eda = "kicad"
     occupied = tmp_path / "occupied"
     occupied.mkdir()
     (occupied / "person-owned.txt").write_text("keep", encoding="utf-8")
+    repository = GitHubRepository(
+        owner="engineer",
+        name="stockroom-catalog",
+        url="https://github.com/engineer/stockroom-catalog.git",
+        visibility="private",
+        permission="admin",
+    )
+
+    class Authority:
+        def create_repository(self, owner, name, *, visibility):
+            return repository
+
+        def clone_repository(self, owner, name, destination):
+            assert (owner, name) == ("engineer", "stockroom-catalog")
+            _library(destination, "Main")
+
+    monkeypatch.setattr("stockroom.api.routers.onboarding.GitHubCli", Authority)
     monkeypatch.setattr(
-        "stockroom.api.routers.onboarding.GitHubCli",
-        lambda: (_ for _ in ()).throw(AssertionError("remote creation must not start")),
+        "stockroom.api.routers.onboarding._github_status",
+        lambda *_args, **_kwargs: {
+            "available": True,
+            "authenticated": True,
+            "online": True,
+            "viewer": {"login": "engineer", "name": None},
+            "owners": [{"login": "engineer", "kind": "personal"}],
+        },
     )
 
     response = client.post(
@@ -314,8 +361,9 @@ def test_guided_repository_preflights_destination_before_remote_creation(
         },
     )
 
-    assert response.status_code == 400
+    assert response.status_code == 200
     assert (occupied / "person-owned.txt").read_text(encoding="utf-8") == "keep"
+    assert app_ctx.libraries_root == tmp_path / "stockroom-catalog"
 
 
 def test_guided_repository_create_switches_only_after_github_returns_identity(
@@ -527,6 +575,8 @@ def test_connect_selected_kicad_runs_as_a_job_and_records_verified_receipt(
         "tool": "kicad",
         "receipt": {"verified": True, "restart_required": True},
     }
+    assert app_ctx.config.guided_setup["completed"] is True
+    assert app_ctx.config.onboarded is True
 
 
 @pytest.mark.parametrize(

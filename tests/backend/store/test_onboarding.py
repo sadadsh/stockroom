@@ -154,7 +154,7 @@ def test_guided_clone_preflight_accepts_an_empty_destination(tmp_path):
     ) == (destination.resolve(), False)
 
 
-def test_guided_clone_preflight_resumes_only_the_exact_origin(tmp_path):
+def test_guided_clone_preflight_resumes_exact_origin_or_chooses_a_safe_sibling(tmp_path):
     destination = _library(tmp_path / "catalog")
     repo = GitRepo(destination)
     repo.add_remote("origin", "https://github.com/engineer/catalog.git")
@@ -163,11 +163,23 @@ def test_guided_clone_preflight_resumes_only_the_exact_origin(tmp_path):
         destination,
         expected_url="https://github.com/engineer/catalog.git",
     ) == (destination.resolve(), True)
-    with pytest.raises(ValueError, match="origin does not match"):
-        onboarding.guided_clone_destination(
-            destination,
-            expected_url="https://github.com/engineer/other.git",
-        )
+    assert onboarding.guided_clone_destination(
+        destination,
+        expected_url="https://github.com/engineer/other.git",
+    ) == (tmp_path / "other", False)
+
+
+def test_guided_clone_preflight_numbers_an_occupied_repository_sibling(tmp_path):
+    destination = _library(tmp_path / "catalog")
+    GitRepo(destination).add_remote("origin", "https://github.com/engineer/catalog.git")
+    (tmp_path / "other").mkdir()
+    (tmp_path / "other" / "keep.txt").write_text("user-owned", encoding="utf-8")
+
+    assert onboarding.guided_clone_destination(
+        destination,
+        expected_url="https://github.com/engineer/other.git",
+    ) == (tmp_path / "other-2", False)
+    assert (tmp_path / "other" / "keep.txt").read_text(encoding="utf-8") == "user-owned"
 
 
 def test_guided_clone_preflight_accepts_ssh_origin_for_selected_github_repository(tmp_path):
