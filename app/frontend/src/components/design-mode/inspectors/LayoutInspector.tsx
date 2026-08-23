@@ -5,9 +5,9 @@ import { isProtectedDesignRoot } from "../../../lib/designIdentity";
 
 export function LayoutInspector(props: DomainInspectorProps) {
   const dev = useDevMode();
-  const restoreLabel = useText("design-studio.inspector.layout.restore", "Show Element");
-  const removeLabel = useText("design-studio.inspector.layout.remove", "Hide Element");
-  const removalHint = useText("design-studio.inspector.layout.removal-hint", "Hidden elements remain available in Layers and Undo.");
+  const restoreLabel = useText("design-studio.inspector.layout.restore", "Restore Element");
+  const removeLabel = useText("design-studio.inspector.layout.remove", "Remove From Arrangement");
+  const removalHint = useText("design-studio.inspector.layout.removal-hint", "Removed elements remain available in Layers and Undo.");
   const protectedRoot = isProtectedDesignRoot(props.inspection.target);
   const removed = props.affectedTargetIds.every(
     (id) => dev.elementOverridesFor(id)?.display === "none",

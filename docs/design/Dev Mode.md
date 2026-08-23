@@ -29,7 +29,8 @@ the last renderable product preview instead of replacing Stockroom with a blank 
 
 In Edit, click the visible element you mean to change. Shift-click adds another target and Tab moves
 through related parent and child targets. The selection outline provides one move grip, eight resize
-handles, visibility, and reset controls. Hidden targets remain available as ghost rows in Layers.
+handles, removal, and reset controls. Removed targets leave layout without deleting their saved
+identity or edits, and remain available as restorable ghost rows in Layers and Undo.
 
 Every Stockroom-owned JSX element receives a deterministic `data-design-id` during the production
 build, so a developer does not need to add an ID merely to make new UI editable. Authored
@@ -48,6 +49,7 @@ The compact inspector groups controls under **Layout**, **Appearance**, **Conten
 unrelated wrapper, and changing an icon does not recolor technical CAD geometry. Safe controls cover
 layout, sizing, flow or detached placement, spacing, stacking, visibility, color, border, shadow,
 typography, text content, icon asset and treatment, interaction states, and validated advanced CSS.
+Direct text on an authored target is editable even when it has no separate copy wrapper.
 Executable JavaScript and unsafe HTML are never accepted.
 
 Move and resize gestures use the selected View preference:

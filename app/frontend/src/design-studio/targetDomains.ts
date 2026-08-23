@@ -213,12 +213,7 @@ function textEditElements(
 ): Element[] {
   const elements = domainElementsExceptTarget(domains, target);
   const ownsVisibleText = domains.some((domain) => domain.element === target);
-  if (
-    ownsVisibleText &&
-    (target.hasAttribute("data-copy-id") || target.hasAttribute("data-design-id"))
-  ) {
-    elements.unshift(target);
-  }
+  if (ownsVisibleText) elements.unshift(target);
   return uniqueElements(elements);
 }
 

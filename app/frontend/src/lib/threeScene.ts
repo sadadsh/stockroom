@@ -39,6 +39,8 @@ import {
 } from "./cameraFit";
 import {
   assessPlacement,
+  buriedSmdUprightAxis,
+  repairBuriedSmdPlacement,
   type PlacementAssessment,
 } from "./placementAssessment";
 import { kicadModelPlacementMatrix } from "./placementTransform";
@@ -1063,11 +1065,21 @@ export function mountModelScene(
    */
   function refreshModelFrame() {
     if (!modelRoot || !nativeModelTransform) return;
+    let placementOrientationRepair: THREE.Matrix4 | null = null;
+    let placementRepair: [number, number, number] | null = null;
     const configure = (source: "kicad" | "model") => {
       modelRoot!.position.copy(nativeModelTransform!.position);
       modelRoot!.quaternion.copy(nativeModelTransform!.quaternion);
       modelRoot!.scale.copy(nativeModelTransform!.scale).multiplyScalar(1000);
       applyPlacement(source === "kicad" ? placement : null);
+      if (source === "kicad" && placementOrientationRepair) {
+        root.matrix.premultiply(placementOrientationRepair);
+        root.matrixWorldNeedsUpdate = true;
+      }
+      if (source === "kicad" && placementRepair) {
+        root.matrix.premultiply(new THREE.Matrix4().makeTranslation(...placementRepair));
+        root.matrixWorldNeedsUpdate = true;
+      }
       if (source === "model") orientUpright(modelRoot!);
       root.updateMatrixWorld(true);
     };
@@ -1082,11 +1094,38 @@ export function mountModelScene(
         centerOffsetRatio: null,
         sizeRatio: null,
         verticalOffsetRatio: null,
+        belowBoardRatio: null,
       },
     };
     if (placement) {
       configure("kicad");
-      const candidate = new THREE.Box3().setFromObject(root);
+      let candidate = new THREE.Box3().setFromObject(root);
+      if (!candidate.isEmpty()) {
+        const candidateBounds = { min: candidate.min.toArray(), max: candidate.max.toArray() };
+        const uprightAxis = buriedSmdUprightAxis(candidateBounds, lastLand?.pads ?? []);
+        if (uprightAxis) {
+          const center = candidate.getCenter(new THREE.Vector3());
+          const angle = uprightAxis === "z"
+            ? (Math.abs(candidate.max.z) >= Math.abs(candidate.min.z) ? -Math.PI / 2 : Math.PI / 2)
+            : (Math.abs(candidate.max.x) >= Math.abs(candidate.min.x) ? Math.PI / 2 : -Math.PI / 2);
+          const rotation = uprightAxis === "z"
+            ? new THREE.Matrix4().makeRotationX(angle)
+            : new THREE.Matrix4().makeRotationZ(angle);
+          placementOrientationRepair = new THREE.Matrix4().makeTranslation(...center.toArray())
+            .multiply(rotation)
+            .multiply(new THREE.Matrix4().makeTranslation(...center.clone().negate().toArray()));
+          configure("kicad");
+          candidate = new THREE.Box3().setFromObject(root);
+        }
+        placementRepair = repairBuriedSmdPlacement(
+          { min: candidate.min.toArray(), max: candidate.max.toArray() },
+          lastLand?.pads ?? [],
+        );
+        if (placementRepair) {
+          configure("kicad");
+          candidate = new THREE.Box3().setFromObject(root);
+        }
+      }
       assessment = assessPlacement(
         candidate.isEmpty()
           ? null

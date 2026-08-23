@@ -30,6 +30,10 @@ management, and in-app Design Studio one coherent product line.
   collapsing repeated occurrences onto the wrong target.
 - Preview recovery, root-surface protection, transform-safe rotation, bounded z-order, gesture
   undo, and persisted draft/applied separation protect both the application and personal work.
+- Remove From Arrangement takes an element out of layout without deleting it; Layers and Undo can
+  restore the exact occurrence. Direct authored text remains selectable and editable.
+- The 3D asset viewer rejects buried or sideways SMD placement, stands rectangular bodies upright,
+  and aligns them to their real footprint pads while leaving valid source placement unchanged.
 
 ## Release Boundary
 

@@ -322,7 +322,7 @@ describe("DesignStudioShell", () => {
     expect(screen.getByRole("status")).toHaveTextContent("Draft is not saved. Design Studio remains open.");
   });
 
-  it("selects and hides one duplicate occurrence while retaining its exact ghost row", async () => {
+  it("selects, removes, and restores one duplicate occurrence through its exact ghost row", async () => {
     render(
       <Providers>
         <DesignStudioShell><DuplicateLayersProduct /></DesignStudioShell>
@@ -337,13 +337,16 @@ describe("DesignStudioShell", () => {
 
     await user.click(duplicateRows[1]!);
     expect(screen.getByTestId("duplicate-selection")).toHaveTextContent("duplicate-second");
-    await user.click(within(sidebar).getByRole("button", { name: "Hide Selected" }));
+    await user.click(within(sidebar).getByRole("button", { name: "Remove Selected" }));
 
-    expect(screen.getByTestId("duplicate-first")).not.toHaveStyle({ visibility: "hidden" });
-    expect(screen.getByTestId("duplicate-second")).toHaveStyle({ visibility: "hidden" });
-    expect(within(sidebar).getByRole("button", {
-      name: /Settings nav item · 2 of 2 · Hidden/,
-    })).toBeVisible();
+    expect(screen.getByTestId("duplicate-first")).not.toHaveStyle({ display: "none" });
+    expect(screen.getByTestId("duplicate-second")).toHaveStyle({ display: "none" });
+    const removedRow = within(sidebar).getByRole("button", {
+      name: /Settings nav item · 2 of 2 · Removed/,
+    });
+    expect(removedRow).toBeVisible();
+    await user.click(within(sidebar).getByRole("button", { name: /Restore Settings nav item · 2 of 2/ }));
+    expect(screen.getByTestId("duplicate-second")).not.toHaveStyle({ display: "none" });
   });
 
   it("recovers the last renderable draft without deleting unrelated edits or requiring undo", async () => {
@@ -658,25 +661,25 @@ describe("DesignStudioShell", () => {
     expect(sidebar.innerHTML).not.toContain("data-target-index");
   });
 
-  it("keeps hidden targets as ghost rows and blanks contents without hiding the preview root", async () => {
+  it("keeps removed targets as restorable ghost rows and clears contents without removing the preview root", async () => {
     await renderStudio();
     const sidebar = await openDrawer("Layers");
     const rail = within(sidebar).getByRole("button", { name: "Navigation rail" });
     await userEvent.setup().click(rail);
-    await userEvent.setup().click(within(sidebar).getByRole("button", { name: "Hide Selected" }));
-    expect(document.querySelector('[data-dev-id="rail.root"]')).toHaveStyle({ visibility: "hidden" });
-    expect(within(sidebar).getByRole("button", { name: /Navigation rail.*Hidden/ })).toBeVisible();
+    await userEvent.setup().click(within(sidebar).getByRole("button", { name: "Remove Selected" }));
+    expect(document.querySelector('[data-dev-id="rail.root"]')).toHaveStyle({ display: "none" });
+    expect(within(sidebar).getByRole("button", { name: /Navigation rail.*Removed/ })).toBeVisible();
 
     const productRoot = screen.getByRole("region", { name: "Stockroom Preview" })
       .querySelector("[data-design-product-root]") as HTMLElement;
-    await userEvent.setup().click(within(sidebar).getByRole("button", { name: "Hide Screen Contents" }));
-    expect(productRoot.style.visibility).toBe("");
-    expect(productRoot.querySelector<HTMLElement>('[data-dev-id="shell.root"]')?.style.visibility ?? "").toBe("");
-    expect(productRoot.querySelectorAll('[style*="visibility: hidden"]').length).toBeGreaterThan(1);
+    await userEvent.setup().click(within(sidebar).getByRole("button", { name: "Remove Screen Contents" }));
+    expect(productRoot.style.display).toBe("");
+    expect(productRoot.querySelector<HTMLElement>('[data-dev-id="shell.root"]')?.style.display ?? "").toBe("");
+    expect(productRoot.querySelectorAll('[style*="display: none"]').length).toBeGreaterThan(1);
 
-    await userEvent.setup().click(within(sidebar).getByRole("button", { name: "Show All Hidden" }));
-    expect(productRoot.style.visibility).toBe("");
-    expect((document.querySelector('[data-dev-id="rail.root"]') as HTMLElement).style.visibility).toBe("");
+    await userEvent.setup().click(within(sidebar).getByRole("button", { name: "Restore All Removed" }));
+    expect(productRoot.style.display).toBe("");
+    expect((document.querySelector('[data-dev-id="rail.root"]') as HTMLElement).style.display).toBe("");
   }, 10_000);
 
   it("defaults to meaningful layers and can reveal every generated wrapper", async () => {

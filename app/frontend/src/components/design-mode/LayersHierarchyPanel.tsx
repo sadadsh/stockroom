@@ -34,10 +34,11 @@ export function LayersHierarchyPanel() {
   const layersLabel = useText("design-studio.layers", "Layers");
   const hierarchyLabel = useText("design-studio.hierarchy", "Structure");
   const allElementsLabel = useText("design-studio.layers.all-elements", "All Elements");
-  const hideSelectedLabel = useText("design-studio.layers.hide-selected", "Hide Selected");
-  const hideScreenLabel = useText("design-studio.layers.hide-screen", "Hide Screen Contents");
-  const showHiddenLabel = useText("design-studio.layers.show-hidden", "Show All Hidden");
-  const hiddenLabel = useText("design-studio.layers.hidden", "Hidden");
+  const removeSelectedLabel = useText("design-studio.layers.hide-selected", "Remove Selected");
+  const removeScreenLabel = useText("design-studio.layers.hide-screen", "Remove Screen Contents");
+  const restoreAllLabel = useText("design-studio.layers.show-hidden", "Restore All Removed");
+  const removedLabel = useText("design-studio.layers.hidden", "Removed");
+  const restoreLabel = useText("design-studio.layers.restore", "Restore");
   const variations = Object.values(studio.document.variations);
   const parentVariations = variations.filter((variation) => variation.id !== studio.activeVariationId);
   const builtInIds = useMemo<Set<string>>(() => new Set(BUILT_IN_VARIATIONS.map((variation) => variation.id)), []);
@@ -48,18 +49,18 @@ export function LayersHierarchyPanel() {
   const visibleTargets = targets.filter(
     (target) => allElements
       || target.meaningful
-      || (target.overrideId !== null && dev.draft.elements[target.overrideId]?.visibility === "hidden"),
+      || (target.overrideId !== null && dev.draft.elements[target.overrideId]?.display === "none"),
   );
 
-  const replaceElementVisibility = (ids: readonly string[], hidden: boolean) => {
+  const replaceElementDisplay = (ids: readonly string[], removed: boolean) => {
     const elements = Object.fromEntries(
       Object.entries(dev.draft.elements).map(([id, props]) => [id, { ...props }]),
     );
     for (const id of ids) {
-      if (hidden) {
-        elements[id] = { ...(elements[id] ?? {}), visibility: "hidden" };
+      if (removed) {
+        elements[id] = { ...(elements[id] ?? {}), display: "none" };
       } else if (elements[id]) {
-        delete elements[id].visibility;
+        delete elements[id].display;
         if (Object.keys(elements[id]).length === 0) delete elements[id];
       }
     }
@@ -75,15 +76,15 @@ export function LayersHierarchyPanel() {
       const id = exactDesignTargetAuthority(element)?.overrideId;
       if (id) ids.push(id);
     }
-    replaceElementVisibility(ids, true);
+    replaceElementDisplay(ids, true);
   };
 
   const showAllHidden = () => {
     const ids: string[] = [];
     for (const [id, props] of Object.entries(dev.draft.elements)) {
-      if (props.visibility === "hidden") ids.push(id);
+      if (props.display === "none") ids.push(id);
     }
-    replaceElementVisibility(ids, false);
+    replaceElementDisplay(ids, false);
   };
 
   const createVariation = (event: FormEvent) => {
@@ -244,41 +245,52 @@ export function LayersHierarchyPanel() {
             <button
               type="button"
               disabled={!dev.selectedTarget || isProtectedDesignRoot(dev.selectedTarget.element)}
-              onClick={() => dev.selectedTarget && replaceElementVisibility([dev.selectedTarget.overrideId], true)}
+              onClick={() => dev.selectedTarget && replaceElementDisplay([dev.selectedTarget.overrideId], true)}
               className="rounded-control px-2 py-1 text-left text-2xs text-t2 hover:bg-raise2 disabled:text-t5"
             >
-              {hideSelectedLabel}
+              {removeSelectedLabel}
             </button>
             <button type="button" onClick={hideScreenContents} className="rounded-control px-2 py-1 text-left text-2xs text-t2 hover:bg-raise2">
-              {hideScreenLabel}
+              {removeScreenLabel}
             </button>
             <button type="button" onClick={showAllHidden} className="rounded-control px-2 py-1 text-left text-2xs text-t2 hover:bg-raise2">
-              {showHiddenLabel}
+              {restoreAllLabel}
             </button>
           </div>
           {visibleTargets.map((entry) => {
-            const isHidden = entry.overrideId !== null
-              && dev.draft.elements[entry.overrideId]?.visibility === "hidden";
+            const isRemoved = entry.overrideId !== null
+              && dev.draft.elements[entry.overrideId]?.display === "none";
             return (
-            <button
-              key={entry.key}
-              type="button"
-              data-target-key={entry.key}
-              data-target-depth={entry.depth}
-              disabled={entry.overrideId === null}
-              onClick={() => entry.overrideId && dev.selectTarget(entry.element)}
-              className={
-                "block w-full truncate rounded-control py-1 text-left text-xs hover:bg-raise2 " +
-                (view === "hierarchy" ? "pr-2" : "px-2") +
-                (dev.selectedTarget?.overrideId === entry.overrideId ? " bg-acc-soft text-t1" : " text-t2") +
-                (isHidden ? " opacity-60 outline outline-1 outline-dashed outline-line2" : "") +
-                (entry.overrideId === null ? " cursor-not-allowed opacity-50" : "")
-              }
-              style={view === "hierarchy" ? { paddingLeft: `${8 + entry.depth * 12}px` } : undefined}
-              title={entry.id}
-            >
-              {entry.label}{entry.occurrences > 1 ? ` (${entry.occurrences})` : ""}{isHidden ? ` · ${hiddenLabel}` : ""}
-            </button>
+            <div key={entry.key} className="flex items-center gap-1">
+              <button
+                type="button"
+                data-target-key={entry.key}
+                data-target-depth={entry.depth}
+                disabled={entry.overrideId === null}
+                onClick={() => entry.overrideId && dev.selectTarget(entry.element)}
+                className={
+                  "min-w-0 flex-1 truncate rounded-control py-1 text-left text-xs hover:bg-raise2 " +
+                  (view === "hierarchy" ? "pr-2" : "px-2") +
+                  (dev.selectedTarget?.overrideId === entry.overrideId ? " bg-acc-soft text-t1" : " text-t2") +
+                  (isRemoved ? " opacity-60 outline outline-1 outline-dashed outline-line2" : "") +
+                  (entry.overrideId === null ? " cursor-not-allowed opacity-50" : "")
+                }
+                style={view === "hierarchy" ? { paddingLeft: `${8 + entry.depth * 12}px` } : undefined}
+                title={entry.id}
+              >
+                {entry.label}{entry.occurrences > 1 ? ` (${entry.occurrences})` : ""}{isRemoved ? ` · ${removedLabel}` : ""}
+              </button>
+              {isRemoved && entry.overrideId ? (
+                <button
+                  type="button"
+                  aria-label={`${restoreLabel} ${entry.label}`}
+                  onClick={() => replaceElementDisplay([entry.overrideId!], false)}
+                  className="rounded-control px-1.5 py-1 text-2xs text-acc hover:bg-acc/10"
+                >
+                  {restoreLabel}
+                </button>
+              ) : null}
+            </div>
             );
           })}
         </div>

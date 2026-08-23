@@ -423,7 +423,7 @@ describe("DevInspector", () => {
 
     expect(screen.getByRole("button", { name: "Move Complete Part" })).toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: /Resize Complete Part/ })).toHaveLength(8);
-    expect(screen.getByRole("button", { name: "Hide Complete Part" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Remove Complete Part From Arrangement" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "More actions for Complete Part" }));
     expect(screen.getByRole("button", { name: "Rotate Complete Part" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Detach Complete Part" })).toBeInTheDocument();
@@ -636,19 +636,19 @@ describe("DevInspector", () => {
     expect(target).toHaveStyle({ transform: "rotate(90deg)" });
   });
 
-  it("hides globally and restores the selected element with one undo", () => {
+  it("removes the selected element from arrangement and restores it with one undo", () => {
     render(<Harness />);
     on("toggle-dev");
     on("toggle-inspect");
     const target = screen.getByRole("button", { name: "Complete Part" });
     fireEvent.click(target);
 
-    fireEvent.click(screen.getByRole("button", { name: "Hide Complete Part" }));
-    expect(target).toHaveStyle({ visibility: "hidden" });
-    expect(screen.getByTestId("element-overrides")).toHaveTextContent('"visibility":"hidden"');
+    fireEvent.click(screen.getByRole("button", { name: "Remove Complete Part From Arrangement" }));
+    expect(target).toHaveStyle({ display: "none" });
+    expect(screen.getByTestId("element-overrides")).toHaveTextContent('"display":"none"');
 
     on("undo");
-    expect(target.style.visibility).toBe("");
+    expect(target.style.display).toBe("");
   });
 
   it("snaps one move gesture and one resize gesture into atomic undo entries", () => {
@@ -812,7 +812,7 @@ describe("DevInspector", () => {
     expect(screen.queryByRole("button", { name: /^Send / })).toBeNull();
   });
 
-  it("uses Shift-click for multi-selection and hides both global targets", () => {
+  it("uses Shift-click for multi-selection and removes both global targets", () => {
     render(<Harness />);
     on("toggle-dev");
     on("toggle-inspect");
@@ -822,9 +822,9 @@ describe("DevInspector", () => {
     fireEvent.click(second, { shiftKey: true });
 
     expect(screen.getByText("2 Selected")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Hide 2 Selected" }));
-    expect(first).toHaveStyle({ visibility: "hidden" });
-    expect(second).toHaveStyle({ visibility: "hidden" });
+    fireEvent.click(screen.getByRole("button", { name: "Remove 2 Selected From Arrangement" }));
+    expect(first).toHaveStyle({ display: "none" });
+    expect(second).toHaveStyle({ display: "none" });
   });
 
   it("detaches without writing destructive geometry to the protected preview root", () => {

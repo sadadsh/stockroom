@@ -212,7 +212,7 @@ function selectedTargetFor(element: Element & ElementCSSInlineStyle): SelectedTa
 
 function withElementChanges(
   draft: DevModeDraft,
-  changes: ReadonlyMap<string, Record<string, string> | null>,
+  changes: ReadonlyMap<string, Record<string, string | null> | null>,
 ): DevModeDraft {
   const elements = Object.fromEntries(
     Object.entries(draft.elements).map(([id, props]) => [id, { ...props }]),
@@ -222,7 +222,13 @@ function withElementChanges(
       delete elements[id];
       continue;
     }
-    elements[id] = { ...(elements[id] ?? {}), ...patch };
+    const next = { ...(elements[id] ?? {}) };
+    for (const [property, value] of Object.entries(patch)) {
+      if (value === null) delete next[property];
+      else next[property] = value;
+    }
+    if (Object.keys(next).length) elements[id] = next;
+    else delete elements[id];
   }
   return { ...draft, elements };
 }
@@ -297,8 +303,8 @@ export function DevInspector() {
     draftRef.current = dev.draft;
   }, [dev.draft]);
 
-  const commitChanges = useCallback((changes: ReadonlyMap<string, Record<string, string> | null>) => {
-    const safeChanges = new Map<string, Record<string, string> | null>();
+  const commitChanges = useCallback((changes: ReadonlyMap<string, Record<string, string | null> | null>) => {
+    const safeChanges = new Map<string, Record<string, string | null> | null>();
     for (const [id, patch] of changes) {
       if (patch === null) {
         safeChanges.set(id, null);
@@ -760,8 +766,8 @@ export function DevInspector() {
     commitChanges(changes);
   }, [commitChanges, selection]);
 
-  const hidden = selection.length > 0 && selection.every(
-    (target) => dev.draft.elements[target.overrideId]?.visibility === "hidden",
+  const removed = selection.length > 0 && selection.every(
+    (target) => dev.draft.elements[target.overrideId]?.display === "none",
   );
   const primary = selection[selection.length - 1];
   const selectionName = selection.length > 1 ? `${selection.length} Selected` : primary?.label ?? "Selection";
@@ -769,11 +775,11 @@ export function DevInspector() {
     (target) => !isProtectedDesignRoot(target.element),
   );
 
-  const toggleVisibility = useCallback(() => {
-    const changes = new Map<string, Record<string, string>>();
-    for (const target of selection) changes.set(target.overrideId, { visibility: hidden ? "visible" : "hidden" });
+  const toggleRemoval = useCallback(() => {
+    const changes = new Map<string, Record<string, string | null>>();
+    for (const target of selection) changes.set(target.overrideId, { display: removed ? null : "none" });
     commitChanges(changes);
-  }, [commitChanges, hidden, selection]);
+  }, [commitChanges, removed, selection]);
 
   const resetSelection = useCallback(() => {
     commitChanges(new Map(selection.map((target) => [target.overrideId, null])));
@@ -928,7 +934,7 @@ export function DevInspector() {
           <div className="pointer-events-auto absolute bottom-full left-0 mb-2 flex items-center gap-1 rounded-control border border-line2 bg-popover p-1 shadow-pop">
             <span className="max-w-40 truncate px-1 text-2xs font-semibold text-t1">{selectionName}</span>
             {geometryEditable ? <button type="button" aria-label={`Move ${selectionName}`} title={`Move ${selectionName}`} onPointerDown={(event) => beginGesture(event, "move")} onKeyDown={moveByKeyboard} className="rounded-control bg-acc px-2 py-1 text-xs font-semibold text-acc-on">Move</button> : null}
-            {geometryEditable ? <button type="button" aria-label={`${hidden ? "Show" : "Hide"} ${selectionName}`} onClick={toggleVisibility} className="rounded-control px-1.5 py-1 text-xs text-t1 hover:bg-control-hover">{hidden ? "Show" : "Hide"}</button> : null}
+            {geometryEditable ? <button type="button" aria-label={`${removed ? "Restore" : "Remove"} ${selectionName}${removed ? "" : " From Arrangement"}`} onClick={toggleRemoval} className="rounded-control px-1.5 py-1 text-xs text-t1 hover:bg-control-hover">{removed ? "Restore" : "Remove"}</button> : null}
             <div className="relative">
               <button ref={selectionActionsButtonRef} type="button" aria-expanded={selectionActionsOpen} aria-label={`More actions for ${selectionName}`} onClick={() => selectionActionsOpen ? closeSelectionActions() : setSelectionActionsOpen(true)} className="rounded-control px-2 py-1 text-xs text-t1 hover:bg-control-hover">More</button>
               {selectionActionsOpen ? <div ref={selectionActionsMenuRef} className="absolute left-0 top-full mt-1 grid min-w-36 gap-0.5 rounded-control bg-popover p-1 shadow-pop">

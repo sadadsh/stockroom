@@ -230,7 +230,7 @@ describe("InspectorPanel", () => {
     expect(first.style.display).toBe("");
     expect(second.style.display).toBe("");
 
-    fireEvent.click(screen.getByRole("button", { name: "Hide Element" }));
+    fireEvent.click(screen.getByRole("button", { name: "Remove From Arrangement" }));
     await waitFor(() => {
       expect(first.style.display).toBe("none");
       expect(second.style.display).toBe("");
@@ -257,7 +257,7 @@ describe("InspectorPanel", () => {
     expect(second).toHaveTextContent("Edited Second");
     expect(third).toHaveTextContent("Repeated Third");
 
-    fireEvent.click(screen.getByRole("button", { name: "Hide Element" }));
+    fireEvent.click(screen.getByRole("button", { name: "Remove From Arrangement" }));
 
     await waitFor(() => expect(second.style.display).toBe("none"));
     expect(first.style.display).toBe("");
@@ -269,8 +269,8 @@ describe("InspectorPanel", () => {
     fireEvent.click(screen.getByRole("button", { name: "Select Preview Root" }));
     const root = document.querySelector<HTMLElement>('[data-dev-id="preview.root"]')!;
 
-    expect(screen.getByRole("button", { name: "Hide Element" })).toBeDisabled();
-    fireEvent.click(screen.getByRole("button", { name: "Hide Element" }));
+    expect(screen.getByRole("button", { name: "Remove From Arrangement" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "Remove From Arrangement" }));
     openGroup("Layout");
     fireEvent.change(screen.getByLabelText("Width Value"), { target: { value: "1" } });
 
@@ -417,7 +417,7 @@ describe("InspectorPanel", () => {
     await waitFor(() => expect(first.style.width).toBe(""));
 
     openGroup("Layout");
-    fireEvent.click(screen.getByRole("button", { name: "Hide Element" }));
+    fireEvent.click(screen.getByRole("button", { name: "Remove From Arrangement" }));
     await waitFor(() => expect(first.style.display).toBe("none"));
     expect(second.style.display).toBe("");
     fireEvent.click(screen.getByRole("button", { name: "Target" }));

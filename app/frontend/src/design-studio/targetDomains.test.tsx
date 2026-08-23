@@ -132,6 +132,15 @@ describe("inspectTarget", () => {
     expect(unrelated.style.color).toBe("");
   });
 
+  it("keeps direct text editable on an authored target", () => {
+    document.body.innerHTML = '<button data-dev-id="action.primary">Save changes</button>';
+    const target = document.querySelector<HTMLElement>('[data-dev-id="action.primary"]')!;
+
+    const inspection = inspectTarget(document.body, "action.primary");
+
+    expect(inspection.editTargets.text.elements).toEqual([target]);
+  });
+
   it.each<FixtureName>(["currentColor SVG", "fill SVG", "nested text", "mixed CAD header"])(
     "reports independent Box, Text, and Icon domains for %s",
     (fixture) => {
