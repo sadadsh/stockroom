@@ -196,7 +196,7 @@ function CatalogRepository({ status }: { status: OnboardingStatus }) {
   const [owner, setOwner] = useState(status.guided_setup.github.viewer?.login ?? "");
   const [name, setName] = useState("stockroom-catalog");
   const [visibility, setVisibility] = useState<"public" | "private">("private");
-  const [folder, setFolder] = useState("");
+  const [folder, setFolder] = useState(status.default_dir);
   const [error, setError] = useState(scenario?.setupError ?? "");
   const login = useOnboardingGitHubLogin();
   const repository = useSetGuidedRepository();
@@ -331,7 +331,7 @@ function CatalogRepository({ status }: { status: OnboardingStatus }) {
         title={<Text id="onboarding.catalog.title">Catalog Repository</Text>}
       >
         <Text id="onboarding.catalog.lede">
-          Create a GitHub-backed Component Catalog or connect one that is present. Select its managed local folder through Explorer.
+          Select a Catalog Repository. Stockroom handles its local folder.
         </Text>
       </StepIntro>
       <p className="mt-3 text-xs text-t3">
@@ -411,10 +411,9 @@ function CatalogRepository({ status }: { status: OnboardingStatus }) {
           <div className="min-w-0">
             <p className="text-xs text-t3"><Text id="onboarding.catalog.local-folder">Managed Local Folder</Text></p>
             <p data-testid="catalog-folder" className="mt-1 truncate text-sm text-t1">{folder || status.default_dir}</p>
-            {!folder ? <p className="mt-1 text-xs text-t3"><Text id="onboarding.catalog.default-note">Suggested Folder. Confirm a folder before continuing.</Text></p> : null}
           </div>
           <Button onClick={chooseFolder} disabled={repository.isPending}>
-            <Text id="onboarding.catalog.choose-folder">Choose Folder</Text>
+            <Text id="onboarding.catalog.choose-folder">Change Folder</Text>
           </Button>
         </div>
       </section>

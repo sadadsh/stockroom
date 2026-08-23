@@ -365,6 +365,26 @@ class GitHubCli:
             raise GitHubCliError("The selected GitHub repository is unavailable.")
         return repository
 
+    def clone_repository(self, owner: str, name: str, destination: Path) -> None:
+        """Clone through the signed-in CLI without exposing or persisting its token."""
+
+        valid_owner, valid_name = validate_owner_repository(owner, name)
+        target = Path(destination).resolve(strict=False)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        self._run(
+            "repo",
+            "clone",
+            credential_free_clone_url(valid_owner, valid_name),
+            str(target),
+            "--",
+            "-c",
+            "core.autocrlf=false",
+            "-c",
+            "core.longpaths=true",
+            timeout=_LOGIN_TIMEOUT_SECONDS,
+            error="GitHub could not clone the selected Catalog Repository.",
+        )
+
     def create_repository(
         self,
         owner: str,

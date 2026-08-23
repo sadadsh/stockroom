@@ -352,18 +352,23 @@ def test_a_stage_running_past_its_lease_is_not_reclaimed(tmp_path):
     assert stage.attempt_count == 1
 
 
+def _wait_for_lease_renewal(store, claim):
+    deadline = time.monotonic() + 1.0
+    current = store.get_stage(claim.id)
+    while current.lease_expires_at <= claim.lease_expires_at and time.monotonic() < deadline:
+        time.sleep(0.01)
+        current = store.get_stage(claim.id)
+    return current
+
+
 def test_lease_renewal_never_rotates_the_fence(tmp_path):
     store = WorkflowStore(tmp_path / "workflow.sqlite3")
     store.submit_batch([IntakeIdentity("ACME", "P-1")])
-    # Keep ample wall-clock margin for a loaded Windows runner.  The 50 ms
-    # heartbeat still proves that renewal happened during the 250 ms handler;
-    # making lease expiry itself race the scheduler only makes the test flaky.
     claim = store.claim_ready("worker", lease_seconds=2.0, limit=1)[0]
     observed: list[Any] = []
 
     def slow(context: StageContext):
-        time.sleep(0.25)
-        observed.append(store.get_stage(claim.id))
+        observed.append(_wait_for_lease_renewal(store, claim))
         return _identity(context)
 
     runtime = WorkflowRuntime(
@@ -392,8 +397,7 @@ def test_lease_renewal_stays_out_of_the_durable_event_journal(tmp_path):
     observed: list[Any] = []
 
     def slow(context: StageContext):
-        time.sleep(0.25)
-        observed.append(store.get_stage(claim.id))
+        observed.append(_wait_for_lease_renewal(store, claim))
         return _identity(context)
 
     runtime = WorkflowRuntime(

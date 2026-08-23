@@ -340,11 +340,15 @@ def test_guided_repository_create_switches_only_after_github_returns_identity(
             )
             return repository
 
+        def clone_repository(self, owner, name, destination):
+            observed["clone"] = (owner, name, destination)
+            _library(destination, "Main")
+
     observed = {}
 
     def prepare(config, mode, **options):
-        observed.update(mode=mode, **options)
-        return _library(selected, "Main")
+        observed["prepare"] = (mode, options)
+        return selected
 
     monkeypatch.setattr("stockroom.api.routers.onboarding.GitHubCli", Authority)
     monkeypatch.setattr("stockroom.api.routers.onboarding.onb.set_library", prepare)
@@ -372,10 +376,8 @@ def test_guided_repository_create_switches_only_after_github_returns_identity(
 
     assert response.status_code == 200, response.json()
     assert observed == {
-        "mode": "clone",
-        "url": repository.url,
-        "dest": selected,
-        "complete": False,
+        "clone": ("engineer", "stockroom-catalog", selected.resolve()),
+        "prepare": ("open", {"path": selected.resolve(), "complete": False}),
     }
     assert app_ctx.libraries_root == selected
     assert app_ctx.config.guided_setup["repository"] == {
@@ -385,6 +387,65 @@ def test_guided_repository_create_switches_only_after_github_returns_identity(
         "url": repository.url,
     }
     assert app_ctx.config.onboarded is False
+
+
+def test_guided_private_repository_clones_through_signed_in_github_cli(
+    client, app_ctx, tmp_path, monkeypatch
+):
+    app_ctx.config.primary_eda = "kicad"
+    selected = tmp_path / "Mainline"
+    repository = GitHubRepository(
+        owner="sadadsh",
+        name="Mainline-Components",
+        url="https://github.com/sadadsh/Mainline-Components.git",
+        visibility="private",
+        permission="admin",
+    )
+    observed: dict[str, object] = {}
+
+    class Authority:
+        def repository(self, owner, name):
+            assert (owner, name) == ("sadadsh", "Mainline-Components")
+            return repository
+
+        def clone_repository(self, owner, name, destination):
+            observed["clone"] = (owner, name, destination)
+            _library(destination, "Main")
+
+    def prepare(config, mode, **options):
+        observed["prepare"] = (mode, options)
+        if not selected.exists():
+            _library(selected, "Main")
+        return selected
+
+    monkeypatch.setattr("stockroom.api.routers.onboarding.GitHubCli", Authority)
+    monkeypatch.setattr("stockroom.api.routers.onboarding.onb.set_library", prepare)
+    monkeypatch.setattr(
+        "stockroom.api.routers.onboarding._github_status",
+        lambda *_args, **_kwargs: {
+            "available": True,
+            "authenticated": True,
+            "online": True,
+            "viewer": {"login": "sadadsh", "name": None},
+            "owners": [{"login": "sadadsh", "kind": "personal"}],
+        },
+    )
+
+    response = client.post(
+        "/api/onboarding/repository",
+        json={
+            "mode": "connect",
+            "owner": "sadadsh",
+            "name": "Mainline-Components",
+            "path": str(selected),
+        },
+    )
+
+    assert response.status_code == 200, response.json()
+    assert observed == {
+        "clone": ("sadadsh", "Mainline-Components", selected.resolve()),
+        "prepare": ("open", {"path": selected.resolve(), "complete": False}),
+    }
 
 
 def test_read_only_repository_is_rejected_before_local_mutation(

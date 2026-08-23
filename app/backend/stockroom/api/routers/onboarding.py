@@ -281,11 +281,11 @@ def onboarding_router(require_token) -> APIRouter:
                     complete=False,
                 )
             else:
+                cli.clone_repository(repository.owner, repository.name, selected_root)
                 root = onb.set_library(
                     ctx.config,
-                    "clone",
-                    url=repository.url,
-                    dest=selected_root,
+                    "open",
+                    path=selected_root,
                     complete=False,
                 )
             ctx.switch_library(root)

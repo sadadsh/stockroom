@@ -408,6 +408,34 @@ def test_clone_url_is_https_and_credential_free() -> None:
     assert "token" not in url
 
 
+def test_private_repository_clone_uses_authenticated_github_cli(tmp_path: Path) -> None:
+    executable = Path("gh.exe")
+    runner = ScriptedRunner(_result())
+    cli = GitHubCli(executable=executable, runner=runner)
+    destination = tmp_path / "Mainline"
+
+    cli.clone_repository("sadadsh", "Mainline-Components", destination)
+
+    assert runner.calls == [
+        (
+            [
+                str(executable),
+                "repo",
+                "clone",
+                "https://github.com/sadadsh/Mainline-Components.git",
+                str(destination.resolve()),
+                "--",
+                "-c",
+                "core.autocrlf=false",
+                "-c",
+                "core.longpaths=true",
+            ],
+            None,
+            10 * 60.0,
+        )
+    ]
+
+
 def test_repository_response_rejects_credentials_and_mismatched_owner() -> None:
     runner = ScriptedRunner(
         _result(

@@ -161,22 +161,21 @@ describe("OnboardingGate", () => {
     expect(screen.getByText("Suggested Name: Stockroom Catalog")).toBeInTheDocument();
     expect(screen.getByRole("option", { name: "hardware-team (Organization)" })).toBeInTheDocument();
     expect(screen.queryByLabelText(/path|url|token/i)).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Create Catalog" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Create Catalog" })).toBeEnabled();
 
     await user.selectOptions(screen.getByLabelText("GitHub Owner"), "hardware-team");
     await user.clear(screen.getByLabelText("Git Checkout Name"));
     await user.type(screen.getByLabelText("Git Checkout Name"), "shared-catalog");
     await user.click(screen.getByRole("button", { name: "Public" }));
-    await user.click(screen.getByRole("button", { name: "Choose Folder" }));
     await user.click(screen.getByRole("button", { name: "Create Catalog" }));
 
-    expect((window as unknown as { __STOCKROOM_HOST__: { pickFolder: ReturnType<typeof vi.fn> } }).__STOCKROOM_HOST__.pickFolder).toHaveBeenCalledWith("catalog");
+    expect((window as unknown as { __STOCKROOM_HOST__: { pickFolder: ReturnType<typeof vi.fn> } }).__STOCKROOM_HOST__.pickFolder).not.toHaveBeenCalled();
     await waitFor(() => expect(mockApi.setGuidedRepository).toHaveBeenCalledWith({
       mode: "create",
       owner: "hardware-team",
       name: "shared-catalog",
       visibility: "public",
-      path: "D:\\Catalogs\\Stockroom Catalog",
+      path: "C:/Users/Engineer/Stockroom Catalog",
     }));
   });
 
@@ -193,7 +192,6 @@ describe("OnboardingGate", () => {
     expect(screen.queryByLabelText(/path|url|token/i)).not.toBeInTheDocument();
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: /engineer\/catalog-a/ }));
-    await user.click(screen.getByRole("button", { name: "Choose Folder" }));
     await user.click(screen.getByRole("button", { name: "Connect Catalog" }));
 
     await waitFor(() => expect(mockApi.setGuidedRepository).toHaveBeenCalledWith({
@@ -201,7 +199,7 @@ describe("OnboardingGate", () => {
       owner: "engineer",
       name: "catalog-a",
       visibility: undefined,
-      path: "D:\\Catalogs\\Stockroom Catalog",
+      path: "C:/Users/Engineer/Stockroom Catalog",
     }));
   });
 
