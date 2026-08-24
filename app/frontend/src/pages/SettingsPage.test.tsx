@@ -362,6 +362,13 @@ describe("SettingsPage — appearance", () => {
     await userEvent.click(screen.getByRole("button", { name: /^light$/i }));
     expect(document.documentElement.dataset.theme).toBe("light");
   });
+
+  it("changes the paired app color scheme", async () => {
+    renderPage();
+    await openSettings("settings.appearance");
+    await userEvent.click(screen.getByRole("button", { name: /^blue$/i }));
+    expect(document.documentElement.dataset.colorScheme).toBe("blue");
+  });
 });
 
 describe("SettingsPage — release links", () => {

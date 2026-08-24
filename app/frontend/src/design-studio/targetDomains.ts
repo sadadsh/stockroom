@@ -328,8 +328,10 @@ function directTextNodes(element: Element): Text[] {
 export function applyDirectTextOverrides(
   root: ParentNode,
   copy: Readonly<Record<string, string>>,
+  resolvedTargets: ReadonlyMap<Element, string | null> = designOverrideIdsFor(root),
 ): void {
-  for (const [element, overrideId] of designOverrideIdsFor(root)) {
+  for (const [element, overrideId] of resolvedTargets) {
+    if (!element.isConnected && root instanceof Element && root.isConnected) continue;
     if (!overrideId || element.hasAttribute("data-copy-id")) continue;
     const nodes = directTextNodes(element);
     const storedDefaults = directTextDefaults.get(element);

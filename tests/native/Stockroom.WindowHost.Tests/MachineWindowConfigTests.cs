@@ -41,6 +41,7 @@ public sealed class MachineWindowConfigTests : IDisposable
               },
               "ui": {
                 "theme": "light",
+                "color_scheme": "violet",
                 "density": "compact"
               },
               "digikey_username": "not-read-by-window-host",
@@ -57,6 +58,7 @@ public sealed class MachineWindowConfigTests : IDisposable
 
         Assert.Equal(Path.GetFullPath(_temporaryRoot), config.ConfigRoot);
         Assert.Equal("light", config.Theme);
+        Assert.Equal("violet", config.ColorScheme);
         Assert.NotNull(config.Geometry);
         Assert.Equal(
             PersistedWindowShowState.Maximized,
@@ -82,6 +84,7 @@ public sealed class MachineWindowConfigTests : IDisposable
 
         Assert.Null(config.Geometry);
         Assert.Equal("dark", config.Theme);
+        Assert.Equal("neutral", config.ColorScheme);
     }
 
     [Theory]

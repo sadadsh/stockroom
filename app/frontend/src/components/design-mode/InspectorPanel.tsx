@@ -47,6 +47,15 @@ function inspectionFor(root: Element, target: string | ExactDesignTargetAuthorit
   }
 }
 
+function matchingIdentity(element: Element): string | null {
+  for (const attribute of ["data-dev-role", "data-copy-id", "data-icon-id"] as const) {
+    const value = element.getAttribute(attribute)?.trim();
+    if (value) return `${attribute}:${value}`;
+  }
+  const designId = designIdOf(element);
+  return designId ? `design:${designId}` : null;
+}
+
 function domainKeys(inspections: readonly TargetInspection[]) {
   return {
     targetIds: inspections.map((inspection) => inspection.overrideId),
@@ -100,11 +109,11 @@ export function InspectorPanel({ root }: { root?: Element; integrated?: boolean 
   ];
   const matchingInspections = useMemo(() => {
     if (!inspection) return [];
-    const designId = designIdOf(inspection.target);
-    if (!designId) return [inspection];
+    const identity = matchingIdentity(inspection.target);
+    if (!identity) return [inspection];
     const matches: TargetInspection[] = [];
-    for (const element of [resolvedRoot, ...resolvedRoot.querySelectorAll("*")]) {
-      if (designIdOf(element) !== designId) continue;
+    for (const element of [resolvedRoot, ...resolvedRoot.querySelectorAll("[data-dev-role],[data-copy-id],[data-icon-id],[data-dev-id],[data-design-id]")]) {
+      if (matchingIdentity(element) !== identity) continue;
       const candidate = inspectionFor(resolvedRoot, exactDesignTargetAuthority(element));
       if (candidate) matches.push(candidate);
     }

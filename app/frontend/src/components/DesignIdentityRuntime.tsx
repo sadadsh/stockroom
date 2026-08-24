@@ -1,5 +1,5 @@
-import { useEffect } from "react";
-import { ensureDesignIdentities } from "../lib/designIdentity";
+import { useEffect, useRef } from "react";
+import { designOverrideIdsFor, ensureDesignIdentities } from "../lib/designIdentity";
 import { useDevMode } from "../lib/devMode";
 import { applyDirectTextOverrides } from "../design-studio/targetDomains";
 
@@ -12,11 +12,15 @@ const PRODUCT_ROOTS = [
 /** Keeps dynamic, cloned, and imperative Stockroom DOM addressable after the JSX build transform. */
 export function DesignIdentityRuntime() {
   const dev = useDevMode();
+  const copy = useRef(dev.draft.copy);
+  const targets = useRef(new Map<Element, Map<Element, string | null>>());
   useEffect(() => {
     const instrument = () => {
       for (const root of document.querySelectorAll(PRODUCT_ROOTS)) {
         ensureDesignIdentities(root);
-        applyDirectTextOverrides(root, dev.draft.copy);
+        const resolved = designOverrideIdsFor(root);
+        targets.current.set(root, resolved);
+        applyDirectTextOverrides(root, copy.current, resolved);
       }
     };
     instrument();
@@ -27,11 +31,18 @@ export function DesignIdentityRuntime() {
         instrument();
       });
     });
-    observer.observe(document.body, { childList: true, characterData: true, subtree: true });
+    observer.observe(document.body, { childList: true, subtree: true });
     return () => {
       observer.disconnect();
       if (frame) cancelAnimationFrame(frame);
+      targets.current.clear();
     };
+  }, []);
+  useEffect(() => {
+    copy.current = dev.draft.copy;
+    for (const root of document.querySelectorAll(PRODUCT_ROOTS)) {
+      applyDirectTextOverrides(root, dev.draft.copy, targets.current.get(root));
+    }
   }, [dev.draft.copy]);
   return null;
 }

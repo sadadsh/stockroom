@@ -11,6 +11,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -19,13 +20,26 @@ import { neutralTheme } from "../themes/neutral/neutral";
 import { readPref, writePref } from "./uiPrefs";
 
 export type Theme = "dark" | "light";
+export type ColorScheme = "neutral" | "blue" | "green" | "violet";
 
 const STORAGE_KEY = "sr-theme";
+const COLOR_SCHEME_STORAGE_KEY = "sr-color-scheme";
 
 interface ThemeContextValue {
   theme: Theme;
+  colorScheme: ColorScheme;
   setTheme: (theme: Theme) => void;
+  setColorScheme: (scheme: ColorScheme) => void;
   toggle: () => void;
+}
+
+function readStoredColorScheme(): ColorScheme {
+  return readPref<ColorScheme>(
+    "color_scheme",
+    COLOR_SCHEME_STORAGE_KEY,
+    (raw) => (["neutral", "blue", "green", "violet"].includes(raw) ? raw as ColorScheme : undefined),
+    "neutral",
+  );
 }
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
@@ -44,6 +58,8 @@ function readStored(): Theme {
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setThemeState] = useState<Theme>(readStored);
+  const [colorScheme, setColorSchemeState] = useState<ColorScheme>(readStoredColorScheme);
+  const colorSchemeMounted = useRef(false);
 
   // Mirror the theme onto the root so the CSS variable set switches, and persist
   // it. The first paint is already correct (the inline script in index.html sets
@@ -53,7 +69,14 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     writePref("theme", theme, STORAGE_KEY);
   }, [theme]);
 
+  useEffect(() => {
+    document.documentElement.dataset.colorScheme = colorScheme;
+    if (colorSchemeMounted.current) writePref("color_scheme", colorScheme, COLOR_SCHEME_STORAGE_KEY);
+    else colorSchemeMounted.current = true;
+  }, [colorScheme]);
+
   const setTheme = useCallback((next: Theme) => setThemeState(next), []);
+  const setColorScheme = useCallback((next: ColorScheme) => setColorSchemeState(next), []);
   const toggle = useCallback(
     () => setThemeState((t) => (t === "dark" ? "light" : "dark")),
     [],
@@ -64,8 +87,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   // made every consumer of `useTheme` re-render whenever anything above this provider did, which
   // is most of the chrome. The dependency list is exactly what the value holds.
   const value = useMemo(
-    () => ({ theme, setTheme, toggle }),
-    [theme, setTheme, toggle],
+    () => ({ theme, colorScheme, setTheme, setColorScheme, toggle }),
+    [theme, colorScheme, setTheme, setColorScheme, toggle],
   );
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;

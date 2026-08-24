@@ -39,7 +39,7 @@ import {
   useLibraryLfs,
   useRescanState,
 } from "../api/queries";
-import { useTheme, type Theme } from "../lib/theme";
+import { useTheme, type ColorScheme, type Theme } from "../lib/theme";
 import { statusTone } from "../lib/statusTone";
 import { openExternalUrl } from "../lib/externalNavigation";
 import { useToast } from "../lib/toast";
@@ -467,8 +467,15 @@ const THEME_OPTIONS: { value: Theme; label: string; id: string }[] = [
   { value: "light", label: "Light", id: "settings.appearance.light" },
 ];
 
+const COLOR_SCHEME_OPTIONS: { value: ColorScheme; label: string; color: string }[] = [
+  { value: "neutral", label: "Neutral", color: "#737873" },
+  { value: "blue", label: "Blue", color: "#4c83c3" },
+  { value: "green", label: "Green", color: "#41845d" },
+  { value: "violet", label: "Violet", color: "#7656a8" },
+];
+
 function AppearanceSection() {
-  const { theme, setTheme } = useTheme();
+  const { theme, colorScheme, setTheme, setColorScheme } = useTheme();
   const studio = useOptionalDesignStudio();
   const { toast } = useToast();
   const resetAppliedConfirmation = useText(
@@ -497,6 +504,28 @@ function AppearanceSection() {
               )}
             >
               <Text id={o.id}>{o.label}</Text>
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="mt-3 flex items-center justify-between border-t border-line pt-3">
+        <span className="text-sm text-t2">
+          <Text id="settings.appearance.color-scheme-label">Color Scheme</Text>
+        </span>
+        <div className="inline-flex rounded-card bg-field p-0.5" data-dev-id="settings.appearance-color-scheme">
+          {COLOR_SCHEME_OPTIONS.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              aria-pressed={colorScheme === option.value}
+              onClick={() => setColorScheme(option.value)}
+              className={cx(
+                "inline-flex items-center gap-1.5 rounded-control px-2 py-1 text-xs transition-colors",
+                colorScheme === option.value ? "bg-acc-soft font-medium text-t1" : "text-t3 hover:text-t2",
+              )}
+            >
+              <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: option.color }} />
+              {option.label}
             </button>
           ))}
         </div>

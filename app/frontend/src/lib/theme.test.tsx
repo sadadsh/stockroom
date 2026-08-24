@@ -4,12 +4,14 @@ import userEvent from "@testing-library/user-event";
 import { AstryxThemeBridge, ThemeProvider, useTheme } from "./theme";
 
 function Probe() {
-  const { theme, toggle, setTheme } = useTheme();
+  const { theme, colorScheme, toggle, setTheme, setColorScheme } = useTheme();
   return (
     <div>
       <span data-testid="theme">{theme}</span>
+      <span data-testid="color-scheme">{colorScheme}</span>
       <button onClick={toggle}>Toggle Theme</button>
       <button onClick={() => setTheme("light")}>Go Light</button>
+      <button onClick={() => setColorScheme("blue")}>Go Blue</button>
     </div>
   );
 }
@@ -22,6 +24,7 @@ describe("ThemeProvider", () => {
     window.__STOCKROOM_UI__ = {};
     delete document.documentElement.dataset.theme;
     delete document.documentElement.dataset.astryxTheme;
+    delete document.documentElement.dataset.colorScheme;
   });
 
   it("defaults to dark and marks the root", () => {
@@ -82,5 +85,17 @@ describe("ThemeProvider", () => {
     );
     await userEvent.click(screen.getByText("Go Light"));
     expect(screen.getByTestId("theme").textContent).toBe("light");
+  });
+
+  it("persists one paired color scheme for both themes", async () => {
+    const first = render(<ThemeProvider><Probe /></ThemeProvider>);
+    await userEvent.click(screen.getByText("Go Blue"));
+    expect(document.documentElement.dataset.colorScheme).toBe("blue");
+    expect(localStorage.getItem("sr-color-scheme")).toBe("blue");
+    first.unmount();
+
+    render(<ThemeProvider><Probe /></ThemeProvider>);
+    expect(screen.getByTestId("color-scheme")).toHaveTextContent("blue");
+    expect(document.documentElement.dataset.colorScheme).toBe("blue");
   });
 });

@@ -47,12 +47,13 @@ function Invoke-Checked {
 
 function Get-DistributionManifest {
     $distributionRoot = Join-Path $repositoryRoot "app\frontend-dist"
+    $distributionPrefix = "$([IO.Path]::GetFullPath($distributionRoot).TrimEnd('\'))\"
     return @(
         Get-ChildItem -LiteralPath $distributionRoot -Recurse -File |
             Sort-Object FullName |
             ForEach-Object {
                 [ordered]@{
-                    path = [IO.Path]::GetRelativePath($distributionRoot, $_.FullName).Replace("\", "/")
+                    path = [IO.Path]::GetFullPath($_.FullName).Substring($distributionPrefix.Length).Replace("\", "/")
                     sha256 = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
                 }
             }

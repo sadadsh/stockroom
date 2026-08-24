@@ -155,3 +155,22 @@ def test_hide_redundant_pin_names_only_hides_number_echoes(tmp_path):
     library = SymbolLib.load(meaningful)
     assert library.get_symbol("X").hide_redundant_pin_names() is False
     assert "hide yes" not in library.serialize()
+
+
+def test_preview_uses_one_symbol_style_instead_of_drawing_both(tmp_path):
+    path = tmp_path / "styled.kicad_sym"
+    path.write_text(
+        '(kicad_symbol_lib (version 20231120) (symbol "R" '
+        '(symbol "R_1_1" '
+        '(rectangle (start -1 -1) (end 1 1) (stroke (width 0.2)) (fill (type none))) '
+        '(pin passive line (at -2 0 0) (length 1) (name "1") (number "1"))) '
+        '(symbol "R_1_2" '
+        '(circle (center 0 0) (radius 1) (stroke (width 0.2)) (fill (type none))) '
+        '(pin passive line (at 2 0 180) (length 1) (name "2") (number "2")))))',
+        encoding="utf-8",
+    )
+
+    symbol = SymbolLib.load(path).get_symbol("R")
+
+    assert [pin.number for pin in symbol.pins] == ["1"]
+    assert [graphic.kind for graphic in symbol.graphics] == ["rectangle"]

@@ -18,9 +18,10 @@
       // here. localStorage stays as the fallback for a browser-served dev run,
       // where there is no host to inject anything.
       (function () {
-        var t;
+        var t, s;
         try {
           t = (window.__STOCKROOM_UI__ || {}).theme;
+          s = (window.__STOCKROOM_UI__ || {}).color_scheme;
         } catch (e) {
           t = undefined;
         }
@@ -33,6 +34,15 @@
         }
         document.documentElement.dataset.theme =
           t === "light" || t === "dark" ? t : "dark";
+        if (!["neutral", "blue", "green", "violet"].includes(s)) {
+          try {
+            s = localStorage.getItem("sr-color-scheme");
+          } catch (e) {
+            s = undefined;
+          }
+        }
+        document.documentElement.dataset.colorScheme =
+          ["blue", "green", "violet"].includes(s) ? s : "neutral";
       })();
     </script>
   </head>

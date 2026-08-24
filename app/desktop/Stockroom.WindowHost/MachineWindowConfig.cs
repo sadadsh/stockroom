@@ -6,7 +6,8 @@ namespace Stockroom.WindowHost;
 internal sealed record MachineWindowConfig(
     string ConfigRoot,
     PersistedWindowGeometry? Geometry,
-    string Theme)
+    string Theme,
+    string ColorScheme)
 {
     private const int MaximumConfigBytes = 4 * 1024 * 1024;
 
@@ -26,7 +27,8 @@ internal sealed record MachineWindowConfig(
             return new MachineWindowConfig(
                 configRoot,
                 null,
-                "dark");
+                "dark",
+                "neutral");
         }
 
         var file = new FileInfo(configPath);
@@ -70,6 +72,7 @@ internal sealed record MachineWindowConfig(
             }
 
             var theme = "dark";
+            var colorScheme = "neutral";
             if (root.TryGetProperty("ui", out var rawUi))
             {
                 RequireObject(rawUi, "ui");
@@ -91,12 +94,30 @@ internal sealed record MachineWindowConfig(
 
                     theme = value;
                 }
+                if (rawUi.TryGetProperty("color_scheme", out var rawColorScheme))
+                {
+                    if (rawColorScheme.ValueKind != JsonValueKind.String)
+                    {
+                        throw new WindowHostException(
+                            "machine config ui.color_scheme is invalid");
+                    }
+
+                    var value = rawColorScheme.GetString();
+                    if (value is not ("neutral" or "blue" or "green" or "violet"))
+                    {
+                        throw new WindowHostException(
+                            "machine config ui.color_scheme is invalid");
+                    }
+
+                    colorScheme = value;
+                }
             }
 
             return new MachineWindowConfig(
                 configRoot,
                 geometry,
-                theme);
+                theme,
+                colorScheme);
         }
     }
 

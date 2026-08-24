@@ -60,6 +60,7 @@ describe("the shape of UiPrefs", () => {
     expect(SOURCE).toBeTruthy();
     expect(declaredMembers().map((m) => m.name)).toEqual([
       "theme",
+      "color_scheme",
       "rail_collapsed",
       "design_studio_left_collapsed",
       "design_studio_right_collapsed",

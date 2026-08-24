@@ -1641,12 +1641,15 @@ internal sealed class WebViewWindowHost : IDisposable
     {
         var themeJson = JsonSerializer.Serialize(
             _machineConfig.Theme);
+        var colorSchemeJson = JsonSerializer.Serialize(
+            _machineConfig.ColorScheme);
         var bypassAppliedJson = _bypassAppliedDesign ? "true" : "false";
         var script = string.Create(
             CultureInfo.InvariantCulture,
             $$"""
               (() => {
                 const theme = {{themeJson}};
+                const colorScheme = {{colorSchemeJson}};
                 const current =
                   window.__STOCKROOM_UI__ &&
                   typeof window.__STOCKROOM_UI__ === "object"
@@ -1655,6 +1658,7 @@ internal sealed class WebViewWindowHost : IDisposable
                 window.__STOCKROOM_UI__ = Object.freeze({
                   ...current,
                   theme,
+                  color_scheme: colorScheme,
                   design_bypass_applied: {{bypassAppliedJson}}
                 });
                 const webview = globalThis.chrome?.webview;

@@ -216,29 +216,39 @@ class Symbol:
         )
 
     def _body_units(self) -> list[SexpNode]:
-        """The drawing units this preview shows: the common unit and the first real one.
+        """The common unit and first real unit, in one KiCad body style.
 
         A multi-unit symbol (a quad op-amp, a relay) draws one gate at a time, and stacking
-        every unit on top of the others produces a smear that is not any of them. Unit 0 is
-        KiCad's "common to all units" and is always included.
+        every unit on top of the others produces a smear that is not any of them. The same is
+        true of KiCad's alternate body styles (normal and De Morgan): preview style 1, while
+        style 0 remains common to every style.
         """
-        units: list[SexpNode] = []
+        parsed: list[tuple[SexpNode, int, int]] = []
         chosen: int | None = None
         for child in self._node.find_all("symbol"):
             name = str(child.children[1].value) if len(child.children) > 1 else ""
             parts = name.rsplit("_", 2)
             try:
                 unit = int(parts[-2]) if len(parts) == 3 else 0
+                style = int(parts[-1]) if len(parts) == 3 else 0
             except ValueError:
                 unit = 0
-            if unit == 0:
-                units.append(child)
-                continue
-            if chosen is None:
+                style = 0
+            parsed.append((child, unit, style))
+            if unit > 0 and chosen is None:
                 chosen = unit
-            if unit == chosen:
-                units.append(child)
-        return units
+        selected_units = {0, chosen} if chosen is not None else {0}
+        preferred = {
+            unit: (1 if any(u == unit and style == 1 for _, u, style in parsed) else min(
+                (style for _, u, style in parsed if u == unit), default=0
+            ))
+            for unit in selected_units
+        }
+        return [
+            child
+            for child, unit, style in parsed
+            if unit in selected_units and (style == 0 or style == preferred[unit])
+        ]
 
     @property
     def pins(self) -> list[SymbolPin]:

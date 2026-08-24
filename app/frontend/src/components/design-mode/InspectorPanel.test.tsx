@@ -306,6 +306,19 @@ describe("InspectorPanel", () => {
     });
   });
 
+  it("applies All Matching to different instances of the same authored role", async () => {
+    render(<Harness />);
+    fireEvent.click(screen.getByRole("button", { name: "Select First" }));
+    fireEvent.click(screen.getByRole("button", { name: "All Matching" }));
+    fireEvent.click(screen.getByRole("button", { name: "Remove From Arrangement" }));
+
+    await waitFor(() => {
+      expect(document.querySelector<HTMLElement>('[data-dev-id="detail.action[first]"]')?.style.display).toBe("none");
+      expect(document.querySelector<HTMLElement>('[data-dev-id="detail.action[second]"]')?.style.display).toBe("none");
+      expect(document.querySelector<HTMLElement>('[data-dev-id="rail.action"]')?.style.display).toBe("");
+    });
+  });
+
   it("edits unregistered direct text on one exact repeated occurrence", async () => {
     render(<Harness />);
     fireEvent.click(screen.getByRole("button", { name: "Select Raw Provider" }));

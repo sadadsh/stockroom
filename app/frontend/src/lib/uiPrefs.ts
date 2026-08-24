@@ -27,6 +27,7 @@ import { api } from "../api/client";
  */
 export interface UiPrefs {
   theme?: "dark" | "light";
+  color_scheme?: "neutral" | "blue" | "green" | "violet";
   rail_collapsed?: boolean;
   design_studio_left_collapsed?: boolean;
   design_studio_right_collapsed?: boolean;

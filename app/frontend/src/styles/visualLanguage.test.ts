@@ -31,6 +31,8 @@ const librarySources = [
   "src/pages/ComponentsPage.tsx",
 ].map((path) => readFileSync(path, "utf8"));
 
+const COLOR_SCHEMES = ["blue", "green", "violet"] as const;
+
 function themeBlock(selector: string): string {
   const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const match = css.match(new RegExp(`${escaped}\\s*\\{([\\s\\S]*?)\\n\\s*\\}`));
@@ -68,6 +70,21 @@ function contrast(left: string, right: string): number {
   const b = luminance(rgb(right));
   return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
 }
+
+describe("paired color schemes", () => {
+  it.each(COLOR_SCHEMES)("%s defines readable dark and light accents", (scheme) => {
+    for (const selector of [
+      `:root[data-color-scheme="${scheme}"]`,
+      `:root[data-theme="light"][data-color-scheme="${scheme}"]`,
+    ]) {
+      const block = themeBlock(selector);
+      expect(contrast(property(block, "--c-acc"), property(block, "--c-acc-on"))).toBeGreaterThanOrEqual(4.5);
+      for (const token of ["--c-active", "--c-selected", "--c-selected-hover", "--c-selected-edge", "--c-acc-strong", "--c-focus"]) {
+        expect(property(block, token)).toMatch(/^#[0-9a-f]{6}$/i);
+      }
+    }
+  });
+});
 
 /**
  * HSL saturation, 0..1. The honest measure of "does this carry a hue".
