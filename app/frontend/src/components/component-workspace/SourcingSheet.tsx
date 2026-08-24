@@ -222,6 +222,7 @@ function OfferDisclosure({ offer }: { offer: DistributorOffer }) {
   return (
     <details
       data-dev-id="component-browser.offer"
+      data-design-key={`${offer.provider}:${offer.sku}`}
       data-offer-provider={offer.provider}
       aria-label={`${offer.providerLabel} ${offer.sku}`.trim()}
       className="group"
@@ -460,6 +461,7 @@ function SourceRow({ source, index }: { source: SourceLedgerEntry; index: number
   return (
     <li
       data-dev-id="component-browser.source-state"
+      data-design-key={source.id}
       className={`flex min-w-0 items-center gap-3 border-b border-line/60 px-3 py-2 ${index % 2 === 0 ? "lg:border-r" : ""}`}
     >
       <span className="min-w-0 flex-1">

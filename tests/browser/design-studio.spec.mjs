@@ -346,6 +346,56 @@ async function representativeClickThrough(page, studio) {
   await page.screenshot({ path: path.join(evidenceRoot, "representative-click-through.png"), fullPage: false });
 }
 
+async function exactEditingAndExport(page, studio) {
+  await studio.open("components.full-data");
+  await page.getByLabel("Studio Mode").getByRole("button", { name: "Edit", exact: true }).click();
+
+  const drawers = page.getByLabel("Design Studio Drawers");
+  await drawers.getByRole("button", { name: "Layers", exact: true }).click();
+  const sourceRows = page.locator('button[title="component-browser.source-state"]');
+  await sourceRows.first().waitFor({ state: "visible", timeout: 10_000 });
+  assert.ok(await sourceRows.count() >= 1, "Layers must expose the populated provider row.");
+  assert.ok((await sourceRows.evaluateAll((rows) => rows.every((row) => !row.hasAttribute("disabled")))));
+  await sourceRows.first().click();
+  await drawers.getByRole("button", { name: "Layers", exact: true }).click();
+
+  const product = page.locator("[data-design-product-root]");
+  const digikey = product.locator('[data-design-key="digikey"] span').filter({ hasText: /^DigiKey$/ }).first();
+  await digikey.dispatchEvent("click");
+  await page.getByRole("button", { name: "Content", exact: true }).click();
+  const textContent = page.getByLabel("Text Content", { exact: true });
+  await textContent.waitFor({ state: "visible" });
+  assert.equal(await textContent.inputValue(), "DigiKey");
+  const providerCount = async (label) => product.locator("span").filter({ hasText: new RegExp(`^${label}$`) }).count();
+  const digikeyCount = await providerCount("DigiKey");
+  const mouserCount = await providerCount("Mouser");
+  await textContent.fill("");
+  await page.waitForFunction((expected) => (
+    [...document.querySelectorAll("[data-design-product-root] span")]
+      .filter((element) => element.textContent === "DigiKey").length === expected
+  ), digikeyCount - 1);
+  assert.equal(await providerCount("Mouser"), mouserCount, "Editing DigiKey must not change Mouser.");
+  await page.getByRole("button", { name: "Undo", exact: true }).click();
+  await page.waitForFunction((expected) => (
+    [...document.querySelectorAll("[data-design-product-root] span")]
+      .filter((element) => element.textContent === "DigiKey").length === expected
+  ), digikeyCount);
+
+  await studio.open("global.real-data");
+  await page.getByRole("button", { name: "View", exact: true }).click();
+  const downloadPromise = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Export Design", exact: true }).click();
+  const download = await downloadPromise;
+  const downloadPath = await download.path();
+  assert.ok(downloadPath, "Export Design must create a download.");
+  const handoff = JSON.parse(await readFile(downloadPath, "utf8"));
+  assert.equal(handoff.schema, "stockroom-design-handoff/1");
+  assert.equal(handoff.activeScenarioId, null);
+  assert.equal(handoff.document.schemaVersion, 2);
+  assert.ok(handoff.instructions.includes("ChatGPT"));
+  process.stdout.write("PASS exact provider editing, populated Layers, and design handoff export\n");
+}
+
 await mkdir(evidenceRoot, { recursive: true });
 const registry = JSON.parse(await readFile(registryPath, "utf8"));
 assert.equal(registry.schemaVersion, 1);
@@ -424,6 +474,7 @@ try {
   assert.deepEqual(duplicateStates, [], "Every shipped case must render distinct product DOM.");
 
   await representativeClickThrough(page, studio);
+  await exactEditingAndExport(page, studio);
   assert.deepEqual(consoleErrors, [], `Browser console errors:\n${consoleErrors.join("\n")}`);
 
   // Prove the debounced personal design survives a real service stop/start, using the same

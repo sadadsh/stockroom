@@ -50,6 +50,14 @@ function attributeNamed(opening, name) {
   );
 }
 
+function attributeNode(opening, name) {
+  return opening.attributes.find(
+    (attribute) => t.isJSXAttribute(attribute)
+      && t.isJSXIdentifier(attribute.name)
+      && attribute.name.name === name,
+  );
+}
+
 function insideTechnicalContent(openingPath) {
   if (attributeNamed(openingPath.node, "data-design-technical-content")) return true;
   return Boolean(openingPath.findParent((parent) => (
@@ -100,12 +108,21 @@ export async function transformStockroomJsx(code, filename) {
             if (
               !t.isJSXIdentifier(opening.name)
               || opening.name.name === "Fragment"
-              || attributeNamed(opening, "data-dev-id")
-              || attributeNamed(opening, "data-design-id")
               || insideTechnicalContent(openingPath)
               || insideSvg(openingPath)
               || !opening.loc
             ) {
+              return;
+            }
+            const key = attributeNode(opening, "key");
+            if (key && !attributeNamed(opening, "data-design-key")) {
+              opening.attributes.push(t.jsxAttribute(
+                t.jsxIdentifier("data-design-key"),
+                t.cloneNode(key.value, true),
+              ));
+              changed = true;
+            }
+            if (attributeNamed(opening, "data-dev-id") || attributeNamed(opening, "data-design-id")) {
               return;
             }
             const id = generatedDesignId(

@@ -203,7 +203,7 @@ function OfferPriceLadder({
             aria-label={priceLadderLabel({ provider: offer.providerLabel })}
           >
             {keyedPriceBreaks(entries).map(({ entry, key }) => (
-              <PriceBreakPill key={key} entry={entry} currency={offer.currency} />
+              <PriceBreakPill key={key} designKey={key} entry={entry} currency={offer.currency} />
             ))}
           </dl>
         ) : null}
@@ -216,19 +216,19 @@ function OfferPriceLadder({
         >
           <div className="bg-field/25 px-2 pb-2 pt-1.5">
             <dl className="grid min-w-0 grid-cols-2 gap-x-3 gap-y-1">
-              <OfferFact label={<Text id="component-browser.offer-col-stock">Stock</Text>} numeric>
+              <OfferFact designKey="stock" label={<Text id="component-browser.offer-col-stock">Stock</Text>} numeric>
                 {offer.stock === null ? stockUnknown : formatCount(offer.stock)}
               </OfferFact>
-              <OfferFact label={<Text id="component-browser.offer-col-price">Unit Price</Text>} numeric>
+              <OfferFact designKey="price" label={<Text id="component-browser.offer-col-price">Unit Price</Text>} numeric>
                 {offer.unitPrice === null ? noPrice : formatPrice(offer.unitPrice, offer.currency)}
               </OfferFact>
-              {offer.currency ? <OfferFact label={<Text id="component-browser.offer-col-currency">Quote Code</Text>}>{offer.currency}</OfferFact> : null}
-              {offer.moq !== null ? <OfferFact label={<Text id="component-browser.offer-col-moq">MOQ</Text>} numeric>{formatCount(offer.moq)}</OfferFact> : null}
-              {offer.leadTime ? <OfferFact label={<Text id="component-browser.offer-col-lead">Lead Time</Text>}>{offer.leadTime}</OfferFact> : null}
-              {offer.factoryLeadTime ? <OfferFact label={<Text id="component-browser.factory-lead-time">Manufacturer Lead Time</Text>}>{offer.factoryLeadTime}</OfferFact> : null}
-              {offer.lifecycle ? <OfferFact label={<Text id="component-browser.lifecycle-state">Product Status</Text>}>{offer.lifecycle}</OfferFact> : null}
+              {offer.currency ? <OfferFact designKey="currency" label={<Text id="component-browser.offer-col-currency">Quote Code</Text>}>{offer.currency}</OfferFact> : null}
+              {offer.moq !== null ? <OfferFact designKey="moq" label={<Text id="component-browser.offer-col-moq">MOQ</Text>} numeric>{formatCount(offer.moq)}</OfferFact> : null}
+              {offer.leadTime ? <OfferFact designKey="lead-time" label={<Text id="component-browser.offer-col-lead">Lead Time</Text>}>{offer.leadTime}</OfferFact> : null}
+              {offer.factoryLeadTime ? <OfferFact designKey="factory-lead-time" label={<Text id="component-browser.factory-lead-time">Manufacturer Lead Time</Text>}>{offer.factoryLeadTime}</OfferFact> : null}
+              {offer.lifecycle ? <OfferFact designKey="lifecycle" label={<Text id="component-browser.lifecycle-state">Product Status</Text>}>{offer.lifecycle}</OfferFact> : null}
               {stamp ? (
-                <OfferFact label={<Text id="component-browser.offer-col-checked">Last Checked</Text>}>
+                <OfferFact designKey="checked" label={<Text id="component-browser.offer-col-checked">Last Checked</Text>}>
                   <span title={stamp.title}>
                     {stamp.text}
                     {offer.staleness === "unknown" ? null : <> · <StalenessLabel staleness={offer.staleness} /></>}
@@ -261,15 +261,18 @@ function PriceBreakPill({
   entry,
   currency,
   compact = false,
+  designKey,
 }: {
   entry: PriceBreak;
   currency: string;
   compact?: boolean;
+  designKey?: string;
 }) {
   const emptyValue = useText("component-browser.no-value", "None");
   return (
     <div
       data-price-break-pill
+      data-design-key={designKey}
       className={
         "grid min-w-0 grid-cols-[minmax(2.5rem,1fr)_auto] items-baseline gap-2 "
         + (compact ? "px-2 py-0.5" : "px-2 py-1")
@@ -314,13 +317,15 @@ function OfferFact({
   label,
   numeric = false,
   children,
+  designKey,
 }: {
   label: ReactNode;
   numeric?: boolean;
   children: ReactNode;
+  designKey: string;
 }) {
   return (
-    <div className="min-w-0">
+    <div data-design-key={designKey} className="min-w-0">
       <dt className="ui-property-label break-words">{label}</dt>
       <dd className={`ui-property-value min-w-0 break-words ${numeric ? "ui-numeric" : ""}`}>
         {children}

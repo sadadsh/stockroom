@@ -169,6 +169,19 @@ const OCCURRENCE_PATH_ATTRIBUTES = [
   "data-copy-id",
   "data-icon-id",
   "data-layout-piece",
+  "data-design-key",
+  "data-spec-key",
+  "data-quality-segment",
+  "data-spec-filter",
+  "data-spec-anchor",
+  "data-splitter",
+  "data-spec-section",
+  "data-sourcing-provider",
+  "data-offer-provider",
+  "data-provider",
+  "data-document-type",
+  "data-document-preferred",
+  "data-conflict-field",
   "data-testid",
   "id",
 ] as const;
@@ -200,6 +213,28 @@ function inclusiveDesignTargets(root: ParentNode): Element[] {
         ...Array.from(root.querySelectorAll(DESIGN_TARGET_SELECTOR)),
       ]
     : Array.from(root.querySelectorAll(DESIGN_TARGET_SELECTOR));
+}
+
+/** Resolve every live target once. Layers and bulk actions must not rescan the document per row. */
+export function designOverrideIdsFor(root: ParentNode): Map<Element, string | null> {
+  ensureDesignOccurrenceIdentities(root);
+  const scope = durableOccurrenceScope(root);
+  const scopedTargets = inclusiveDesignTargets(scope)
+    .filter((element) => !element.closest("[data-design-studio-chrome]"));
+  const semanticCounts = new Map<string, number>();
+  for (const element of scopedTargets) {
+    const id = designIdOf(element);
+    if (id) semanticCounts.set(id, (semanticCounts.get(id) ?? 0) + 1);
+  }
+  const requested = inclusiveDesignTargets(root)
+    .filter((element) => !element.closest("[data-design-studio-chrome]"));
+  return new Map(requested.map((element) => {
+    const id = designIdOf(element);
+    if (!id) return [element, null];
+    if (semanticCounts.get(id) === 1) return [element, id];
+    const occurrenceId = element.getAttribute(DESIGN_OCCURRENCE_ATTRIBUTE);
+    return [element, occurrenceId && isOccurrenceDesignId(occurrenceId) ? occurrenceId : null];
+  }));
 }
 
 function durableOccurrenceScope(root: ParentNode): ParentNode {

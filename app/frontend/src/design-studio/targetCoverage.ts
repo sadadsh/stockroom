@@ -3,8 +3,8 @@ import type { DevIdEntry } from "../lib/devIds";
 import { ICON_BY_ID } from "../lib/iconRegistry";
 import { WORKSPACE_PIECE_REGISTRY } from "../layout/workspacePieces";
 import {
+  designOverrideIdsFor,
   ensureDesignIdentities,
-  exactDesignTargetAuthority,
   isGeneratedDesignId,
 } from "../lib/designIdentity";
 
@@ -124,6 +124,7 @@ export function coverageIssuesFor(root: ParentNode, registry: DevIdEntry[]): Tar
 /** Build the rendered target tree with keys derived only from stable registry identities. */
 export function targetLayersFor(root: ParentNode, registry: DevIdEntry[]): TargetLayer[] {
   ensureDesignIdentities(root);
+  const overrideIds = designOverrideIdsFor(root);
   const devById = new Map(registry.map((entry) => [entry.id, entry]));
   const layers: TargetLayer[] = [];
   const byKey = new Map<string, TargetLayer>();
@@ -157,7 +158,7 @@ export function targetLayersFor(root: ParentNode, registry: DevIdEntry[]): Targe
       ["icon", element.getAttribute("data-icon-id")],
       ["layout-piece", element.getAttribute("data-layout-piece")],
     ] as const;
-    const authority = exactDesignTargetAuthority(element);
+    const overrideId = overrideIds.get(element) ?? null;
     let ancestor = element.parentElement;
     let parentKey: string | null = null;
     let ownerDevId: string | null = null;
@@ -183,8 +184,8 @@ export function targetLayersFor(root: ParentNode, registry: DevIdEntry[]): Targe
       const occurrenceNumber = (seenOccurrences.get(baseKey) ?? 0) + 1;
       seenOccurrences.set(baseKey, occurrenceNumber);
       const key = occurrenceTotal > 1
-        ? authority
-          ? `${baseKey}@${authority.overrideId}`
+        ? overrideId
+          ? `${baseKey}@${overrideId}`
           : `${baseKey}@ambiguous`
         : baseKey;
       const existing = byKey.get(key);
@@ -194,7 +195,7 @@ export function targetLayersFor(root: ParentNode, registry: DevIdEntry[]): Targe
       } else {
         const depth = parentKey ? (byKey.get(parentKey)?.depth ?? -1) + 1 : 0;
         const baseLabel = kind === "dev" ? (devById.get(id)?.label ?? id) : `${kind === "layout-piece" ? "Layout Piece" : kind === "generated" ? "Element" : kind[0].toUpperCase() + kind.slice(1)} · ${id}`;
-        const label = occurrenceTotal > 1 && authority
+        const label = occurrenceTotal > 1 && overrideId
           ? `${baseLabel} · ${occurrenceNumber} of ${occurrenceTotal}`
           : occurrenceTotal > 1
             ? `${baseLabel} · Ambiguous (${occurrenceTotal})`
@@ -207,7 +208,7 @@ export function targetLayersFor(root: ParentNode, registry: DevIdEntry[]): Targe
           parentKey,
           depth,
           occurrences: 1,
-          overrideId: authority?.overrideId ?? null,
+          overrideId,
           element,
           ownerDevId: kind === "dev" || kind === "generated" ? id : ownerDevId,
           meaningful: kind !== "generated"

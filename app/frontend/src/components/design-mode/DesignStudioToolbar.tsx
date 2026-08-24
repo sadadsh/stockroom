@@ -11,6 +11,7 @@ import {
 } from "../../design-studio/responsiveViewports";
 import { ValueSlider } from "./ValueSlider";
 import { useEscapeDismiss } from "../../lib/useEscapeDismiss";
+import { downloadDesignHandoff } from "../../design-studio/designHandoff";
 
 interface DesignStudioToolbarProps {
   mode: StudioMode;
@@ -91,6 +92,7 @@ export function DesignStudioToolbar({
   const redoLabel = useText("design-studio.redo", "Redo");
   const viewLabel = useText("design-studio.view", "View");
   const developerLabel = useText("design-studio.developer", "Developer Tools");
+  const exportLabel = useText("design-studio.export", "Export Design");
   const applyLabel = useText("design-studio.apply-local", "Apply To This PC");
   const applyFixtureTitle = useText("design-studio.apply-local.fixture-help", "Return To Real Data To Apply This Draft");
   const applyTitle = useText("design-studio.apply-local.help", "Apply This Draft On This PC");
@@ -170,6 +172,22 @@ export function DesignStudioToolbar({
             <div className="mt-3 flex items-center gap-2">
               <Button aria-pressed={presentation} onClick={() => onPresentationChange(!presentation)}>{presentationLabel}</Button>
             </div>
+            <button
+              type="button"
+              disabled={fixturePreview}
+              onClick={() => {
+                downloadDesignHandoff({
+                  document: studio.document,
+                  theme,
+                  activeScenarioId: studio.activeScenarioId,
+                  appliedRevision: studio.appliedRevision,
+                });
+                closeView();
+              }}
+              className="mt-3 w-full rounded-control px-2 py-1.5 text-left text-xs text-t2 hover:bg-raise2 hover:text-t1 disabled:text-t5"
+            >
+              {exportLabel}
+            </button>
             {onDeveloperOpen ? <button type="button" onClick={() => { setViewOpen(false); onDeveloperOpen(); }} className="mt-3 w-full rounded-control px-2 py-1.5 text-left text-xs text-t2 hover:bg-raise2 hover:text-t1">{developerLabel}</button> : null}
           </div>
         ) : null}

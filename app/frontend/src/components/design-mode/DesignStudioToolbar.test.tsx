@@ -3,6 +3,9 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DesignStudioToolbar } from "./DesignStudioToolbar";
 
+const { downloadDesignHandoff } = vi.hoisted(() => ({ downloadDesignHandoff: vi.fn() }));
+vi.mock("../../design-studio/designHandoff", () => ({ downloadDesignHandoff }));
+
 const applyLocal = vi.fn();
 const studio = {
   activeScenario: null as { id: string; title: string } | null,
@@ -11,6 +14,7 @@ const studio = {
   appliedState: "ready" as "loading" | "ready" | "applying" | "error",
   appliedMatchesDraft: false,
   applyLocal,
+  document: { schemaVersion: 2, base: {}, variations: {}, activeVariationId: "", globalTargets: {}, orphanedEdits: {}, cadPresentation: {} },
 };
 
 vi.mock("../../design-studio/DesignStudioProvider", () => ({ useDesignStudio: () => studio }));
@@ -81,6 +85,21 @@ describe("DesignStudioToolbar local Apply", () => {
     expect(screen.getByRole("button", { name: "Grid" })).toBeVisible();
     expect(screen.getByRole("button", { name: "Snap" })).toBeVisible();
     expect(screen.getByRole("slider", { name: "Grid And Snap Size" })).toHaveValue("8");
+    expect(screen.getByRole("button", { name: "Export Design" })).toBeVisible();
+  });
+
+  it("exports the current personal design for a future ChatGPT revision", async () => {
+    renderToolbar();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "View" }));
+    await user.click(screen.getByRole("button", { name: "Export Design" }));
+
+    expect(downloadDesignHandoff).toHaveBeenCalledWith(expect.objectContaining({
+      document: studio.document,
+      theme: "dark",
+      activeScenarioId: null,
+      appliedRevision: null,
+    }));
   });
 
   it("lets Escape close only the View menu", async () => {

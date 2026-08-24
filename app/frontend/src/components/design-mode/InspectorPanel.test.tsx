@@ -6,6 +6,7 @@ import { ThemeProvider } from "../../lib/theme";
 import { InspectorPanel } from "./InspectorPanel";
 import { Button } from "../primitives";
 import { Text } from "../../lib/copy";
+import { DesignIdentityRuntime } from "../DesignIdentityRuntime";
 
 function Controls() {
   const dev = useDevMode();
@@ -58,6 +59,15 @@ function Controls() {
       >
         Select Text Only
       </button>
+      <button
+        type="button"
+        onClick={() => {
+          if (!dev.enabled) dev.toggle();
+          dev.selectTarget(document.querySelector('[data-testid="raw-provider-digikey"]'));
+        }}
+      >
+        Select Raw Provider
+      </button>
       <output data-testid="inspector-draft">{JSON.stringify(dev.draft)}</output>
     </>
   );
@@ -100,9 +110,14 @@ function Harness() {
         <Button type="button" data-testid="repeated-inspector-first" data-design-id="auto.inspector-repeat.1234567"><Text id="repeated.copy.first">Repeated First</Text></Button>
         <Button type="button" data-testid="repeated-inspector-second" data-design-id="auto.inspector-repeat.1234567"><Text id="repeated.copy.second">Repeated Second</Text></Button>
         <Button type="button" data-testid="repeated-inspector-third" data-design-id="auto.inspector-repeat.1234567"><Text id="repeated.copy.third">Repeated Third</Text></Button>
-        <main data-design-product-root="true" data-dev-id="preview.root"><p>Preview Root</p></main>
+        <main data-design-product-root="true" data-dev-id="preview.root">
+          <p>Preview Root</p>
+          <div data-spec-key="supplier-digikey"><span data-testid="raw-provider-digikey" data-design-id="auto.provider-name.1234567">DigiKey</span></div>
+          <div data-spec-key="supplier-mouser"><span data-testid="raw-provider-mouser" data-design-id="auto.provider-name.1234567">Mouser</span></div>
+        </main>
         <output data-testid="activation-count">{activations}</output>
         <InspectorPanel />
+        <DesignIdentityRuntime />
       </DevModeProvider>
     </ThemeProvider>
   );
@@ -262,6 +277,25 @@ describe("InspectorPanel", () => {
     await waitFor(() => expect(second.style.display).toBe("none"));
     expect(first.style.display).toBe("");
     expect(third.style.display).toBe("");
+  });
+
+  it("edits unregistered direct text on one exact repeated occurrence", async () => {
+    render(<Harness />);
+    fireEvent.click(screen.getByRole("button", { name: "Select Raw Provider" }));
+    openGroup("Content");
+
+    const editor = screen.getByLabelText("Text Content");
+    expect(editor).toHaveValue("DigiKey");
+    fireEvent.change(editor, { target: { value: "" } });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("raw-provider-digikey").textContent).toBe("");
+      expect(screen.getByTestId("raw-provider-mouser")).toHaveTextContent("Mouser");
+      const draft = JSON.parse(screen.getByTestId("inspector-draft").textContent ?? "{}") as {
+        copy: Record<string, string>;
+      };
+      expect(Object.values(draft.copy)).toContain("");
+    });
   });
 
   it("blocks root visibility, removal, and geometry from inspector facets", () => {

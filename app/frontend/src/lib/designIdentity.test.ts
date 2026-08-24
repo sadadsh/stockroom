@@ -139,6 +139,24 @@ describe("ensureDesignIdentities", () => {
     root.remove();
   });
 
+  it("uses stable product data keys to address repeated interface rows", () => {
+    const root = document.createElement("div");
+    root.innerHTML = `
+      <main data-dev-id="shell.root">
+        <div data-spec-key="supplier-digikey"><span data-design-id="auto.source-label.1234567">DigiKey</span></div>
+        <div data-spec-key="supplier-mouser"><span data-design-id="auto.source-label.1234567">Mouser</span></div>
+      </main>
+    `;
+    document.body.append(root);
+    ensureDesignIdentities(root);
+    const labels = root.querySelectorAll('[data-design-id="auto.source-label.1234567"]');
+    const authorities = Array.from(labels, exactDesignTargetAuthority);
+
+    expect(authorities.every(Boolean)).toBe(true);
+    expect(new Set(authorities.map((authority) => authority?.overrideId)).size).toBe(2);
+    root.remove();
+  });
+
   it("invalidates an exact occurrence when reparenting changes its durable locator", () => {
     const root = document.createElement("div");
     root.innerHTML = `

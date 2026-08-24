@@ -2,6 +2,7 @@ import type { DesignScope } from "./document";
 import { nodesForDevId } from "../lib/componentDevIds";
 import {
   DESIGN_TARGET_SELECTOR,
+  designOverrideIdsFor,
   designOverrideSelector,
   designIdOf,
   designIdSelector,
@@ -9,6 +10,7 @@ import {
   isOccurrenceDesignId,
   isGeneratedDesignId,
   narrowDesignOverrideTargets,
+  runtimeDesignId,
   type ExactDesignTargetAuthority,
 } from "../lib/designIdentity";
 
@@ -134,7 +136,11 @@ function belongsToTarget(element: Element, target: Element): boolean {
   return authoredBoundary === target || authoredBoundary === null || !target.contains(authoredBoundary);
 }
 
-function textDomains(target: Element): TargetTextDomain[] {
+export function directTextCopyId(overrideId: string): string {
+  return runtimeDesignId("direct-copy", overrideId);
+}
+
+function textDomains(target: Element, overrideId?: string): TargetTextDomain[] {
   const texts: TargetTextDomain[] = [];
   const visit = (node: Node) => {
     if (node.nodeType === Node.ELEMENT_NODE) {
@@ -148,7 +154,12 @@ function textDomains(target: Element): TargetTextDomain[] {
       const parent = node.parentElement;
       if (value && parent && !isTechnical(parent)) {
         const copyElement = parent.closest("[data-copy-id]");
-        texts.push({ element: parent, copyId: copyElement?.getAttribute("data-copy-id") ?? null, value });
+        texts.push({
+          element: parent,
+          copyId: copyElement?.getAttribute("data-copy-id")
+            ?? (overrideId && parent === target ? directTextCopyId(overrideId) : null),
+          value,
+        });
       }
       return;
     }
@@ -272,7 +283,7 @@ export function inspectTarget(
     throw new Error(`Design target '${id}' is outside the supplied root.`);
   }
   const overrideId = typeof authority === "string" ? id : authority.overrideId;
-  const texts = textDomains(target);
+  const texts = textDomains(target, overrideId);
   const icons = iconDomains(target);
   const behaviors = behaviorDomains(target);
   const states = stateDomains(target);
@@ -306,6 +317,48 @@ export function inspectTarget(
   };
 }
 
+const directTextDefaults = new WeakMap<Element, string[]>();
+const appliedDirectText = new WeakMap<Element, string>();
+
+function directTextNodes(element: Element): Text[] {
+  return Array.from(element.childNodes).filter((node): node is Text => node.nodeType === Node.TEXT_NODE);
+}
+
+/** Apply occurrence-backed copy overrides to JSX text that is not wrapped by the Text primitive. */
+export function applyDirectTextOverrides(
+  root: ParentNode,
+  copy: Readonly<Record<string, string>>,
+): void {
+  for (const [element, overrideId] of designOverrideIdsFor(root)) {
+    if (!overrideId || element.hasAttribute("data-copy-id")) continue;
+    const nodes = directTextNodes(element);
+    const storedDefaults = directTextDefaults.get(element);
+    if (nodes.length === 0 || (!storedDefaults && !nodes.some((node) => node.data.trim()))) continue;
+    const id = directTextCopyId(overrideId);
+    const next = copy[id];
+    const previousApplied = appliedDirectText.get(element);
+    if (next === undefined) {
+      if (storedDefaults && storedDefaults.length === nodes.length) {
+        nodes.forEach((node, index) => {
+          const value = storedDefaults[index] ?? "";
+          if (node.data !== value) node.data = value;
+        });
+      }
+      appliedDirectText.delete(element);
+      continue;
+    }
+    const directText = nodes.map((node) => node.data).join("");
+    if (!storedDefaults || (previousApplied !== undefined && directText !== previousApplied)) {
+      directTextDefaults.set(element, nodes.map((node) => node.data));
+    }
+    nodes.forEach((node, index) => {
+      const value = index === 0 ? next : "";
+      if (node.data !== value) node.data = value;
+    });
+    appliedDirectText.set(element, next);
+  }
+}
+
 /** Resolve a persisted domain override against every live instance of its owning stable target. */
 export function elementsForTargetDomainOverride(
   overrideId: string,
@@ -325,7 +378,7 @@ export function elementsForTargetDomainOverride(
   for (const target of targets) {
     if (address.domain === "box") elements.push(target);
     else if (address.domain === "text") {
-      elements.push(...textEditElements(textDomains(target), target));
+      elements.push(...textEditElements(textDomains(target, address.targetId), target));
     } else {
       elements.push(...iconDomains(target).map((icon) => icon.element));
     }

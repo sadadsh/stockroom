@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { DEV_IDS } from "../lib/devIds";
 import { componentDevId } from "../lib/componentDevIds";
 import { coverageIssuesFor, targetLayersFor } from "./targetCoverage";
@@ -177,5 +177,22 @@ describe("target coverage", () => {
       expect.objectContaining({ id: "auto.icon.0def456", occurrences: 1, meaningful: false }),
       expect.objectContaining({ id: "auto.fixture.0ghi789", occurrences: 1, meaningful: true }),
     ]));
+  });
+
+  it("builds a populated repeated layer tree with one bounded identity scan", () => {
+    const rows = Array.from({ length: 120 }, (_, index) => `
+      <div data-spec-key="field-${index}">
+        <span data-design-id="auto.spec-label.1234567">Field ${index}</span>
+        <span data-design-id="auto.spec-value.1234567">Value ${index}</span>
+      </div>
+    `).join("");
+    const root = fixture(`<main data-dev-id="shell.root">${rows}</main>`);
+    const query = vi.spyOn(Element.prototype, "querySelectorAll");
+
+    const targets = targetLayersFor(root, DEV_IDS);
+
+    expect(targets.filter((target) => target.id === "auto.spec-label.1234567")).toHaveLength(120);
+    expect(query.mock.calls.length).toBeLessThan(30);
+    query.mockRestore();
   });
 });

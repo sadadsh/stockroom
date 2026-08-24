@@ -6,8 +6,6 @@ import { useDevMode } from "../../lib/devMode";
 import { useText } from "../../lib/copy";
 import { BUILT_IN_VARIATIONS } from "../../design-studio/document";
 import {
-  DESIGN_TARGET_SELECTOR,
-  exactDesignTargetAuthority,
   isProtectedDesignRoot,
 } from "../../lib/designIdentity";
 
@@ -68,14 +66,9 @@ export function LayersHierarchyPanel() {
   };
 
   const hideScreenContents = () => {
-    const root = document.querySelector("[data-design-product-root]");
-    if (!root) return;
-    const ids: string[] = [];
-    for (const element of root.querySelectorAll(DESIGN_TARGET_SELECTOR)) {
-      if (isProtectedDesignRoot(element)) continue;
-      const id = exactDesignTargetAuthority(element)?.overrideId;
-      if (id) ids.push(id);
-    }
+    const ids = [...new Set(targets.flatMap((target) => (
+      target.overrideId && !isProtectedDesignRoot(target.element) ? [target.overrideId] : []
+    )))];
     replaceElementDisplay(ids, true);
   };
 

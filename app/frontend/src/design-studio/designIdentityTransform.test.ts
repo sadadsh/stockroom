@@ -40,4 +40,13 @@ describe("automatic design identity transform", () => {
       ),
     ).toBeNull();
   });
+
+  it("preserves a rendered list key as a durable occurrence discriminator", async () => {
+    const transformed = await transformStockroomJsx(
+      `export function Rows({ rows }) { return <>{rows.map((row) => <span key={row.id}>{row.label}</span>)}</>; }`,
+      "D:/repo/app/frontend/src/components/Rows.tsx",
+    );
+
+    expect(transformed).toContain("data-design-key={row.id}");
+  });
 });
