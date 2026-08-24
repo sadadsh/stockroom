@@ -436,21 +436,30 @@ def test_dev_save_records_owner_authored_copy_ids_only_for_written_overrides(
     assert "bad id!" not in copy_ts
 
 
-def test_dev_save_with_no_owner_authored_copy_reproduces_the_committed_file(
+def test_dev_save_reproduces_the_committed_copy_and_provenance(
     client, tmp_path, monkeypatch
 ):
-    # An empty save regenerates copy.overrides.ts as the repository has it, provenance record and all
-    # - so the record cannot quietly disappear the first time somebody saves a token nudge. Semantic
-    # rather than byte equality for the prettier reason recorded on the layout test above.
+    # A save regenerates copy.overrides.ts as the repository has it, provenance record and all - so
+    # existing owner edits cannot quietly disappear the first time somebody saves a token nudge.
+    # Semantic rather than byte equality for the prettier reason recorded on the layout test above.
     src = _src_with_lib(tmp_path, monkeypatch)
-    res = client.post("/api/dev/save", json={"tokens": {"root": {}, "light": {}}, "copy": {}})
-    assert res.status_code == 200
-    assert res.json()["ownerAuthoredCopy"] == 0
-    copy_ts = (src / "lib" / "copy.overrides.ts").read_text(encoding="utf-8")
     committed = (_COMMITTED_LIB / "copy.overrides.ts").read_text(encoding="utf-8")
+    expected_copy = _emitted_json(committed, "COPY_OVERRIDES")
+    expected_owner_authored = _emitted_json(committed, "OWNER_AUTHORED_COPY_IDS")
+    res = client.post(
+        "/api/dev/save",
+        json={
+            "tokens": {"root": {}, "light": {}},
+            "copy": expected_copy,
+            "ownerAuthoredCopy": expected_owner_authored,
+        },
+    )
+    assert res.status_code == 200
+    assert res.json()["ownerAuthoredCopy"] == len(expected_owner_authored)
+    copy_ts = (src / "lib" / "copy.overrides.ts").read_text(encoding="utf-8")
     for text in (copy_ts, committed):
-        assert _emitted_json(text, "COPY_OVERRIDES") == {}
-        assert _emitted_json(text, "OWNER_AUTHORED_COPY_IDS") == []
+        assert _emitted_json(text, "COPY_OVERRIDES") == expected_copy
+        assert _emitted_json(text, "OWNER_AUTHORED_COPY_IDS") == expected_owner_authored
         assert "OWNER-AUTHORED PROVENANCE" in text
 
 

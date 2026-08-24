@@ -34,7 +34,7 @@ def test_public_policy_truthfully_describes_local_and_provider_data() -> None:
 def test_public_site_exposes_the_one_time_github_channel_install_files() -> None:
     page = (ROOT / "store-site" / "index.html").read_text(encoding="utf-8")
 
-    assert 'href="downloads/Stockroom-Windows-Portable.zip"' in page
+    assert 'href="downloads/Stockroom-Windows-EXE.zip"' in page
     assert "Stockroom.exe" in page
     assert 'href="downloads/Stockroom-GitHub-Signing.cer"' in page
     assert 'href="windows/x64/Stockroom.appinstaller"' in page

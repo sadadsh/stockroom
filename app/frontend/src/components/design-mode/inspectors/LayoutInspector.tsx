@@ -9,7 +9,7 @@ export function LayoutInspector(props: DomainInspectorProps) {
   const removeLabel = useText("design-studio.inspector.layout.remove", "Remove From Arrangement");
   const removalHint = useText("design-studio.inspector.layout.removal-hint", "Removed elements remain available in Layers and Undo.");
   const protectedRoot = isProtectedDesignRoot(props.inspection.target);
-  const removed = props.affectedTargetIds.every(
+  const removed = (props.boxOverrideIds ?? props.affectedTargetIds).every(
     (id) => dev.elementOverridesFor(id)?.display === "none",
   );
   return (

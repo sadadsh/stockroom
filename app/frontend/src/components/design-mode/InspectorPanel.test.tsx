@@ -316,6 +316,20 @@ describe("InspectorPanel", () => {
       expect(document.querySelector<HTMLElement>('[data-dev-id="detail.action[first]"]')?.style.display).toBe("none");
       expect(document.querySelector<HTMLElement>('[data-dev-id="detail.action[second]"]')?.style.display).toBe("none");
       expect(document.querySelector<HTMLElement>('[data-dev-id="rail.action"]')?.style.display).toBe("");
+      const draft = JSON.parse(screen.getByTestId("inspector-draft").textContent ?? "{}") as {
+        elements: Record<string, Record<string, string>>;
+      };
+      expect(draft.elements["detail.action::matching"]?.display).toBe("none");
+      expect(Object.entries(draft.elements).some(
+        ([id, override]) => id.startsWith("auto.occurrence.") && override.display === "none",
+      )).toBe(false);
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Restore Element" }));
+    await waitFor(() => {
+      expect(document.querySelector<HTMLElement>('[data-dev-id="detail.action[first]"]')?.style.display).toBe("");
+      expect(document.querySelector<HTMLElement>('[data-dev-id="detail.action[second]"]')?.style.display).toBe("");
+      expect(screen.getByRole("button", { name: "Remove From Arrangement" })).toBeVisible();
     });
   });
 
@@ -388,7 +402,7 @@ describe("InspectorPanel", () => {
           icons: Record<string, { swapToId?: string; body?: string; treatment?: string; alignment?: string; a11yLabel?: string }>;
           elements: Record<string, Record<string, string>>;
         };
-        expect(Object.keys(draft.copy).sort()).toEqual([...copyIds].sort());
+        expect(Object.keys(draft.copy).filter((id) => id.startsWith("detail.")).sort()).toEqual([...copyIds].sort());
         expect(Object.keys(draft.icons).sort()).toEqual([...iconIds].sort());
         for (const id of copyIds) expect(draft.copy[id]).toBe("Global Text");
         expect(draft.copy["detail.action.second.copy"]).toBeUndefined();

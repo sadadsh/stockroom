@@ -217,7 +217,7 @@ describe("the Datasheet control", () => {
     expect(document.querySelector(devIdSelector("component-browser.datasheet-more"))).toBeNull();
   });
 
-  it("becomes a split button whose menu lists the revisions and the other documents", async () => {
+  it("uses one menu button like Manage when revisions or other documents exist", async () => {
     const user = userEvent.setup();
     await open(
       withDocuments(
@@ -232,7 +232,8 @@ describe("the Datasheet control", () => {
         }),
       ),
     );
-    await user.click(node("component-browser.datasheet-more"));
+    expect(document.querySelector(devIdSelector("component-browser.datasheet-more"))).toBeNull();
+    await user.click(node("component-browser.header-datasheet"));
     const menu = node("component-browser.datasheet-menu");
     expect(within(menu).getAllByRole("menuitem").map((item) => item.textContent?.trim())).toEqual([
       "Current DatasheetDatasheet",
@@ -268,6 +269,7 @@ describe("the datasheet viewer", () => {
       makeDossierWith({ documents: [arrivesFirst, wanted] }),
     );
     await user.click(node("component-browser.header-datasheet"));
+    await user.click(node("component-browser.datasheet-current"));
 
     await waitFor(() => expect(mockApi.documentFile).toHaveBeenCalledWith(ID, wanted.id));
     expect(mockApi.documentFile).not.toHaveBeenCalledWith(ID, arrivesFirst.id);

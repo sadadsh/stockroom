@@ -380,7 +380,9 @@ describe("DesignStudioProvider", () => {
     await studio.applyLocal();
     expect(mockApi.designStudioApplyLocal).toHaveBeenCalledWith({
       document: expect.objectContaining({
-        base: expect.objectContaining({ copy: { "rail.components": "Applied Components" } }),
+        base: expect.objectContaining({
+          copy: expect.objectContaining({ "rail.components": "Applied Components" }),
+        }),
       }),
     });
     await studio.close();
@@ -414,9 +416,9 @@ describe("DesignStudioProvider", () => {
     expect(mockApi.designStudioApplyLocal).toHaveBeenCalledWith({
       document: expect.objectContaining({
         base: expect.objectContaining({
-          copy: mixed.base.copy,
-          icons: mixed.base.icons,
-          elements: mixed.base.elements,
+          copy: expect.objectContaining(mixed.base.copy),
+          icons: expect.objectContaining(mixed.base.icons),
+          elements: expect.objectContaining(mixed.base.elements),
         }),
         cadPresentation: mixed.cadPresentation,
       }),
@@ -525,7 +527,9 @@ describe("DesignStudioProvider", () => {
     expect(mockApi.designStudioPut).toHaveBeenCalledWith({
       document: expect.objectContaining({
         schemaVersion: 2,
-        base: expect.objectContaining({ copy: { "rail.about": "Information" } }),
+        base: expect.objectContaining({
+          copy: expect.objectContaining({ "rail.about": "Information" }),
+        }),
       }),
       expected_revision: "r1",
     });
@@ -600,7 +604,9 @@ describe("DesignStudioProvider", () => {
     expect(mockApi.designStudioPut).not.toHaveBeenCalled();
     expect(mockApi.designStudioPutForPageExit).toHaveBeenCalledWith({
       document: expect.objectContaining({
-        base: expect.objectContaining({ copy: { "rail.about": "Page Exit Safe" } }),
+        base: expect.objectContaining({
+          copy: expect.objectContaining({ "rail.about": "Page Exit Safe" }),
+        }),
       }),
       expected_revision: "r1",
       superseded_document: null,

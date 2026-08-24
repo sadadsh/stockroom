@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import {
   inspectTarget,
+  matchingTargetDomainOverrideId,
   previewTargetScope,
   type EditableTargetDomain,
   type TargetInspection,
@@ -131,6 +132,9 @@ export function InspectorPanel({ root }: { root?: Element; integrated?: boolean 
   );
 
   const domainOverrideIds = (domain: EditableTargetDomain) => {
+    if (scope === "matching") {
+      return [matchingTargetDomainOverrideId(inspection.role ?? inspection.id, domain)];
+    }
     const ids = new Set<string>();
     for (const item of affectedInspections) {
       const target = item.editTargets[domain];
@@ -215,6 +219,7 @@ export function InspectorPanel({ root }: { root?: Element; integrated?: boolean 
     inspection,
     inspections: affectedInspections,
     affectedTargetIds,
+    boxOverrideIds: domainOverrideIds("box"),
     setDomainProperty,
     resetDomainProperty,
   };

@@ -216,8 +216,11 @@ function inclusiveDesignTargets(root: ParentNode): Element[] {
 }
 
 /** Resolve every live target once. Layers and bulk actions must not rescan the document per row. */
-export function designOverrideIdsFor(root: ParentNode): Map<Element, string | null> {
-  ensureDesignOccurrenceIdentities(root);
+export function designOverrideIdsFor(
+  root: ParentNode,
+  occurrenceIdentitiesReady = false,
+): Map<Element, string | null> {
+  if (!occurrenceIdentitiesReady) ensureDesignOccurrenceIdentities(root);
   const scope = durableOccurrenceScope(root);
   const scopedTargets = inclusiveDesignTargets(scope)
     .filter((element) => !element.closest("[data-design-studio-chrome]"));
@@ -226,8 +229,10 @@ export function designOverrideIdsFor(root: ParentNode): Map<Element, string | nu
     const id = designIdOf(element);
     if (id) semanticCounts.set(id, (semanticCounts.get(id) ?? 0) + 1);
   }
-  const requested = inclusiveDesignTargets(root)
-    .filter((element) => !element.closest("[data-design-studio-chrome]"));
+  const requested = scope === root
+    ? scopedTargets
+    : inclusiveDesignTargets(root)
+      .filter((element) => !element.closest("[data-design-studio-chrome]"));
   return new Map(requested.map((element) => {
     const id = designIdOf(element);
     if (!id) return [element, null];
@@ -429,7 +434,7 @@ function semanticGeneratedId(element: Element): string | null {
 }
 
 /** Cover DOM emitted through dynamic JSX tags, portals, clones, and imperative Stockroom renderers. */
-export function ensureDesignIdentities(root: ParentNode): void {
+export function ensureDesignIdentities(root: ParentNode, ensureOccurrences = true): void {
   const elements = root instanceof Element
     ? [root, ...Array.from(root.querySelectorAll("*"))]
     : Array.from(root.querySelectorAll("*"));
@@ -454,5 +459,5 @@ export function ensureDesignIdentities(root: ParentNode): void {
     if (designIdOf(element)) continue;
     assignDesignIdentity(element, `dom-${element.localName}`, fallbackSemanticKey(element, ordinal));
   }
-  ensureDesignOccurrenceIdentities(root);
+  if (ensureOccurrences) ensureDesignOccurrenceIdentities(root);
 }

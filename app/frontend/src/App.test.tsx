@@ -236,7 +236,7 @@ describe("App shell", () => {
     expect((await screen.findAllByText(/Dual Operational Amplifier/)).length).toBeGreaterThan(0);
     // Components inspects CAD evidence; acquisition is handed to the Assets route.
     expect(screen.queryAllByRole("tab")).toHaveLength(0);
-    expect(screen.getByRole("button", { name: "Manage CAD Assets" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Manage Assets" })).toBeVisible();
   });
 
   it("reaches Add Parts as a full-screen wizard from the Parts toolbar", async () => {

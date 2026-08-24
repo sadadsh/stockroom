@@ -1,5 +1,9 @@
 import { useEffect, useRef } from "react";
-import { designOverrideIdsFor, ensureDesignIdentities } from "../lib/designIdentity";
+import {
+  designOverrideIdsFor,
+  ensureDesignIdentities,
+  ensureDesignOccurrenceIdentities,
+} from "../lib/designIdentity";
 import { useDevMode } from "../lib/devMode";
 import { applyDirectTextOverrides } from "../design-studio/targetDomains";
 
@@ -14,11 +18,18 @@ export function DesignIdentityRuntime() {
   const dev = useDevMode();
   const copy = useRef(dev.draft.copy);
   const targets = useRef(new Map<Element, Map<Element, string | null>>());
+  const active = dev.enabled || Object.keys(dev.draft.copy).some((id) => id.startsWith("auto.direct-copy."));
   useEffect(() => {
+    if (!active) return;
     const instrument = () => {
-      for (const root of document.querySelectorAll(PRODUCT_ROOTS)) {
-        ensureDesignIdentities(root);
-        const resolved = designOverrideIdsFor(root);
+      const roots = Array.from(document.querySelectorAll(PRODUCT_ROOTS));
+      for (const root of roots) ensureDesignIdentities(root, false);
+      ensureDesignOccurrenceIdentities(document);
+      const resolvedDocument = designOverrideIdsFor(document, true);
+      for (const root of roots) {
+        const resolved = new Map(
+          [...resolvedDocument].filter(([element]) => element === root || root.contains(element)),
+        );
         targets.current.set(root, resolved);
         applyDirectTextOverrides(root, copy.current, resolved);
       }
@@ -37,7 +48,7 @@ export function DesignIdentityRuntime() {
       if (frame) cancelAnimationFrame(frame);
       targets.current.clear();
     };
-  }, []);
+  }, [active]);
   useEffect(() => {
     copy.current = dev.draft.copy;
     for (const root of document.querySelectorAll(PRODUCT_ROOTS)) {

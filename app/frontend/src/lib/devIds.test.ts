@@ -200,7 +200,7 @@ import { DEV_IDS, DEV_ID_AREAS, DEV_ID_BY_ID } from "./devIds";
 // deleted Altium bulk-embed control.
 // 515 makes the truthful About current-version status directly editable.
 // 517 adds the opened-component Details control.
-const EXPECTED_ENTRIES = 511;
+const EXPECTED_ENTRIES = 510;
 
 describe("devIds catalogue", () => {
   it("contains no retired About targets", () => {

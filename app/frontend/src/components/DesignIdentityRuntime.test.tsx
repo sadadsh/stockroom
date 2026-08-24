@@ -7,10 +7,28 @@ import { Text } from "../lib/copy";
 import { DevModeProvider, useDevMode } from "../lib/devMode";
 import { directTextCopyId } from "../design-studio/targetDomains";
 import { ThemeProvider } from "../lib/theme";
+import type { ReactNode } from "react";
 
 function DirectCopyControl() {
   const dev = useDevMode();
   return <button type="button" onClick={() => dev.setCopy(directTextCopyId("perf.direct"), "Changed")}>Change Copy</button>;
+}
+
+function ToggleDesignControl() {
+  const dev = useDevMode();
+  return <button type="button" onClick={dev.toggle}>Toggle Design</button>;
+}
+
+function EnabledRuntime({ children }: { children: ReactNode }) {
+  return (
+    <ThemeProvider>
+      <DevModeProvider>
+        {children}
+        <ToggleDesignControl />
+        <DesignIdentityRuntime />
+      </DevModeProvider>
+    </ThemeProvider>
+  );
 }
 
 afterEach(() => {
@@ -22,6 +40,22 @@ afterEach(() => {
 });
 
 describe("DesignIdentityRuntime", () => {
+  it("does not scan a large product until Design Studio is enabled", async () => {
+    render(
+      <EnabledRuntime>
+        <section data-testid="root" data-design-product-root="true">
+          {Array.from({ length: 291 }, (_, index) => (
+            <span key={index} data-testid={`unidentified-${index}`}>Part {index}</span>
+          ))}
+        </section>
+      </EnabledRuntime>,
+    );
+
+    expect(screen.getByTestId("unidentified-290")).not.toHaveAttribute("data-design-id");
+    fireEvent.click(screen.getByRole("button", { name: "Toggle Design" }));
+    await waitFor(() => expect(screen.getByTestId("unidentified-290")).toHaveAttribute("data-design-id"));
+  });
+
   it("keeps production caller identities authoritative over copy, icon, and layout metadata", async () => {
     render(
       <>
@@ -94,13 +128,18 @@ describe("DesignIdentityRuntime", () => {
       return 1;
     });
     vi.spyOn(window, "cancelAnimationFrame").mockImplementation(() => undefined);
-    render(<><section data-testid="root" data-design-product-root="true" /><DesignIdentityRuntime /></>);
+    render(<EnabledRuntime><section data-testid="root" data-design-product-root="true" /></EnabledRuntime>);
+    fireEvent.click(screen.getByRole("button", { name: "Toggle Design" }));
+    await waitFor(() => expect(document.querySelector('[data-testid="root"]')).toHaveAttribute("data-design-id"));
+    queued.splice(0).forEach((callback) => callback(0));
+    request.mockClear();
     const root = document.querySelector('[data-testid="root"]')!;
+    const scan = vi.spyOn(root, "querySelectorAll");
 
     root.append(document.createElement("span"), document.createElement("span"));
-    await waitFor(() => expect(request).toHaveBeenCalledTimes(1));
-    queued[0]?.(0);
-    expect(request).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(request).toHaveBeenCalled());
+    queued.splice(0).forEach((callback) => callback(0));
+    expect(scan.mock.calls.filter(([selector]) => selector === "*")).toHaveLength(1);
   });
 
   it("does not rescan the product tree for text-only mutations", async () => {
@@ -110,7 +149,8 @@ describe("DesignIdentityRuntime", () => {
       return 1;
     });
     vi.spyOn(window, "cancelAnimationFrame").mockImplementation(() => undefined);
-    render(<><section data-testid="root" data-design-product-root="true"><span>Before</span></section><DesignIdentityRuntime /></>);
+    render(<EnabledRuntime><section data-testid="root" data-design-product-root="true"><span>Before</span></section></EnabledRuntime>);
+    fireEvent.click(screen.getByRole("button", { name: "Toggle Design" }));
 
     queued.splice(0).forEach((callback) => callback(0));
     request.mockClear();
@@ -130,10 +170,13 @@ describe("DesignIdentityRuntime", () => {
             <span data-dev-id="perf.direct">Before</span>
           </section>
           <DirectCopyControl />
+          <ToggleDesignControl />
           <DesignIdentityRuntime />
         </DevModeProvider>
       </ThemeProvider>,
     );
+    fireEvent.click(screen.getByRole("button", { name: "Toggle Design" }));
+    await waitFor(() => expect(document.querySelector('[data-testid="root"]')).toHaveAttribute("data-design-id"));
     const root = document.querySelector<HTMLElement>('[data-testid="root"]')!;
     const scan = vi.spyOn(root, "querySelectorAll");
 

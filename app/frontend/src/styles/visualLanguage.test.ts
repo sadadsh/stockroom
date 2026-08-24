@@ -72,15 +72,17 @@ function contrast(left: string, right: string): number {
 }
 
 describe("paired color schemes", () => {
-  it.each(COLOR_SCHEMES)("%s defines readable dark and light accents", (scheme) => {
+  it.each(COLOR_SCHEMES)("%s tints app backgrounds in dark and light without recoloring highlights", (scheme) => {
     for (const selector of [
       `:root[data-color-scheme="${scheme}"]`,
       `:root[data-theme="light"][data-color-scheme="${scheme}"]`,
     ]) {
       const block = themeBlock(selector);
-      expect(contrast(property(block, "--c-acc"), property(block, "--c-acc-on"))).toBeGreaterThanOrEqual(4.5);
-      for (const token of ["--c-active", "--c-selected", "--c-selected-hover", "--c-selected-edge", "--c-acc-strong", "--c-focus"]) {
+      for (const token of ["--c-app", "--c-canvas", "--c-rail", "--c-surface", "--c-raise", "--c-raise2", "--c-section", "--c-field", "--c-popover", "--c-band", "--c-stage", "--c-sticky"]) {
         expect(property(block, token)).toMatch(/^#[0-9a-f]{6}$/i);
+      }
+      for (const highlight of ["--c-active", "--c-selected", "--c-selected-hover", "--c-selected-edge", "--c-acc", "--c-acc-on", "--c-acc-strong", "--c-acc-soft", "--c-focus"]) {
+        expect(block).not.toMatch(new RegExp(`${highlight.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*:`));
       }
     }
   });

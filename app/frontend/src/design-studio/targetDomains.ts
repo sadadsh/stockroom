@@ -1,5 +1,5 @@
 import type { DesignScope } from "./document";
-import { nodesForDevId } from "../lib/componentDevIds";
+import { devRoleSelector, nodesForDevId } from "../lib/componentDevIds";
 import {
   DESIGN_TARGET_SELECTOR,
   designOverrideIdsFor,
@@ -88,15 +88,29 @@ export function targetDomainOverrideId(targetId: string, domain: EditableTargetD
   return domain === "box" ? targetId : `${targetId}${DOMAIN_OVERRIDE_SUFFIX}${domain}`;
 }
 
+/** One explicit reusable-group key. Unlike an exact semantic key, this may target duplicates. */
+export function matchingTargetDomainOverrideId(
+  targetId: string,
+  domain: EditableTargetDomain,
+): string {
+  const suffix = domain === "box" ? "matching" : `matching-${domain}`;
+  return `${targetId}${DOMAIN_OVERRIDE_SUFFIX}${suffix}`;
+}
+
 export function parseTargetDomainOverrideId(
   overrideId: string,
-): { targetId: string; domain: EditableTargetDomain } {
+): { targetId: string; domain: EditableTargetDomain; matching: boolean } {
   const separator = overrideId.lastIndexOf(DOMAIN_OVERRIDE_SUFFIX);
-  if (separator === -1) return { targetId: overrideId, domain: "box" };
+  if (separator === -1) return { targetId: overrideId, domain: "box", matching: false };
   const targetId = overrideId.slice(0, separator);
   const suffix = overrideId.slice(separator + DOMAIN_OVERRIDE_SUFFIX.length);
-  if (suffix === "text" || suffix === "icon") return { targetId, domain: suffix };
-  return { targetId: overrideId, domain: "box" };
+  if (suffix === "text" || suffix === "icon") {
+    return { targetId, domain: suffix, matching: false };
+  }
+  if (suffix === "matching") return { targetId, domain: "box", matching: true };
+  if (suffix === "matching-text") return { targetId, domain: "text", matching: true };
+  if (suffix === "matching-icon") return { targetId, domain: "icon", matching: true };
+  return { targetId: overrideId, domain: "box", matching: false };
 }
 
 export interface ScopePreview {
@@ -365,16 +379,24 @@ export function applyDirectTextOverrides(
 export function elementsForTargetDomainOverride(
   overrideId: string,
   root: ParentNode = document,
+  occurrenceIdentitiesReady = false,
 ): Element[] {
   const address = parseTargetDomainOverrideId(overrideId);
   const elements: Element[] = [];
-  if (isOccurrenceDesignId(address.targetId)) ensureDesignOccurrenceIdentities(root);
+  if (isOccurrenceDesignId(address.targetId) && !occurrenceIdentitiesReady) {
+    ensureDesignOccurrenceIdentities(root);
+  }
   const candidates = isOccurrenceDesignId(address.targetId)
     ? Array.from(root.querySelectorAll(designOverrideSelector(address.targetId)))
     : isGeneratedDesignId(address.targetId)
     ? Array.from(root.querySelectorAll(designIdSelector(address.targetId)))
-    : nodesForDevId(address.targetId, root);
-  const targets = isOccurrenceDesignId(address.targetId)
+    : uniqueElements([
+        ...nodesForDevId(address.targetId, root),
+        ...(address.matching
+          ? Array.from(root.querySelectorAll(devRoleSelector(address.targetId)))
+          : []),
+      ]);
+  const targets = address.matching || isOccurrenceDesignId(address.targetId)
     ? candidates
     : narrowDesignOverrideTargets(address.targetId, candidates);
   for (const target of targets) {

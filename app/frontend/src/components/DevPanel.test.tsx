@@ -8,6 +8,8 @@ import { DevPanel } from "./DevPanel";
 import { DevInspector } from "./DevInspector";
 import { Icon } from "./Icon";
 
+vi.mock("../lib/element.overrides", () => ({ ELEMENT_OVERRIDES: {} }));
+
 vi.mock("../api/client", async (importActual) => {
   const actual = await importActual<typeof import("../api/client")>();
   return {

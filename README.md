@@ -2,7 +2,7 @@
 
 Stockroom keeps electronic components, CAD files, datasheets, sourcing evidence, and PCB projects in one Windows app. Your component Catalog lives in its own Git repository, so you can use the same parts on another PC or share them with people who have repository access.
 
-[Download Stockroom for Windows](https://sadadsh.github.io/stockroom/) and choose the portable EXE. Unzip it, then open `Stockroom.exe`.
+[Download Stockroom for Windows](https://sadadsh.github.io/stockroom/), choose **Download Stockroom.exe (.zip)**, unzip it, then open `Stockroom.exe`.
 
 ## Start Here
 
@@ -98,7 +98,7 @@ Give another person access to the Catalog repository, then let them connect it f
 
 The [Stockroom download page](https://sadadsh.github.io/stockroom/) offers two Windows channels:
 
-- **Portable EXE**: unzip and open `Stockroom.exe`. This is the shortest path.
+- **Stockroom.exe (.zip)**: unzip and open `Stockroom.exe`. This is the shortest path.
 - **App Installer**: installs Stockroom into Windows and uses the same signed runtime.
 
 Both channels use the same native WPF host, WebView2 interface, immutable packaged worker, CAD converter, and signed update feed. Microsoft Store distribution is optional and separate.

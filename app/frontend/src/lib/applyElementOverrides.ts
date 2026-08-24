@@ -28,6 +28,8 @@ import {
 import { isApplicableElementOverride } from "./elementLayout";
 import {
   designOverrideSelector,
+  ensureDesignOccurrenceIdentities,
+  isOccurrenceDesignId,
   isRootProtectedDesignProperty,
 } from "./designIdentity";
 
@@ -52,12 +54,19 @@ function stateSelectors(targetId: string, state: string): string[] {
   return [...bases.map((base) => `${base}:${state}`), ...preview];
 }
 
-function writeStateOverrides(overrides: ElementOverrides): void {
+function writeStateOverrides(
+  overrides: ElementOverrides,
+  occurrenceIdentitiesReady: boolean,
+): void {
   const rules: string[] = [];
   for (const [id, props] of Object.entries(overrides)) {
     const match = STATE_OVERRIDE_RE.exec(id);
     if (!match) continue;
-    const targetElements = elementsForTargetDomainOverride(match[1]);
+    const targetElements = elementsForTargetDomainOverride(
+      match[1],
+      document,
+      occurrenceIdentitiesReady,
+    );
     const safeDeclarations: string[] = [];
     for (const [property, value] of Object.entries(props)) {
       if (!targetElements.some((element) => isRootProtectedDesignProperty(element, property))) {
@@ -94,9 +103,14 @@ function concreteIconPaintTargets(icon: Element): Array<{ element: Element & Ele
   return targets;
 }
 
-function writeOverrideProperty(id: string, property: string, value: string | null): void {
+function writeOverrideProperty(
+  id: string,
+  property: string,
+  value: string | null,
+  occurrenceIdentitiesReady: boolean,
+): void {
   const domain = parseTargetDomainOverrideId(id).domain;
-  for (const element of elementsForTargetDomainOverride(id)) {
+  for (const element of elementsForTargetDomainOverride(id, document, occurrenceIdentitiesReady)) {
     const target = styled(element);
     if (!target) continue;
     if (isRootProtectedDesignProperty(element, property)) {
@@ -114,9 +128,14 @@ function writeOverrideProperty(id: string, property: string, value: string | nul
   }
 }
 
-function safelyWriteOverrideProperty(id: string, property: string, value: string | null): void {
+function safelyWriteOverrideProperty(
+  id: string,
+  property: string,
+  value: string | null,
+  occurrenceIdentitiesReady: boolean,
+): void {
   try {
-    writeOverrideProperty(id, property, value);
+    writeOverrideProperty(id, property, value, occurrenceIdentitiesReady);
   } catch (error) {
     console.error(`Design override '${id}.${property}' was skipped after a DOM write failure.`, error);
   }
@@ -150,8 +169,15 @@ export function applicableOverrides(source: ElementOverrides): ElementOverrides 
  */
 export function applyElementOverrides(current: ElementOverrides, previous?: ElementOverrides): void {
   const live = applicableOverrides(current);
+  const occurrenceIdentitiesReady = [...Object.keys(live), ...Object.keys(previous ?? {})].some(
+    (id) => {
+      const target = STATE_OVERRIDE_RE.exec(id)?.[1] ?? id;
+      return isOccurrenceDesignId(parseTargetDomainOverrideId(target).targetId);
+    },
+  );
+  if (occurrenceIdentitiesReady) ensureDesignOccurrenceIdentities(document);
   try {
-    writeStateOverrides(live);
+    writeStateOverrides(live, occurrenceIdentitiesReady);
   } catch (error) {
     console.error("Design state overrides were skipped after a DOM write failure.", error);
   }
@@ -159,7 +185,9 @@ export function applyElementOverrides(current: ElementOverrides, previous?: Elem
   // Set every current prop on every element the id addresses.
   for (const [id, props] of Object.entries(live)) {
     if (STATE_OVERRIDE_RE.test(id)) continue;
-    for (const [prop, value] of Object.entries(props)) safelyWriteOverrideProperty(id, prop, value);
+    for (const [prop, value] of Object.entries(props)) {
+      safelyWriteOverrideProperty(id, prop, value, occurrenceIdentitiesReady);
+    }
   }
 
   // Clear anything present in `previous` that no longer appears in `current` (a removed id, or a
@@ -170,7 +198,9 @@ export function applyElementOverrides(current: ElementOverrides, previous?: Elem
       const nextProps = live[id];
       const removed = Object.keys(prevProps).filter((prop) => !nextProps || !(prop in nextProps));
       if (removed.length === 0) continue;
-      for (const prop of removed) safelyWriteOverrideProperty(id, prop, null);
+      for (const prop of removed) {
+        safelyWriteOverrideProperty(id, prop, null, occurrenceIdentitiesReady);
+      }
     }
   }
 }
@@ -181,14 +211,22 @@ export function applyElementOverrides(current: ElementOverrides, previous?: Elem
  * override. `getOverrides` returns the current map at call time (the caller keeps it fresh).
  *
  * Observes `childList` + `subtree` ONLY, never `attributes`: writing a style attribute during a
- * re-apply must not retrigger the observer and loop. The re-apply is idempotent, so a broad re-apply
- * over the small overrides key-set on any DOM growth is cheap and correct. Returns a disconnect fn.
+ * re-apply must not retrigger the observer and loop. React may deliver several growth batches while
+ * opening a large catalog, so one animation-frame job coalesces them into one full resolution pass.
  */
 export function startElementOverrideObserver(getOverrides: () => ElementOverrides): () => void {
+  let frame: number | null = null;
   const observer = new MutationObserver((records) => {
     const grew = records.some((r) => r.addedNodes.length > 0);
-    if (grew) applyElementOverrides(getOverrides());
+    if (!grew || frame !== null) return;
+    frame = requestAnimationFrame(() => {
+      frame = null;
+      applyElementOverrides(getOverrides());
+    });
   });
   observer.observe(document.body, { childList: true, subtree: true });
-  return () => observer.disconnect();
+  return () => {
+    observer.disconnect();
+    if (frame !== null) cancelAnimationFrame(frame);
+  };
 }

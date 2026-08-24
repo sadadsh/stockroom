@@ -105,7 +105,7 @@ def _valid_element_id(value: object) -> bool:
         base, separator, domain = value.rpartition("::")
         if not separator or "::" in base:
             return False
-        if domain in {"text", "icon"}:
+        if domain in {"text", "icon", "matching", "matching-text", "matching-icon"}:
             value = base
         elif domain.startswith("state:") and domain.removeprefix("state:") in {
             "hover",

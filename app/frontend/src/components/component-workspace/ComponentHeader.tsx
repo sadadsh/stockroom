@@ -289,48 +289,67 @@ export function HeaderActionsPart() {
   return (
     <div
       data-dev-id="component-browser.header-actions"
-      className="flex w-full flex-wrap items-center justify-end gap-1.5"
+      className={
+        "grid w-full grid-cols-[repeat(auto-fit,minmax(7.5rem,1fr))] items-center gap-1.5 " +
+        "[&_[data-header-action-cell]>button]:w-full " +
+        "[&_[data-header-action-cell]>button]:justify-center " +
+        "[&_[data-header-action-cell]>span]:w-full " +
+        "[&_[data-header-action-cell]>span>button:first-child]:w-full " +
+        "[&_[data-header-action-cell]>span>button:first-child]:justify-center"
+      }
     >
-      <Button
-        small
-        data-dev-id="component-browser.header-details"
-        aria-pressed={header.showDetails}
-        icon={<Icon id="status.info" className="h-3.5 w-3.5" />}
-        onClick={header.onToggleDetails}
-      >
-        {header.showDetails ? hideDetailsLabel : showDetailsLabel}
-      </Button>
-      <DatasheetButton
-        documents={dossier.documents}
-        onOpen={header.onOpenDatasheet}
-        onFindDatasheet={header.onFindDatasheet}
-      />
+      <HeaderActionCell>
+        <Button
+          small
+          data-dev-id="component-browser.header-details"
+          aria-pressed={header.showDetails}
+          icon={<Icon id="status.info" className="h-3.5 w-3.5" />}
+          onClick={header.onToggleDetails}
+        >
+          {header.showDetails ? hideDetailsLabel : showDetailsLabel}
+        </Button>
+      </HeaderActionCell>
+      <HeaderActionCell>
+        <DatasheetButton
+          documents={dossier.documents}
+          onOpen={header.onOpenDatasheet}
+          onFindDatasheet={header.onFindDatasheet}
+        />
+      </HeaderActionCell>
       {/* Only when the projection PROVED the host is the manufacturer's own, or that the
           manufacturer supplied it. An unverified candidate produces no action here at all
           rather than a mislabelled one. */}
       {page.verified && page.url ? (
+        <HeaderActionCell>
+          <Button
+            small
+            data-dev-id="component-browser.header-manufacturer-page"
+            aria-label={manufacturerPageLabel}
+            icon={<ExternalIcon className="h-3.5 w-3.5" />}
+            onClick={() => openExternalUrl(page.url)}
+          >
+            <Text id="component-browser.header-manufacturer-page">Manufacturer Page</Text>
+          </Button>
+        </HeaderActionCell>
+      ) : null}
+      <HeaderActionCell>
         <Button
           small
-          data-dev-id="component-browser.header-manufacturer-page"
-          aria-label={manufacturerPageLabel}
-          icon={<ExternalIcon className="h-3.5 w-3.5" />}
-          onClick={() => openExternalUrl(page.url)}
+          data-dev-id="component-browser.header-manage-assets"
+          icon={<BoardIcon className="h-3.5 w-3.5" />}
+          onClick={header.onManageAssets}
         >
-          <Text id="component-browser.header-manufacturer-page">Manufacturer Page</Text>
+          <Text id="component-browser.header-manage-assets">Manage CAD Assets</Text>
         </Button>
-      ) : null}
-      <Button
-        small
-        data-dev-id="component-browser.header-manage-assets"
-        icon={<BoardIcon className="h-3.5 w-3.5" />}
-        onClick={header.onManageAssets}
-      >
-        <Text id="component-browser.header-manage-assets">Manage CAD Assets</Text>
-      </Button>
-      <CopyMpnButton mpn={dossier.identity.mpn} />
-      <ManageMenu items={header.manageItems} />
+      </HeaderActionCell>
+      <HeaderActionCell><CopyMpnButton mpn={dossier.identity.mpn} /></HeaderActionCell>
+      <HeaderActionCell><ManageMenu items={header.manageItems} /></HeaderActionCell>
     </div>
   );
+}
+
+function HeaderActionCell({ children }: { children: React.ReactNode }) {
+  return <span data-header-action-cell className="flex min-w-0">{children}</span>;
 }
 
 const QUALITY_TONE: Record<"warn" | "err" | "neutral" | "ok", string> = {

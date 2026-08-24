@@ -63,6 +63,7 @@ vi.mock("./copy.overrides", () => ({
   COPY_OVERRIDES: MOCK_COPY_OVERRIDES,
   OWNER_AUTHORED_COPY_IDS: MOCK_OWNER_AUTHORED,
 }));
+vi.mock("./element.overrides", () => ({ ELEMENT_OVERRIDES: {} }));
 
 const mockApi = vi.mocked(api);
 

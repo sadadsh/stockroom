@@ -1,6 +1,6 @@
 /**
- * The header's Datasheet control: a split button when there is a choice, a plain one when there is
- * not, and an honest statement when there is no datasheet at all.
+ * The header's Datasheet control: one button whether it opens a document or a menu, and an honest
+ * statement when there is no datasheet at all.
  *
  * The bug this replaces was small and expensive: the button rendered because a FILE existed, and
  * the handler only knew how to open a URL. Pressing it on a component whose datasheet was on disk
@@ -8,10 +8,8 @@
  * bytes or a URL, whichever that copy is - and the arrow menu carries the rest: the other
  * revisions of the same document, and every other document the part references.
  *
- * A split button is only a split button when there IS a safe default plus alternatives. With one
- * document it is a single control, because an arrow that opens a menu of nothing is a dead click,
- * and with no document there is no button at all: `Datasheet Missing` is a state, and `Find
- * Datasheet` beside it is the action that can change the state.
+ * With alternatives, the same button opens a menu whose first item is the preferred copy. This
+ * matches the adjacent Manage control instead of changing shape into a split button.
  */
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import type { DocumentsView } from "../../api/dossierTypes";
@@ -42,7 +40,6 @@ export function DatasheetButton({
   const listRef = useRef<HTMLDivElement>(null);
   const menuId = useId();
   const menuLabel = useText("component-browser.datasheet-menu", "Other documents");
-  const moreLabel = useText("component-browser.datasheet-more", "More datasheet options");
 
   const preferred = preferredTarget(documents);
   const revisions = revisionTargets(documents);
@@ -53,7 +50,7 @@ export function DatasheetButton({
     setOpen(false);
     if (restoreFocus) {
       anchorRef.current
-        ?.querySelector<HTMLButtonElement>("[data-dev-id='component-browser.datasheet-more']")
+        ?.querySelector<HTMLButtonElement>("[data-dev-id='component-browser.header-datasheet']")
         ?.focus();
     }
   }, []);
@@ -95,30 +92,21 @@ export function DatasheetButton({
   }
 
   return (
-    <span ref={anchorRef} className="relative inline-flex items-center gap-px">
+    <span ref={anchorRef} className="relative inline-flex">
       <Button
         small
         data-dev-id="component-browser.header-datasheet"
         icon={<Icon id="detail.datasheet-link" className="h-3.5 w-3.5" />}
-        onClick={() => onOpen(preferred)}
+        aria-haspopup={hasMenu ? "menu" : undefined}
+        aria-expanded={hasMenu ? open : undefined}
+        aria-controls={hasMenu && open ? menuId : undefined}
+        onClick={() => hasMenu ? setOpen((current) => !current) : onOpen(preferred)}
       >
         <Text id="component-browser.header-datasheet">Datasheet</Text>
+        {hasMenu ? <Icon id="overlay.chevron" className="h-3 w-3 flex-none" /> : null}
       </Button>
       {hasMenu ? (
         <>
-          <Button
-            small
-            data-dev-id="component-browser.datasheet-more"
-            aria-haspopup="menu"
-            aria-expanded={open}
-            aria-controls={open ? menuId : undefined}
-            aria-label={moreLabel}
-            title={moreLabel}
-            className="px-1"
-            onClick={() => setOpen((current) => !current)}
-          >
-            <Icon id="overlay.chevron" className="h-3 w-3 flex-none" />
-          </Button>
           {open ? (
             <div
               ref={listRef}

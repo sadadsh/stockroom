@@ -763,7 +763,7 @@ def test_dev_save_accepts_approved_dynamic_element_ids(client, tmp_path, monkeyp
     assert "ingest.candidate[abc-123]" in elem_ts
 
 
-def test_dev_save_accepts_only_text_and_icon_domain_qualifiers_on_valid_element_ids(
+def test_dev_save_accepts_only_supported_domain_qualifiers_on_valid_element_ids(
     client, tmp_path, monkeypatch
 ):
     src = _src_with_lib(tmp_path, monkeypatch)
@@ -773,6 +773,9 @@ def test_dev_save_accepts_only_text_and_icon_domain_qualifiers_on_valid_element_
         "elements": {
             "detail.header::text": {"font-size": "18px"},
             "detail.header::icon": {"width": "24px"},
+            "detail.action::matching": {"display": "none"},
+            "detail.header::matching-text": {"font-size": "18px"},
+            "detail.header::matching-icon": {"width": "24px"},
             "component-browser.component[part-1].tab::text": {"color": "#123456"},
             "ingest.candidate[abc-123]::icon": {"height": "20px"},
             "detail.header::box": {"width": "10px"},
@@ -782,11 +785,14 @@ def test_dev_save_accepts_only_text_and_icon_domain_qualifiers_on_valid_element_
     }
     res = client.post("/api/dev/save", json=body)
     assert res.status_code == 200
-    assert res.json()["elements"] == 4
+    assert res.json()["elements"] == 7
 
     elem_ts = (src / "lib" / "element.overrides.ts").read_text(encoding="utf-8")
     assert "detail.header::text" in elem_ts
     assert "detail.header::icon" in elem_ts
+    assert "detail.action::matching" in elem_ts
+    assert "detail.header::matching-text" in elem_ts
+    assert "detail.header::matching-icon" in elem_ts
     assert "component-browser.component[part-1].tab::text" in elem_ts
     assert "ingest.candidate[abc-123]::icon" in elem_ts
     assert "::box" not in elem_ts

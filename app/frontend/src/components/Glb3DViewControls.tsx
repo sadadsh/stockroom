@@ -142,7 +142,7 @@ function ModelControlStrip({
       // with the rest of the bar empty. Now the layer + shading clusters hold the left and the view
       // cluster holds the right, so the bar reads as two ends rather than one heap.
       className={
-        "pointer-events-auto flex items-center " +
+        "pointer-events-auto flex items-center bg-surface " +
         (panelMode
           ? // The same 24px strip the symbol and land-pattern previews use, so the three
             // modules read as one column rather than three differently-chromed tiles.

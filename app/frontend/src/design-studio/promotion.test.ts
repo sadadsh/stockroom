@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { DevWorkspaceStatus } from "../api/types";
+import { committedDevModeDraft } from "../lib/devModeDraft";
 import type { DesignDocument } from "./document";
 import {
   PromotionValidationError,
@@ -63,16 +64,17 @@ function readyStatus(overrides: Partial<DevWorkspaceStatus> = {}): DevWorkspaceS
 
 describe("personal design source promotion", () => {
   it("translates the complete resolved design into the existing source-owned save body", () => {
+    const committed = committedDevModeDraft();
     expect(promotionPlan(personalDocument(), "light", null)).toEqual({
       tokens: { root: { "--r-card": "18px" }, light: { "--c-t1": "#111111" } },
-      copy: { "rail.components": "My Components" },
-      icons: { "nav.components": { swapToId: "nav.stm" } },
-      elements: { "rail.nav-settings": { width: "240px" } },
-      behaviors: { "projects.board-control": { preset: "segmented" } },
+      copy: { ...committed.copy, "rail.components": "My Components" },
+      icons: { ...committed.icons, "nav.components": { swapToId: "nav.stm" } },
+      elements: { ...committed.elements, "rail.nav-settings": { width: "240px" } },
+      behaviors: { ...committed.behaviors, "projects.board-control": { preset: "segmented" } },
       copyPlaceholders: {},
       layout: { workspace: null },
       committedIssues: { workspace: [] },
-      ownerAuthoredCopy: ["rail.components"],
+      ownerAuthoredCopy: [...Object.keys(committed.copy), "rail.components"],
     });
   });
 

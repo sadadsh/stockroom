@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { DevModeDraft } from "../lib/devModeDraft";
+import { committedDevModeDraft, type DevModeDraft } from "../lib/devModeDraft";
 import {
   BUILT_IN_VARIATIONS,
   builtInVariationDocument,
@@ -447,12 +447,16 @@ describe("Design Studio document", () => {
     resolved.elements["component-browser.offers"].opacity = "0.5";
     resolved.tokens.root["--c-new"] = "new";
 
+    const committed = committedDevModeDraft();
     expect(resolved).toEqual({
       tokens: { root: { "--c-new": "new" }, light: {} },
-      copy: {},
-      icons: {},
-      elements: { "component-browser.offers": { opacity: "0.5" } },
-      behaviors: {},
+      copy: committed.copy,
+      icons: committed.icons,
+      elements: {
+        ...committed.elements,
+        "component-browser.offers": { opacity: "0.5" },
+      },
+      behaviors: committed.behaviors,
       cadPresentation: {},
       layout: null,
     });

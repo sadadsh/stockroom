@@ -57,7 +57,9 @@ function baseTargetId(id: string): string {
   const separator = id.lastIndexOf("::");
   if (separator === -1) return id;
   const suffix = id.slice(separator + 2);
-  return suffix === "text" || suffix === "icon" ? id.slice(0, separator) : id;
+  return ["text", "icon", "matching", "matching-text", "matching-icon"].includes(suffix)
+    ? id.slice(0, separator)
+    : id;
 }
 
 function isKnownDevTarget(id: string): boolean {

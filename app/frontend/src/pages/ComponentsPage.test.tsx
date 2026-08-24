@@ -600,7 +600,7 @@ describe("opening a component", () => {
     const { state } = wrap(<ComponentsPage />);
     await screen.findByText("Description p0");
     expect(screen.queryAllByRole("tab")).toHaveLength(0);
-    await userEvent.setup().click(screen.getByRole("button", { name: "Manage CAD Assets" }));
+    await userEvent.setup().click(screen.getByRole("button", { name: "Manage Assets" }));
     expect(state.route).toBe("assets");
     expect(readUiSession().selected_ids.component).toBe("p0");
     expect(readUiSession().active_component).toBe("p0");

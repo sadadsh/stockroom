@@ -8,6 +8,8 @@ import { Button } from "./primitives";
 import { usedVarsForElement } from "../lib/inspectVars";
 import { TECHNICAL_CONTENT_ATTRIBUTE } from "../design-studio/targetDomains";
 
+vi.mock("../lib/element.overrides", () => ({ ELEMENT_OVERRIDES: {} }));
+
 afterEach(() => {
   document.documentElement.removeAttribute("style");
   document.documentElement.removeAttribute("data-theme");
@@ -307,7 +309,9 @@ describe("DevInspector", () => {
     await waitFor(() => expect(screen.getByTestId("selected-version")).toHaveTextContent("second-mount"));
     expect(screen.getByTestId("selected")).toHaveTextContent("auto.unique-action.1234567");
     expect(screen.getByTestId("selected-override")).toHaveTextContent("auto.unique-action.1234567");
-    expect((screen.getByTestId("unique-target-second-mount") as HTMLElement).style.width).toBe("120px");
+    await waitFor(() =>
+      expect((screen.getByTestId("unique-target-second-mount") as HTMLElement).style.width).toBe("120px"),
+    );
   });
 
   it("retains a connected target across earlier insertion and clears safely on unprovable remount", async () => {

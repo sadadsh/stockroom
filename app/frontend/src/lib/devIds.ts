@@ -132,7 +132,6 @@ export const DEV_IDS: DevIdEntry[] = [
   { id: "component-browser.header-manage-assets", label: "Manage CAD Assets handoff", area: "component-browser" },
   { id: "component-browser.datasheet-missing", label: "Datasheet Missing state", area: "component-browser" },
   { id: "component-browser.datasheet-find", label: "Find Datasheet action", area: "component-browser" },
-  { id: "component-browser.datasheet-more", label: "Datasheet split-button menu trigger", area: "component-browser" },
   { id: "component-browser.datasheet-menu", label: "Datasheet menu surface", area: "component-browser" },
   { id: "component-browser.datasheet-current", label: "Current Datasheet menu item", area: "component-browser" },
   { id: "component-browser.datasheet-revision", label: "One superseded datasheet revision", area: "component-browser" },

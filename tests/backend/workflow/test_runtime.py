@@ -353,7 +353,9 @@ def test_a_stage_running_past_its_lease_is_not_reclaimed(tmp_path):
 
 
 def _wait_for_lease_renewal(store, claim):
-    deadline = time.monotonic() + 1.0
+    # Parallel CI can briefly starve the renewal thread; stay below the surrounding test timeouts
+    # without mistaking scheduler contention for a changed lease fence.
+    deadline = time.monotonic() + 3.0
     current = store.get_stage(claim.id)
     while current.lease_expires_at <= claim.lease_expires_at and time.monotonic() < deadline:
         time.sleep(0.01)

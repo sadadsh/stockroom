@@ -1,10 +1,16 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { applyElementOverrides, startElementOverrideObserver } from "./applyElementOverrides";
-import { exactDesignTargetAuthority, releaseExactDesignTargetAuthority } from "./designIdentity";
+import { ELEMENT_OVERRIDES } from "./element.overrides";
+import {
+  DESIGN_TARGET_SELECTOR,
+  exactDesignTargetAuthority,
+  releaseExactDesignTargetAuthority,
+} from "./designIdentity";
 
 // Each test seeds real nodes under document.body; clear them so state never leaks between tests.
 afterEach(() => {
   document.body.innerHTML = "";
+  vi.unstubAllGlobals();
 });
 
 function nodeWithId(id: string): HTMLElement {
@@ -19,11 +25,28 @@ function nextTick(): Promise<void> {
   return new Promise((resolve) => queueMicrotask(resolve));
 }
 
+function nextFrame(): Promise<void> {
+  return new Promise((resolve) => requestAnimationFrame(() => resolve()));
+}
+
 describe("applyElementOverrides", () => {
   it("sets the mapped CSS property as an inline style on a matching node", () => {
     const el = nodeWithId("x.y");
     applyElementOverrides({ "x.y": { width: "240px" } });
     expect(el.style.getPropertyValue("width")).toBe("240px");
+  });
+
+  it("removes every repeated specification source with one saved semantic override", () => {
+    document.body.innerHTML = `
+      <span data-dev-id="component-browser.spec-source">DigiKey</span>
+      <span data-dev-id="component-browser.spec-source">Mouser</span>
+    `;
+    applyElementOverrides(ELEMENT_OVERRIDES);
+    const sources = document.querySelectorAll<HTMLElement>(
+      '[data-dev-id="component-browser.spec-source"]',
+    );
+    expect(sources).toHaveLength(2);
+    expect(Array.from(sources).map((source) => source.style.display)).toEqual(["none", "none"]);
   });
 
   it("reapplies a persisted occurrence override to the same semantic branch after restart", () => {
@@ -138,9 +161,63 @@ describe("applyElementOverrides", () => {
     // Not applied synchronously on insert; the observer re-applies on its microtask flush.
     expect(el.style.getPropertyValue("width")).toBe("");
     await nextTick();
+    await nextFrame();
     expect(el.style.getPropertyValue("width")).toBe("300px");
 
     disconnect();
+  });
+
+  it("coalesces repeated catalog growth into one override pass per frame", async () => {
+    let scheduled: FrameRequestCallback | undefined;
+    const request = vi.fn((callback: FrameRequestCallback) => {
+      scheduled = callback;
+      return 1;
+    });
+    vi.stubGlobal("requestAnimationFrame", request);
+    vi.stubGlobal("cancelAnimationFrame", vi.fn());
+    const overrides = { "late.node::matching": { width: "300px" } };
+    const disconnect = startElementOverrideObserver(() => overrides);
+
+    const first = nodeWithId("late.node");
+    await nextTick();
+    const second = nodeWithId("late.node");
+    await nextTick();
+
+    expect(request).toHaveBeenCalledTimes(1);
+    scheduled?.(0);
+    expect(first.style.width).toBe("300px");
+    expect(second.style.width).toBe("300px");
+    disconnect();
+  });
+
+  it("resolves occurrence identities once for a large applied design", () => {
+    document.body.innerHTML = `
+      <main data-design-product-root="true">
+        <section data-testid="left"><button data-dev-id="shared.action">Left</button></section>
+        <section data-testid="right"><button data-dev-id="shared.action">Right</button></section>
+      </main>
+    `;
+    const buttons = document.querySelectorAll<HTMLElement>('[data-dev-id="shared.action"]');
+    const left = exactDesignTargetAuthority(buttons[0])?.overrideId;
+    const right = exactDesignTargetAuthority(buttons[1])?.overrideId;
+    expect(left).toMatch(/^auto\.occurrence\./);
+    expect(right).toMatch(/^auto\.occurrence\./);
+
+    const query = vi.spyOn(document, "querySelectorAll");
+    const largeAppliedDesign = Object.fromEntries(
+      Array.from({ length: 80 }, (_, index) => [
+        `auto.occurrence.${index.toString(36).padStart(7, "0")}`,
+        { display: "none" },
+      ]),
+    );
+    applyElementOverrides({
+      ...largeAppliedDesign,
+      [left!]: { display: "none" },
+      [right!]: { display: "none" },
+    });
+
+    expect(query.mock.calls.filter(([selector]) => selector === DESIGN_TARGET_SELECTOR)).toHaveLength(1);
+    query.mockRestore();
   });
 
   it("writes safe global state rules and removes them with the draft", () => {

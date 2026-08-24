@@ -193,7 +193,7 @@ describe("the three-column workspace", () => {
       "sourcing",
       "specifications",
     ]);
-    expect(node("component-browser.column-cad")).toHaveTextContent("CAD Assets");
+    expect(node("component-browser.column-cad")).toHaveTextContent("Assets");
     expect(node("component-browser.column-specifications")).toHaveTextContent("Specifications");
     expect(node("component-browser.column-sourcing")).toHaveTextContent("Sourcing and Resources");
   });
@@ -210,14 +210,14 @@ describe("the three-column workspace", () => {
   it("keeps acquisition controls out of the inspection column", async () => {
     await open();
     expect(screen.queryAllByRole("tab")).toHaveLength(0);
-    expect(screen.getByRole("button", { name: "Manage CAD Assets" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Manage Assets" })).toBeVisible();
   });
 
   it("marks the exact component for the Assets workspace", async () => {
     const user = userEvent.setup();
     await open();
 
-    await user.click(screen.getByRole("button", { name: "Manage CAD Assets" }));
+    await user.click(screen.getByRole("button", { name: "Manage Assets" }));
 
     expect(columns()).toHaveLength(3);
     expect(readUiSession().active_component).toBe(ID);
@@ -565,10 +565,14 @@ describe("the identity header", () => {
       "Show Details",
       "Datasheet",
       "Manufacturer Page",
-      "Manage CAD Assets",
+      "Manage Assets",
       "MPN",
       "Manage",
     ]);
+    expect(node("component-browser.header-actions")).toHaveClass("grid");
+    expect(
+      node("component-browser.header-actions").querySelectorAll("[data-header-action-cell]"),
+    ).toHaveLength(6);
 
     for (const gone of [
       "Complete Component",

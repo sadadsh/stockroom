@@ -260,6 +260,7 @@ def test_only_the_exact_verified_release_asset_set_can_be_published() -> None:
 def test_main_release_atomically_deploys_the_verified_update_feed() -> None:
     deploy = WORKFLOW["jobs"]["deploy-update-feed"]
     stage = named_step("deploy-update-feed", "Assemble Verified Pages Site")["run"]
+    verify = named_step("build-windows-package", "Verify And Stage Exact Release Assets")["run"]
 
     assert deploy["if"] == (
         "${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}"
@@ -267,7 +268,8 @@ def test_main_release_atomically_deploys_the_verified_update_feed() -> None:
     assert "Copy-Item -Recurse -Force store-site/* pages-root" in stage
     assert "Stockroom GitHub Signing.cer" in stage
     assert "pages-root/downloads/Stockroom-GitHub-Signing.cer" in stage
-    assert "pages-root/downloads/Stockroom-Windows-Portable.zip" in stage
+    assert 'Stockroom_$($env:STOCKROOM_PACKAGE_VERSION)_Windows_x64_EXE.zip' in verify
+    assert "pages-root/downloads/Stockroom-Windows-EXE.zip" in stage
     assert "packaging/deploy_release_feed.py" in stage
     assert "--previous-feed" in stage
     assert "pages-root/windows/x64" in stage

@@ -8,4 +8,40 @@
  * through a strict CSS-value validator (safe lengths / keywords only); safe to hand-edit but the backend
  * validator is the authority on what may ship.
  */
-export const ELEMENT_OVERRIDES: Record<string, Record<string, string>> = {};
+const HIDDEN_TARGETS = [
+  "auto.parts-list.0iafwyi",
+  "auto.product-state.0tk9qox",
+  "auto.specifications-pieces.0fb5jxn",
+  "component-browser.header-lifecycle",
+  "component-browser.preferred-source",
+  "component-browser.quality-summary",
+  "component-browser.spec-anchors",
+  "component-browser.spec-source::matching",
+] as const;
+
+export const ELEMENT_OVERRIDES: Record<string, Record<string, string>> = {
+  ...Object.fromEntries(HIDDEN_TARGETS.map((id) => [id, { display: "none" }])),
+  "auto.occurrence.1n39y9a": {
+    left: "0px",
+    position: "relative",
+    top: "0px",
+    "z-index": "3",
+  },
+  "auto.occurrence.1qyzb8v": {
+    left: "0px",
+    position: "relative",
+    top: "0px",
+    "z-index": "3",
+  },
+  "auto.occurrence.1t2ybpd": {
+    left: "0px",
+    position: "relative",
+    top: "0px",
+    "z-index": "3",
+  },
+  "auto.parts-list.1u34bm3": {
+    left: "0px",
+    position: "relative",
+    top: "8px",
+  },
+};

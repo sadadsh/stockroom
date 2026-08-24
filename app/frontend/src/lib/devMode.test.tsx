@@ -35,6 +35,10 @@ const mockApi = vi.mocked(api);
 // (which would flip `dirty` after a resetAll that clears elements to {}).
 const MOCK_ELEMENT_OVERRIDES: Record<string, Record<string, string>> = vi.hoisted(() => ({}));
 vi.mock("./element.overrides", () => ({ ELEMENT_OVERRIDES: MOCK_ELEMENT_OVERRIDES }));
+vi.mock("./copy.overrides", () => ({
+  COPY_OVERRIDES: {},
+  OWNER_AUTHORED_COPY_IDS: [],
+}));
 
 afterEach(() => {
   // token edits set inline CSS vars on <html>; clear them so tests don't leak into each other

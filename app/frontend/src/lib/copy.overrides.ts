@@ -5,7 +5,10 @@
  * stable copy id (see <Text id="...">); an absent id falls back to the default text written in
  * the JSX. Regenerated whole by POST /api/dev/save - safe to hand-edit.
  */
-export const COPY_OVERRIDES: Record<string, string> = {};
+export const COPY_OVERRIDES: Record<string, string> = {
+  "component-browser.column-cad": "Assets",
+  "component-browser.header-manage-assets": "Manage Assets"
+};
 
 /**
  * OWNER-AUTHORED PROVENANCE for the rewordings above (plan 1.5, the owner amendment).
@@ -21,4 +24,7 @@ export const COPY_OVERRIDES: Record<string, string> = {};
  * override above can appear; the writer drops any other, so this can never become a standing
  * exemption for a string that is not there.
  */
-export const OWNER_AUTHORED_COPY_IDS: readonly string[] = [];
+export const OWNER_AUTHORED_COPY_IDS: readonly string[] = [
+  "component-browser.column-cad",
+  "component-browser.header-manage-assets"
+];

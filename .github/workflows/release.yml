@@ -476,7 +476,7 @@ jobs:
           $artifactRoot = Join-Path $env:RUNNER_TEMP "Stockroom.Release.Output\Artifacts"
           $packageName = "Stockroom_$($env:STOCKROOM_PACKAGE_VERSION)_x64.msix"
           $packagePath = Join-Path $artifactRoot $packageName
-          $portableName = "Stockroom_$($env:STOCKROOM_PACKAGE_VERSION)_x64_portable.zip"
+          $portableName = "Stockroom_$($env:STOCKROOM_PACKAGE_VERSION)_Windows_x64_EXE.zip"
           $portablePath = Join-Path $artifactRoot $portableName
           $appInstallerPath = Join-Path $artifactRoot "Stockroom.appinstaller"
           $evidencePath = Join-Path $artifactRoot "Build Evidence.json"
@@ -796,7 +796,7 @@ jobs:
           Set-StrictMode -Version Latest
           $ErrorActionPreference = "Stop"
           $packageName = "Stockroom_$($env:STOCKROOM_PACKAGE_VERSION)_x64.msix"
-          $portableName = "Stockroom_$($env:STOCKROOM_PACKAGE_VERSION)_x64_portable.zip"
+          $portableName = "Stockroom_$($env:STOCKROOM_PACKAGE_VERSION)_Windows_x64_EXE.zip"
           $feedName = "Stockroom_TUF_Feed_$($env:STOCKROOM_PACKAGE_VERSION).zip"
           $allowed = @(
             "Build Evidence.json",
@@ -839,7 +839,10 @@ jobs:
 
           $notesPath = Join-Path $env:RUNNER_TEMP "Stockroom.Release.Notes.md"
           @"
-          Signed, verified portable EXE and App Installer releases for Stockroom.
+          Signed, verified Windows EXE and App Installer releases for Stockroom.
+
+          Download the file ending in ``Windows_x64_EXE.zip``, unzip it, then open
+          ``Stockroom.exe``.
 
           This release contains Stockroom's stable signed-release broker, immutable
           built-in release, generation-fenced workflow coordinator, full backend, and
@@ -857,7 +860,7 @@ jobs:
           "@ | Set-Content -LiteralPath $notesPath -Encoding utf8NoBOM
 
           $packageName = "Stockroom_$($env:STOCKROOM_PACKAGE_VERSION)_x64.msix"
-          $portableName = "Stockroom_$($env:STOCKROOM_PACKAGE_VERSION)_x64_portable.zip"
+          $portableName = "Stockroom_$($env:STOCKROOM_PACKAGE_VERSION)_Windows_x64_EXE.zip"
           $feedName = "Stockroom_TUF_Feed_$($env:STOCKROOM_PACKAGE_VERSION).zip"
           $allowed = @(
             "Build Evidence.json",
@@ -962,9 +965,9 @@ jobs:
           New-Item -ItemType Directory -Path pages-root/downloads | Out-Null
           Copy-Item -LiteralPath "packaging/Stockroom GitHub Signing.cer" `
             -Destination "pages-root/downloads/Stockroom-GitHub-Signing.cer"
-          $portableName = "Stockroom_${{ needs.build-windows-package.outputs.version }}_x64_portable.zip"
+          $portableName = "Stockroom_${{ needs.build-windows-package.outputs.version }}_Windows_x64_EXE.zip"
           Copy-Item -LiteralPath (Join-Path "release-assets" $portableName) `
-            -Destination "pages-root/downloads/Stockroom-Windows-Portable.zip"
+            -Destination "pages-root/downloads/Stockroom-Windows-EXE.zip"
           New-Item -ItemType Directory -Path previous-feeds | Out-Null
 
           $tags = @(

@@ -508,7 +508,7 @@ describe("the three modules", () => {
     await open(dossier);
 
     for (const kind of ["symbol", "footprint", "model"]) expect(module_(kind)).toBeNull();
-    expect(screen.getByRole("button", { name: "Manage CAD Assets" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Manage Assets" })).toBeVisible();
 
     await userEvent.setup().click(screen.getByRole("button", { name: "Show Details" }));
     for (const kind of ["symbol", "footprint", "model"]) {
@@ -517,7 +517,7 @@ describe("the three modules", () => {
         module_(kind).querySelector('[data-dev-id="component-browser.asset-preview"]'),
       ).toHaveClass("h-[40px]");
     }
-    expect(screen.getByRole("button", { name: "Manage CAD Assets" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Manage Assets" })).toBeVisible();
   });
 
   it("keeps every attached module equal while a full preview is open", async () => {
