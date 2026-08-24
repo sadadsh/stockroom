@@ -76,7 +76,7 @@ beforeEach(() => {
     completed_identity: "",
     pending_count: 1,
     pending_parts: [{ id: "ready", display_name: "LM358DR", identity: "part-1" }],
-    blocked_parts: [],
+    blocked_parts: [{ id: "missing", detail: "Symbol, Footprint" }],
     last_result: null,
     history: [],
   });
@@ -135,6 +135,30 @@ describe("AssetsPage", () => {
         .getByRole("button", { name: /Build Now/ }),
     ).toHaveAttribute("aria-pressed", "true");
     expect(screen.queryByRole("button", { name: "Add Parts" })).toBeNull();
+  });
+
+  it("does not call complete CAD missing just because trust is unknown", async () => {
+    const response = await mockApi.listParts({});
+    mockApi.listParts.mockResolvedValue({
+      count: 1,
+      parts: [{
+        ...response.parts[1]!,
+        id: "complete-unknown",
+        mpn: "COMPLETE-UNKNOWN",
+        eda_readiness: { altium: { required: ["symbol", "footprint", "model"], missing: [], coverage_complete: true, trust: "unknown", ready: false } },
+      }],
+    });
+    mockApi.catalogBuildStatus.mockResolvedValue({
+      ...(await mockApi.catalogBuildStatus()),
+      blocked_parts: [],
+      pending_parts: [{ id: "complete-unknown", display_name: "COMPLETE-UNKNOWN", identity: "part-unknown" }],
+    });
+
+    renderPage();
+
+    expect(await screen.findByText("COMPLETE-UNKNOWN")).toBeVisible();
+    expect(screen.getByRole("button", { name: /Needs Assets/ })).toHaveAttribute("aria-pressed", "false");
+    expect(within(screen.getByRole("group", { name: "Asset workflow" })).getByRole("button", { name: /Build Now/ })).toHaveAttribute("aria-pressed", "true");
   });
 
   it("shows a true empty state when neither asset repair nor catalog build is needed", async () => {

@@ -108,7 +108,7 @@ function MissingAssetArt({
  */
 function previewStageClass(compactMissing: boolean): string {
   return (
-    "flex w-full items-center justify-center overflow-hidden border-y border-line " +
+    "flex w-full items-center justify-center overflow-visible border-y border-line " +
     "bg-technical focus-visible:outline focus-visible:outline-2 " +
     "focus-visible:-outline-offset-2 focus-visible:outline-focus " +
     (compactMissing ? "h-[40px] min-h-[40px] flex-none" : "min-h-[40px] flex-1")
@@ -401,7 +401,7 @@ function AssetPreview({
         isError={preview.model.isError}
         error={preview.model.error}
         land={preview.land.data ?? null}
-        boardInitiallyVisible={false}
+        boardInitiallyVisible
         showViews={interactive}
         showShading={interactive}
         compact

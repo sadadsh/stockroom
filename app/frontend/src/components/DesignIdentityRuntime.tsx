@@ -20,9 +20,18 @@ export function DesignIdentityRuntime() {
       }
     };
     instrument();
-    const observer = new MutationObserver(instrument);
+    let frame = 0;
+    const observer = new MutationObserver(() => {
+      if (!frame) frame = requestAnimationFrame(() => {
+        frame = 0;
+        instrument();
+      });
+    });
     observer.observe(document.body, { childList: true, characterData: true, subtree: true });
-    return () => observer.disconnect();
+    return () => {
+      observer.disconnect();
+      if (frame) cancelAnimationFrame(frame);
+    };
   }, [dev.draft.copy]);
   return null;
 }

@@ -30,10 +30,18 @@ export function TextInspector(props: DomainInspectorProps) {
     () => props.inspection.texts,
     [props.inspection],
   );
-  const copyIds = useMemo(
-    () => [...new Set(texts.flatMap((text) => text.copyId ? [text.copyId] : []))],
-    [texts],
-  );
+  const copyIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const inspection of props.inspections) {
+      for (const text of inspection.texts) {
+        if (text.copyId) ids.add(text.copyId);
+      }
+      for (const element of inspection.target.querySelectorAll<HTMLElement>("[data-copy-id]")) {
+        if (element.dataset.copyId) ids.add(element.dataset.copyId);
+      }
+    }
+    return [...ids];
+  }, [props.inspections]);
   const primary = props.inspection.texts[0] ?? texts[0];
   const copyId = copyIds[0];
   const computed = getComputedStyle(primary?.element ?? props.inspection.target);
@@ -46,7 +54,7 @@ export function TextInspector(props: DomainInspectorProps) {
           <textarea
             aria-label={contentAria}
             value={dev.resolveCopy(copyId, primary.value)}
-            onChange={(event) => dev.setCopy(copyId, event.target.value)}
+            onChange={(event) => copyIds.forEach((id) => dev.setCopy(id, event.target.value))}
             className="mt-1 min-h-16 w-full resize-y rounded-control border border-line bg-field px-2 py-1.5 text-xs text-t1 outline-none focus:border-focus"
           />
         </label>

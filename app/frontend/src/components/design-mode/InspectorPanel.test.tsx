@@ -279,6 +279,33 @@ describe("InspectorPanel", () => {
     expect(third.style.display).toBe("");
   });
 
+  it("removes every matching provider label when All Matching is selected", async () => {
+    render(<Harness />);
+    fireEvent.click(screen.getByRole("button", { name: "Select Raw Provider" }));
+    fireEvent.click(screen.getByRole("button", { name: "All Matching" }));
+    openGroup("Content");
+    fireEvent.change(screen.getByLabelText("Text Content"), { target: { value: "" } });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("raw-provider-digikey").textContent).toBe("");
+      expect(screen.getByTestId("raw-provider-mouser").textContent).toBe("");
+    });
+  });
+
+  it("changes every matching registered label when All Matching is selected", async () => {
+    render(<Harness />);
+    fireEvent.click(screen.getByRole("button", { name: "Select Repeated Second" }));
+    fireEvent.click(screen.getByRole("button", { name: "All Matching" }));
+    openGroup("Content");
+    fireEvent.change(screen.getByLabelText("Text Content"), { target: { value: "Shared Label" } });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("repeated-inspector-first")).toHaveTextContent("Shared Label");
+      expect(screen.getByTestId("repeated-inspector-second")).toHaveTextContent("Shared Label");
+      expect(screen.getByTestId("repeated-inspector-third")).toHaveTextContent("Shared Label");
+    });
+  });
+
   it("edits unregistered direct text on one exact repeated occurrence", async () => {
     render(<Harness />);
     fireEvent.click(screen.getByRole("button", { name: "Select Raw Provider" }));

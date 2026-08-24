@@ -696,15 +696,15 @@ describe("the previews are drawn from the file", () => {
     for (const canvas of canvases) expect(canvas).toHaveClass("bg-technical");
   });
 
-  it("starts the mini 3D preview without the PCB slab", async () => {
+  it("starts the mini 3D preview with PCB context and one View Options control", async () => {
     await open(attached());
     const model = module_("model");
     const user = userEvent.setup();
-    const settings = await within(model).findByRole("button", { name: "3D view settings" });
+    const settings = await within(model).findByRole("button", { name: "View Options" });
     await user.click(settings);
     expect(within(model).getByRole("button", { name: "PCB" })).toHaveAttribute(
       "aria-pressed",
-      "false",
+      "true",
     );
   });
 

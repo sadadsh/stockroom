@@ -168,6 +168,13 @@ def _resolve_symbol_file(ctx, part_id: str) -> tuple[PartRecord, Path]:
     kicad = rec.assets_for("kicad")
     if kicad.symbol is None or not kicad.symbol.name:
         raise FileNotFoundError(f"part {part_id} has no symbol")
+    published = _production_artifact_file(ctx, rec, _KICAD_SYMBOL_ARTIFACT_PATH)
+    attached = ctx.profile.library.symbols_dir / f"{kicad.symbol.lib}.kicad_sym"
+    if published is not None or attached.exists():
+        lib = published or attached
+        if not lib.exists():
+            raise FileNotFoundError(f"published symbol artifact is missing: {published}")
+        return rec, lib
     if rec.passive:
         lib = stock_symbol_lib_file(kicad.symbol.lib)
         if lib is None:
@@ -175,7 +182,6 @@ def _resolve_symbol_file(ctx, part_id: str) -> tuple[PartRecord, Path]:
                 f"KiCad stock symbol library {kicad.symbol.lib} is not installed"
             )
         return rec, lib
-    published = _production_artifact_file(ctx, rec, _KICAD_SYMBOL_ARTIFACT_PATH)
     lib = published or ctx.profile.library.symbol_lib_path(rec.category)
     if not lib.exists():
         if published is not None:
@@ -454,6 +460,14 @@ def _resolve_footprint_file(ctx, part_id: str):
     kicad = rec.assets_for("kicad")
     if kicad.footprint is None or not kicad.footprint.name:
         raise FileNotFoundError(f"part {part_id} has no footprint")
+    published = _production_artifact_file(ctx, rec, _KICAD_FOOTPRINT_ARTIFACT_PATH)
+    attached_pretty = ctx.profile.library.footprints_dir / f"{kicad.footprint.lib}.pretty"
+    attached = attached_pretty / f"{kicad.footprint.name}.kicad_mod"
+    if published is not None or attached.exists():
+        fp_file = published or attached
+        if not fp_file.exists():
+            raise FileNotFoundError(f"published footprint artifact is missing: {published}")
+        return rec, fp_file, fp_file.parent
     if rec.passive:
         fp_file = stock_footprint_file(kicad.footprint.lib, kicad.footprint.name)
         if fp_file is None:
@@ -462,7 +476,6 @@ def _resolve_footprint_file(ctx, part_id: str):
                 "is not installed"
             )
         return rec, fp_file, fp_file.parent
-    published = _production_artifact_file(ctx, rec, _KICAD_FOOTPRINT_ARTIFACT_PATH)
     if published is not None:
         if not published.exists():
             raise FileNotFoundError(f"published footprint artifact is missing: {published}")
@@ -752,9 +765,12 @@ def previews_router(require_token) -> APIRouter:
             raise FileNotFoundError(f"no such part: {part_id}")
         rec = ctx.ops.load_record(part_id)
         kicad = rec.assets_for("kicad")
-        # A passive inherits the stock footprint's own 3D model (no owned model.file):
-        # resolve it from the installed KiCad libraries keyed on the footprint lib_id.
-        if rec.passive:
+        if kicad.model is not None and kicad.model.file:
+            src = ctx.profile.library.root / kicad.model.file
+            if not src.exists():
+                raise FileNotFoundError(f"3D model file is missing: {kicad.model.file}")
+        # A passive without an attached model inherits the stock footprint's own 3D model.
+        elif rec.passive:
             if kicad.footprint is None or not kicad.footprint.name:
                 raise FileNotFoundError(f"part {part_id} has no footprint for a 3D model")
             src = stock_model_file(kicad.footprint.lib, kicad.footprint.name)
@@ -764,13 +780,7 @@ def previews_router(require_token) -> APIRouter:
                     "is not installed"
                 )
         else:
-            if kicad.model is None or not kicad.model.file:
-                raise FileNotFoundError(f"part {part_id} has no 3D model")
-            # model.file is stored relative to the profile library root (same convention
-            # the mutation engine and the doctor use).
-            src = ctx.profile.library.root / kicad.model.file
-            if not src.exists():
-                raise FileNotFoundError(f"3D model file is missing: {kicad.model.file}")
+            raise FileNotFoundError(f"part {part_id} has no 3D model")
         key = f"model_{part_id}_{_MODEL_CONVERT_VERSION}_{_hash_file(src)}.glb"
         cached = _cache_dir(ctx) / key
         if cached.exists():

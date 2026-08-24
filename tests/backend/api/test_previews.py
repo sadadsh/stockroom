@@ -179,6 +179,27 @@ def test_production_previews_use_the_attested_component_scoped_artifacts(app_ctx
     assert cli.footprint_dirs[0].name == "clean.pretty"
 
 
+def test_preview_resolvers_prefer_attached_assets_after_passive_reclassification(app_ctx):
+    from stockroom.api.routers.previews import _resolve_footprint_file, _resolve_symbol_file
+    from stockroom.model.part_class import PartClass
+
+    rec = app_ctx.ops.load_record("tps62130")
+    rec.part_class = PartClass.PASSIVE
+    rec.category = "Changed Category"
+    kicad = rec.assets_for("kicad")
+    symbol = app_ctx.profile.library.symbols_dir / f"{kicad.symbol.lib}.kicad_sym"
+    pretty = app_ctx.profile.library.footprints_dir / f"{kicad.footprint.lib}.pretty"
+    footprint = pretty / f"{kicad.footprint.name}.kicad_mod"
+    symbol.parent.mkdir(parents=True, exist_ok=True)
+    pretty.mkdir(parents=True, exist_ok=True)
+    symbol.write_text("(kicad_symbol_lib)", encoding="utf-8")
+    footprint.write_text(f'(footprint "{kicad.footprint.name}")', encoding="utf-8")
+    (app_ctx.profile.library.parts_dir / "tps62130.json").write_text(rec.dumps(), encoding="utf-8")
+
+    assert _resolve_symbol_file(app_ctx, "tps62130")[1] == symbol
+    assert _resolve_footprint_file(app_ctx, "tps62130")[1:] == (footprint, pretty)
+
+
 def test_bw_and_color_previews_cache_separately(app_ctx):
     # A bw request must not be served the cached color SVG (and vice versa): distinct
     # cache keys mean the renderer runs once per variant, not once total.

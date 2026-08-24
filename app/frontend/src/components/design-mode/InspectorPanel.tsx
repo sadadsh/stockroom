@@ -16,7 +16,12 @@ import {
   setDraftElementProperty,
 } from "../../lib/devModeDraft";
 import { isThemeSpecificElementProp } from "../../lib/elementLayout";
-import { isRootProtectedDesignProperty, type ExactDesignTargetAuthority } from "../../lib/designIdentity";
+import {
+  designIdOf,
+  exactDesignTargetAuthority,
+  isRootProtectedDesignProperty,
+  type ExactDesignTargetAuthority,
+} from "../../lib/designIdentity";
 import { AdvancedInspector } from "./inspectors/AdvancedInspector";
 import { BehaviorInspector } from "./inspectors/BehaviorInspector";
 import { BoxInspector } from "./inspectors/BoxInspector";
@@ -55,6 +60,7 @@ export function InspectorPanel({ root }: { root?: Element; integrated?: boolean 
   const studio = useOptionalDesignStudio();
   const defaultFacet: InspectorFacet = "layout";
   const [openState, setOpenState] = useState<{ targetId: string | null; values: InspectorFacet[] }>(() => ({ targetId: dev.selectedDevId, values: [defaultFacet] }));
+  const [scopeState, setScopeState] = useState<{ targetId: string | null; value: "this" | "matching" }>(() => ({ targetId: dev.selectedDevId, value: "this" }));
   const openFacets = openState.targetId === dev.selectedDevId ? openState.values : [defaultFacet];
   const toggleFacet = (value: InspectorFacet) => setOpenState((current) => {
     const values = current.targetId === dev.selectedDevId ? current.values : [defaultFacet];
@@ -83,20 +89,30 @@ export function InspectorPanel({ root }: { root?: Element; integrated?: boolean 
   const fullDesignLabel = useText("design-studio.inspector.reset.full-design", "Full Personal Design");
   const textDomainPreviewLabel = useText("design-studio.inspector.domain.text-preview", "Text Domain Preview");
   const iconDomainPreviewLabel = useText("design-studio.inspector.domain.icon-preview", "Icon Domain Preview");
+  const applyToLabel = useText("design-studio.inspector.apply-to", "Apply To");
+  const thisLabel = useText("design-studio.inspector.apply-to.this", "This");
+  const matchingLabel = useText("design-studio.inspector.apply-to.matching", "All Matching");
   const facets: readonly { id: InspectorFacet; label: string }[] = [
     { id: "layout", label: layoutLabel },
     { id: "appearance", label: appearanceLabel },
     { id: "content", label: contentLabel },
     { id: "advanced", label: advancedLabel },
   ];
-  const affectedTargetIds = useMemo(
-    () => inspection ? [inspection.overrideId] : [],
-    [inspection],
-  );
-  const affectedInspections = useMemo(
-    () => inspection ? [inspection] : [],
-    [inspection],
-  );
+  const matchingInspections = useMemo(() => {
+    if (!inspection) return [];
+    const designId = designIdOf(inspection.target);
+    if (!designId) return [inspection];
+    const matches: TargetInspection[] = [];
+    for (const element of [resolvedRoot, ...resolvedRoot.querySelectorAll("*")]) {
+      if (designIdOf(element) !== designId) continue;
+      const candidate = inspectionFor(resolvedRoot, exactDesignTargetAuthority(element));
+      if (candidate) matches.push(candidate);
+    }
+    return matches;
+  }, [inspection, resolvedRoot]);
+  const scope = scopeState.targetId === dev.selectedDevId ? scopeState.value : "this";
+  const affectedInspections = scope === "matching" ? matchingInspections : inspection ? [inspection] : [];
+  const affectedTargetIds = affectedInspections.map((item) => item.overrideId);
 
   if (!dev.enabled) return null;
   if (!inspection) return (
@@ -227,6 +243,33 @@ export function InspectorPanel({ root }: { root?: Element; integrated?: boolean 
           </div>
         </div>
       </div>
+
+      {matchingInspections.length > 1 ? (
+        <div
+          className="flex items-center justify-between gap-2 px-3.5 pb-2"
+          role="group"
+          aria-label={applyToLabel}
+        >
+          <span className="ui-property-label">{applyToLabel}</span>
+          <div className="flex rounded-control bg-field p-0.5">
+            {(["this", "matching"] as const).map((value) => (
+              <button
+                key={value}
+                type="button"
+                aria-pressed={scope === value}
+                onClick={() => setScopeState({ targetId: dev.selectedDevId, value })}
+                className={`rounded-control px-2 py-1 text-2xs font-semibold ${
+                  scope === value
+                    ? "bg-control-pressed text-t1"
+                    : "text-t3 hover:text-t1"
+                }`}
+              >
+                {value === "this" ? thisLabel : matchingLabel}
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       <div aria-label={inspectorDomainsLabel} className="space-y-1 px-2">
         {facets.map((item) => (

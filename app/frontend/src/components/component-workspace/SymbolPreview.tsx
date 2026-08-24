@@ -26,6 +26,14 @@ import { usePanZoom } from "../../lib/usePanZoom";
 /** Millimetres of clear space around the drawn art, so nothing touches the frame edge. */
 const MARGIN = 1.27;
 
+export function symbolLabelFontSize(geometry: SymbolGeometry): number {
+  const bounds = geometry.bounds;
+  if (!bounds || geometry.pins.length === 0) return 1.1;
+  const perimeterSpacing = (2 * (bounds.width + bounds.height)) / geometry.pins.length;
+  const longest = Math.max(1, ...geometry.pins.map((pin) => pin.name.length));
+  return Math.max(0.45, Math.min(1.1, perimeterSpacing * 0.45, 4 / (longest * 0.6)));
+}
+
 /** The layers a person can turn on and off. Each is a real property of the pins being drawn. */
 export type SymbolLayer = "pinName" | "pinNumber" | "electrical";
 
@@ -91,6 +99,7 @@ export function SymbolPreview({
       height: bounds.height + 2 * MARGIN,
     };
   }, [geometry.bounds]);
+  const labelFontSize = useMemo(() => symbolLabelFontSize(geometry), [geometry]);
 
   if (box === null) {
     return (
@@ -169,7 +178,7 @@ export function SymbolPreview({
         </g>
         {/* Text is drawn OUTSIDE the flip, with its own per-pin placement, because a mirrored
             glyph is not a smaller mistake than a mirrored body. */}
-        <g fontSize={1.1} className="fill-technical-ink">
+        <g fontSize={labelFontSize} className="fill-technical-ink">
           {geometry.pins.map((pin) => (
             <PinLabels
               key={pinKey(pin)}
@@ -309,7 +318,7 @@ function PinLabels({
           y={screen(pin.at[1]) - 0.35}
           textAnchor={horizontal ? (towardsBody > 0 ? "end" : "start") : "middle"}
           className="fill-technical-note"
-          fontSize={0.85}
+          fontSize="0.75em"
           data-layer="electrical"
         >
           {ELECTRICAL_SHORT[pin.electrical] ?? pin.electrical}

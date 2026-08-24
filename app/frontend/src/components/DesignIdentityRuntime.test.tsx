@@ -1,5 +1,5 @@
 import { cleanup, render, waitFor } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { ELEMENT_OVERRIDES } from "../lib/element.overrides";
 import { DesignIdentityRuntime } from "./DesignIdentityRuntime";
 import { Icon } from "./Icon";
@@ -7,6 +7,7 @@ import { Text } from "../lib/copy";
 
 afterEach(() => {
   cleanup();
+  vi.restoreAllMocks();
   delete ELEMENT_OVERRIDES["auto.caller-copy.1234567"];
   delete ELEMENT_OVERRIDES["auto.caller-copy.7654321"];
   delete ELEMENT_OVERRIDES["authored.copy"];
@@ -76,5 +77,21 @@ describe("DesignIdentityRuntime", () => {
 
     expect(document.querySelector('[data-dev-id="authored.copy"]')).toHaveTextContent("Authored Copy");
     expect(document.querySelector("svg")).toHaveAttribute("data-dev-id", "authored.icon");
+  });
+
+  it("coalesces a burst of DOM mutations into one identity pass", async () => {
+    const queued: FrameRequestCallback[] = [];
+    const request = vi.spyOn(window, "requestAnimationFrame").mockImplementation((callback) => {
+      queued.push(callback);
+      return 1;
+    });
+    vi.spyOn(window, "cancelAnimationFrame").mockImplementation(() => undefined);
+    render(<><section data-testid="root" data-design-product-root="true" /><DesignIdentityRuntime /></>);
+    const root = document.querySelector('[data-testid="root"]')!;
+
+    root.append(document.createElement("span"), document.createElement("span"));
+    await waitFor(() => expect(request).toHaveBeenCalledTimes(1));
+    queued[0]?.(0);
+    expect(request).toHaveBeenCalledTimes(1);
   });
 });

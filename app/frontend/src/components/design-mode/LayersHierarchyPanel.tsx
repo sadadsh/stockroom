@@ -43,7 +43,7 @@ export function LayersHierarchyPanel() {
   const targets = useMemo(() => {
     const productRoot = document.querySelector("[data-design-product-root]");
     return productRoot ? targetLayersFor(productRoot, DEV_IDS) : [];
-  }, [studio.activeScenario, studio.document, dev.selectedDevId, dev.draft.elements]);
+  }, [studio.activeScenario]);
   const visibleTargets = targets.filter(
     (target) => allElements
       || target.meaningful

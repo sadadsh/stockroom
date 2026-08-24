@@ -104,7 +104,7 @@ export function HeaderBandChrome({ children }: RegionChromeProps) {
   return (
     <header
       data-dev-id="component-browser.header"
-      className="flex flex-none items-start gap-3 border-b border-line bg-surface px-2 py-2"
+      className="flex flex-none flex-col gap-2 border-b border-line bg-surface px-2 py-2"
     >
       <HeaderLinesContext.Provider value={lines}>
         <LayoutRuntimeScope conditions={conditions}>{children}</LayoutRuntimeScope>
@@ -163,7 +163,7 @@ export function HeaderDescriptionPart() {
   return (
     <p
       data-dev-id="component-browser.header-description"
-      className="ui-component-description mt-0.5 min-w-0 truncate"
+      className="ui-component-description mt-0.5 min-w-0 line-clamp-2"
       title={descriptionLine}
     >
       {identity.manufacturer ? (
@@ -289,7 +289,7 @@ export function HeaderActionsPart() {
   return (
     <div
       data-dev-id="component-browser.header-actions"
-      className="flex flex-none items-center gap-1.5"
+      className="flex w-full flex-wrap items-center justify-end gap-1.5"
     >
       <Button
         small

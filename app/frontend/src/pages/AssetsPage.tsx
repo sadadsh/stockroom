@@ -97,13 +97,16 @@ export function AssetsPage() {
   const captureTool: CaptureEda | null = tool === "kicad" || tool === "altium" ? tool : null;
   const toolLabel = onboarding.data?.eda_tools.find((item) => item.key === tool)?.label ?? tool ?? "CAD";
   const rows = parts.data?.parts ?? [];
-  const needsAssets = useMemo(
-    () => tool ? rows.filter((part) => readiness(part, tool)?.ready !== true) : [],
-    [rows, tool],
+  const blockedParts = catalogStatus.data?.blocked_parts;
+  const blocked = useMemo(
+    () => new Map(blockedParts?.map((part) => [part.id, part.detail]) ?? []),
+    [blockedParts],
   );
+  const needsAssets = useMemo(() => rows.filter((part) => blocked.has(part.id)), [blocked, rows]);
+  const pendingParts = catalogStatus.data?.pending_parts;
   const pendingIds = useMemo(
-    () => new Set(catalogStatus.data?.pending_parts.map((part) => part.id) ?? []),
-    [catalogStatus.data?.pending_parts],
+    () => new Set(pendingParts?.map((part) => part.id) ?? []),
+    [pendingParts],
   );
   const readyToBuild = useMemo(() => rows.filter((part) => pendingIds.has(part.id)), [rows, pendingIds]);
   const automaticView: AssetsView = needsAssets.length > 0
@@ -243,7 +246,7 @@ export function AssetsPage() {
                   <span className="text-xs tabular-nums text-t3">{(activeView === "needs-assets" ? needsAssets : readyToBuild).length}</span>
                 </header>
                 {activeView === "needs-assets" ? (
-                  needsAssets.length > 0 ? <ul>{needsAssets.map((part) => <AssetRow key={part.id} part={part} tool={tool} onManage={() => selectAssetsComponent(part.id)} />)}</ul>
+                  needsAssets.length > 0 ? <ul>{needsAssets.map((part) => <AssetRow key={part.id} part={part} tool={tool} stateLabel={blocked.get(part.id)} onManage={() => selectAssetsComponent(part.id)} />)}</ul>
                   : <EmptyState className="m-5" id="assets.none-missing">No components need required CAD assets.</EmptyState>
                 ) : (
                   <>

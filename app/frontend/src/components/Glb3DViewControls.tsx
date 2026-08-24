@@ -120,7 +120,7 @@ function ModelControlStrip({
   const layersLabel = useText("model3d.layers", "Layers");
   const appearanceLabel = useText("model3d.appearance", "Appearance");
   const motionLabel = useText("model3d.motion", "Motion");
-  const settingsLabel = useText("model3d.settings", "3D view settings");
+  const settingsLabel = useText("model3d.settings", "View Options");
   const settingsHint = useText(
     "model3d.settings-hint",
     "View, appearance, placement, and fit settings",
@@ -286,7 +286,7 @@ function ModelControlStrip({
                 : "bg-field text-t2 hover:bg-raise hover:text-t1")
             }
           >
-            <Icon id="action.settings" className="h-4 w-4" />
+            <Icon id="action.view" className="h-4 w-4" />
           </button>
         ) : (
           <div
@@ -329,7 +329,7 @@ function ModelControlStrip({
             (settingsOpen ? "bg-selected text-t1" : "text-t3")
           }
         >
-          <Icon id="action.settings" className="h-3.5 w-3.5" />
+          <Icon id="action.view" className="h-3.5 w-3.5" />
         </button>
         {trailing ? (
           <span className="ml-auto flex flex-none items-center gap-1">{trailing}</span>
@@ -375,7 +375,7 @@ function ModelSettingsPanel({
       data-dev-id="detail.model-settings-popover"
       onClick={(event) => event.stopPropagation()}
       className={
-        "pointer-events-auto absolute z-20 rounded-card border border-line2 bg-popover p-2 shadow-pop " +
+        "pointer-events-auto absolute z-30 rounded-card border border-line2 bg-popover p-2 shadow-pop " +
         (panelMode ? "bottom-6 left-2 w-[15rem]" : "bottom-10 right-2 w-[270px]")
       }
     >

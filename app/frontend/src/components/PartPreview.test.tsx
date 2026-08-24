@@ -402,7 +402,7 @@ describe("Glb3DView scene synchronization", () => {
     await userEvent.click(screen.getByRole("button", { name: "Auto rotate" }));
     expect(handle.setSpin).toHaveBeenLastCalledWith(false);
 
-    await userEvent.click(screen.getByRole("button", { name: "3D view settings" }));
+    await userEvent.click(screen.getByRole("button", { name: "View Options" }));
     expect(screen.getByRole("group", { name: "Placement" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Auto" }).querySelector("path")?.getAttribute("d")).toBe(
       ICON_BY_ID.get("view.placement-auto")?.body.match(/d="([^"]+)"/)?.[1],
@@ -431,7 +431,7 @@ describe("Glb3DView scene synchronization", () => {
         <Glb3DView data={bytes} isLoading={false} isError={false} showViews compact />,
       );
       await waitFor(() => expect(mountSpy).toHaveBeenCalled());
-      const settings = screen.getByRole("button", { name: "3D view settings" });
+      const settings = screen.getByRole("button", { name: "View Options" });
       await userEvent.click(settings);
       expect(settings).toHaveAttribute("aria-expanded", "true");
       const insidePanel = screen.getByRole("button", { name: "Fit model" });
@@ -458,7 +458,7 @@ describe("Glb3DView scene synchronization", () => {
     mountSpy.mockReturnValue(sceneHandle());
     wrap(<Glb3DView data={bytes} isLoading={false} isError={false} showViews compact />);
     await waitFor(() => expect(mountSpy).toHaveBeenCalled());
-    const settings = screen.getByRole("button", { name: "3D view settings" });
+    const settings = screen.getByRole("button", { name: "View Options" });
     await userEvent.click(settings);
     expect(settings).toHaveAttribute("aria-expanded", "true");
 
